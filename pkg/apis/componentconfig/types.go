@@ -117,6 +117,7 @@ type KubeSchedulerConfiguration struct {
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
 	LeaderElectionConfiguration
+
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string
 	// LockObjectName defines the lock object name

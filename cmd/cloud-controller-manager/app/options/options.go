@@ -52,7 +52,6 @@ func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
 		Generic:                   cmoptions.NewGenericControllerManagerOptions(componentConfig),
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
-	s.Generic.ComponentConfig.LeaderElection.LeaderElect = true
 
 	s.Generic.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.Generic.SecureServing.ServerCert.PairName = "cloud-controller-manager"

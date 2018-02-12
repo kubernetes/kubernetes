@@ -152,8 +152,14 @@ func NewOptions() (*Options, error) {
 		return nil, err
 	}
 
-	// TODO: we should fix this up better (PR 59732)
-	o.config.LeaderElection.LeaderElect = true
+	externalConfig := &componentconfigv1alpha1.KubeSchedulerConfiguration{}
+	// Assume we are starting with an empty external configuration, we apply
+	// defaults and then convert it into an internal data structure. This helps
+	// ensure that all the defaults are applied correctly (example LeaderElect)
+	o.scheme.Default(externalConfig)
+	if err := o.scheme.Convert(externalConfig, o.config, nil); err != nil {
+		return nil, err
+	}
 
 	return o, nil
 }

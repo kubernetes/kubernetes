@@ -18,14 +18,12 @@ package options
 
 import (
 	"net"
-	"time"
 
-	"github.com/cloudflare/cfssl/helpers"
 	"github.com/golang/glog"
 
 	"github.com/spf13/pflag"
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
@@ -36,7 +34,7 @@ import (
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 )
 
 // GenericControllerManagerOptions is the common structure for a controller manager. It works with NewGenericControllerManagerOptions
@@ -90,65 +88,14 @@ func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeCont
 
 // NewDefaultControllerManagerComponentConfig returns default kube-controller manager configuration object.
 func NewDefaultControllerManagerComponentConfig(insecurePort int32) componentconfig.KubeControllerManagerConfiguration {
-	return componentconfig.KubeControllerManagerConfiguration{
-		Controllers:                                     []string{"*"},
-		Port:                                            insecurePort,
-		Address:                                         "0.0.0.0",
-		ConcurrentEndpointSyncs:                         5,
-		ConcurrentServiceSyncs:                          1,
-		ConcurrentRCSyncs:                               5,
-		ConcurrentRSSyncs:                               5,
-		ConcurrentDaemonSetSyncs:                        2,
-		ConcurrentJobSyncs:                              5,
-		ConcurrentResourceQuotaSyncs:                    5,
-		ConcurrentDeploymentSyncs:                       5,
-		ConcurrentNamespaceSyncs:                        10,
-		ConcurrentSATokenSyncs:                          5,
-		RouteReconciliationPeriod:                       metav1.Duration{Duration: 10 * time.Second},
-		ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
-		NamespaceSyncPeriod:                             metav1.Duration{Duration: 5 * time.Minute},
-		PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 15 * time.Second},
-		HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 30 * time.Second},
-		HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 3 * time.Minute},
-		HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 5 * time.Minute},
-		HorizontalPodAutoscalerTolerance:                0.1,
-		DeploymentControllerSyncPeriod:                  metav1.Duration{Duration: 30 * time.Second},
-		MinResyncPeriod:                                 metav1.Duration{Duration: 12 * time.Hour},
-		RegisterRetryCount:                              10,
-		PodEvictionTimeout:                              metav1.Duration{Duration: 5 * time.Minute},
-		NodeMonitorGracePeriod:                          metav1.Duration{Duration: 40 * time.Second},
-		NodeStartupGracePeriod:                          metav1.Duration{Duration: 60 * time.Second},
-		NodeMonitorPeriod:                               metav1.Duration{Duration: 5 * time.Second},
-		ClusterName:                                     "kubernetes",
-		NodeCIDRMaskSize:                                24,
-		ConfigureCloudRoutes:                            true,
-		TerminatedPodGCThreshold:                        12500,
-		VolumeConfiguration: componentconfig.VolumeConfiguration{
-			EnableHostPathProvisioning: false,
-			EnableDynamicProvisioning:  true,
-			PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
-				MaximumRetry:             3,
-				MinimumTimeoutNFS:        300,
-				IncrementTimeoutNFS:      30,
-				MinimumTimeoutHostPath:   60,
-				IncrementTimeoutHostPath: 30,
-			},
-			FlexVolumePluginDir: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-		},
-		ContentType:                           "application/vnd.kubernetes.protobuf",
-		KubeAPIQPS:                            20.0,
-		KubeAPIBurst:                          30,
-		LeaderElection:                        leaderelectionconfig.DefaultLeaderElectionConfiguration(),
-		ControllerStartInterval:               metav1.Duration{Duration: 0 * time.Second},
-		EnableGarbageCollector:                true,
-		ConcurrentGCSyncs:                     20,
-		ClusterSigningCertFile:                DefaultClusterSigningCertFile,
-		ClusterSigningKeyFile:                 DefaultClusterSigningKeyFile,
-		ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
-		ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
-		EnableTaintManager:                    true,
-		HorizontalPodAutoscalerUseRESTClients: true,
-	}
+	scheme := runtime.NewScheme()
+	componentconfigv1alpha1.AddToScheme(scheme)
+	versioned := componentconfigv1alpha1.KubeControllerManagerConfiguration{}
+	scheme.Default(&versioned)
+	internal := componentconfig.KubeControllerManagerConfiguration{}
+	scheme.Convert(&versioned, &internal, nil)
+	internal.Port = insecurePort
+	return internal
 }
 
 // AddFlags adds common/default flags for both the kube and cloud Controller Manager Server to the
