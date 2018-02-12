@@ -236,13 +236,14 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	elem := &storeElement{Key: key, Object: event.Object}
 	if len(w.onceSerializationSchemes) > 0 {
 		// TODO: Make it look better.
-		serialized := make([]*runtime.SerializedObject, 0, len(w.onceSerializationSchemes))
+		// FIXME: DO we want to support more than 1?
+/*		serialized := make([]*runtime.SerializedObject, 0, len(w.onceSerializationSchemes))
 		for _, ss := range w.onceSerializationSchemes {
 			serialized = append(serialized, runtime.NewSerializedObject(ss))
-		}
+		}*/
 		elem.Wrapped = &runtime.SmartlySerializedObject{
 			Object:     event.Object,
-			Serialized: serialized,
+			Serialized: runtime.NewSerializedObject(w.onceSerializationSchemes[0]),
 		}
 	}
 

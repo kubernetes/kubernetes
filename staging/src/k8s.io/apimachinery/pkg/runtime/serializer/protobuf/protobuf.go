@@ -172,19 +172,17 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
-		for _, serialized := range sso.Serialized {
-			if serialized.Scheme.MediaType == s.contentType {
-				serialized.Serialize(s, sso.Object)
-				if serialized.Err != nil {
-					glog.Errorf("XXX: Bad serialization: %v", serialized.Err)
-					return serialized.Err
-				}
-				glog.Errorf("AAA: using smartly serialized")
-				_, err := w.Write(serialized.Raw)
-				return err
+		if sso.Serialized.Scheme.MediaType == s.contentType {
+			sso.Serialized.Serialize(s)
+			if sso.Serialized.Err != nil {
+				glog.Errorf("XXX: Bad serialization: %v", sso.Serialized.Err)
+				return sso.Serialized.Err
 			}
+			glog.Errorf("AAA: using smartly serialized")
+			_, err := w.Write(sso.Serialized.Raw)
+			return err
 		}
-		return s.Encode(sso.Object.DeepCopyObject(), w)
+		return s.Encode(sso.Serialized.Object.DeepCopyObject(), w)
 	}
 
 	prefixSize := uint64(len(s.prefix))
@@ -426,7 +424,7 @@ func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
 		// FIXME: This should never happen.
 		glog.Errorf("CCC: PANIC")
-		obj = sso.Object.DeepCopyObject()
+		obj = sso.Serialized.Object.DeepCopyObject()
 	}
 
 	switch t := obj.(type) {
