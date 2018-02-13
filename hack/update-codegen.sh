@@ -82,32 +82,26 @@ INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 ${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
 ${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 
-listergen_internal_apis=(
-$(
-  cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
+mapfile -t listergen_internal_apis < <(
+	cd "${KUBE_ROOT}"
+	sort <(find pkg/apis -maxdepth 2 -name types.go -exec dirname {} \;)
 )
-)
-listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
+listergen_internal_apis=("${listergen_internal_apis[@]/#/k8s.io/kubernetes/}")
 listergen_internal_apis_csv=$(IFS=,; echo "${listergen_internal_apis[*]}")
 ${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
 
-listergen_external_apis=(
-$(
-  cd ${KUBE_ROOT}/staging/src
-  find k8s.io/api -name types.go | xargs -n1 dirname | sort
-)
+mapfile -t listergen_external_apis < <(
+	cd "${KUBE_ROOT}/staging/src"
+	sort <(find k8s.io/api -name types.go -exec dirname {} \;)
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
 ${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
 
-informergen_internal_apis=(
-$(
-  cd ${KUBE_ROOT}
-  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
+mapfile -t informergen_internal_apis < <(
+	cd "${KUBE_ROOT}"
+	sort <(find pkg/apis -maxdepth 2 -name types.go -exec dirname {} \;)
 )
-)
-informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
+informergen_internal_apis=("${informergen_internal_apis[@]/#/k8s.io/kubernetes/}")
 informergen_internal_apis_csv=$(IFS=,; echo "${informergen_internal_apis[*]}")
 ${informergen} \
   --input-dirs "${informergen_internal_apis_csv}" \
@@ -115,12 +109,10 @@ ${informergen} \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
   "$@"
 
-informergen_external_apis=(
-$(
-  cd ${KUBE_ROOT}/staging/src
-  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
-  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
-)
+mapfile -t informergen_external_apis < <(
+	cd "${KUBE_ROOT}/staging/src"
+	# because client-gen doesn't do policy/v1alpha1, we have to skip it too
+	sort <(find k8s.io/api -name types.go -exec dirname {} \;) | grep -v pkg.apis.policy.v1alpha1
 )
 
 informergen_external_apis_csv=$(IFS=,; echo "${informergen_external_apis[*]}")
