@@ -21,6 +21,7 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/code-generator/pkg/util:go_default_library",
         "//vendor/k8s.io/code-generator/third_party/forked/golang/reflect:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
         "//vendor/k8s.io/gengo/generator:go_default_library",
