@@ -310,7 +310,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	internalStopCh := make(chan struct{})
 
 	if s.SecureServingInfo != nil && s.Handler != nil {
-		if err := s.serveSecurely(internalStopCh); err != nil {
+		if err := s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh); err != nil {
 			close(internalStopCh)
 			return err
 		}

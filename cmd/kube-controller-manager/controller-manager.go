@@ -22,13 +22,12 @@ package main
 
 import (
 	goflag "flag"
+	"fmt"
 	"math/rand"
 	"os"
 	"time"
 
 	"github.com/spf13/pflag"
-
-	"fmt"
 
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"

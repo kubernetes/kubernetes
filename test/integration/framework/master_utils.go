@@ -159,17 +159,17 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
-	if masterConfig.GenericConfig.Authenticator == nil {
-		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+	if masterConfig.GenericConfig.Authentication.Authenticator == nil {
+		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
 	} else {
-		masterConfig.GenericConfig.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authenticator)
+		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authentication.Authenticator)
 	}
 
-	if masterConfig.GenericConfig.Authorizer != nil {
+	if masterConfig.GenericConfig.Authorization.Authorizer != nil {
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		masterConfig.GenericConfig.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorizer)
+		masterConfig.GenericConfig.Authorization.Authorizer = authorizerunion.New(tokenAuthorizer, masterConfig.GenericConfig.Authorization.Authorizer)
 	} else {
-		masterConfig.GenericConfig.Authorizer = alwaysAllow{}
+		masterConfig.GenericConfig.Authorization.Authorizer = alwaysAllow{}
 	}
 
 	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
@@ -280,7 +280,7 @@ func NewMasterConfig() *master.Config {
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
-	genericConfig.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
 

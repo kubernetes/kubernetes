@@ -101,8 +101,8 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorizer = nodeRBACAuthorizer
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
+	masterConfig.GenericConfig.Authorization.Authorizer = nodeRBACAuthorizer
 	masterConfig.GenericConfig.AdmissionControl = nodeRestrictionAdmission
 
 	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)

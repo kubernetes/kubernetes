@@ -530,7 +530,7 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 	}
 	if len(eac.ControllerManagerExtraArgs) > 0 {
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := cmoptions.NewCMServer()
+		s := cmoptions.NewKubeControllerManagerOptions()
 		s.AddFlags(flags, []string{}, []string{})
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}

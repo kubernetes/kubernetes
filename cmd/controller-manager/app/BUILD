@@ -3,26 +3,25 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "config.go",
         "insecure_serving.go",
-        "options.go",
+        "serve.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/controller-manager/app/options",
+    importpath = "k8s.io/kubernetes/cmd/controller-manager/app",
     visibility = ["//visibility:public"],
     deps = [
-        "//cmd/controller-manager/app:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/client/leaderelectionconfig:go_default_library",
-        "//vendor/github.com/cloudflare/cfssl/helpers:go_default_library",
+        "//pkg/util/configz:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/filters:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
@@ -36,7 +35,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/controller-manager/app/options:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
