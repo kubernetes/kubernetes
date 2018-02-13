@@ -95,7 +95,7 @@ var ipvsModules = []string{
 	"nf_conntrack_ipv4",
 }
 
-// In IPVS proxy mode, the following flags need to be setted
+// In IPVS proxy mode, the following flags need to be set
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 const sysctlVSConnTrack = "net/ipv4/vs/conntrack"
