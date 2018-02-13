@@ -20,11 +20,12 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ProxyProvider is the interface provided by proxier implementations.
 type ProxyProvider interface {
-	// Sync immediately synchronizes the ProxyProvider's current state to iptables.
+	// Sync immediately synchronizes the ProxyProvider's current state to proxy rules.
 	Sync()
 	// SyncLoop runs periodic work.
 	// This is expected to run as a goroutine or as the main loop of the app.
@@ -33,7 +34,7 @@ type ProxyProvider interface {
 }
 
 // ServicePortName carries a namespace + name + portname.  This is the unique
-// identfier for a load-balanced service.
+// identifier for a load-balanced service.
 type ServicePortName struct {
 	types.NamespacedName
 	Port string
@@ -41,4 +42,32 @@ type ServicePortName struct {
 
 func (spn ServicePortName) String() string {
 	return fmt.Sprintf("%s:%s", spn.NamespacedName.String(), spn.Port)
+}
+
+type ServicePort interface {
+	// returns service string
+	String() string
+	// returns service cluster IP
+	ClusterIP() string
+	// returns service protocol
+	Protocol() api.Protocol
+	// returns service health check node port if present
+	HealthCheckNodePort() int
+}
+
+type Endpoint interface {
+	// returns endpoint string
+	String() string
+	// returns true if the endpoint is running in same host as kube-proxy, otherwise returns false
+	IsLocal() bool
+	// returns IP part of endpoints
+	IP() string
+	// checks if two endpoints are equal
+	Equal(Endpoint) bool
+}
+
+// ServiceEndpoint is used to identify a service and one of its endpoint pair.
+type ServiceEndpoint struct {
+	Endpoint        string
+	ServicePortName ServicePortName
 }
