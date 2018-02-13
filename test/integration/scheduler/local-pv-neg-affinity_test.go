@@ -19,7 +19,6 @@ package scheduler
 // This file tests the VolumeScheduling feature.
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -310,14 +309,4 @@ func markNodeSelector(pod *v1.Pod, node string) {
 		"kubernetes.io/hostname": node,
 	}
 	pod.Spec.NodeSelector = ns
-}
-
-func printIndentedJson(data interface{}) string {
-	var indentedJSON []byte
-
-	indentedJSON, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return fmt.Sprintf("JSON parse error: %v", err)
-	}
-	return string(indentedJSON)
 }

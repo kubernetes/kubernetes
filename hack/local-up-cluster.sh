@@ -23,7 +23,7 @@ DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
-ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
+DENY_SECURITY_CONTEXT_ADMISSION=${DENY_SECURITY_CONTEXT_ADMISSION:-""}
 PSP_ADMISSION=${PSP_ADMISSION:-""}
 NODE_ADMISSION=${NODE_ADMISSION:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
@@ -418,7 +418,7 @@ function set_service_accounts {
 
 function start_apiserver {
     security_admission=""
-    if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
+    if [[ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]]; then
       security_admission=",SecurityContextDeny"
     fi
     if [[ -n "${PSP_ADMISSION}" ]]; then

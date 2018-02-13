@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -716,47 +717,41 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 			}
 		}()
 
-		for {
-			kubeAPIServerOptions := options.NewServerRunOptions()
-			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
-			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
-			kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
-			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
-			kubeAPIServerOptions.Authorization.Mode = "RBAC"
+		listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			// always get a fresh port in case something claimed the old one
-			kubePort, err := framework.FindFreeLocalPort()
-			if err != nil {
-				t.Fatal(err)
-			}
+		kubeAPIServerOptions := options.NewServerRunOptions()
 
-			kubeAPIServerOptions.SecureServing.BindPort = kubePort
+		kubeAPIServerOptions.SecureServing.Listener = listener
+		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
+		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
+		kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
+		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+		kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
-			tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
-			if err != nil {
-				t.Fatal(err)
-			}
-			kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
-			if err != nil {
-				t.Fatal(err)
-			}
+		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			kubeAPIServerConfig.ExtraConfig.APIResourceConfigSource = &allResourceSource{} // force enable all resources
+		kubeAPIServerConfig.ExtraConfig.APIResourceConfigSource = &allResourceSource{} // force enable all resources
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
-			if err != nil {
-				t.Fatal(err)
-			}
+		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
-			storageConfigValue.Store(kubeAPIServerOptions.Etcd.StorageConfig)
+		kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+		storageConfigValue.Store(kubeAPIServerOptions.Etcd.StorageConfig)
 
-			if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
-				t.Log(err)
-			}
-
-			time.Sleep(time.Second)
+		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
+			t.Fatal(err)
 		}
 	}()
 

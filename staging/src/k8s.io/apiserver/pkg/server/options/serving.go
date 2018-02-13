@@ -24,7 +24,6 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
-	"github.com/pborman/uuid"
 	"github.com/spf13/pflag"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -35,7 +34,8 @@ import (
 
 type SecureServingOptions struct {
 	BindAddress net.IP
-	BindPort    int
+	// BindPort is ignored when Listener is set, will serve https even with 0.
+	BindPort int
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
@@ -110,9 +110,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
-		"The IP address on which to listen for the --secure-port port. The "+
-		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
-		"clients. If blank, all interfaces will be used (0.0.0.0).")
+		"The IP address on which to listen for the --secure-port port. If blank, all interfaces will be used (0.0.0.0).")
 
 	fs.IntVar(&s.BindPort, "secure-port", s.BindPort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
@@ -156,11 +154,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up serving information in the server configuration.
-func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
+func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error {
 	if s == nil {
 		return nil
 	}
-	if s.BindPort <= 0 {
+	if s.BindPort <= 0 && s.Listener == nil {
 		return nil
 	}
 
@@ -171,44 +169,18 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}
+	} else {
+		if _, ok := s.Listener.Addr().(*net.TCPAddr); !ok {
+			return fmt.Errorf("failed to parse ip and port from listener")
+		}
+		s.BindPort = s.Listener.Addr().(*net.TCPAddr).Port
+		s.BindAddress = s.Listener.Addr().(*net.TCPAddr).IP
 	}
 
-	if err := s.applyServingInfoTo(c); err != nil {
-		return err
+	*config = &server.SecureServingInfo{
+		Listener: s.Listener,
 	}
-
-	c.SecureServingInfo.Listener = s.Listener
-
-	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
-	// let the server return it when the loopback client connects.
-	certPem, keyPem, err := certutil.GenerateSelfSignedCertKey(server.LoopbackClientServerNameOverride, nil, nil)
-	if err != nil {
-		return fmt.Errorf("failed to generate self-signed certificate for loopback connection: %v", err)
-	}
-	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
-	if err != nil {
-		return fmt.Errorf("failed to generate self-signed certificate for loopback connection: %v", err)
-	}
-
-	secureLoopbackClientConfig, err := c.SecureServingInfo.NewLoopbackClientConfig(uuid.NewRandom().String(), certPem)
-	switch {
-	// if we failed and there's no fallback loopback client config, we need to fail
-	case err != nil && c.LoopbackClientConfig == nil:
-		return err
-
-	// if we failed, but we already have a fallback loopback client config (usually insecure), allow it
-	case err != nil && c.LoopbackClientConfig != nil:
-
-	default:
-		c.LoopbackClientConfig = secureLoopbackClientConfig
-		c.SecureServingInfo.SNICerts[server.LoopbackClientServerNameOverride] = &tlsCert
-	}
-
-	return nil
-}
-
-func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
-	secureServingInfo := &server.SecureServingInfo{}
+	c := *config
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
 	// load main cert
@@ -217,7 +189,7 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		if err != nil {
 			return fmt.Errorf("unable to load server certificate: %v", err)
 		}
-		secureServingInfo.Cert = &tlsCert
+		c.Cert = &tlsCert
 	}
 
 	if len(s.CipherSuites) != 0 {
@@ -225,11 +197,11 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 		if err != nil {
 			return err
 		}
-		secureServingInfo.CipherSuites = cipherSuites
+		c.CipherSuites = cipherSuites
 	}
 
 	var err error
-	secureServingInfo.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
+	c.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
 	if err != nil {
 		return err
 	}
@@ -246,13 +218,10 @@ func (s *SecureServingOptions) applyServingInfoTo(c *server.Config) error {
 			return fmt.Errorf("failed to load SNI cert and key: %v", err)
 		}
 	}
-	secureServingInfo.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
+	c.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
 	if err != nil {
 		return err
 	}
-
-	c.SecureServingInfo = secureServingInfo
-	c.ReadWritePort = s.BindPort
 
 	return nil
 }

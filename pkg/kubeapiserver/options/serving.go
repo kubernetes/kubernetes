@@ -33,15 +33,15 @@ import (
 
 // NewSecureServingOptions gives default values for the kube-apiserver which are not the options wanted by
 // "normal" API servers running on the platform
-func NewSecureServingOptions() *genericoptions.SecureServingOptions {
-	return &genericoptions.SecureServingOptions{
+func NewSecureServingOptions() *genericoptions.SecureServingOptionsWithLoopback {
+	return genericoptions.WithLoopback(&genericoptions.SecureServingOptions{
 		BindAddress: net.ParseIP("0.0.0.0"),
 		BindPort:    6443,
 		ServerCert: genericoptions.GeneratableKeyCert{
 			PairName:      "apiserver",
 			CertDirectory: "/var/run/kubernetes",
 		},
-	}
+	})
 }
 
 // DefaultAdvertiseAddress sets the field AdvertiseAddress if

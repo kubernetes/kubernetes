@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 	"k8s.io/code-generator/cmd/lister-gen/generators"
+	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/args"
 
 	generatorargs "k8s.io/code-generator/cmd/lister-gen/args"
@@ -33,7 +34,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of lister-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
 	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/listers"
 
 	genericArgs.AddFlags(pflag.CommandLine)

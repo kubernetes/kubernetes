@@ -30,7 +30,7 @@ import (
 // Each of them can be nil to leave the feature unconfigured on ApplyTo.
 type RecommendedOptions struct {
 	Etcd           *EtcdOptions
-	SecureServing  *SecureServingOptions
+	SecureServing  *SecureServingOptionsWithLoopback
 	Authentication *DelegatingAuthenticationOptions
 	Authorization  *DelegatingAuthorizationOptions
 	Audit          *AuditOptions
@@ -46,7 +46,7 @@ type RecommendedOptions struct {
 func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
 	return &RecommendedOptions{
 		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:              NewSecureServingOptions(),
+		SecureServing:              WithLoopback(NewSecureServingOptions()),
 		Authentication:             NewDelegatingAuthenticationOptions(),
 		Authorization:              NewDelegatingAuthorizationOptions(),
 		Audit:                      NewAuditOptions(),
@@ -78,10 +78,10 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig, scheme *r
 	if err := o.SecureServing.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(&config.Config); err != nil {
+	if err := o.Authentication.ApplyTo(&config.Config.Authentication, config.SecureServing, config.OpenAPIConfig); err != nil {
 		return err
 	}
-	if err := o.Authorization.ApplyTo(&config.Config); err != nil {
+	if err := o.Authorization.ApplyTo(&config.Config.Authorization); err != nil {
 		return err
 	}
 	if err := o.Audit.ApplyTo(&config.Config); err != nil {

@@ -36,9 +36,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // Binder knows how to write a binding.

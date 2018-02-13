@@ -530,7 +530,7 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 	}
 	if len(eac.ControllerManagerExtraArgs) > 0 {
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := cmoptions.NewCMServer()
+		s := cmoptions.NewKubeControllerManagerOptions()
 		s.AddFlags(flags, []string{}, []string{})
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
@@ -975,6 +975,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
 	if useCRI {
 		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
@@ -999,19 +1000,27 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 			criCtlChecker)
 	}
 
+	var bridgenf6Check Checker
 	for _, server := range cfg.DiscoveryTokenAPIServers {
 		ipstr, _, err := net.SplitHostPort(server)
 		if err == nil {
-			if ip := net.ParseIP(ipstr); ip != nil {
-				if ip.To4() == nil && ip.To16() != nil {
-					checks = append(checks,
-						FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-					)
-					break // Ensure that check is added only once
+			checks = append(checks,
+				HTTPProxyCheck{Proto: "https", Host: ipstr},
+			)
+			if bridgenf6Check == nil {
+				if ip := net.ParseIP(ipstr); ip != nil {
+					if ip.To4() == nil && ip.To16() != nil {
+						// This check should be added only once
+						bridgenf6Check = FileContentCheck{Path: bridgenf6, Content: []byte{'1'}}
+					}
 				}
 			}
 		}
 	}
+	if bridgenf6Check != nil {
+		checks = append(checks, bridgenf6Check)
+	}
+
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 

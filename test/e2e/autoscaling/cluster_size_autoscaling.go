@@ -54,6 +54,7 @@ import (
 const (
 	defaultTimeout         = 3 * time.Minute
 	resizeTimeout          = 5 * time.Minute
+	manualResizeTimeout    = 6 * time.Minute
 	scaleUpTimeout         = 5 * time.Minute
 	scaleUpTriggerTimeout  = 2 * time.Minute
 	scaleDownTimeout       = 20 * time.Minute
@@ -445,7 +446,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Waiting for new node to appear and annotating it")
 		framework.WaitForGroupSize(minMig, int32(minSize+1))
-		// Verify, that cluster size is increased
+		// Verify that cluster size is increased
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= nodeCount+1 }, scaleUpTimeout))
 
@@ -537,7 +538,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		}
 		setMigSizes(newSizes)
 		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
-			func(size int) bool { return size >= increasedSize }, scaleUpTimeout, unready))
+			func(size int) bool { return size >= increasedSize }, manualResizeTimeout, unready))
 
 		By("Some node should be removed")
 		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(f.ClientSet,
@@ -1778,7 +1779,7 @@ func manuallyIncreaseClusterSize(f *framework.Framework, originalSizes map[strin
 		return false
 	}
 
-	framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet, checkClusterSize, scaleUpTimeout))
+	framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet, checkClusterSize, manualResizeTimeout))
 	return increasedSize
 }
 

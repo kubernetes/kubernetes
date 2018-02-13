@@ -92,6 +92,7 @@ go_test(
         "eviction_test.go",
         "garbage_collector_test.go",
         "gke_environment_test.go",
+        "hugepages_test.go",
         "image_id_test.go",
         "kubelet_test.go",
         "lifecycle_hook_test.go",

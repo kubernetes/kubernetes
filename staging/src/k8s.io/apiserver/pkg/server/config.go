@@ -79,14 +79,19 @@ const (
 // Config is a structure used to configure a GenericAPIServer.
 // Its members are sorted roughly in order of importance for composers.
 type Config struct {
-	// SecureServingInfo is required to serve https
-	SecureServingInfo *SecureServingInfo
+	// SecureServing is required to serve https
+	SecureServing *SecureServingInfo
+
+	// Authentication is the configuration for authentication
+	Authentication AuthenticationInfo
+
+	// Authentication is the configuration for authentication
+	Authorization AuthorizationInfo
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
+	// TODO: move into SecureServing(WithLoopback) as soon as insecure serving is gone
 	LoopbackClientConfig *restclient.Config
-	// Authenticator determines which subject is making the request
-	Authenticator authenticator.Request
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
@@ -116,10 +121,6 @@ type Config struct {
 	AuditBackend audit.Backend
 	// AuditPolicyChecker makes the decision of whether and how to audit log a request.
 	AuditPolicyChecker auditpolicy.Checker
-	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
-	// If this is true, a basic auth challenge is returned on authentication failure
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth bool
 	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
 	// Will default to a value based on secure serving info and available ipv4 IPs.
 	ExternalAddress string
@@ -231,6 +232,21 @@ type SecureServingInfo struct {
 	CipherSuites []uint16
 }
 
+type AuthenticationInfo struct {
+	// Authenticator determines which subject is making the request
+	Authenticator authenticator.Request
+	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
+	// If this is true, a basic auth challenge is returned on authentication failure
+	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
+	SupportsBasicAuth bool
+}
+
+type AuthorizationInfo struct {
+	// Authorizer determines whether the subject is allowed to make the request based only
+	// on the RequestURI
+	Authorizer authorizer.Authorizer
+}
+
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	return &Config{
@@ -302,23 +318,23 @@ func DefaultSwaggerConfig() *swagger.Config {
 	}
 }
 
-func (c *Config) ApplyClientCert(clientCAFile string) (*Config, error) {
-	if c.SecureServingInfo != nil {
+func (c *AuthenticationInfo) ApplyClientCert(clientCAFile string, servingInfo *SecureServingInfo) error {
+	if servingInfo != nil {
 		if len(clientCAFile) > 0 {
 			clientCAs, err := certutil.CertsFromFile(clientCAFile)
 			if err != nil {
-				return nil, fmt.Errorf("unable to load client CA file: %v", err)
+				return fmt.Errorf("unable to load client CA file: %v", err)
 			}
-			if c.SecureServingInfo.ClientCA == nil {
-				c.SecureServingInfo.ClientCA = x509.NewCertPool()
+			if servingInfo.ClientCA == nil {
+				servingInfo.ClientCA = x509.NewCertPool()
 			}
 			for _, cert := range clientCAs {
-				c.SecureServingInfo.ClientCA.AddCert(cert)
+				servingInfo.ClientCA.AddCert(cert)
 			}
 		}
 	}
 
-	return c, nil
+	return nil
 }
 
 type completedConfig struct {
@@ -385,7 +401,7 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		}
 	}
 	if c.SwaggerConfig != nil && len(c.SwaggerConfig.WebServicesUrl) == 0 {
-		if c.SecureServingInfo != nil {
+		if c.SecureServing != nil {
 			c.SwaggerConfig.WebServicesUrl = "https://" + c.ExternalAddress
 		} else {
 			c.SwaggerConfig.WebServicesUrl = "http://" + c.ExternalAddress
@@ -397,7 +413,7 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 
 	// If the loopbackclientconfig is specified AND it has a token for use against the API server
 	// wrap the authenticator and authorizer in loopback authentication logic
-	if c.Authenticator != nil && c.Authorizer != nil && c.LoopbackClientConfig != nil && len(c.LoopbackClientConfig.BearerToken) > 0 {
+	if c.Authentication.Authenticator != nil && c.Authorization.Authorizer != nil && c.LoopbackClientConfig != nil && len(c.LoopbackClientConfig.BearerToken) > 0 {
 		privilegedLoopbackToken := c.LoopbackClientConfig.BearerToken
 		var uid = uuid.NewRandom().String()
 		tokens := make(map[string]*user.DefaultInfo)
@@ -408,10 +424,10 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		}
 
 		tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
-		c.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authenticator)
+		c.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, c.Authentication.Authenticator)
 
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		c.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorizer)
+		c.Authorization.Authorizer = authorizerunion.New(tokenAuthorizer, c.Authorization.Authorizer)
 	}
 
 	if c.RequestInfoResolver == nil {
@@ -458,7 +474,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 		ShutdownTimeout:   c.RequestTimeout,
 
-		SecureServingInfo: c.SecureServingInfo,
+		SecureServingInfo: c.SecureServing,
 		ExternalAddress:   c.ExternalAddress,
 
 		Handler: apiServerHandler,
@@ -530,19 +546,19 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorizer, c.Serializer)
+	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, c.Authorization.Authorizer, c.Serializer)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
-	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer, c.Serializer)
+	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, c.Authorization.Authorizer, c.Serializer)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
 		handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
 		handler = genericapifilters.WithLegacyAudit(handler, c.RequestContextMapper, c.LegacyAuditWriter)
 	}
-	failedHandler := genericapifilters.Unauthorized(c.RequestContextMapper, c.Serializer, c.SupportsBasicAuth)
+	failedHandler := genericapifilters.Unauthorized(c.RequestContextMapper, c.Serializer, c.Authentication.SupportsBasicAuth)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
 		failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker)
 	}
-	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, failedHandler)
+	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authentication.Authenticator, failedHandler)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)

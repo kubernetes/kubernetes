@@ -44,6 +44,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       containers:
         - image: k8s.gcr.io/heapster-amd64:v1.5.0
           name: heapster

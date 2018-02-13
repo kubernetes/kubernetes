@@ -76,9 +76,12 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
 	equivalenceHash uint64,
+	needLock bool,
 ) {
-	ec.Lock()
-	defer ec.Unlock()
+	if needLock {
+		ec.Lock()
+		defer ec.Unlock()
+	}
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
 		ec.algorithmCache[nodeName] = newAlgorithmCache()
 	}
@@ -107,10 +110,12 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(
 // based on cached predicate results
 func (ec *EquivalenceCache) PredicateWithECache(
 	podName, nodeName, predicateKey string,
-	equivalenceHash uint64,
+	equivalenceHash uint64, needLock bool,
 ) (bool, []algorithm.PredicateFailureReason, bool) {
-	ec.RLock()
-	defer ec.RUnlock()
+	if needLock {
+		ec.RLock()
+		defer ec.RUnlock()
+	}
 	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
 		predicateKey, podName, nodeName)
 	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {

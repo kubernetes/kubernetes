@@ -18,67 +18,69 @@ package configuration
 
 import (
 	"fmt"
-	"reflect"
-
-	"github.com/golang/glog"
+	"sort"
+	"sync/atomic"
 
 	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/labels"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	admissionregistrationinformers "k8s.io/client-go/informers/admissionregistration/v1beta1"
+	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
+	"k8s.io/client-go/tools/cache"
 )
-
-type ValidatingWebhookConfigurationLister interface {
-	List(opts metav1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error)
-}
 
 // ValidatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type ValidatingWebhookConfigurationManager struct {
-	*poller
+	configuration *atomic.Value
+	lister        admissionregistrationlisters.ValidatingWebhookConfigurationLister
 }
 
-func NewValidatingWebhookConfigurationManager(c ValidatingWebhookConfigurationLister) *ValidatingWebhookConfigurationManager {
-	getFn := func() (runtime.Object, error) {
-		list, err := c.List(metav1.ListOptions{})
-		if err != nil {
-			if errors.IsNotFound(err) || errors.IsForbidden(err) {
-				glog.V(5).Infof("ValidatingWebhookConfiguration are disabled due to an error: %v", err)
-				return nil, ErrDisabled
-			}
-			return nil, err
-		}
-		return mergeValidatingWebhookConfigurations(list), nil
+func NewValidatingWebhookConfigurationManager(informer admissionregistrationinformers.ValidatingWebhookConfigurationInformer) *ValidatingWebhookConfigurationManager {
+	manager := &ValidatingWebhookConfigurationManager{
+		configuration: &atomic.Value{},
+		lister:        informer.Lister(),
 	}
 
-	return &ValidatingWebhookConfigurationManager{
-		newPoller(getFn),
-	}
+	// Start with an empty list
+	manager.configuration.Store(&v1beta1.ValidatingWebhookConfiguration{})
+
+	// On any change, rebuild the config
+	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(_ interface{}) { manager.updateConfiguration() },
+		UpdateFunc: func(_, _ interface{}) { manager.updateConfiguration() },
+		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
+	})
+
+	return manager
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
-func (im *ValidatingWebhookConfigurationManager) Webhooks() (*v1beta1.ValidatingWebhookConfiguration, error) {
-	configuration, err := im.poller.configuration()
-	if err != nil {
-		return nil, err
-	}
-	validatingWebhookConfiguration, ok := configuration.(*v1beta1.ValidatingWebhookConfiguration)
-	if !ok {
-		return nil, fmt.Errorf("expected type %v, got type %v", reflect.TypeOf(validatingWebhookConfiguration), reflect.TypeOf(configuration))
-	}
-	return validatingWebhookConfiguration, nil
+func (v *ValidatingWebhookConfigurationManager) Webhooks() *v1beta1.ValidatingWebhookConfiguration {
+	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration)
 }
 
-func (im *ValidatingWebhookConfigurationManager) Run(stopCh <-chan struct{}) {
-	im.poller.Run(stopCh)
+func (v *ValidatingWebhookConfigurationManager) updateConfiguration() {
+	configurations, err := v.lister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error updating configuration: %v", err))
+		return
+	}
+	v.configuration.Store(mergeValidatingWebhookConfigurations(configurations))
 }
 
 func mergeValidatingWebhookConfigurations(
-	list *v1beta1.ValidatingWebhookConfigurationList,
+	configurations []*v1beta1.ValidatingWebhookConfiguration,
 ) *v1beta1.ValidatingWebhookConfiguration {
-	configurations := list.Items
+	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
 	var ret v1beta1.ValidatingWebhookConfiguration
 	for _, c := range configurations {
 		ret.Webhooks = append(ret.Webhooks, c.Webhooks...)
 	}
 	return &ret
+}
+
+type ValidatingWebhookConfigurationSorter []*v1beta1.ValidatingWebhookConfiguration
+
+func (a ValidatingWebhookConfigurationSorter) ByName(i, j int) bool {
+	return a[i].Name < a[j].Name
 }

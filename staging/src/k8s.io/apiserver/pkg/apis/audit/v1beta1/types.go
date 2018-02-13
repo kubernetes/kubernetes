@@ -237,10 +237,19 @@ type GroupResources struct {
 	// The empty string represents the core API group.
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
-	// Resources is a list of resources within the API group. Subresources are
-	// matched using a "/" to indicate the subresource. For example, "pods/log"
-	// would match request to the log subresource of pods. The top level resource
-	// does not match subresources, "pods" doesn't match "pods/log".
+	// Resources is a list of resources this rule applies to.
+	//
+	// For example:
+	// 'pods' matches pods.
+	// 'pods/log' matches the log subresource of pods.
+	// '*' matches all resources and their subresources.
+	// 'pods/*' matches all subresources of pods.
+	// '*/scale' matches all scale subresources.
+	//
+	// If wildcard is present, the validation rule will ensure resources do not
+	// overlap with each other.
+	//
+	// An empty list implies all resources and subresources in this API groups apply.
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// ResourceNames is a list of resource instance names that the policy matches.

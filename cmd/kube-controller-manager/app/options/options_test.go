@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"reflect"
 	"sort"
 	"testing"
@@ -26,13 +27,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewCMServer()
+	s := NewKubeControllerManagerOptions()
 	s.AddFlags(f, []string{""}, []string{""})
 
 	args := []string{
@@ -103,17 +105,20 @@ func TestAddFlags(t *testing.T) {
 		"--terminated-pod-gc-threshold=12000",
 		"--unhealthy-zone-threshold=0.6",
 		"--use-service-account-credentials=true",
+		"--cert-dir=/a/b/c",
+		"--bind-address=192.168.4.21",
+		"--secure-port=10001",
 	}
 	f.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
-	sort.Sort(sortedGCIgnoredResources(s.GCIgnoredResources))
+	sort.Sort(sortedGCIgnoredResources(s.Generic.ComponentConfig.GCIgnoredResources))
 
-	expected := &CMServer{
-		ControllerManagerServer: cmoptions.ControllerManagerServer{
-			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-				Port:                                            10000,
-				Address:                                         "192.168.4.10",
+	expected := &KubeControllerManagerOptions{
+		Generic: cmoptions.GenericControllerManagerOptions{
+			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
+				Port:                                            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				AllocateNodeCIDRs:                               true,
 				CloudConfigFile:                                 "/cloud-config",
 				CloudProvider:                                   "gce",
@@ -204,6 +209,19 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerUseRESTClients: true,
 				UseServiceAccountCredentials:          true,
 			},
+			SecureServing: &apiserveroptions.SecureServingOptions{
+				BindPort:    10001,
+				BindAddress: net.ParseIP("192.168.4.21"),
+				ServerCert: apiserveroptions.GeneratableKeyCert{
+					CertDirectory: "/a/b/c",
+					PairName:      "kube-controller-manager",
+				},
+			},
+			InsecureServing: &cmoptions.InsecureServingOptions{
+				BindAddress: net.ParseIP("192.168.4.10"),
+				BindPort:    int(10000),
+				BindNetwork: "tcp",
+			},
 			Kubeconfig: "/kubeconfig",
 			Master:     "192.168.4.20",
 		},
@@ -211,7 +229,7 @@ func TestAddFlags(t *testing.T) {
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
-	sort.Sort(sortedGCIgnoredResources(expected.GCIgnoredResources))
+	sort.Sort(sortedGCIgnoredResources(expected.Generic.ComponentConfig.GCIgnoredResources))
 
 	if !reflect.DeepEqual(expected, s) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(expected, s))

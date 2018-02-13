@@ -92,5 +92,6 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
-  --packages=$(IFS=, ; echo "${PACKAGES[*]}")
+  --packages=$(IFS=, ; echo "${PACKAGES[*]}") \
+  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt \
   "$@"

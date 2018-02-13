@@ -425,8 +425,8 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true
-	masterConfig.GenericConfig.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorizer = authorizer
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
+	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
 	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
 	framework.RunAMasterUsingServer(masterConfig, apiServer, h)
 

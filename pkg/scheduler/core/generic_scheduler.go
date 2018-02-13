@@ -39,9 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
@@ -108,7 +108,7 @@ type genericScheduler struct {
 
 // Schedule tries to schedule the given pod to one of node in the node list.
 // If it succeeds, it will return the name of the node.
-// If it fails, it will return a Fiterror error with reasons.
+// If it fails, it will return a FitError error with reasons.
 func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister) (string, error) {
 	trace := utiltrace.New(fmt.Sprintf("Scheduling %s/%s", pod.Namespace, pod.Name))
 	defer trace.LogIfLong(100 * time.Millisecond)
@@ -469,8 +469,11 @@ func podFitsOnNode(
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
+					// Lock ecache here to avoid a race condition against cache invalidation invoked
+					// in event handlers. This race has existed despite locks in eCache implementation.
+					ecache.Lock()
 					// PredicateWithECache will return its cached predicate results.
-					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivCacheInfo.hash)
+					fit, reasons, invalid = ecache.PredicateWithECache(pod.GetName(), info.Node().GetName(), predicateKey, equivCacheInfo.hash, false)
 				}
 
 				if !eCacheAvailable || invalid {
@@ -488,8 +491,15 @@ func podFitsOnNode(
 						} else {
 							predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
 						}
+						result := predicateResults[predicateKey]
+						ecache.UpdateCachedPredicateItem(pod.GetName(), info.Node().GetName(), predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
 					}
 				}
+
+				if eCacheAvailable {
+					ecache.Unlock()
+				}
+
 				if !fit {
 					// eCache is available and valid, and predicates result is unfit, record the fail reasons
 					failedPredicates = append(failedPredicates, reasons...)
@@ -503,18 +513,6 @@ func podFitsOnNode(
 		}
 	}
 
-	// TODO(bsalamat): This way of updating equiv. cache has a race condition against
-	// cache invalidations invoked in event handlers. This race has existed despite locks
-	// in eCache implementation. If cache is invalidated after a predicate is executed
-	// and before we update the cache, the updates should not be written to the cache.
-	if eCacheAvailable {
-		nodeName := info.Node().GetName()
-		for predKey, result := range predicateResults {
-			// update equivalence cache with newly computed fit & reasons
-			// TODO(resouer) should we do this in another thread? any race?
-			ecache.UpdateCachedPredicateItem(pod.GetName(), nodeName, predKey, result.Fit, result.FailReasons, equivCacheInfo.hash)
-		}
-	}
 	return len(failedPredicates) == 0, failedPredicates, nil
 }
 
