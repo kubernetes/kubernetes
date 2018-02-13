@@ -203,8 +203,3 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 	}
 	return a.dispatcher.Dispatch(ctx, &versionedAttr, relevantHooks)
 }
-
-// Convertor returns the versioned convertor, which is used by mutating webhook.
-func (a *Webhook) Convertor() *versioned.Convertor {
-	return a.convertor
-}
