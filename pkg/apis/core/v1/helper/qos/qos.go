@@ -39,43 +39,11 @@ func isSupportedQoSComputeResource(name v1.ResourceName) bool {
 func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 	requests := v1.ResourceList{}
 	limits := v1.ResourceList{}
-	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
 	for _, container := range pod.Spec.Containers {
-		// process requests
-		for name, quantity := range container.Resources.Requests {
-			if !isSupportedQoSComputeResource(name) {
-				continue
-			}
-			if quantity.Cmp(zeroQuantity) == 1 {
-				delta := quantity.Copy()
-				if _, exists := requests[name]; !exists {
-					requests[name] = *delta
-				} else {
-					delta.Add(requests[name])
-					requests[name] = *delta
-				}
-			}
-		}
-		// process limits
-		qosLimitsFound := sets.NewString()
-		for name, quantity := range container.Resources.Limits {
-			if !isSupportedQoSComputeResource(name) {
-				continue
-			}
-			if quantity.Cmp(zeroQuantity) == 1 {
-				qosLimitsFound.Insert(string(name))
-				delta := quantity.Copy()
-				if _, exists := limits[name]; !exists {
-					limits[name] = *delta
-				} else {
-					delta.Add(limits[name])
-					limits[name] = *delta
-				}
-			}
-		}
+		guaranteedResources := GetContainerQOSResources(&container, requests, limits)
 
-		if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
+		if !guaranteedResources.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
 			isGuaranteed = false
 		}
 	}
@@ -96,4 +64,50 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 		return v1.PodQOSGuaranteed
 	}
 	return v1.PodQOSBurstable
+}
+
+func GetContainerQOSResources(container *v1.Container, requests v1.ResourceList, limits v1.ResourceList) sets.String {
+	guaranteedResources := sets.NewString()
+	zeroQuantity := resource.MustParse("0")
+
+	// process requests
+	for name, quantity := range container.Resources.Requests {
+		if !isSupportedQoSComputeResource(name) {
+			continue
+		}
+		if quantity.Cmp(zeroQuantity) == 1 {
+			delta := quantity.Copy()
+			if _, exists := requests[name]; !exists {
+				requests[name] = *delta
+			} else {
+				delta.Add(requests[name])
+				requests[name] = *delta
+			}
+		}
+	}
+	// process limits
+	qosLimitsFound := sets.NewString()
+	for name, quantity := range container.Resources.Limits {
+		if !isSupportedQoSComputeResource(name) {
+			continue
+		}
+		if quantity.Cmp(zeroQuantity) == 1 {
+			qosLimitsFound.Insert(string(name))
+			delta := quantity.Copy()
+			if _, exists := limits[name]; !exists {
+				limits[name] = *delta
+			} else {
+				delta.Add(limits[name])
+				limits[name] = *delta
+			}
+		}
+	}
+
+	for name, req := range requests {
+		if lim, exists := limits[name]; exists && lim.Cmp(req) == 0 {
+			guaranteedResources.Insert(string(name))
+		}
+	}
+
+	return guaranteedResources
 }
