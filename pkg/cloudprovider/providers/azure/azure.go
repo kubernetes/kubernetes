@@ -188,7 +188,8 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		subscriptionID:          config.SubscriptionID,
 		resourceManagerEndpoint: env.ResourceManagerEndpoint,
 		servicePrincipalToken:   servicePrincipalToken,
-		rateLimiter:             operationPollRateLimiter,
+		rateLimiterReader:       operationPollRateLimiter,
+		rateLimiterWriter:       operationPollRateLimiter,
 	}
 	az := Cloud{
 		Config:      *config,
