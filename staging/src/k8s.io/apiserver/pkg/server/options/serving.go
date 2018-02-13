@@ -35,7 +35,8 @@ import (
 
 type SecureServingOptions struct {
 	BindAddress net.IP
-	BindPort    int
+	// BindPort is ignored when Listener is set, will serve https even with 0.
+	BindPort int
 	// BindNetwork is the type of network to bind to - defaults to "tcp", accepts "tcp",
 	// "tcp4", and "tcp6".
 	BindNetwork string
@@ -160,7 +161,7 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 	if s == nil {
 		return nil
 	}
-	if s.BindPort <= 0 {
+	if s.BindPort <= 0 && s.Listener == nil {
 		return nil
 	}
 
@@ -171,6 +172,12 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}
+	} else {
+		if _, ok := s.Listener.Addr().(*net.TCPAddr); !ok {
+			return fmt.Errorf("failed to parse ip and port from listener")
+		}
+		s.BindPort = s.Listener.Addr().(*net.TCPAddr).Port
+		s.BindAddress = s.Listener.Addr().(*net.TCPAddr).IP
 	}
 
 	if err := s.applyServingInfoTo(c); err != nil {
