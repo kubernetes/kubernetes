@@ -22,7 +22,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/request:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/versioned:go_default_library",
     ],
 )
 
