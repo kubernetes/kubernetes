@@ -591,7 +591,7 @@ func (c *configFactory) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	if c.skipPodUpdate(pod) {
 		return
 	}
-	if err := c.podQueue.Update(pod); err != nil {
+	if err := c.podQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
 		runtime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
 }
