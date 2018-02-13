@@ -184,7 +184,7 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 	}
 
 	// convert the object to the external version before sending it to the webhook
-	versionedAttr := versioned.Attributes{
+	versionedAttr := VersionedAttributes{
 		Attributes: attr,
 	}
 	if oldObj := attr.GetOldObject(); oldObj != nil {
@@ -192,14 +192,14 @@ func (a *Webhook) Dispatch(attr admission.Attributes) error {
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttr.OldObject = out
+		versionedAttr.VersionedOldObject = out
 	}
 	if obj := attr.GetObject(); obj != nil {
 		out, err := a.convertor.ConvertToGVK(obj, attr.GetKind())
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttr.Object = out
+		versionedAttr.VersionedObject = out
 	}
 	return a.dispatcher.Dispatch(ctx, &versionedAttr, relevantHooks)
 }
