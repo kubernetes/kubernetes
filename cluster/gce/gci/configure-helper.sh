@@ -1998,7 +1998,7 @@ function wait-for-apiserver-and-update-fluentd {
   fi
 
   # Wait until ScalingPolicy CRD is in place.
-  until kubectl get scalingpolicies
+  until kubectl get scalingpolicies.scalingpolicy.kope.io
   do
     sleep 10
   done
