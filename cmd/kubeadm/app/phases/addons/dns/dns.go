@@ -17,12 +17,12 @@ limitations under the License.
 package dns
 
 import (
+	"encoding/json"
 	"fmt"
-
 	"runtime"
 	"strings"
 
-	"encoding/json"
+	"github.com/mholt/caddy/caddyfile"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -37,7 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -47,6 +46,7 @@ const (
 	kubeDNSStubDomain          = "stubDomains"
 	kubeDNSUpstreamNameservers = "upstreamNameservers"
 	kubeDNSFederation          = "federations"
+	coreDNSStanzaFormat        = "\n    "
 )
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
@@ -147,6 +147,8 @@ func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interfac
 	if err != nil {
 		return fmt.Errorf("error when parsing CoreDNS deployment template: %v", err)
 	}
+
+	// Get the kube-dns ConfigMap for translation to equivalent CoreDNS Config.
 	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeDNS, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -279,16 +281,39 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
 	if proxy, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		stubDomainData := make(map[string][]string)
-		proxyStanzaList := coreDNSStanzaPrefix
+		var proxyStanzaList string
 
 		err := json.Unmarshal([]byte(proxy), &stubDomainData)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse JSON from 'kube-dns ConfigMap: %v", err)
 		}
+		var proxyStanza []interface{}
 
 		for domain, proxyIP := range stubDomainData {
-			proxyStanzaList = proxyStanzaList + domain + coreDNSProxyDefaultPort + coreDNSCorefileDefaultData + strings.Join(proxyIP, " ") + coreDNSProxyStanzaSuffix
+			strings.Join(proxyIP, " ")
+			pStanza := map[string]interface{}{}
+			pStanza["keys"] = []string{domain + ":53"}
+			pStanza["body"] = [][]string{
+				{"errors"},
+				{"cache", "30"},
+				{"proxy", ".", strings.Join(proxyIP, " ")},
+			}
+
+			proxyStanza = append(proxyStanza, pStanza)
 		}
+		stanzasBytes, err := json.Marshal(proxyStanza)
+		if err != nil {
+			return "", err
+		}
+
+		outputJSON, err := caddyfile.FromJSON(stanzasBytes)
+		if err != nil {
+			return "", err
+		}
+		// This is required to format the Corefile, otherwise errors due to bad yaml format.
+		output := strings.NewReplacer("\n\t", "\n        ", "\"", "", "\n}", "\n    }", "\n\n", "\n    ").Replace(string(outputJSON))
+		proxyStanzaList = coreDNSStanzaFormat + output + coreDNSStanzaFormat
+
 		return proxyStanzaList, nil
 	}
 	return "", nil
@@ -308,26 +333,50 @@ func translateUpstreamNameServerOfKubeDNSToUpstreamProxyCoreDNS(dataField string
 		coreDNSProxyStanzaList := strings.Join(upstreamProxyIP, " ")
 		return coreDNSProxyStanzaList, nil
 	}
-	return kubetypes.ResolvConfDefault, nil
+	return "/etc/resolv.conf", nil
 }
 
-// translateFederationofKubeDNSToCoreDNS translates Federations Data in kube-dns ConfigMap
+// translateFederationsofKubeDNSToCoreDNS translates Federations Data in kube-dns ConfigMap
 // to Federation for CoreDNS Corefile.
 func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
 	if federation, ok := kubeDNSConfigMap.Data[dataField]; ok {
+		var (
+			federationStanza []interface{}
+			fData            []string
+		)
 		federationData := make(map[string]string)
 
 		err := json.Unmarshal([]byte(federation), &federationData)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse JSON from kube-dns ConfigMap: %v", err)
 		}
-		federationStanzaList := coreDNSStanzaPrefix + coreDNSFederation + coreDNSDomain + coreDNSFederationStanzaPrefix
-		var federationStanzaContents string
+
 		for name, domain := range federationData {
-			federationStanzaContents = federationStanzaContents + coreDNSFederationStanzaMid + name + " " + domain
+			fData = append(fData, name+" "+domain)
 		}
-		federationStanzaList = federationStanzaList + federationStanzaContents + coreDNSFederationStanzaSuffix
+		fStanza := map[string]interface{}{}
+		fStanza["body"] = [][]string{
+			{strings.Join(fData, "\n       ")},
+		}
+		federationStanza = append(federationStanza, fStanza)
+		fStanza["keys"] = []string{"federation " + coreDNSDomain}
+
+		stanzasBytes, err := json.Marshal(federationStanza)
+		if err != nil {
+			return "", err
+		}
+
+		outputJSON, err := caddyfile.FromJSON(stanzasBytes)
+		if err != nil {
+			return "", err
+		}
+
+		// This is required to format the Corefile, otherwise errors due to bad yaml format.
+		output := strings.NewReplacer("\n\t", "\n       ", "\"", "", "\n}", "\n    }").Replace(string(outputJSON))
+		federationStanzaList := coreDNSStanzaFormat + output
+
 		return federationStanzaList, nil
+
 	}
 	return "", nil
 }

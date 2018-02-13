@@ -358,16 +358,4 @@ metadata:
   name: coredns
   namespace: kube-system
 `
-	// coreDNSProxyDefaultPort, coreDNSCorefileDefaultData, coreDNSProxyStanzaSuffix is used in the translation of configMap of kube-dns to CoreDNS.
-	coreDNSStanzaPrefix        = "\n    "
-	coreDNSProxyDefaultPort    = `:53`
-	coreDNSCorefileDefaultData = ` {
-        errors
-        cache 30
-        proxy . `
-	coreDNSProxyStanzaSuffix      = "\n    }\n    "
-	coreDNSFederation             = "federation "
-	coreDNSFederationStanzaPrefix = " {"
-	coreDNSFederationStanzaMid    = "\n       "
-	coreDNSFederationStanzaSuffix = "\n    }"
 )
