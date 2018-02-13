@@ -178,7 +178,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 				glog.Errorf("XXX: Bad serialization: %v", sso.Serialized.Err)
 				return sso.Serialized.Err
 			}
-			glog.Errorf("AAA: using smartly serialized")
+			//glog.Errorf("AAA: using smartly serialized")
 			_, err := w.Write(sso.Serialized.Raw)
 			return err
 		}

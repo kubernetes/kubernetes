@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/golang/glog"
+//	"github.com/golang/glog"
 )
 
 // Note that the types provided in this file are not versioned and are intended to be
@@ -186,7 +186,7 @@ func (s *SerializedObject) Serialize(serializer Serializer) {
 		buffer := bytes.NewBuffer(nil)
 		s.Err = serializer.Encode(s.Object.DeepCopyObject(), buffer)
 		s.Raw = buffer.Bytes()
-		glog.Errorf("BBB: smart serialization: %v", s.Err)
+		//glog.Errorf("BBB: smart serialization: %v", s.Err)
 	}
 }
 
