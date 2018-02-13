@@ -20,6 +20,7 @@ go_library(
         "errors.go",
     ],
     importpath = "k8s.io/apimachinery/pkg/util/errors",
+    deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 
 filegroup(

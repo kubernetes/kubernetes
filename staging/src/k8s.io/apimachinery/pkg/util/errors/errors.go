@@ -19,6 +19,8 @@ package errors
 import (
 	"errors"
 	"fmt"
+
+	"github.com/golang/glog"
 )
 
 // MessageCountMap contains occurrence for each error message.
@@ -65,6 +67,7 @@ func (agg aggregate) Error() string {
 		return ""
 	}
 	if len(agg) == 1 {
+		glog.Errorf("PPP: %s", agg[0].Error())
 		return agg[0].Error()
 	}
 	result := fmt.Sprintf("[%s", agg[0].Error())
@@ -72,6 +75,7 @@ func (agg aggregate) Error() string {
 		result += fmt.Sprintf(", %s", agg[i].Error())
 	}
 	result += "]"
+	glog.Errorf("QQQ %s", result)
 	return result
 }
 
