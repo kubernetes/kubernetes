@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -51,15 +52,32 @@ type PortForwardOptions struct {
 }
 
 var (
+	portforwardLong = templates.LongDesc(i18n.T(`
+                Forward one or more local ports to a pod.
+
+                Use resource type/name such as deployment/mydeployment to select a pod. Resource type defaults to 'pod' if omitted.
+
+                If there are multiple pods matching the criteria, a pod will be selected automatically. The
+                forwarding session ends when the selected pod terminates, and rerun of the command is needed
+                to resume forwarding.`))
+
 	portforwardExample = templates.Examples(i18n.T(`
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
-		kubectl port-forward mypod 5000 6000
+		kubectl port-forward pod/mypod 5000 6000
+
+		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment
+		kubectl port-forward deployment/mydeployment 5000 6000
 
 		# Listen on port 8888 locally, forwarding to 5000 in the pod
-		kubectl port-forward mypod 8888:5000
+		kubectl port-forward pod/mypod 8888:5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward mypod :5000`))
+		kubectl port-forward pod/mypod :5000`))
+)
+
+const (
+	// Amount of time to wait until at least one pod is running
+	defaultPodPortForwardWaitTimeout = 60 * time.Second
 )
 
 func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -70,10 +88,10 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 		},
 	}
 	cmd := &cobra.Command{
-		Use: "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
+		Use: "port-forward TYPE/NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Forward one or more local ports to a pod"),
-		Long:    "Forward one or more local ports to a pod.",
+		Long:    portforwardLong,
 		Example: portforwardExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := opts.Complete(f, cmd, args); err != nil {
@@ -87,7 +105,7 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 			}
 		},
 	}
-	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
 	// TODO support UID
 	return cmd
 }
@@ -116,23 +134,40 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 // Complete completes all the required options for port-forward cmd.
 func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.PodName = cmdutil.GetFlagString(cmd, "pod")
-	if len(o.PodName) == 0 && len(args) == 0 {
-		return cmdutil.UsageErrorf(cmd, "POD is required for port-forward")
-	}
-
-	if len(o.PodName) != 0 {
-		printDeprecationWarning("port-forward POD", "-p POD")
-		o.Ports = args
-	} else {
-		o.PodName = args[0]
-		o.Ports = args[1:]
+	if len(args) < 2 {
+		return cmdutil.UsageErrorf(cmd, "TYPE/NAME and list of ports are required for port-forward")
 	}
 
 	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
+
+	builder := f.NewBuilder().
+		Internal().
+		ContinueOnError().
+		NamespaceParam(o.Namespace).DefaultNamespace()
+
+	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return cmdutil.UsageErrorf(cmd, err.Error())
+	}
+
+	resourceName := args[0]
+	builder.ResourceNames("pods", resourceName)
+
+	obj, err := builder.Do().Object()
+	if err != nil {
+		return err
+	}
+
+	forwardablePod, err := f.AttachablePodForObject(obj, getPodTimeout)
+	if err != nil {
+		return err
+	}
+
+	o.PodName = forwardablePod.Name
+	o.Ports = args[1:]
 
 	clientset, err := f.ClientSet()
 	if err != nil {
@@ -157,7 +192,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 // Validate validates all the required options for port-forward cmd.
 func (o PortForwardOptions) Validate() error {
 	if len(o.PodName) == 0 {
-		return fmt.Errorf("pod name must be specified")
+		return fmt.Errorf("pod name or resource type/name must be specified")
 	}
 
 	if len(o.Ports) < 1 {

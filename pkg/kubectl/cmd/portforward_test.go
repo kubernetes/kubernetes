@@ -70,6 +70,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 		var err error
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
+			VersionedAPIPath:     "/api/v1",
 			GroupVersion:         schema.GroupVersion{Group: ""},
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -130,8 +131,4 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 
 func TestPortForward(t *testing.T) {
 	testPortForward(t, nil, []string{"foo", ":5000", ":1000"})
-}
-
-func TestPortForwardWithPFlag(t *testing.T) {
-	testPortForward(t, map[string]string{"pod": "foo"}, []string{":5000", ":1000"})
 }
