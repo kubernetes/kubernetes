@@ -328,7 +328,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	s.processor.addAndStartListener(listener)
+	s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
 		listener.add(addNotification{newObj: item})
 	}
@@ -366,6 +366,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 }
 
 type sharedProcessor struct {
+	listenersStarted bool
 	listenersLock    sync.RWMutex
 	listeners        []*processorListener
 	syncingListeners []*processorListener
@@ -373,20 +374,15 @@ type sharedProcessor struct {
 	wg               wait.Group
 }
 
-func (p *sharedProcessor) addAndStartListener(listener *processorListener) {
-	p.listenersLock.Lock()
-	defer p.listenersLock.Unlock()
-
-	p.addListenerLocked(listener)
-	p.wg.Start(listener.run)
-	p.wg.Start(listener.pop)
-}
-
 func (p *sharedProcessor) addListener(listener *processorListener) {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
 	p.addListenerLocked(listener)
+	if p.listenersStarted {
+		p.wg.Start(listener.run)
+		p.wg.Start(listener.pop)
+	}
 }
 
 func (p *sharedProcessor) addListenerLocked(listener *processorListener) {
@@ -417,6 +413,7 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 			p.wg.Start(listener.run)
 			p.wg.Start(listener.pop)
 		}
+		p.listenersStarted = true
 	}()
 	<-stopCh
 	p.listenersLock.RLock()
