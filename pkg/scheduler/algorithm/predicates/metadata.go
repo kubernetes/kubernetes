@@ -53,6 +53,9 @@ type predicateMetadata struct {
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
+	// Extended resources can be cluster level or node level.
+	// When set to true, resource fit predicates will ignore absence of extended resources.
+	ignoreMissingExtendedResources bool
 }
 
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
@@ -185,4 +188,12 @@ func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 	newPredMeta.serviceAffinityMatchingPodList = append([]*v1.Pod(nil),
 		meta.serviceAffinityMatchingPodList...)
 	return (algorithm.PredicateMetadata)(newPredMeta)
+}
+
+// RegisterPodFitsResourcesPredicateMetadataProducer registers additional metadata that are specific to
+// PodFitsResources scheduling predicate.
+func RegisterPodFitsResourcesPredicateMetadataProducer(ignoreMissingExtendedResources bool) {
+	RegisterPredicateMetadataProducer("PodFitsResources", func(pm *predicateMetadata) {
+		pm.ignoreMissingExtendedResources = ignoreMissingExtendedResources
+	})
 }

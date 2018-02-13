@@ -712,9 +712,14 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourcePods, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber)))
 	}
 
-	var podRequest *schedulercache.Resource
+	var (
+		podRequest                     *schedulercache.Resource
+		ignoreMissingExtendedResources bool
+	)
+
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podRequest = predicateMeta.podRequest
+		ignoreMissingExtendedResources = predicateMeta.ignoreMissingExtendedResources
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = GetResourceRequest(pod)
@@ -744,6 +749,11 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 
 	for rName, rQuant := range podRequest.ScalarResources {
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
+			// Ignore missing extended resources
+			// This is useful in scenarios where predicate checks are run on nodes with pods requesting cluster level resources which cannot be found on nodes.
+			if _, exists := nodeInfo.RequestedResource().ScalarResources[rName]; !exists && (ignoreMissingExtendedResources && v1helper.IsExtendedResourceName(rName)) {
+				continue
+			}
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
 		}
 	}

@@ -67,6 +67,13 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	pods := attrs.OtherPods
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+	// Ignore missing extended resources. This is required to support cluster level resources which are not tied to Nodes.
+	// If there happens to be a node level resource that is exposed via device plugin as an extended resource,
+	// it will also be ignored if it is not found in the Node Capacity and Allocatable.
+	// There is an implicit assumption that the lifecycle of device plugins will affect node
+	// health and nodes marked unhealthy should not be accepting new pods and
+	// possibly evicting existing pods too.
+	predicates.RegisterPodFitsResourcesPredicateMetadataProducer(true /* ignoreMissingExtendedResources */)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
@@ -77,6 +84,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: message,
 		}
 	}
+
 	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
