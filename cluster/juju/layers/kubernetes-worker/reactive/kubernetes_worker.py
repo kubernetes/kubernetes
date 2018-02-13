@@ -365,7 +365,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
     update_kubelet_status()
-    apply_node_labels()
+    set_state('kubernetes-worker.label-config-required')
     remove_state('kubernetes-worker.restart-needed')
 
 
@@ -412,37 +412,54 @@ def render_and_launch_ingress():
         hookenv.close_port(443)
 
 
-@when('config.changed.labels', 'kubernetes-worker.config.created')
+@when('config.changed.labels')
+def handle_labels_changed():
+    set_state('kubernetes-worker.label-config-required')
+
+
+@when('kubernetes-worker.label-config-required',
+      'kubernetes-worker.config.created')
 def apply_node_labels():
-    ''' Parse the labels configuration option and apply the labels to the node.
-    '''
-    # scrub and try to format an array from the configuration option
+    ''' Parse the labels configuration option and apply the labels to the
+        node. '''
+    # Get the user's configured labels.
     config = hookenv.config()
-    user_labels = _parse_labels(config.get('labels'))
-
-    # For diffing sake, iterate the previous label set
-    if config.previous('labels'):
-        previous_labels = _parse_labels(config.previous('labels'))
-        hookenv.log('previous labels: {}'.format(previous_labels))
-    else:
-        # this handles first time run if there is no previous labels config
-        previous_labels = _parse_labels("")
-
-    # Calculate label removal
-    for label in previous_labels:
-        if label not in user_labels:
-            hookenv.log('Deleting node label {}'.format(label))
-            _apply_node_label(label, delete=True)
-        # if the label is in user labels we do nothing here, it will get set
-        # during the atomic update below.
-
-    # Atomically set a label
-    for label in user_labels:
-        _apply_node_label(label, overwrite=True)
-
-    # Set label for application name
-    _apply_node_label('juju-application={}'.format(hookenv.service_name()),
-                      overwrite=True)
+    user_labels = {}
+    for item in config.get('labels').split(' '):
+        if '=' in item:
+            key, val = item.split('=')
+            user_labels[key] = val
+        else:
+            hookenv.log('Skipping malformed option: {}.'.format(item))
+    # Collect the current label state.
+    current_labels = db.get('current_labels') or {}
+    # Remove any labels that the user has removed from the config.
+    for key in list(current_labels.keys()):
+        if key not in user_labels:
+            try:
+                remove_label(key)
+                del current_labels[key]
+                db.set('current_labels', current_labels)
+            except ApplyNodeLabelFailed as e:
+                hookenv.log(str(e))
+                return
+    # Add any new labels.
+    for key, val in user_labels.items():
+        try:
+            set_label(key, val)
+            current_labels[key] = val
+            db.set('current_labels', current_labels)
+        except ApplyNodeLabelFailed as e:
+            hookenv.log(str(e))
+            return
+    # Set the juju-application label.
+    try:
+        set_label('juju-application', hookenv.service_name())
+    except ApplyNodeLabelFailed as e:
+        hookenv.log(str(e))
+        return
+    # Label configuration complete.
+    remove_state('kubernetes-worker.label-config-required')
 
 
 @when_any('config.changed.kubelet-extra-args',
@@ -881,8 +898,8 @@ def enable_gpu():
         return
 
     # Apply node labels
-    _apply_node_label('gpu=true', overwrite=True)
-    _apply_node_label('cuda=true', overwrite=True)
+    set_label('gpu', 'true')
+    set_label('cuda', 'true')
 
     set_state('kubernetes-worker.gpu.enabled')
     set_state('kubernetes-worker.restart-needed')
@@ -902,8 +919,8 @@ def disable_gpu():
     hookenv.log('Disabling gpu mode')
 
     # Remove node labels
-    _apply_node_label('gpu', delete=True)
-    _apply_node_label('cuda', delete=True)
+    remove_label('gpu')
+    remove_label('cuda')
 
     remove_state('kubernetes-worker.gpu.enabled')
     set_state('kubernetes-worker.restart-needed')
@@ -1012,43 +1029,33 @@ class ApplyNodeLabelFailed(Exception):
     pass
 
 
-def _apply_node_label(label, delete=False, overwrite=False):
-    ''' Invoke kubectl to apply node label changes '''
-    nodename = get_node_name()
-
-    # TODO: Make this part of the kubectl calls instead of a special string
-    cmd_base = 'kubectl --kubeconfig={0} label node {1} {2}'
-
-    if delete is True:
-        label_key = label.split('=')[0]
-        cmd = cmd_base.format(kubeconfig_path, nodename, label_key)
-        cmd = cmd + '-'
-    else:
-        cmd = cmd_base.format(kubeconfig_path, nodename, label)
-        if overwrite:
-            cmd = '{} --overwrite'.format(cmd)
-    cmd = cmd.split()
-
+def persistent_call(cmd, retry_message):
     deadline = time.time() + 180
     while time.time() < deadline:
         code = subprocess.call(cmd)
         if code == 0:
-            break
-        hookenv.log('Failed to apply label %s, exit code %d. Will retry.' % (
-            label, code))
+            return True
+        hookenv.log(retry_message)
         time.sleep(1)
     else:
-        msg = 'Failed to apply label %s' % label
-        raise ApplyNodeLabelFailed(msg)
+        return False
 
 
-def _parse_labels(labels):
-    ''' Parse labels from a key=value string separated by space.'''
-    label_array = labels.split(' ')
-    sanitized_labels = []
-    for item in label_array:
-        if '=' in item:
-            sanitized_labels.append(item)
-        else:
-            hookenv.log('Skipping malformed option: {}'.format(item))
-    return sanitized_labels
+def set_label(label, value):
+    nodename = get_node_name()
+    cmd = 'kubectl --kubeconfig={0} label node {1} {2}={3} --overwrite'
+    cmd = cmd.format(kubeconfig_path, nodename, label, value)
+    cmd = cmd.split()
+    retry = 'Failed to apply label %s=%s. Will retry.' % (label, value)
+    if not persistent_call(cmd, retry):
+        raise ApplyNodeLabelFailed(retry)
+
+
+def remove_label(label):
+    nodename = get_node_name()
+    cmd = 'kubectl --kubeconfig={0} label node {1} {2}-'
+    cmd = cmd.format(kubeconfig_path, nodename, label)
+    cmd = cmd.split()
+    retry = 'Failed to remove label {0}. Will retry.'.format(label)
+    if not persistent_call(cmd, retry):
+        raise ApplyNodeLabelFailed(retry)
