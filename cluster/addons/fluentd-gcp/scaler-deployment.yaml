@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp-scaler
-    version: v0.1
+    version: v0.1.0
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
