@@ -28,20 +28,8 @@ type Convertor struct {
 	Scheme *runtime.Scheme
 }
 
-// Convert converts the in object to the out object and returns an error if the
-// conversion fails.
-func (c Convertor) Convert(in runtime.Object, out runtime.Object) error {
-	// For custom resources, because ConvertToGVK reuses the passed in object as
-	// the output. c.Scheme.Convert resets the objects to empty if in == out, so
-	// we skip the conversion if that's the case.
-	if in == out {
-		return nil
-	}
-	return c.Scheme.Convert(in, out, nil)
-}
-
 // ConvertToGVK converts object to the desired gvk.
-func (c Convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
+func (c *Convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so
 	// if obj is a custom resource, it should not need conversion.
 	if obj.GetObjectKind().GroupVersionKind() == gvk {
@@ -61,7 +49,7 @@ func (c Convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind)
 // Validate checks if the conversion has a scheme.
 func (c *Convertor) Validate() error {
 	if c.Scheme == nil {
-		return fmt.Errorf("the Convertor requires a scheme")
+		return fmt.Errorf("the convertor requires a scheme")
 	}
 	return nil
 }

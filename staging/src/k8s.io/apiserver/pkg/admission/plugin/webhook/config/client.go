@@ -48,7 +48,7 @@ type ClientManager struct {
 	cache                *lru.Cache
 }
 
-// NewClientManager creates a ClientManager.
+// NewClientManager creates a clientManager.
 func NewClientManager() (ClientManager, error) {
 	cache, err := lru.New(defaultCacheSize)
 	if err != nil {
@@ -84,17 +84,17 @@ func (cm *ClientManager) SetNegotiatedSerializer(n runtime.NegotiatedSerializer)
 	cm.negotiatedSerializer = n
 }
 
-// Validate checks if ClientManager is properly set up.
+// Validate checks if clientManager is properly set up.
 func (cm *ClientManager) Validate() error {
 	var errs []error
 	if cm.negotiatedSerializer == nil {
-		errs = append(errs, fmt.Errorf("the ClientManager requires a negotiatedSerializer"))
+		errs = append(errs, fmt.Errorf("the clientManager requires a negotiatedSerializer"))
 	}
 	if cm.serviceResolver == nil {
-		errs = append(errs, fmt.Errorf("the ClientManager requires a serviceResolver"))
+		errs = append(errs, fmt.Errorf("the clientManager requires a serviceResolver"))
 	}
 	if cm.authInfoResolver == nil {
-		errs = append(errs, fmt.Errorf("the ClientManager requires an authInfoResolver"))
+		errs = append(errs, fmt.Errorf("the clientManager requires an authInfoResolver"))
 	}
 	return utilerrors.NewAggregate(errs)
 }

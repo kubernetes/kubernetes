@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "attributes.go",
         "conversion.go",
         "doc.go",
     ],
@@ -12,7 +11,6 @@ go_library(
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
