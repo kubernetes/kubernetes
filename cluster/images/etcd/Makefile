@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.11 3.2.14] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.11 3.2.16] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any tag from here.
@@ -26,8 +26,8 @@
 # Except from etcd-$(tag) and etcdctl-$(tag) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last tag from $(TAGS).
-TAGS?=2.2.1 2.3.7 3.0.17 3.1.11 3.2.14
-REGISTRY_TAG?=3.2.14
+TAGS?=2.2.1 2.3.7 3.0.17 3.1.11 3.2.16
+REGISTRY_TAG?=3.2.16
 # ROLLBACK_REGISTRY_TAG specified the tag that REGISTRY_TAG may be rolled back to.
 ROLLBACK_REGISTRY_TAG?=3.1.11
 ARCH?=amd64
@@ -129,7 +129,7 @@ test-rollback-etcd2:
 		-e "TARGET_STORAGE=etcd3" \
 		-e "TARGET_VERSION=$(ETCD2_ROLLBACK_NEW_TAG)" \
 		-e "DATA_DIRECTORY=/var/etcd/data" \
-		gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+		$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 			'INITIAL_CLUSTER=etcd-$$(hostname)=http://localhost:2380 \
 			/usr/local/bin/migrate-if-needed.sh && \
 			source /usr/local/bin/start-stop-etcd.sh && \
@@ -143,7 +143,7 @@ test-rollback-etcd2:
 		-e "TARGET_STORAGE=etcd2" \
 		-e "TARGET_VERSION=$(ETCD2_ROLLBACK_OLD_TAG)" \
 		-e "DATA_DIRECTORY=/var/etcd/data" \
-		gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+		$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 			'INITIAL_CLUSTER=etcd-$$(hostname)=http://localhost:2380 \
 			/usr/local/bin/migrate-if-needed.sh && \
 			source /usr/local/bin/start-stop-etcd.sh && \
@@ -153,7 +153,7 @@ test-rollback-etcd2:
 
 	@echo "Checking if rollback successfully downgraded etcd to $(ETCD2_ROLLBACK_OLD_TAG)"
 	docker run --tty --interactive -v $(TEMP_DIR)/rollback-etcd2:/var/etcd \
-		gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+		$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 			'[ $$(cat /var/etcd/data/version.txt) = $(ETCD2_ROLLBACK_OLD_TAG)/etcd2 ] && \
 			 grep -q value1 /var/etcd/keyspace.txt'
 
@@ -167,7 +167,7 @@ test-rollback:
 		-e "TARGET_STORAGE=etcd3" \
 		-e "TARGET_VERSION=$(REGISTRY_TAG)" \
 		-e "DATA_DIRECTORY=/var/etcd/data" \
-		gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+		$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 			'INITIAL_CLUSTER=etcd-$$(hostname)=http://localhost:2380 \
 			/usr/local/bin/migrate-if-needed.sh && \
 			source /usr/local/bin/start-stop-etcd.sh && \
@@ -180,7 +180,7 @@ test-rollback:
 		-e "TARGET_STORAGE=etcd3" \
 		-e "TARGET_VERSION=$(ROLLBACK_REGISTRY_TAG)" \
 		-e "DATA_DIRECTORY=/var/etcd/data" \
-		gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+		$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 			'INITIAL_CLUSTER=etcd-$$(hostname)=http://localhost:2380 \
 			/usr/local/bin/migrate-if-needed.sh && \
 			source /usr/local/bin/start-stop-etcd.sh && \
@@ -190,7 +190,7 @@ test-rollback:
 
 	@echo "Checking if rollback successfully downgraded etcd to $(ROLLBACK_REGISTRY_TAG)"
 	docker run --tty --interactive -v $(TEMP_DIR)/rollback-test:/var/etcd \
-		gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+		$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 			'[ $$(cat /var/etcd/data/version.txt) = $(ROLLBACK_REGISTRY_TAG)/etcd3 ] && \
 			 grep -q value1 /var/etcd/keyspace.txt'
 
@@ -206,7 +206,7 @@ test-migrate:
 			-e "TARGET_STORAGE=etcd$${MAJOR_VERSION}" \
 			-e "TARGET_VERSION=$${tag}" \
 			-e "DATA_DIRECTORY=/var/etcd/data" \
-			gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+			$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 				"INITIAL_CLUSTER=etcd-\$$(hostname)=http://localhost:2380 \
 				/usr/local/bin/migrate-if-needed.sh && \
 				source /usr/local/bin/start-stop-etcd.sh && \
@@ -222,7 +222,7 @@ test-migrate:
 			-e "TARGET_STORAGE=etcd3" \
 			-e "TARGET_VERSION=$(REGISTRY_TAG)" \
 			-e "DATA_DIRECTORY=/var/etcd/data" \
-			gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+			$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 				'INITIAL_CLUSTER=etcd-$$(hostname)=http://localhost:2380 \
 				/usr/local/bin/migrate-if-needed.sh && \
 				source /usr/local/bin/start-stop-etcd.sh && \
@@ -231,7 +231,7 @@ test-migrate:
 				stop_etcd'  && \
 		echo "Checking if migrate from $${tag} successfully upgraded etcd to $(REGISTRY_TAG)" && \
 		docker run --tty --interactive -v $(TEMP_DIR)/migrate-$${tag}:/var/etcd \
-			gcr.io/google_containers/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
+			$(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) /bin/sh -c \
 				'[ $$(cat /var/etcd/data/version.txt) = $(REGISTRY_TAG)/etcd3 ] && \
 				 grep -q value1 /var/etcd/keyspace.txt'; \
 	done
