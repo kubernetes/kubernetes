@@ -675,7 +675,7 @@ kube::golang::build_binaries() {
     kube::golang::build_kube_toolchain
 
     kube::log::status "Generating bindata:" "${KUBE_BINDATAS[@]}"
-    for bindata in ${KUBE_BINDATAS[@]}; do
+    for bindata in "${KUBE_BINDATAS[@]}"; do
       # Only try to generate bindata if the file exists, since in some cases
       # one-off builds of individual directories may exclude some files.
       if [[ -f "${KUBE_ROOT}/${bindata}" ]]; then
