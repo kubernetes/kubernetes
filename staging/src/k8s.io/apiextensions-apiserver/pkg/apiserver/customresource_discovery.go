@@ -20,15 +20,17 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 )
 
+type versionDiscoveryMap map[schema.GroupVersion]*discovery.APIVersionHandler
+
 type versionDiscoveryHandler struct {
-	// TODO, writing is infrequent, optimize this
-	discoveryLock sync.RWMutex
-	discovery     map[schema.GroupVersion]*discovery.APIVersionHandler
+	discoveryLock    sync.RWMutex
+	discoveryStorage atomic.Value // writing is infrequent
 
 	delegate http.Handler
 }
@@ -50,10 +52,8 @@ func (r *versionDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 }
 
 func (r *versionDiscoveryHandler) getDiscovery(gv schema.GroupVersion) (*discovery.APIVersionHandler, bool) {
-	r.discoveryLock.RLock()
-	defer r.discoveryLock.RUnlock()
-
-	ret, ok := r.discovery[gv]
+	discoveryMap := r.discoveryStorage.Load().(versionDiscoveryMap)
+	ret, ok := discoveryMap[gv]
 	return ret, ok
 }
 
@@ -61,20 +61,27 @@ func (r *versionDiscoveryHandler) setDiscovery(gv schema.GroupVersion, discovery
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
-	r.discovery[gv] = discovery
+	discoveryMap := r.discoveryStorage.Load().(versionDiscoveryMap)
+	discoveryMap2 := clone(discoveryMap).(versionDiscoveryMap)
+	discoveryMap2[gv] = discovery
+	r.discoveryStorage.Store(discoveryMap2)
 }
 
 func (r *versionDiscoveryHandler) unsetDiscovery(gv schema.GroupVersion) {
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
-	delete(r.discovery, gv)
+	discoveryMap := r.discoveryStorage.Load().(versionDiscoveryMap)
+	discoveryMap2 := clone(discoveryMap).(versionDiscoveryMap)
+	delete(discoveryMap2, gv)
+	r.discoveryStorage.Store(discoveryMap2)
 }
 
+type groupDiscoveryMap map[string]*discovery.APIGroupHandler
+
 type groupDiscoveryHandler struct {
-	// TODO, writing is infrequent, optimize this
-	discoveryLock sync.RWMutex
-	discovery     map[string]*discovery.APIGroupHandler
+	discoveryLock    sync.RWMutex
+	discoveryStorage atomic.Value // writing is infrequent
 
 	delegate http.Handler
 }
@@ -96,10 +103,8 @@ func (r *groupDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 }
 
 func (r *groupDiscoveryHandler) getDiscovery(group string) (*discovery.APIGroupHandler, bool) {
-	r.discoveryLock.RLock()
-	defer r.discoveryLock.RUnlock()
-
-	ret, ok := r.discovery[group]
+	discoveryMap := r.discoveryStorage.Load().(groupDiscoveryMap)
+	ret, ok := discoveryMap[group]
 	return ret, ok
 }
 
@@ -107,14 +112,20 @@ func (r *groupDiscoveryHandler) setDiscovery(group string, discovery *discovery.
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
-	r.discovery[group] = discovery
+	discoveryMap := r.discoveryStorage.Load().(groupDiscoveryMap)
+	discoveryMap2 := clone(discoveryMap).(groupDiscoveryMap)
+	discoveryMap2[group] = discovery
+	r.discoveryStorage.Store(discoveryMap2)
 }
 
 func (r *groupDiscoveryHandler) unsetDiscovery(group string) {
 	r.discoveryLock.Lock()
 	defer r.discoveryLock.Unlock()
 
-	delete(r.discovery, group)
+	discoveryMap := r.discoveryStorage.Load().(groupDiscoveryMap)
+	discoveryMap2 := clone(discoveryMap).(groupDiscoveryMap)
+	delete(discoveryMap2, group)
+	r.discoveryStorage.Store(discoveryMap2)
 }
 
 // splitPath returns the segments for a URL path.
@@ -124,4 +135,34 @@ func splitPath(path string) []string {
 		return []string{}
 	}
 	return strings.Split(path, "/")
+}
+
+// clone returns a shallow copy of the provided object.
+func clone(original interface{}) interface{} {
+	if original == nil {
+		return nil
+	}
+
+	switch original := original.(type) {
+	case versionDiscoveryMap:
+		clone := make(versionDiscoveryMap, len(original))
+		for k, v := range original {
+			clone[k] = v
+		}
+		return clone
+	case groupDiscoveryMap:
+		clone := make(groupDiscoveryMap, len(original))
+		for k, v := range original {
+			clone[k] = v
+		}
+		return clone
+	case crdStorageMap:
+		clone := make(crdStorageMap, len(original))
+		for k, v := range original {
+			clone[k] = v
+		}
+		return clone
+	default:
+		return original
+	}
 }
