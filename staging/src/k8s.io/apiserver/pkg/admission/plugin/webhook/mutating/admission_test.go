@@ -47,16 +47,16 @@ type fakeHookSource struct {
 	err   error
 }
 
-func (f *fakeHookSource) Webhooks() (*registrationv1beta1.MutatingWebhookConfiguration, error) {
+func (f *fakeHookSource) Webhooks() *registrationv1beta1.MutatingWebhookConfiguration {
 	if f.err != nil {
-		return nil, f.err
+		return nil
 	}
 	for i, h := range f.hooks {
 		if h.NamespaceSelector == nil {
 			f.hooks[i].NamespaceSelector = &metav1.LabelSelector{}
 		}
 	}
-	return &registrationv1beta1.MutatingWebhookConfiguration{Webhooks: f.hooks}, nil
+	return &registrationv1beta1.MutatingWebhookConfiguration{Webhooks: f.hooks}
 }
 
 func (f *fakeHookSource) Run(stopCh <-chan struct{}) {}
