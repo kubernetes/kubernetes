@@ -42,8 +42,13 @@ type NsenterMounter struct {
 	ne *nsenter.Nsenter
 }
 
-func NewNsenterMounter() *NsenterMounter {
-	return &NsenterMounter{ne: nsenter.NewNsenter()}
+func NewNsenterMounter() (*NsenterMounter, error) {
+	ne, err := nsenter.NewNsenter()
+	if err != nil {
+		return nil, err
+	}
+
+	return &NsenterMounter{ne}, nil
 }
 
 // NsenterMounter implements mount.Interface

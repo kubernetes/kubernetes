@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/utils/exec"
 
@@ -63,40 +64,46 @@ const (
 type Nsenter struct {
 	// a map of commands to their paths on the host filesystem
 	paths map[string]string
+	// directories to search for required commands
+	searchDirs []string
+
+	hasSystemd *bool
 }
 
 // NewNsenter constructs a new instance of Nsenter
-func NewNsenter() *Nsenter {
+func NewNsenter() (*Nsenter, error) {
 	ne := &Nsenter{
 		paths: map[string]string{
-			"mount":       "",
-			"findmnt":     "",
-			"umount":      "",
-			"systemd-run": "",
-			"stat":        "",
-			"touch":       "",
-			"mkdir":       "",
-			"ls":          "",
-			"sh":          "",
-			"chmod":       "",
+			"mount":   "",
+			"findmnt": "",
+			"umount":  "",
+			"stat":    "",
+			"touch":   "",
+			"mkdir":   "",
+			"ls":      "",
+			"sh":      "",
+			"chmod":   "",
+			"nsenter": "",
 		},
+		searchDirs: []string{"/bin", "/usr/sbin", "/usr/bin", "/"},
 	}
-	// search for the required commands in other locations besides /usr/bin
 	for binary := range ne.paths {
-		// default to root
-		ne.paths[binary] = filepath.Join("/", binary)
-		for _, path := range []string{"/bin", "/usr/sbin", "/usr/bin"} {
+		found := false
+		for _, path := range ne.searchDirs {
 			binPath := filepath.Join(path, binary)
 			if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
 				continue
 			}
 			ne.paths[binary] = binPath
+			found = true
 			break
 		}
-		// TODO: error, so that the kubelet can stop if the paths don't exist
-		// (don't forget that systemd-run is optional)
+
+		if !found {
+			return nil, fmt.Errorf("unable to find binary %s for nsenter in any of %s", binary, strings.Join(ne.searchDirs, ", "))
+		}
 	}
-	return ne
+	return ne, nil
 }
 
 // Exec executes nsenter commands in hostProcMountNsPath mount namespace
@@ -117,8 +124,27 @@ func (ne *Nsenter) AbsHostPath(command string) string {
 	return path
 }
 
-// SupportsSystemd checks whether command systemd-run exists
+// SupportsSystemd checks whether optional command systemd-run exists
 func (ne *Nsenter) SupportsSystemd() (string, bool) {
-	systemdRunPath, hasSystemd := ne.paths["systemd-run"]
-	return systemdRunPath, hasSystemd
+	systemdBinary := "systemd-run"
+	// search for "systemd-run" command if not performed
+	if ne.hasSystemd == nil {
+		found := false
+		for _, path := range ne.searchDirs {
+			binPath := filepath.Join(path, systemdBinary)
+			if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
+				continue
+			}
+			ne.paths[systemdBinary] = binPath
+			found = true
+			break
+		}
+		ne.hasSystemd = &found
+	}
+
+	var systemdRunPath string
+	if *ne.hasSystemd {
+		systemdRunPath = ne.paths[systemdBinary]
+	}
+	return systemdRunPath, len(systemdRunPath) != 0
 }

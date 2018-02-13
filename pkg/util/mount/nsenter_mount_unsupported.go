@@ -24,8 +24,8 @@ import (
 
 type NsenterMounter struct{}
 
-func NewNsenterMounter() *NsenterMounter {
-	return &NsenterMounter{}
+func NewNsenterMounter() (*NsenterMounter, error) {
+	return &NsenterMounter{}, nil
 }
 
 var _ = Interface(&NsenterMounter{})
