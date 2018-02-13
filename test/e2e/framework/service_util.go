@@ -80,6 +80,7 @@ const (
 	// On average it takes ~6 minutes for a single backend to come online in GCE.
 	LoadBalancerPollTimeout  = 15 * time.Minute
 	LoadBalancerPollInterval = 30 * time.Second
+	LoadBalancerQuickPollInterval = 500 * time.Millisecond
 
 	LargeClusterMinNodesNumber = 100
 

@@ -4949,16 +4949,19 @@ func SimpleGET(c *http.Client, url, host string) (string, error) {
 
 // PollURL polls till the url responds with a healthy http code. If
 // expectUnreachable is true, it breaks on first non-healthy http code instead.
-func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+// expectReachable is true, returns error if not reached in first try.
+func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool, expectReachable bool) error {
 	var lastBody string
 	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		var err error
 		lastBody, err = SimpleGET(httpClient, route, host)
 		if err != nil {
 			Logf("host %v path %v: %v unreachable", host, route, err)
+			if expectReachable {
+				return expectReachable, err
+			}
 			return expectUnreachable, nil
 		}
-		Logf("host %v path %v: reached", host, route)
 		return !expectUnreachable, nil
 	})
 	if pollErr != nil {

@@ -224,7 +224,7 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.Address, pathToFail)
-				ExpectNoError(PollURL(route, updateURLMapHost, LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
+				ExpectNoError(PollURL(route, updateURLMapHost, LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true, false))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
@@ -1331,7 +1331,7 @@ func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address st
 			}
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			j.Logger.Infof("Testing route %v host %v with simple GET", route, rules.Host)
-			if err := PollURL(route, rules.Host, timeout, j.PollInterval, timeoutClient, false); err != nil {
+			if err := PollURL(route, rules.Host, timeout, j.PollInterval, timeoutClient, false, false); err != nil {
 				return err
 			}
 		}
@@ -1403,7 +1403,7 @@ func (j *IngressTestJig) pollServiceNodePort(ns, name string, port int) error {
 	if err != nil {
 		return err
 	}
-	return PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false)
+	return PollURL(u, "", 30*time.Second, j.PollInterval, &http.Client{Timeout: IngressReqTimeout}, false, false)
 }
 
 func (j *IngressTestJig) GetDefaultBackendNodePort() (int32, error) {

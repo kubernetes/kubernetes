@@ -132,10 +132,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := framework.BuildInsecureClient(framework.IngressReqTimeout)
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false, false))
 
 			By("should reject HTTP traffic")
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true, false))
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.GetFirewallRule()
