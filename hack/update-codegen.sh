@@ -50,20 +50,28 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 
 
 	# skip groups that aren't being served, clients for these don't matter
-    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
-      continue
-    fi
+	if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+		continue
+	fi
 
 	GV_DIRS+=("${pkg_dir}")
 
 	# collect internal groups
 	int_group="${pkg_dir%/*}/"
 	if [[ "${pkg_dir}" = core/* ]]; then
-	  int_group="api/"
+		int_group="api/"
 	fi
-    if ! [[ " ${INTERNAL_DIRS[@]:-} " =~ " ${int_group} " ]]; then
-      INTERNAL_DIRS+=("${int_group}")
-    fi
+
+	found=0
+	for dir in "${INTERNAL_DIRS[@]}"; do
+		if [[ "$dir" = "$int_group" ]]; then
+			found=1
+			break
+		fi
+	done
+	if [[ $found = 0 ]]; then
+		INTERNAL_DIRS+=("$int_group")
+	fi
 done
 # delimit by commas for the command
 GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
