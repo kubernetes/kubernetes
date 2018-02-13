@@ -41,10 +41,10 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (

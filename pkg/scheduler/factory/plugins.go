@@ -28,9 +28,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
