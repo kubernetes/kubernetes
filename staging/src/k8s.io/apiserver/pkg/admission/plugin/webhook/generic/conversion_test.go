@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package generic
 
 import (
 	"reflect"
@@ -39,7 +39,7 @@ func initiateScheme() *runtime.Scheme {
 
 func TestConvertToGVK(t *testing.T) {
 	scheme := initiateScheme()
-	c := Convertor{Scheme: scheme}
+	c := convertor{Scheme: scheme}
 	table := map[string]struct {
 		obj         runtime.Object
 		gvk         schema.GroupVersionKind
