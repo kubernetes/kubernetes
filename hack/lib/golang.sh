@@ -37,7 +37,8 @@ kube::golang::server_targets() {
   echo "${targets[@]}"
 }
 
-readonly KUBE_SERVER_TARGETS=($(kube::golang::server_targets))
+IFS=" " read -ra KUBE_SERVER_TARGETS <<< "$(kube::golang::server_targets)"
+readonly KUBE_SERVER_TARGETS
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 
 # The set of server targets that we are only building for Kubernetes nodes
@@ -51,15 +52,20 @@ kube::golang::node_targets() {
   echo "${targets[@]}"
 }
 
-readonly KUBE_NODE_TARGETS=($(kube::golang::node_targets))
+IFS=" " read -ra KUBE_NODE_TARGETS <<< "$(kube::golang::node_targets)"
+readonly KUBE_NODE_TARGETS
 readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
 if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
-  readonly KUBE_SERVER_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
-  readonly KUBE_NODE_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
-  readonly KUBE_TEST_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
-  readonly KUBE_CLIENT_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  readonly KUBE_SERVER_PLATFORMS
+  readonly KUBE_NODE_PLATFORMS
+  readonly KUBE_TEST_PLATFORMS
+  readonly KUBE_CLIENT_PLATFORMS
 elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
   readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
   readonly KUBE_NODE_PLATFORMS=(linux/amd64)
@@ -146,7 +152,8 @@ kube::golang::test_targets() {
   )
   echo "${targets[@]}"
 }
-readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
+IFS=" " read -ra KUBE_TEST_TARGETS <<< "$(kube::golang::test_targets)"
+readonly KUBE_TEST_TARGETS
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 # If you update this list, please also update build/BUILD.
@@ -177,7 +184,8 @@ kube::golang::server_test_targets() {
   echo "${targets[@]}"
 }
 
-readonly KUBE_TEST_SERVER_TARGETS=($(kube::golang::server_test_targets))
+IFS=" " read -ra KUBE_TEST_SERVER_TARGETS <<< "$(kube::golang::server_test_targets)"
+readonly KUBE_TEST_SERVER_TARGETS
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
 readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 
@@ -316,7 +324,7 @@ EOF
   fi
 
   local go_version
-  go_version=($(go version))
+  IFS=" " read -ra go_version <<< "$(go version)"
   local minimum_go_version
   minimum_go_version=go1.9.1
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
@@ -640,7 +648,8 @@ kube::golang::build_binaries() {
       targets=("${KUBE_ALL_TARGETS[@]}")
     fi
 
-    local -a platforms=(${KUBE_BUILD_PLATFORMS:-})
+    local -a platforms
+    IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
     fi
