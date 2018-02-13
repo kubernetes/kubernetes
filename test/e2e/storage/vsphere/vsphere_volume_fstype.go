@@ -175,11 +175,14 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 }
 
 func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Pod, volPath string) {
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	Expect(err).To(BeNil())
+	nodeName := pod.Spec.NodeName
 	By("Deleting pod")
 	framework.DeletePodWithWait(f, client, pod)
 
 	By("Waiting for volumes to be detached from the node")
-	waitForVSphereDiskToDetach(volPath, pod.Spec.NodeName)
+	waitForVSphereDiskToDetach(volPath, nodeName)
 }
 
 func deleteVolume(client clientset.Interface, pvclaimName string, namespace string) {

@@ -18,6 +18,7 @@ package vsphere
 
 import (
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"time"
 
@@ -513,18 +514,6 @@ func removeStorageClusterORFolderNameFromVDiskPath(vDiskPath string) string {
 	return vDiskPath
 }
 
-// isDiskAttached checks if disk is attached to the VM.
-func isDiskAttached(ctx context.Context, vm *object.VirtualMachine, diskPath string) (bool, error) {
-	device, err := getVirtualDeviceByPath(ctx, vm, diskPath)
-	if err != nil {
-		return false, err
-	}
-	if device != nil {
-		return true, nil
-	}
-	return false, nil
-}
-
 // getVirtualDeviceByPath gets the virtual device by path
 func getVirtualDeviceByPath(ctx context.Context, vm *object.VirtualMachine, diskPath string) (vim25types.BaseVirtualDevice, error) {
 	vmDevices, err := vm.Device(ctx)
@@ -541,6 +530,8 @@ func getVirtualDeviceByPath(ctx context.Context, vm *object.VirtualMachine, disk
 				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
 					framework.Logf("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
+				} else {
+					framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 				}
 			}
 		}
@@ -715,21 +706,34 @@ func diskIsAttached(volPath string, nodeName string) (bool, error) {
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
 	Connect(ctx, nodeInfo.VSphere)
 	vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
 	volPath = removeStorageClusterORFolderNameFromVDiskPath(volPath)
-	attached, err := isDiskAttached(ctx, vm, volPath)
+	device, err := getVirtualDeviceByPath(ctx, vm, volPath)
 	if err != nil {
 		framework.Logf("diskIsAttached failed to determine whether disk %q is still attached on node %q",
 			volPath,
 			nodeName)
+		return false, err
 	}
-	framework.Logf("diskIsAttached result: %v and error: %v, for volume: %s", attached, err, volPath)
-	return attached, err
+	if device != nil {
+		framework.Logf("diskIsAttached found the disk %q attached on node %q",
+			volPath,
+			nodeName)
+	}
+	return true, nil
 }
 
 func getUUIDFromProviderID(providerID string) string {
 	return strings.TrimPrefix(providerID, ProviderPrefix)
+}
+
+func GetReadySchedulableRandomNodeInfo() *NodeInfo {
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+	rand.Seed(time.Now().Unix())
+	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeList.Items[rand.Int()%len(nodeList.Items)].Name)
+	Expect(nodeInfo).NotTo(BeNil())
+	return nodeInfo
 }

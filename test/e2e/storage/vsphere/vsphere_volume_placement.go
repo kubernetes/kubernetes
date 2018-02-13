@@ -56,9 +56,9 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		if !isNodeLabeled {
 			node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
 			isNodeLabeled = true
+			nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
+			vsp = nodeInfo.VSphere
 		}
-		nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
-		vsp = nodeInfo.VSphere
 		By("creating vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		Expect(err).NotTo(HaveOccurred())

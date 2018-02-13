@@ -504,10 +504,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			vspheretest.Bootstrap(f)
-			nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-			Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
-			nodeInfo := vspheretest.TestContext.NodeMapper.GetNodeInfo(nodeList.Items[0].Name)
-
+			nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 			var volumePath string
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,

@@ -17,9 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
-	"math/rand"
 	"path/filepath"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -70,14 +68,8 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			rand.Seed(time.Now().Unix())
-			nodeName = nodeList.Items[rand.Int()%len(nodeList.Items)].Name
-		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
 		if !isNodeLabeled {
+			nodeName = GetReadySchedulableRandomNodeInfo().Name
 			nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 			nodeKeyValueLabel = make(map[string]string)
 			nodeKeyValueLabel[NodeLabelKey] = nodeLabelValue

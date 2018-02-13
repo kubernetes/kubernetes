@@ -51,11 +51,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)
-			nodes := framework.GetReadySchedulableNodesOrDie(c)
-			if len(nodes.Items) < 1 {
-				framework.Skipf("Requires at least %d node", 1)
-			}
-			nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
+			nodeInfo = GetReadySchedulableRandomNodeInfo()
 			pv = nil
 			pvc = nil
 			volumePath = ""

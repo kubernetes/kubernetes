@@ -18,9 +18,6 @@ package vsphere
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,11 +52,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
-		rand.Seed(time.Now().Unix())
-		nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodeList.Items[rand.Int()%len(nodeList.Items)].Name)
-
+		nodeInfo = GetReadySchedulableRandomNodeInfo()
 		scParameters = make(map[string]string)
 		clusterDatastore = GetAndExpectStringEnvVar(VCPClusterDatastore)
 	})
