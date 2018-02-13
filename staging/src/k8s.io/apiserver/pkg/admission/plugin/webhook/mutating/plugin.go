@@ -50,7 +50,7 @@ func Register(plugins *admission.Plugins) {
 type Plugin struct {
 	*generic.Webhook
 
-	defaulter      runtime.ObjectDefaulter
+	scheme         *runtime.Scheme
 	jsonSerializer *json.Serializer
 }
 
@@ -73,7 +73,7 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 func (a *Plugin) SetScheme(scheme *runtime.Scheme) {
 	a.Webhook.SetScheme(scheme)
 	if scheme != nil {
-		a.defaulter = scheme
+		a.scheme = scheme
 		a.jsonSerializer = json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
 	}
 }
@@ -83,8 +83,8 @@ func (a *Plugin) ValidateInitialization() error {
 	if err := a.Webhook.ValidateInitialization(); err != nil {
 		return err
 	}
-	if a.defaulter == nil {
-		return fmt.Errorf("defaulter is not properly setup")
+	if a.scheme == nil {
+		return fmt.Errorf("scheme is not properly setup")
 	}
 	if a.jsonSerializer == nil {
 		return fmt.Errorf("jsonSerializer is not properly setup")

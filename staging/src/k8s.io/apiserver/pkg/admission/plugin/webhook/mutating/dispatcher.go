@@ -73,7 +73,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 	}
 
 	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes
-	return a.plugin.Convertor().Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil)
+	return a.plugin.scheme.Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil)
 }
 
 // note that callAttrMutatingHook updates attr
@@ -118,6 +118,6 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	if _, _, err := a.plugin.jsonSerializer.Decode(patchedJS, nil, attr.VersionedObject); err != nil {
 		return apierrors.NewInternalError(err)
 	}
-	a.plugin.defaulter.Default(attr.VersionedObject)
+	a.plugin.scheme.Default(attr.VersionedObject)
 	return nil
 }
