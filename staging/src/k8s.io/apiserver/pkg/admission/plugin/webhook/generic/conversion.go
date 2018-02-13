@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package generic
 
 import (
 	"fmt"
@@ -23,13 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Convertor converts objects to the desired version.
-type Convertor struct {
+// convertor converts objects to the desired version.
+type convertor struct {
 	Scheme *runtime.Scheme
 }
 
 // ConvertToGVK converts object to the desired gvk.
-func (c *Convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
+func (c *convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
 	// Unlike other resources, custom resources do not have internal version, so
 	// if obj is a custom resource, it should not need conversion.
 	if obj.GetObjectKind().GroupVersionKind() == gvk {
@@ -47,7 +47,7 @@ func (c *Convertor) ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind
 }
 
 // Validate checks if the conversion has a scheme.
-func (c *Convertor) Validate() error {
+func (c *convertor) Validate() error {
 	if c.Scheme == nil {
 		return fmt.Errorf("the convertor requires a scheme")
 	}

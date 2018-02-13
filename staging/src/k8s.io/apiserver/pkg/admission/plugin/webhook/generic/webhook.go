@@ -31,7 +31,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -44,7 +43,7 @@ type Webhook struct {
 
 	hookSource       Source
 	clientManager    *config.ClientManager
-	convertor        *versioned.Convertor
+	convertor        *convertor
 	namespaceMatcher *namespace.Matcher
 	dispatcher       Dispatcher
 }
@@ -80,7 +79,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		Handler:          handler,
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
-		convertor:        &versioned.Convertor{},
+		convertor:        &convertor{},
 		namespaceMatcher: &namespace.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
 	}, nil
