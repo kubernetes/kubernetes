@@ -41,6 +41,12 @@ options:
     default: ""
     description: |
       Password to be used for admin user (leave empty for random password).
+  grafana-www-root:
+    type: string
+    default: "/api/v1/proxy/namespaces/kube-system/services/monitoring-grafana/"
+    description: |
+      Set this to "/" if you plan to expose the grafana used for cluster monitoring.
+      The default value is for accessing the service through kubectl proxy.
   api-extra-args:
     type: string
     default: ""

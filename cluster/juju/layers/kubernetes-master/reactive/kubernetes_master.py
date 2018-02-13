@@ -640,12 +640,14 @@ def configure_cdk_addons():
     remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
+    grafanaWwwRoot = str(hookenv.config('grafana-www-root'))
     args = [
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
         'enable-dashboard=' + dbEnabled,
-        'enable-kube-dns=' + dnsEnabled
+        'enable-kube-dns=' + dnsEnabled,
+        'gf-www=' + grafanaWwwRoot,
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
