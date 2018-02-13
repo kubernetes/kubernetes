@@ -36,7 +36,6 @@ import (
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
 )
 
 type validatingDispatcher struct {
@@ -49,7 +48,7 @@ func newValidatingDispatcher(cm *config.ClientManager) generic.Dispatcher {
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, versionedAttr *versioned.Attributes, relevantHooks []*v1beta1.Webhook) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) error {
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, len(relevantHooks))
 	wg.Add(len(relevantHooks))
@@ -58,8 +57,8 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, versionedAttr *vers
 			defer wg.Done()
 
 			t := time.Now()
-			err := d.callHook(ctx, hook, versionedAttr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
+			err := d.callHook(ctx, hook, attr)
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}

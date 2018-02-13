@@ -36,7 +36,6 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/versioned"
 )
 
 type mutatingDispatcher struct {
@@ -52,11 +51,11 @@ func newMutatingDispatcher(p *Plugin) func(cm *config.ClientManager) generic.Dis
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
-func (a *mutatingDispatcher) Dispatch(ctx context.Context, versionedAttr *versioned.Attributes, relevantHooks []*v1beta1.Webhook) error {
+func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) error {
 	for _, hook := range relevantHooks {
 		t := time.Now()
-		err := a.callAttrMutatingHook(ctx, hook, versionedAttr)
-		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name)
+		err := a.callAttrMutatingHook(ctx, hook, attr)
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "admit", hook.Name)
 		if err == nil {
 			continue
 		}
@@ -73,12 +72,12 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, versionedAttr *versio
 		return apierrors.NewInternalError(err)
 	}
 
-	// convert attr.Object to the internal version
-	return a.plugin.Convertor().Convert(versionedAttr.Object, versionedAttr.Attributes.GetObject())
+	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes
+	return a.plugin.Convertor().Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil)
 }
 
 // note that callAttrMutatingHook updates attr
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *versioned.Attributes) error {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
 	client, err := a.cm.HookClient(h)
@@ -106,7 +105,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
-	objJS, err := runtime.Encode(a.plugin.jsonSerializer, attr.Object)
+	objJS, err := runtime.Encode(a.plugin.jsonSerializer, attr.VersionedObject)
 	if err != nil {
 		return apierrors.NewInternalError(err)
 	}
@@ -116,9 +115,9 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 	// TODO: if we have multiple mutating webhooks, we can remember the json
 	// instead of encoding and decoding for each one.
-	if _, _, err := a.plugin.jsonSerializer.Decode(patchedJS, nil, attr.Object); err != nil {
+	if _, _, err := a.plugin.jsonSerializer.Decode(patchedJS, nil, attr.VersionedObject); err != nil {
 		return apierrors.NewInternalError(err)
 	}
-	a.plugin.defaulter.Default(attr.Object)
+	a.plugin.defaulter.Default(attr.VersionedObject)
 	return nil
 }
