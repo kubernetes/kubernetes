@@ -59,7 +59,7 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:a3b936c0fb98a934eecd2cfb91f73658d402b29116084e778ce9ddb68e55383e",
+    digest = "sha256:fb18678f8203ca1bd2fad2671e3ebd80cb408a1baae423d4ad39c05f4caac4e1",
     registry = "k8s.gcr.io",
     repository = "debian-iptables-amd64",
     tag = "v10",  # ignored, but kept here for documentation
@@ -75,7 +75,7 @@ docker_pull(
 
 docker_pull(
     name = "official_busybox",
-    digest = "sha256:be3c11fdba7cfe299214e46edc642e09514dbb9bbefcd0d3836c05a1e0cd0642",
+    digest = "sha256:4cee1979ba0bf7db9fc5d28fb7b798ca69ae95a47c5fecf46327720df4ff352d",
     registry = "index.docker.io",
     repository = "library/busybox",
     tag = "latest",  # ignored, but kept here for documentation
