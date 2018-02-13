@@ -72,7 +72,7 @@ INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
 ${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
-${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt "$@"
 
 listergen_internal_apis=(
 $(
@@ -91,7 +91,7 @@ $(
 )
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
-${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
+${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt "$@"
 
 informergen_internal_apis=(
 $(
@@ -105,6 +105,7 @@ ${informergen} \
   --input-dirs "${informergen_internal_apis_csv}" \
   --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
+  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt \
   "$@"
 
 informergen_external_apis=(
@@ -124,6 +125,7 @@ ${informergen} \
   --input-dirs "${informergen_external_apis_csv}" \
   --versioned-clientset-package k8s.io/client-go/kubernetes \
   --listers-package k8s.io/client-go/listers \
+  --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt \
   "$@"
 
 # You may add additional calls of code generators like set-gen above.
