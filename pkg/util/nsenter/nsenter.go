@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/utils/exec"
 
@@ -64,41 +65,51 @@ const (
 type Nsenter struct {
 	// a map of commands to their paths on the host filesystem
 	paths map[string]string
+	// directories to search for required commands
+	searchDirs []string
+
+	hasSystemd *bool
 }
 
 // NewNsenter constructs a new instance of Nsenter
 func NewNsenter() (*Nsenter, error) {
 	ne := &Nsenter{
 		paths: map[string]string{
-			"mount":       "",
-			"findmnt":     "",
-			"umount":      "",
-			"systemd-run": "",
-			"stat":        "",
-			"touch":       "",
-			"mkdir":       "",
-			"ls":          "",
-			"sh":          "",
-			"chmod":       "",
+			"mount":   "",
+			"findmnt": "",
+			"umount":  "",
+			"stat":    "",
+			"touch":   "",
+			"mkdir":   "",
+			"ls":      "",
+			"sh":      "",
+			"chmod":   "",
+			"nsenter": "",
 		},
+		searchDirs: []string{"/bin", "/usr/sbin", "/usr/bin", "/"},
 	}
-	// search for the required commands in other locations besides /usr/bin
 	for binary := range ne.paths {
-		// check for binary under the following directories
-		for _, path := range []string{"/", "/bin", "/usr/sbin", "/usr/bin"} {
-			binPath := filepath.Join(path, binary)
-			if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
-				continue
-			}
-			ne.paths[binary] = binPath
-			break
-		}
-		// systemd-run is optional, bailout if we don't find any of the other binaries
-		if ne.paths[binary] == "" && binary != "systemd-run" {
-			return nil, fmt.Errorf("unable to find %v", binary)
+		if found := ne.findBinary(binary); !found {
+			return nil, fmt.Errorf("unable to find binary %s for nsenter in any of %s", binary, strings.Join(ne.searchDirs, ", "))
 		}
 	}
 	return ne, nil
+}
+
+// findBinary searches for the executable binary path
+func (ne *Nsenter) findBinary(binary string) bool {
+	var found bool
+	for _, path := range ne.searchDirs {
+		binPath := filepath.Join(path, binary)
+		if _, err := os.Stat(filepath.Join(hostRootFsPath, binPath)); err != nil {
+			continue
+		}
+		ne.paths[binary] = binPath
+		found = true
+		break
+	}
+
+	return found
 }
 
 // Exec executes nsenter commands in hostProcMountNsPath mount namespace
@@ -119,8 +130,19 @@ func (ne *Nsenter) AbsHostPath(command string) string {
 	return path
 }
 
-// SupportsSystemd checks whether command systemd-run exists
+// SupportsSystemd checks whether optional command systemd-run exists
 func (ne *Nsenter) SupportsSystemd() (string, bool) {
-	systemdRunPath, ok := ne.paths["systemd-run"]
-	return systemdRunPath, ok && systemdRunPath != ""
+	systemdBinary := "systemd-run"
+	// search for "systemd-run" command if not performed
+	// systemd-run is optional, bailout if we don't find any of the other binaries
+	if ne.hasSystemd == nil {
+		found := ne.findBinary(systemdBinary)
+		ne.hasSystemd = &found
+	}
+
+	var systemdRunPath string
+	if *ne.hasSystemd {
+		systemdRunPath = ne.paths[systemdBinary]
+	}
+	return systemdRunPath, len(systemdRunPath) != 0
 }
