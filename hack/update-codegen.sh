@@ -38,7 +38,7 @@ informergen=$(kube::util::find-binary "informer-gen")
 # that generates the set-gen program.
 #
 
-GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
+IFS=" " read -ra GROUP_VERSIONS <<< "$KUBE_AVAILABLE_GROUP_VERSIONS"
 GV_DIRS=()
 INTERNAL_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
