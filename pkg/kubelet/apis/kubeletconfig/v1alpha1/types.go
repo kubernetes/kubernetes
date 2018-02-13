@@ -209,10 +209,10 @@ type KubeletConfiguration struct {
 	SerializeImagePulls *bool `json:"serializeImagePulls"`
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
 	// +optional
-	EvictionHard map[string]string `json:"evictionHard"`
+	EvictionHard map[string]string `json:"evictionHard,omitempty"`
 	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
 	// +optional
-	EvictionSoft map[string]string `json:"evictionSoft"`
+	EvictionSoft map[string]string `json:"evictionSoft,omitempty"`
 	// Map of signal names to quantities that defines grace periods for each soft eviction signal. For example: {"memory.available": "30s"}.
 	// +optional
 	EvictionSoftGracePeriod map[string]string `json:"evictionSoftGracePeriod"`
