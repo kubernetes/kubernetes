@@ -52,7 +52,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_ContainerMetrics_To_metrics_ContainerMetrics(in *ContainerMetrics, out *metrics.ContainerMetrics, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Usage = *(*metrics.ResourceList)(unsafe.Pointer(&in.Usage))
+	out.Usage = *(*v1.ResourceList)(unsafe.Pointer(&in.Usage))
 	return nil
 }
 
@@ -76,7 +76,7 @@ func autoConvert_v1alpha1_NodeMetrics_To_metrics_NodeMetrics(in *NodeMetrics, ou
 	out.ObjectMeta = in.ObjectMeta
 	out.Timestamp = in.Timestamp
 	out.Window = in.Window
-	out.Usage = *(*metrics.ResourceList)(unsafe.Pointer(&in.Usage))
+	out.Usage = *(*v1.ResourceList)(unsafe.Pointer(&in.Usage))
 	return nil
 }
 
