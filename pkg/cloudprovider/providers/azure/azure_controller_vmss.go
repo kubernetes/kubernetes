@@ -33,10 +33,6 @@ import (
 func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
 	ssName, instanceID, vm, err := ss.getVmssVM(string(nodeName))
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(3).Infof("AttachDisk: node %q is not managed by VMSS, retry with availabilitySet", nodeName)
-			return ss.availabilitySet.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
-		}
 		return err
 	}
 
@@ -98,11 +94,6 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 func (ss *scaleSet) DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error {
 	ssName, instanceID, vm, err := ss.getVmssVM(string(nodeName))
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(3).Infof("DetachDiskByName: node %q is not managed by VMSS, retry with availabilitySet", nodeName)
-			return ss.availabilitySet.DetachDiskByName(diskName, diskURI, nodeName)
-		}
-
 		return err
 	}
 
@@ -152,11 +143,6 @@ func (ss *scaleSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 func (ss *scaleSet) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
 	_, _, vm, err := ss.getVmssVM(string(nodeName))
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(3).Infof("GetDiskLun: node %q is not managed by VMSS, retry with availabilitySet", nodeName)
-			return ss.availabilitySet.GetDiskLun(diskName, diskURI, nodeName)
-		}
-
 		return -1, err
 	}
 
@@ -178,11 +164,6 @@ func (ss *scaleSet) GetDiskLun(diskName, diskURI string, nodeName types.NodeName
 func (ss *scaleSet) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
 	_, _, vm, err := ss.getVmssVM(string(nodeName))
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(3).Infof("GetNextDiskLun: node %q is not managed by VMSS, retry with availabilitySet", nodeName)
-			return ss.availabilitySet.GetNextDiskLun(nodeName)
-		}
-
 		return -1, err
 	}
 
@@ -210,11 +191,6 @@ func (ss *scaleSet) DisksAreAttached(diskNames []string, nodeName types.NodeName
 
 	_, _, vm, err := ss.getVmssVM(string(nodeName))
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(3).Infof("DisksAreAttached: node %q is not managed by VMSS, retry with availabilitySet", nodeName)
-			return ss.availabilitySet.DisksAreAttached(diskNames, nodeName)
-		}
-
 		if err == cloudprovider.InstanceNotFound {
 			// if host doesn't exist, no need to detach
 			glog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",

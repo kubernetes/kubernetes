@@ -90,16 +90,6 @@ func newScaleSet(az *Cloud) (VMSet, error) {
 // getVmssVM gets virtualMachineScaleSetVM by nodeName from cache.
 // It returns cloudprovider.InstanceNotFound if node does not belong to any scale sets.
 func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm computepreview.VirtualMachineScaleSetVM, err error) {
-	// Known node not managed by scale sets.
-	managedByAS, err := ss.isNodeManagedByAvailabilitySet(nodeName)
-	if err != nil {
-		return "", "", vm, err
-	}
-	if managedByAS {
-		glog.V(8).Infof("Found node %q in availabilitySetNodesCache", nodeName)
-		return "", "", vm, ErrorNotVmssInstance
-	}
-
 	instanceID, err = getScaleSetVMInstanceID(nodeName)
 	if err != nil {
 		return ssName, instanceID, vm, err
