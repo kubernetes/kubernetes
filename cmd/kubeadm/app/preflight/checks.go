@@ -975,6 +975,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
 	if useCRI {
 		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
