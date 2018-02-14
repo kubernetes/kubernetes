@@ -60,6 +60,21 @@ type ManagerImpl struct {
 
 	server *grpc.Server
 
+	// listenSocket stores a copy of the socket that was created during
+	// Start. It will get closed eventually by server.Serve or server.Stop.
+	//
+	// But there is a race when server.Stop is called shortly after
+	// creating the goroutine which runs server.Serve: that can lead
+	// to server.Serve executing, closing the socket and returning *after*
+	// server.Stop (https://github.com/kubernetes/kubernetes/issues/59488).
+	// Reusing the socket path for a new server instance then breaks because
+	// the old instance removes the filesystem entry for the new socket.
+	//
+	// To fix this, we could wait for completion of the goroutine or (and
+	// this is easier) we can close the socket ourselves. Closing it twice
+	// is safe (https://github.com/grpc/grpc-go/issues/1861).
+	listenSocket net.Listener
+
 	// activePods is a method for listing active pods on the node
 	// so the amount of pluginResources requested by existing pods
 	// could be counted when updating allocated devices
@@ -230,6 +245,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 
 	pluginapi.RegisterRegistrationServer(m.server, m)
 	go m.server.Serve(s)
+	m.listenSocket = s
 
 	glog.V(2).Infof("Serving device plugin registration server on %q", socketPath)
 
@@ -316,6 +332,7 @@ func (m *ManagerImpl) Stop() error {
 	}
 
 	m.server.Stop()
+	m.listenSocket.Close()
 	return nil
 }
 

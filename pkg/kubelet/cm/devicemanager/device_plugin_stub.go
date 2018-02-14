@@ -38,6 +38,12 @@ type Stub struct {
 	update chan []*pluginapi.Device
 
 	server *grpc.Server
+	// We need to close the socket ourselves because there's a
+	// race between server.Close and server.Serve which can lead
+	// to server.Serve running and closing the socket after Stop.
+	// See ManagerImpl and https://github.com/kubernetes/kubernetes/issues/59488
+	// for details.
+	listenSocket net.Listener
 
 	// allocFunc is used for handling allocation request
 	allocFunc stubAllocFunc
@@ -86,6 +92,7 @@ func (m *Stub) Start() error {
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 
 	go m.server.Serve(sock)
+	m.listenSocket = sock
 	_, conn, err := dial(m.socket)
 	if err != nil {
 		return err
@@ -100,6 +107,7 @@ func (m *Stub) Start() error {
 func (m *Stub) Stop() error {
 	m.server.Stop()
 	close(m.stop)
+	m.listenSocket.Close()
 
 	return m.cleanup()
 }
