@@ -1382,18 +1382,15 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Status: v1.ConditionTrue,
 	})
 
-	if kl.kubeClient != nil {
-		hostIP, err := kl.getHostIPAnyWay()
-		if err != nil {
-			glog.V(4).Infof("Cannot get host IP: %v", err)
-		} else {
-			s.HostIP = hostIP.String()
-			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
-				s.PodIP = hostIP.String()
-			}
-		}
+	hostIP, err := kl.getHostIPAnyWay()
+	if err != nil {
+		glog.V(4).Infof("Cannot get host IP: %v", err)
+		return *s
 	}
-
+	s.HostIP = hostIP.String()
+	if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
+		s.PodIP = hostIP.String()
+	}
 	return *s
 }
 
