@@ -388,7 +388,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",
-			"Rev": "7abd5745472fff5eb3685386d5fb8bf38683154d"
+			"Rev": "1de3e0542de65ad8d75452a595886fdd0befb363"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/swag",
