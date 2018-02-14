@@ -173,6 +173,7 @@ func waitForPodToFailover(client clientset.Interface, deployment *extensions.Dep
 	return getNodeForDeployment(client, deployment)
 }
 
+// getNodeForDeployment returns node name for the Deployment
 func getNodeForDeployment(client clientset.Interface, deployment *extensions.Deployment) (string, error) {
 	podList, err := framework.GetPodsForDeployment(client, deployment)
 	if err != nil {

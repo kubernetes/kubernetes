@@ -89,7 +89,6 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 		}
-		//nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
 		// Verify volume count specified by the user can be satisfied
 		if volumeCount > volumesPerNode*len(nodes.Items) {
 			framework.Skipf("Cannot attach %d volumes to %d nodes. Maximum volumes that can be attached on %d nodes is %d", volumeCount, len(nodes.Items), len(nodes.Items), volumesPerNode*len(nodes.Items))

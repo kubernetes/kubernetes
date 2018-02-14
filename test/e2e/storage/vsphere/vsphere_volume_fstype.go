@@ -73,7 +73,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		Expect(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+		Expect(GetReadySchedulableNodeInfos).NotTo(BeEmpty())
 	})
 
 	It("verify fstype - ext3 formatted volume", func() {
@@ -108,7 +108,8 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
-	deleteVolume(client, pvclaim.Name, namespace)
+	err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	Expect(err).To(BeNil())
 }
 
 func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string) {
@@ -130,7 +131,8 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
-	deleteVolume(client, pvclaim.Name, namespace)
+	err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	Expect(err).To(BeNil())
 
 	Expect(eventList.Items).NotTo(BeEmpty())
 	errorMsg := `MountVolume.MountDevice failed for volume "` + persistentvolumes[0].Name + `" : executable file not found`
@@ -174,6 +176,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 	return pod
 }
 
+// detachVolume delete the volume passed in the argument and wait until volume is detached from the node,
 func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Pod, volPath string) {
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 	Expect(err).To(BeNil())
@@ -183,8 +186,4 @@ func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Po
 
 	By("Waiting for volumes to be detached from the node")
 	waitForVSphereDiskToDetach(volPath, nodeName)
-}
-
-func deleteVolume(client clientset.Interface, pvclaimName string, namespace string) {
-	framework.DeletePersistentVolumeClaim(client, pvclaimName, namespace)
 }

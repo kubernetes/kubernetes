@@ -98,6 +98,8 @@ func (vs *VSphere) GetFolderByPath(ctx context.Context, dc object.Reference, fol
 	return vmFolder.Reference(), nil
 }
 
+// CreateVolume creates a vsphere volume using given volume paramemters specified in VolumeOptions.
+// If volume is created successfully the canonical disk path is returned else error is returned.
 func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef types.ManagedObjectReference) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -108,34 +110,14 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef type
 		directoryAlreadyPresent = false
 	)
 	if datacenter == nil {
-		err = fmt.Errorf("datacenter is nil")
-		return "", err
+		return "", fmt.Errorf("datacenter is nil")
 	}
-	if volumeOptions == nil {
-		volumeOptions = &VolumeOptions{}
-	}
-	if volumeOptions.Datastore == "" {
-		volumeOptions.Datastore = vs.Config.DefaultDatastore
-	}
-	if volumeOptions.CapacityKB == 0 {
-		volumeOptions.CapacityKB = DefaultDiskCapacityKB
-	}
-	if volumeOptions.Name == "" {
-		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	}
-	if volumeOptions.DiskFormat == "" {
-		volumeOptions.DiskFormat = DefaultDiskFormat
-	}
-	if volumeOptions.SCSIControllerType == "" {
-		volumeOptions.SCSIControllerType = DefaultSCSIControllerType
-	}
-
+	vs.initVolumeOptions(volumeOptions)
 	finder := find.NewFinder(datacenter.Client(), true)
 	finder.SetDatacenter(datacenter)
 	ds, err := finder.Datastore(ctx, volumeOptions.Datastore)
 	if err != nil {
-		err = fmt.Errorf("Failed while searching for datastore: %s. err: %+v", volumeOptions.Datastore, err)
-		return "", err
+		return "", fmt.Errorf("Failed while searching for datastore: %s. err: %+v", volumeOptions.Datastore, err)
 	}
 	directoryPath := filepath.Clean(ds.Path(VolDir)) + "/"
 	fileManager := object.NewFileManager(ds.Client())
@@ -185,6 +167,8 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef type
 	return canonicalDiskPath, nil
 }
 
+// DeleteVolume deletes the vmdk file specified in the volumePath.
+// if an error is encountered while deleting volume, error is returned.
 func (vs *VSphere) DeleteVolume(volumePath string, dataCenterRef types.ManagedObjectReference) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -207,6 +191,8 @@ func (vs *VSphere) DeleteVolume(volumePath string, dataCenterRef types.ManagedOb
 	return nil
 }
 
+// IsVMPresent checks if VM with the name specified in the vmName argument, is present in the vCenter inventory.
+// if VM is present, function returns true else false.
 func (vs *VSphere) IsVMPresent(vmName string, dataCenterRef types.ManagedObjectReference) (isVMPresent bool, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -229,4 +215,26 @@ func (vs *VSphere) IsVMPresent(vmName string, dataCenterRef types.ManagedObjectR
 		}
 	}
 	return
+}
+
+// initVolumeOptions function sets default values for volumeOptions parameters if not set
+func (vs *VSphere) initVolumeOptions(volumeOptions *VolumeOptions) {
+	if volumeOptions == nil {
+		volumeOptions = &VolumeOptions{}
+	}
+	if volumeOptions.Datastore == "" {
+		volumeOptions.Datastore = vs.Config.DefaultDatastore
+	}
+	if volumeOptions.CapacityKB == 0 {
+		volumeOptions.CapacityKB = DefaultDiskCapacityKB
+	}
+	if volumeOptions.Name == "" {
+		volumeOptions.Name = "e2e-vmdk-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+	if volumeOptions.DiskFormat == "" {
+		volumeOptions.DiskFormat = DefaultDiskFormat
+	}
+	if volumeOptions.SCSIControllerType == "" {
+		volumeOptions.SCSIControllerType = DefaultSCSIControllerType
+	}
 }

@@ -63,10 +63,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) == 0 {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		Expect(GetReadySchedulableNodeInfos()).NotTo(BeEmpty())
 		if os.Getenv("VOLUME_OPS_SCALE") != "" {
 			volume_ops_scale, err = strconv.Atoi(os.Getenv("VOLUME_OPS_SCALE"))
 			Expect(err).NotTo(HaveOccurred())

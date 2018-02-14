@@ -565,6 +565,7 @@ func convertVolPathsToDevicePaths(ctx context.Context, nodeVolumes map[string][]
 	return vmVolumes, nil
 }
 
+// convertVolPathToDevicePath takes volPath and returns canonical volume path
 func convertVolPathToDevicePath(ctx context.Context, dc *object.Datacenter, volPath string) (string, error) {
 	volPath = removeStorageClusterORFolderNameFromVDiskPath(volPath)
 	// Get the canonical volume path for volPath.
@@ -673,6 +674,7 @@ func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.Reso
 	poweronNodeVM(nodeName, vm)
 }
 
+// disksAreAttached takes map of node and it's volumes and returns map of node, its volumes and attachment state
 func disksAreAttached(nodeVolumes map[string][]string) (nodeVolumesAttachMap map[string]map[string]bool, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -725,15 +727,32 @@ func diskIsAttached(volPath string, nodeName string) (bool, error) {
 	return true, nil
 }
 
+// getUUIDFromProviderID strips ProviderPrefix - "vsphere://" from the providerID
+// this gives the VM UUID which can be used to find Node VM from vCenter
 func getUUIDFromProviderID(providerID string) string {
 	return strings.TrimPrefix(providerID, ProviderPrefix)
 }
 
-func GetReadySchedulableRandomNodeInfo() *NodeInfo {
+// GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
+func GetReadySchedulableNodeInfos() []*NodeInfo {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+	var nodesInfo []*NodeInfo
+	for _, node := range nodeList.Items {
+		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
+		if nodeInfo != nil {
+			nodesInfo = append(nodesInfo, nodeInfo)
+		}
+	}
+	return nodesInfo
+}
+
+// GetReadySchedulableRandomNodeInfo returns NodeInfo object for one of the Ready and Schedulable Node.
+// if multiple nodes are present with Ready and Scheduable state then one of the Node is selected randomly
+// and it's associated NodeInfo object is returned.
+func GetReadySchedulableRandomNodeInfo() *NodeInfo {
+	nodesInfo := GetReadySchedulableNodeInfos()
 	rand.Seed(time.Now().Unix())
-	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeList.Items[rand.Int()%len(nodeList.Items)].Name)
-	Expect(nodeInfo).NotTo(BeNil())
-	return nodeInfo
+	Expect(nodesInfo).NotTo(BeEmpty())
+	return nodesInfo[rand.Int()%len(nodesInfo)]
 }
