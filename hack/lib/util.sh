@@ -459,7 +459,12 @@ kube::util::ensure_godep_version() {
 kube::util::ensure_no_staging_repos_in_gopath() {
   kube::util::ensure_single_dir_gopath
   local error=0
-  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
+  for repo_file in "${KUBE_ROOT}"/staging/src/k8s.io/*; do
+    if [[ ! -d "$repo_file" ]]; then
+      # not a directory or there were no files
+      continue;
+    fi
+    repo="$(basename "$repo_file")"
     if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
       echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
       error=1
