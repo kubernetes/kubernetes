@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -34,8 +35,10 @@ type Stub struct {
 	devs   []*pluginapi.Device
 	socket string
 
-	stop   chan interface{}
-	update chan []*pluginapi.Device
+	stop       chan interface{}
+	stopIsOpen bool
+	wg         sync.WaitGroup
+	update     chan []*pluginapi.Device
 
 	server *grpc.Server
 
@@ -58,8 +61,9 @@ func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
 		devs:   devs,
 		socket: socket,
 
-		stop:   make(chan interface{}),
-		update: make(chan []*pluginapi.Device),
+		stop:       make(chan interface{}),
+		stopIsOpen: true,
+		update:     make(chan []*pluginapi.Device),
 
 		allocFunc: defaultAllocFunc,
 	}
@@ -70,7 +74,8 @@ func (m *Stub) SetAllocFunc(f stubAllocFunc) {
 	m.allocFunc = f
 }
 
-// Start starts the gRPC server of the device plugin
+// Start starts the gRPC server of the device plugin. Can only
+// be called once.
 func (m *Stub) Start() error {
 	err := m.cleanup()
 	if err != nil {
@@ -82,10 +87,14 @@ func (m *Stub) Start() error {
 		return err
 	}
 
+	m.wg.Add(1)
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(m.server, m)
 
-	go m.server.Serve(sock)
+	go func() {
+		defer m.wg.Done()
+		m.server.Serve(sock)
+	}()
 	_, conn, err := dial(m.socket)
 	if err != nil {
 		return err
@@ -96,10 +105,20 @@ func (m *Stub) Start() error {
 	return nil
 }
 
-// Stop stops the gRPC server
+// Stop stops the gRPC server. Can be called without a prior Start
+// and more than once. Not safe to be called concurrently by different
+// goroutines!
 func (m *Stub) Stop() error {
-	m.server.Stop()
-	close(m.stop)
+	if m.server != nil {
+		m.server.Stop()
+		m.wg.Wait()
+		m.server = nil
+	}
+	if m.stopIsOpen {
+		// This prevents re-starting the server.
+		close(m.stop)
+		m.stopIsOpen = false
+	}
 
 	return m.cleanup()
 }
