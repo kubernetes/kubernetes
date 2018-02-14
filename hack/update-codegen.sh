@@ -63,7 +63,7 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 	fi
 
 	found=0
-	for dir in "${INTERNAL_DIRS[@]}"; do
+	for dir in "${INTERNAL_DIRS[@]:-}"; do
 		if [[ "$dir" = "$int_group" ]]; then
 			found=1
 			break
