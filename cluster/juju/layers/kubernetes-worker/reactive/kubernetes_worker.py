@@ -970,15 +970,14 @@ def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
     nodeuser = 'system:node:{}'.format(get_node_name().lower())
     creds = kube_control.get_auth_credentials(nodeuser)
-    if creds \
-            and data_changed('kube-control.creds', creds) \
-            and creds['user'] == nodeuser:
+    if creds and creds['user'] == nodeuser:
         # We need to cache the credentials here because if the
         # master changes (master leader dies and replaced by a new one)
         # the new master will have no recollection of our certs.
         db.set('credentials', creds)
         set_state('worker.auth.bootstrapped')
-        set_state('kubernetes-worker.restart-needed')
+        if data_changed('kube-control.creds', creds):
+            set_state('kubernetes-worker.restart-needed')
 
 
 @when_not('kube-control.connected')
