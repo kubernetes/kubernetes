@@ -104,24 +104,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			}
 		}
 	}
-	if in.EnableServer != nil {
-		in, out := &in.EnableServer, &out.EnableServer
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
-	if in.ReadOnlyPort != nil {
-		in, out := &in.ReadOnlyPort, &out.ReadOnlyPort
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
-	}
 	if in.TLSCipherSuites != nil {
 		in, out := &in.TLSCipherSuites, &out.TLSCipherSuites
 		*out = make([]string, len(*in))

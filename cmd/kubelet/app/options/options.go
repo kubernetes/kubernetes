@@ -39,6 +39,7 @@ import (
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/master/ports"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -64,6 +65,9 @@ type KubeletFlags struct {
 	// If runOnce is true, the Kubelet will check the API server once for pods,
 	// run those in addition to the pods specified by the local manifest, and exit.
 	RunOnce bool
+
+	// enableServer enables the Kubelet's server
+	EnableServer bool
 
 	// HostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
@@ -214,6 +218,7 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 
 	return &KubeletFlags{
+		EnableServer:                        true,
 		ContainerRuntimeOptions:             *NewContainerRuntimeOptions(),
 		CertDirectory:                       "/var/lib/kubelet/pki",
 		RootDirectory:                       v1alpha1.DefaultRootDir,
@@ -264,7 +269,22 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 	if err := scheme.Convert(versioned, config, nil); err != nil {
 		return nil, err
 	}
+	applyLegacyDefaults(config)
 	return config, nil
+}
+
+// applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
+// preserve the command line API. This is used to construct the baseline default KubeletConfiguration
+// before the first round of flag parsing.
+func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
+	// --anonymous-auth
+	kc.Authentication.Anonymous.Enabled = true
+	// --authentication-token-webhook
+	kc.Authentication.Webhook.Enabled = false
+	// --authorization-mode
+	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
+	// --read-only-port
+	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -322,6 +342,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --enable-server")
+	fs.BoolVar(&f.EnableServer, "enable-server", f.EnableServer, "Enable the Kubelet's server")
 
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
@@ -407,7 +428,6 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	fs.DurationVar(&c.HTTPCheckFrequency.Duration, "http-check-frequency", c.HTTPCheckFrequency.Duration, "Duration between checking http for new data")
 	fs.StringVar(&c.ManifestURL, "manifest-url", c.ManifestURL, "URL for accessing the container manifest")
 	fs.Var(flag.NewColonSeparatedMultimapStringString(&c.ManifestURLHeader), "manifest-url-header", "Comma-separated list of HTTP headers to use when accessing the manifest URL. Multiple headers with the same name will be added in the same order provided. This flag can be repeatedly invoked. For example: `--manifest-url-header 'a:hello,b:again,c:world' --manifest-url-header 'b:beautiful'`")
-	fs.BoolVar(&c.EnableServer, "enable-server", c.EnableServer, "Enable the Kubelet's server")
 	fs.Var(componentconfig.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Int32Var(&c.Port, "port", c.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&c.ReadOnlyPort, "read-only-port", c.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
