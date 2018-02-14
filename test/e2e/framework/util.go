@@ -5074,7 +5074,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 }
 
 func IsRetryableAPIError(err error) bool {
-	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || apierrs.IsInternalError(err)
+	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err)
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
