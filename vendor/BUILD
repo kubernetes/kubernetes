@@ -288,6 +288,7 @@ filegroup(
         "//vendor/github.com/mailru/easyjson/jlexer:all-srcs",
         "//vendor/github.com/mailru/easyjson/jwriter:all-srcs",
         "//vendor/github.com/matttproud/golang_protobuf_extensions/pbutil:all-srcs",
+        "//vendor/github.com/mholt/caddy/caddyfile:all-srcs",
         "//vendor/github.com/miekg/dns:all-srcs",
         "//vendor/github.com/mindprince/gonvml:all-srcs",
         "//vendor/github.com/mistifyio/go-zfs:all-srcs",

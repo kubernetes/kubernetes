@@ -2093,6 +2093,11 @@
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
 		},
 		{
+			"ImportPath": "github.com/mholt/caddy/caddyfile",
+			"Comment": "v0.10.10-57-g2de4950",
+			"Rev": "2de495001514ed50eac2e09f474c32d417100c5c"
+		},
+		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "5d001d020961ae1c184f9f8152fdc73810481677"
 		},
