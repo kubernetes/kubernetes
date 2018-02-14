@@ -336,7 +336,6 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 			EnableCoreControllers:   true,
 			EventTTL:                s.EventTTL,
 			KubeletClientConfig:     s.KubeletConfig,
-			EnableUISupport:         true,
 			EnableLogsSupport:       s.EnableLogsHandler,
 			ProxyTransport:          proxyTransport,
 
@@ -450,12 +449,12 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		)
 	}
 
-	genericConfig.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, sharedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
-	genericConfig.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers, versionedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
@@ -586,7 +585,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 		// FIXME (soltysh): this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{
 			batch.Resource("cronjobs").WithVersion("v1beta1"),
-			storage.Resource("volumeattachments").WithVersion("v1alpha1"),
+			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
 		apiResourceConfig)
@@ -595,11 +594,9 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 	}
 
 	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))
-
-	// keep Deployments, Daemonsets and ReplicaSets in extensions for backwards compatibility, we'll have to migrate at some point, eventually
-	storageFactory.AddCohabitatingResources(extensions.Resource("deployments"), apps.Resource("deployments"))
-	storageFactory.AddCohabitatingResources(extensions.Resource("daemonsets"), apps.Resource("daemonsets"))
-	storageFactory.AddCohabitatingResources(extensions.Resource("replicasets"), apps.Resource("replicasets"))
+	storageFactory.AddCohabitatingResources(apps.Resource("deployments"), extensions.Resource("deployments"))
+	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
+	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
 	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
@@ -636,7 +633,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 
 func defaultOptions(s *options.ServerRunOptions) error {
 	// set defaults
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing.SecureServingOptions); err != nil {
 		return err
 	}
 	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {

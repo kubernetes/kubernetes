@@ -23,7 +23,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/allow:all-srcs",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/keystone:all-srcs",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile:all-srcs",
     ],
     tags = ["automanaged"],

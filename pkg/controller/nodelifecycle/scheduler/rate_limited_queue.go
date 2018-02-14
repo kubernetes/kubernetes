@@ -293,20 +293,15 @@ func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
 		newLimiter = flowcontrol.NewFakeNeverRateLimiter()
 	} else {
 		newLimiter = flowcontrol.NewTokenBucketRateLimiter(newQPS, EvictionRateLimiterBurst)
-	}
-	// If we're currently waiting on limiter, we drain the new one - this is a good approach when Burst value is 1
-	// TODO: figure out if we need to support higher Burst values and decide on the drain logic, should we keep:
-	// - saturation (percentage of used tokens)
-	// - number of used tokens
-	// - number of available tokens
-	// - something else
-	for q.limiter.Saturation() > newLimiter.Saturation() {
-		// Check if we're not using fake limiter
-		previousSaturation := newLimiter.Saturation()
-		newLimiter.TryAccept()
-		// It's a fake limiter
-		if newLimiter.Saturation() == previousSaturation {
-			break
+
+		// If we're currently waiting on limiter, we drain the new one - this is a good approach when Burst value is 1
+		// TODO: figure out if we need to support higher Burst values and decide on the drain logic, should we keep:
+		// - saturation (percentage of used tokens)
+		// - number of used tokens
+		// - number of available tokens
+		// - something else
+		if q.limiter.TryAccept() == false {
+			newLimiter.TryAccept()
 		}
 	}
 	q.limiter.Stop()

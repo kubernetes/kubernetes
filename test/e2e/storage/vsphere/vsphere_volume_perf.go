@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -63,6 +62,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 
@@ -160,7 +160,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		totalpvs      [][]*v1.PersistentVolume
 		totalpods     []*v1.Pod
 	)
-	nodeVolumeMap := make(map[types.NodeName][]string)
+	nodeVolumeMap := make(map[string][]string)
 	latency = make(map[string]float64)
 	numPods := volumeCount / volumesPerPod
 
@@ -197,18 +197,14 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	elapsed = time.Since(start)
 	latency[AttachOp] = elapsed.Seconds()
 
-	// Verify access to the volumes
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
-
 	for i, pod := range totalpods {
-		verifyVSphereVolumesAccessible(client, pod, totalpvs[i], vsp)
+		verifyVSphereVolumesAccessible(client, pod, totalpvs[i])
 	}
 
 	By("Deleting pods")
 	start = time.Now()
 	for _, pod := range totalpods {
-		err = framework.DeletePodWithWait(f, client, pod)
+		err := framework.DeletePodWithWait(f, client, pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
 	elapsed = time.Since(start)
@@ -216,12 +212,11 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 
 	for i, pod := range totalpods {
 		for _, pv := range totalpvs[i] {
-			nodeName := types.NodeName(pod.Spec.NodeName)
-			nodeVolumeMap[nodeName] = append(nodeVolumeMap[nodeName], pv.Spec.VsphereVolume.VolumePath)
+			nodeVolumeMap[pod.Spec.NodeName] = append(nodeVolumeMap[pod.Spec.NodeName], pv.Spec.VsphereVolume.VolumePath)
 		}
 	}
 
-	err = waitForVSphereDisksToDetach(client, vsp, nodeVolumeMap)
+	err := waitForVSphereDisksToDetach(nodeVolumeMap)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Deleting the PVCs")

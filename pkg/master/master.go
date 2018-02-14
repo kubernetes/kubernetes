@@ -109,7 +109,6 @@ type ExtraConfig struct {
 
 	// Used to start and monitor tunneling
 	Tunneler          tunneler.Tunneler
-	EnableUISupport   bool
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
 
@@ -269,9 +268,6 @@ func (cfg *Config) Complete(informers informers.SharedInformerFactory) Completed
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
 	}
 
-	// enable swagger UI only if general UI support is on
-	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.ExtraConfig.EnableUISupport
-
 	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
 		c.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
@@ -304,9 +300,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	if c.ExtraConfig.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Handler.NonGoRestfulMux)
-	}
 	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
@@ -337,15 +330,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
-		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
+		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
+		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
-		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
+		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},

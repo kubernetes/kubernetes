@@ -87,7 +87,7 @@ type PrefixWriter interface {
 	Write(level int, format string, a ...interface{})
 	// WriteLine writes an entire line with no indentation level.
 	WriteLine(a ...interface{})
-	// Flush forces indendation to be reset.
+	// Flush forces indentation to be reset.
 	Flush()
 }
 
@@ -636,7 +636,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		printLabelsMultiline(w, "Labels", pod.Labels)
 		printAnnotationsMultiline(w, "Annotations", pod.Annotations)
 		if pod.DeletionTimestamp != nil {
-			w.Write(LEVEL_0, "Status:\tTerminating (expires %s)\n", pod.DeletionTimestamp.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pod.DeletionTimestamp))
 			w.Write(LEVEL_0, "Termination Grace Period:\t%ds\n", *pod.DeletionGracePeriodSeconds)
 		} else {
 			w.Write(LEVEL_0, "Status:\t%s\n", string(pod.Status.Phase))
@@ -650,6 +650,9 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
+		}
+		if len(pod.Status.NominatedNodeName) > 0 {
+			w.Write(LEVEL_0, "NominatedNodeName:\t%s\n", pod.Status.NominatedNodeName)
 		}
 
 		if len(pod.Spec.InitContainers) > 0 {
@@ -1137,8 +1140,13 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", pv.ObjectMeta.Finalizers)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
-		w.Write(LEVEL_0, "Status:\t%s\n", pv.Status.Phase)
+		if pv.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pv.ObjectMeta.DeletionTimestamp))
+		} else {
+			w.Write(LEVEL_0, "Status:\t%v\n", pv.Status.Phase)
+		}
 		if pv.Spec.ClaimRef != nil {
 			w.Write(LEVEL_0, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
 		} else {
@@ -1235,7 +1243,7 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClaimClass(pvc))
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			w.Write(LEVEL_0, "Status:\tTerminating (since %s)\n", pvc.ObjectMeta.DeletionTimestamp.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pvc.ObjectMeta.DeletionTimestamp))
 		} else {
 			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
 		}
@@ -2580,8 +2588,9 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		}
 		printLabelsMultiline(w, "Labels", node.Labels)
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
-		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
+		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
+		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
@@ -2909,10 +2918,18 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
-	fractionCpuReqs := float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	fractionCpuLimits := float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	fractionMemoryReqs := float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
-	fractionMemoryLimits := float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
+	fractionCpuReqs := float64(0)
+	fractionCpuLimits := float64(0)
+	if allocatable.Cpu().MilliValue() != 0 {
+		fractionCpuReqs = float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
+		fractionCpuLimits = float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
+	}
+	fractionMemoryReqs := float64(0)
+	fractionMemoryLimits := float64(0)
+	if allocatable.Memory().Value() != 0 {
+		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
+		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
+	}
 	w.Write(LEVEL_1, "%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
 		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits),
 		memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))

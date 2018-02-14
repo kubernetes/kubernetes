@@ -214,7 +214,7 @@ func (o *Options) applyDeprecatedHealthzPortToConfig() {
 // 3. --algorithm-provider to use a named algorithm provider.
 func (o *Options) applyDeprecatedAlgorithmSourceOptionsToConfig() {
 	switch {
-	case o.useLegacyPolicyConfig:
+	case o.useLegacyPolicyConfig || (len(o.policyConfigFile) > 0 && o.policyConfigMapName == ""):
 		o.config.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
 			Policy: &componentconfig.SchedulerPolicySource{
 				File: &componentconfig.SchedulerPolicyFileSource{

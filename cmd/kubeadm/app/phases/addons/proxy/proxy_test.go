@@ -218,7 +218,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 			UnifiedControlPlaneImage: "someImage",
 		}
 
-		// Simulate an error if neccessary
+		// Simulate an error if necessary
 		switch tc.simError {
 		case ServiceAccountError:
 			client.PrependReactor("create", "serviceaccounts", func(action core.Action) (bool, runtime.Object, error) {

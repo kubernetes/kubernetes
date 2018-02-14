@@ -1659,7 +1659,7 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">prefix</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3754,7 +3754,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_eventseries">v1.EventSeries</h3>
 <div class="paragraph">
-<p>EventSeries contain information on series of events, i.e. thing that was/is happening continously for some time.</p>
+<p>EventSeries contain information on series of events, i.e. thing that was/is happening continuously for some time.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3783,7 +3783,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastObservedTime</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Time of the last occurence observed</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Time of the last occurrence observed</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5201,7 +5201,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">names</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Names by which this image is known. e.g. ["gcr.io/google_containers/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Names by which this image is known. e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -9046,6 +9046,13 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nominatedNodeName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">hostIP</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">IP address of the host to which the pod is assigned. Empty if not yet scheduled.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -9277,7 +9284,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">priorityClassName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">If specified, indicates the pod&#8217;s priority. "SYSTEM" is a special keyword which indicates the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If specified, indicates the pod&#8217;s priority. "system-node-critical" and "system-cluster-critical" are two special keywords which indicate the highest priorities with the former being the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>

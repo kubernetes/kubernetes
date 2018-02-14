@@ -59,6 +59,7 @@ type ApplyOptions struct {
 	PruneResources  []pruneResource
 	Timeout         time.Duration
 	cmdBaseName     string
+	all             bool
 }
 
 const (
@@ -112,7 +113,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 		Example: applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(options.Prune, cmdutil.GetFlagBool(cmd, "all"), options.Selector))
+			cmdutil.CheckErr(validatePruneAll(options.Prune, options.all, options.Selector))
 			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, &options))
 		},
 	}
@@ -127,8 +128,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.Flags().BoolVar(&options.Force, "force", false, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().Bool("openapi-patch", true, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
@@ -149,11 +150,13 @@ func validateArgs(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
-
 	return nil
 }
 
 func validatePruneAll(prune, all bool, selector string) error {
+	if all && len(selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	if prune && !all && selector == "" {
 		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector.")
 	}
@@ -297,7 +300,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			if len(output) > 0 && !shortOutput {
 				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
-			f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
 		}
 
@@ -342,7 +345,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if string(patchBytes) == "{}" {
 				count++
-				f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
+				f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
 				return nil
 			}
 		}
@@ -350,7 +353,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		if len(output) > 0 && !shortOutput {
 			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
 	})
 
@@ -517,7 +520,7 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 				return err
 			}
 		}
-		f.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		f.PrintSuccess(shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }
@@ -675,13 +678,13 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		}
 		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name, errOut)
 	}
-	if err != nil && p.force {
-		patchBytes, patchObject, err = p.deleteAndCreate(modified, namespace, name)
+	if err != nil && errors.IsConflict(err) && p.force {
+		patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
 	}
 	return patchBytes, patchObject, err
 }
 
-func (p *patcher) deleteAndCreate(modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
+func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
 	err := p.delete(namespace, name)
 	if err != nil {
 		return modified, nil, err
@@ -700,5 +703,15 @@ func (p *patcher) deleteAndCreate(modified []byte, namespace, name string) ([]by
 		return modified, nil, err
 	}
 	createdObject, err := p.helper.Create(namespace, true, versionedObject)
+	if err != nil {
+		// restore the original object if we fail to create the new one
+		// but still propagate and advertise error to user
+		recreated, recreateErr := p.helper.Create(namespace, true, original)
+		if recreateErr != nil {
+			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
+		} else {
+			createdObject = recreated
+		}
+	}
 	return modified, createdObject, err
 }

@@ -430,7 +430,7 @@ mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
 resourceContainer: /foo
-udpTimeoutMilliseconds: 123ms
+udpIdleTimeout: 123ms
 `
 
 	testCases := []struct {

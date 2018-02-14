@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -44,17 +45,17 @@ func runBasicSecureAPIServer(t *testing.T, ciphers []string) (uint32, error) {
 	var kubePort uint32
 
 	go func() {
-		// always get a fresh port in case something claimed the old one
-		freePort, err := framework.FindFreeLocalPort()
+		listener, port, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		atomic.StoreUint32(&kubePort, uint32(freePort))
+		atomic.StoreUint32(&kubePort, uint32(port))
 
 		kubeAPIServerOptions := options.NewServerRunOptions()
 		kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
-		kubeAPIServerOptions.SecureServing.BindPort = freePort
+		kubeAPIServerOptions.SecureServing.BindPort = port
+		kubeAPIServerOptions.SecureServing.Listener = listener
 		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 		kubeAPIServerOptions.SecureServing.CipherSuites = ciphers
 		kubeAPIServerOptions.InsecureServing.BindPort = 0

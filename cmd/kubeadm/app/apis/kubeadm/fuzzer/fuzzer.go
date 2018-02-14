@@ -72,7 +72,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					Authentication: kubeletconfigv1alpha1.KubeletAuthentication{
 						X509: kubeletconfigv1alpha1.KubeletX509Authentication{ClientCAFile: "foo"},
 					},
-					CAdvisorPort: utilpointer.Int32Ptr(0),
 				},
 			}
 			kubeletconfigv1alpha1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
@@ -110,6 +109,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					},
 					ConfigSyncPeriod: metav1.Duration{Duration: 1},
 				},
+			}
+			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
+				Path:      "foo",
+				LogDir:    "/foo",
+				LogMaxAge: utilpointer.Int32Ptr(0),
 			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {

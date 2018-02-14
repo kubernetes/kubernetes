@@ -57,6 +57,7 @@ filegroup(
         "//pkg/cloudprovider/providers/gce/cloud/filter:all-srcs",
         "//pkg/cloudprovider/providers/gce/cloud/gen:all-srcs",
         "//pkg/cloudprovider/providers/gce/cloud/meta:all-srcs",
+        "//pkg/cloudprovider/providers/gce/cloud/mock:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -200,7 +200,7 @@ func (o *objectCountEvaluator) UsageStats(options quota.UsageStatsOptions) (quot
 var _ quota.Evaluator = &objectCountEvaluator{}
 
 // NewObjectCountEvaluator returns an evaluator that can perform generic
-// object quota counting.  It allows an optional alias for backwards compatibilty
+// object quota counting.  It allows an optional alias for backwards compatibility
 // purposes for the legacy object counting names in quota.  Unless its supporting
 // backward compatibility, alias should not be used.
 func NewObjectCountEvaluator(

@@ -69,6 +69,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
 // Calls AddPodToVolume() twice to add the same pod to the same volume
@@ -113,6 +114,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	verifyVolumeExistsInVolumesToMount(
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
 // Populates data struct with a new volume/pod
@@ -160,6 +162,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	verifyVolumeDoesntExist(t, generatedVolumeName, dsw)
 	verifyVolumeDoesntExistInVolumesToMount(t, generatedVolumeName, dsw)
 	verifyPodDoesntExistInVolumeDsw(t, podName, generatedVolumeName, dsw)
+	verifyVolumeDoesntExistWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
 }
 
 // Calls AddPodToVolume() to add three new volumes to data struct
@@ -377,6 +380,32 @@ func verifyPodDoesntExistInVolumeDsw(
 		expectedPodName, expectedVolumeName); podExistsInVolume {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+}
+
+func verifyVolumeExistsWithSpecNameInVolumeDsw(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedVolumeSpecName string,
+	dsw DesiredStateOfWorld) {
+	if podExistsInVolume := dsw.VolumeExistsWithSpecName(
+		expectedPodName, expectedVolumeSpecName); !podExistsInVolume {
+		t.Fatalf(
+			"DSW VolumeExistsWithSpecNam returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+}
+
+func verifyVolumeDoesntExistWithSpecNameInVolumeDsw(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedVolumeSpecName string,
+	dsw DesiredStateOfWorld) {
+	if podExistsInVolume := dsw.VolumeExistsWithSpecName(
+		expectedPodName, expectedVolumeSpecName); podExistsInVolume {
+		t.Fatalf(
+			"DSW VolumeExistsWithSpecNam returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
 	}
 }

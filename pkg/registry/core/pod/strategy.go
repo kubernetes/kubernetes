@@ -243,6 +243,7 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
+	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 

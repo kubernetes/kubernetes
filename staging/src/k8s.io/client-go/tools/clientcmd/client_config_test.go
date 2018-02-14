@@ -94,7 +94,7 @@ func TestInsecureOverridesCA(t *testing.T) {
 }
 
 func TestMergeContext(t *testing.T) {
-	const namespace = "overriden-namespace"
+	const namespace = "overridden-namespace"
 
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)

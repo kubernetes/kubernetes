@@ -319,7 +319,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 		key        string
 		updateFn   func(*v1.Service) *v1.Service //Manipulate the structure
 		svc        *v1.Service
-		expectedFn func(*v1.Service, error) error //Error comparision function
+		expectedFn func(*v1.Service, error) error //Error comparison function
 	}{
 		{
 			testName: "If updating a valid service",
@@ -489,7 +489,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		expectedFn func(svcErr error) error // Function to check if the returned value is expected
 	}{
 		{
-			testName: "If an non-existant service is deleted",
+			testName: "If an non-existent service is deleted",
 			updateFn: func(controller *ServiceController) {
 				// Does not do anything
 			},

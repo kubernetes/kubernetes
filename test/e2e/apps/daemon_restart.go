@@ -249,7 +249,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		framework.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-controller", ports.ControllerManagerPort, restartPollInterval, restartTimeout)
+			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
 		restarter.restart()
 
 		// The intent is to ensure the replication controller manager has observed and reported status of

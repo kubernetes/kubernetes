@@ -17,14 +17,22 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
-// ValidatePriorityClassName can be used to check whether the given priority
-// class name is valid.
-var ValidatePriorityClassName = apivalidation.NameIsDNSSubdomain
+// ValidatePriorityClassName checks whether the given priority class name is valid.
+func ValidatePriorityClassName(name string, prefix bool) []string {
+	var allErrs []string
+	if strings.HasPrefix(name, scheduling.SystemPriorityClassPrefix) {
+		allErrs = append(allErrs, "priority class names with '"+scheduling.SystemPriorityClassPrefix+"' prefix are reserved for system use only")
+	}
+	allErrs = append(allErrs, apivalidation.NameIsDNSSubdomain(name, prefix)...)
+	return allErrs
+}
 
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
 // set correctly.

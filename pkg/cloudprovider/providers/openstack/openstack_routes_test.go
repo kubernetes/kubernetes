@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"net"
 	"testing"
 
@@ -39,9 +40,17 @@ func TestRoutes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
+	vms := getServers(os)
+	_, err = os.InstanceID()
+	if err != nil || len(vms) == 0 {
+		t.Skipf("Please run this test in an OpenStack vm or create at least one VM in OpenStack before you run this test.")
+	}
+
+	// We know we have at least one vm.
+	servername := vms[0].Name
+
 	// Pick the first router and server to try a test with
-	os.routeOpts.RouterId = getRouters(os)[0].ID
-	servername := getServers(os)[0].Name
+	os.routeOpts.RouterID = getRouters(os)[0].ID
 
 	r, ok := os.Routes()
 	if !ok {
@@ -52,12 +61,12 @@ func TestRoutes(t *testing.T) {
 		DestinationCIDR: "10.164.2.0/24",
 		TargetNode:      types.NodeName(servername),
 	}
-	err = r.CreateRoute(clusterName, "myhint", &newroute)
+	err = r.CreateRoute(context.TODO(), clusterName, "myhint", &newroute)
 	if err != nil {
 		t.Fatalf("CreateRoute error: %v", err)
 	}
 
-	routelist, err := r.ListRoutes(clusterName)
+	routelist, err := r.ListRoutes(context.TODO(), clusterName)
 	if err != nil {
 		t.Fatalf("ListRoutes() error: %v", err)
 	}
@@ -70,7 +79,7 @@ func TestRoutes(t *testing.T) {
 		t.Logf("%s via %s", cidr, route.TargetNode)
 	}
 
-	err = r.DeleteRoute(clusterName, &newroute)
+	err = r.DeleteRoute(context.TODO(), clusterName, &newroute)
 	if err != nil {
 		t.Fatalf("DeleteRoute error: %v", err)
 	}

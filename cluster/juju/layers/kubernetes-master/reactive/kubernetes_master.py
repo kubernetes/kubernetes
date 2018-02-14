@@ -463,7 +463,7 @@ def start_master(etcd):
 def etcd_data_change(etcd):
     ''' Etcd scale events block master reconfiguration due to the
         kubernetes-master.components.started state. We need a way to
-        handle these events consistenly only when the number of etcd
+        handle these events consistently only when the number of etcd
         units has actually changed '''
 
     # key off of the connection string
@@ -1169,7 +1169,7 @@ def configure_controller_manager():
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
 
-    # Default to 3 minute resync. TODO: Make this configureable?
+    # Default to 3 minute resync. TODO: Make this configurable?
     controller_opts['min-resync-period'] = '3m'
     controller_opts['v'] = '2'
     controller_opts['root-ca-file'] = ca_cert_path

@@ -62,6 +62,7 @@ func newAlgorithmCache() AlgorithmCache {
 	}
 }
 
+// NewEquivalenceCache creates a EquivalenceCache object.
 func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
 	return &EquivalenceCache{
 		getEquivalencePod: getEquivalencePodFunc,
@@ -75,9 +76,12 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
 	equivalenceHash uint64,
+	needLock bool,
 ) {
-	ec.Lock()
-	defer ec.Unlock()
+	if needLock {
+		ec.Lock()
+		defer ec.Unlock()
+	}
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
 		ec.algorithmCache[nodeName] = newAlgorithmCache()
 	}
@@ -106,10 +110,12 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(
 // based on cached predicate results
 func (ec *EquivalenceCache) PredicateWithECache(
 	podName, nodeName, predicateKey string,
-	equivalenceHash uint64,
+	equivalenceHash uint64, needLock bool,
 ) (bool, []algorithm.PredicateFailureReason, bool) {
-	ec.RLock()
-	defer ec.RUnlock()
+	if needLock {
+		ec.RLock()
+		defer ec.RUnlock()
+	}
 	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
 		predicateKey, podName, nodeName)
 	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
@@ -119,13 +125,11 @@ func (ec *EquivalenceCache) PredicateWithECache(
 			if hostPredicate, ok := predicateMap[equivalenceHash]; ok {
 				if hostPredicate.Fit {
 					return true, []algorithm.PredicateFailureReason{}, false
-				} else {
-					return false, hostPredicate.FailReasons, false
 				}
-			} else {
-				// is invalid
-				return false, []algorithm.PredicateFailureReason{}, true
+				return false, hostPredicate.FailReasons, false
 			}
+			// is invalid
+			return false, []algorithm.PredicateFailureReason{}, true
 		}
 	}
 	return false, []algorithm.PredicateFailureReason{}, true
@@ -208,15 +212,22 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 	ec.InvalidateCachedPredicateItem(nodeName, invalidPredicates)
 }
 
-// getHashEquivalencePod returns the hash of equivalence pod.
-// 1. equivalenceHash
-// 2. if equivalence hash is valid
-func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) (uint64, bool) {
+// equivalenceClassInfo holds equivalence hash which is used for checking equivalence cache.
+// We will pass this to podFitsOnNode to ensure equivalence hash is only calculated per schedule.
+type equivalenceClassInfo struct {
+	// Equivalence hash.
+	hash uint64
+}
+
+// getEquivalenceClassInfo returns the equivalence class of given pod.
+func (ec *EquivalenceCache) getEquivalenceClassInfo(pod *v1.Pod) *equivalenceClassInfo {
 	equivalencePod := ec.getEquivalencePod(pod)
 	if equivalencePod != nil {
 		hash := fnv.New32a()
 		hashutil.DeepHashObject(hash, equivalencePod)
-		return uint64(hash.Sum32()), true
+		return &equivalenceClassInfo{
+			hash: uint64(hash.Sum32()),
+		}
 	}
-	return 0, false
+	return nil
 }

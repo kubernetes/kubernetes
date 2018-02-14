@@ -39,6 +39,9 @@ import (
 
 const (
 	checkpointsDir = "checkpoints"
+	// TODO(mtaufen): We may expose this in a future API, but for the time being we use an internal default,
+	// because it is not especially clear where this should live in the API.
+	configTrialDuration = 10 * time.Minute
 )
 
 // Controller manages syncing dynamic Kubelet configurations
@@ -101,7 +104,7 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 		// periodically checks whether the last-known good needs to be updated
 		// we only do this when the assigned config loads and passes validation
 		// wait.Forever will call the func once before starting the timer
-		go wait.Forever(func() { cc.checkTrial(assigned.ConfigTrialDuration.Duration) }, 10*time.Second)
+		go wait.Forever(func() { cc.checkTrial(configTrialDuration) }, 10*time.Second)
 
 		return assigned, nil
 	} // Assert: the assigned config failed to load, parse, or validate

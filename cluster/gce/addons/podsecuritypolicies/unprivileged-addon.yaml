@@ -3,7 +3,7 @@ kind: PodSecurityPolicy
 metadata:
   name: gce.unprivileged-addon
   annotations:
-    kubernetes.io/description: 'This policy grants the minimum ammount of
+    kubernetes.io/description: 'This policy grants the minimum amount of
       privilege necessary to run non-privileged kube-system pods. This policy is
       not intended for use outside of kube-system, and may include further
       restrictions in the future.'

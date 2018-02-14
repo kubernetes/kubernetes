@@ -145,6 +145,47 @@ func (m VirtualDiskManager) DeleteVirtualDisk(ctx context.Context, name string, 
 	return NewTask(m.c, res.Returnval), nil
 }
 
+// InflateVirtualDisk inflates a virtual disk.
+func (m VirtualDiskManager) InflateVirtualDisk(ctx context.Context, name string, dc *Datacenter) (*Task, error) {
+	req := types.InflateVirtualDisk_Task{
+		This: m.Reference(),
+		Name: name,
+	}
+
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	res, err := methods.InflateVirtualDisk_Task(ctx, m.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(m.c, res.Returnval), nil
+}
+
+// ShrinkVirtualDisk shrinks a virtual disk.
+func (m VirtualDiskManager) ShrinkVirtualDisk(ctx context.Context, name string, dc *Datacenter, copy *bool) (*Task, error) {
+	req := types.ShrinkVirtualDisk_Task{
+		This: m.Reference(),
+		Name: name,
+		Copy: copy,
+	}
+
+	if dc != nil {
+		ref := dc.Reference()
+		req.Datacenter = &ref
+	}
+
+	res, err := methods.ShrinkVirtualDisk_Task(ctx, m.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(m.c, res.Returnval), nil
+}
+
 // Queries virtual disk uuid
 func (m VirtualDiskManager) QueryVirtualDiskUuid(ctx context.Context, name string, dc *Datacenter) (string, error) {
 	req := types.QueryVirtualDiskUuid{

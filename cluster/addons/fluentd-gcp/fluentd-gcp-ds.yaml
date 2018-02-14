@@ -23,11 +23,12 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       serviceAccountName: fluentd-gcp
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.14
+        image: k8s.gcr.io/fluentd-gcp:2.0.14
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
@@ -82,7 +83,7 @@ spec:
               fi;
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
+        image: k8s.gcr.io/prometheus-to-sd:v0.2.2
         command:
           - /monitor
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
@@ -122,4 +123,4 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.2.3
+          name: fluentd-gcp-config-v1.2.4

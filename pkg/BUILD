@@ -103,7 +103,6 @@ filegroup(
         "//pkg/version:all-srcs",
         "//pkg/volume:all-srcs",
         "//pkg/watch/json:all-srcs",
-        "//pkg/watch/versioned:all-srcs",
     ],
     tags = ["automanaged"],
 )

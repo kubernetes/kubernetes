@@ -17,13 +17,17 @@ limitations under the License.
 package azure
 
 import (
-	"k8s.io/apimachinery/pkg/util/wait"
+	"context"
+	"net/http"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // requestBackoff if backoff is disabled in cloud provider it
@@ -131,7 +135,12 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(sg network.SecurityGroup) error {
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		return processRetryResponse(resp.Response, err)
+		done, err := processRetryResponse(resp.Response, err)
+		if done && err == nil {
+			// Invalidate the cache right after updating
+			az.nsgCache.Delete(*sg.Name)
+		}
+		return done, err
 	})
 }
 
@@ -142,7 +151,12 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
-		return processRetryResponse(resp.Response, err)
+		done, err := processRetryResponse(resp.Response, err)
+		if done && err == nil {
+			// Invalidate the cache right after updating
+			az.lbCache.Delete(*lb.Name)
+		}
+		return done, err
 	})
 }
 
@@ -283,7 +297,12 @@ func (az *Cloud) DeleteLBWithRetry(lbName string) error {
 		respChan, errChan := az.LoadBalancerClient.Delete(az.ResourceGroup, lbName, nil)
 		resp := <-respChan
 		err := <-errChan
-		return processRetryResponse(resp, err)
+		done, err := processRetryResponse(resp, err)
+		if done && err == nil {
+			// Invalidate the cache right after deleting
+			az.lbCache.Delete(lbName)
+		}
+		return done, err
 	})
 }
 
@@ -330,6 +349,15 @@ func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualM
 	})
 }
 
+// UpdateVmssVMWithRetry invokes az.VirtualMachineScaleSetVMsClient.Update with exponential backoff retry
+func (az *Cloud) UpdateVmssVMWithRetry(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters computepreview.VirtualMachineScaleSetVM) error {
+	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
+		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
+		return processHTTPRetryResponse(resp, err)
+	})
+}
+
 // A wait.ConditionFunc function to deal with common HTTP backoff response conditions
 func processRetryResponse(resp autorest.Response, err error) (bool, error) {
 	if isSuccessHTTPResponse(resp) {
@@ -364,4 +392,37 @@ func isSuccessHTTPResponse(resp autorest.Response) bool {
 		return true
 	}
 	return false
+}
+
+func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
+	if err != nil {
+		return true
+	}
+
+	if resp != nil {
+		// HTTP 4xx or 5xx suggests we should retry
+		if 399 < resp.StatusCode && resp.StatusCode < 600 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func processHTTPRetryResponse(resp *http.Response, err error) (bool, error) {
+	if resp != nil {
+		// HTTP 2xx suggests a successful response
+		if 199 < resp.StatusCode && resp.StatusCode < 300 {
+			return true, nil
+		}
+	}
+
+	if shouldRetryHTTPRequest(resp, err) {
+		glog.Errorf("backoff: failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
+		// suppress the error object so that backoff process continues
+		return false, nil
+	}
+
+	// Fall-through: stop periodic backoff
+	return true, nil
 }

@@ -121,6 +121,10 @@ func (p *Collector) RetrieveProperties(ctx context.Context, req types.RetrievePr
 // of the specified managed objects, with the relevant properties filled in. If
 // the properties slice is nil, all properties are loaded.
 func (p *Collector) Retrieve(ctx context.Context, objs []types.ManagedObjectReference, ps []string, dst interface{}) error {
+	if len(objs) == 0 {
+		return errors.New("object references is empty")
+	}
+
 	var propSpec *types.PropertySpec
 	var objectSet []types.ObjectSpec
 

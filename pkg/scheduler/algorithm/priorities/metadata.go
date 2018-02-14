@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
+// PriorityMetadataFactory is a factory to produce PriorityMetadata.
 type PriorityMetadataFactory struct {
 	serviceLister     algorithm.ServiceLister
 	controllerLister  algorithm.ControllerLister
@@ -32,6 +33,7 @@ type PriorityMetadataFactory struct {
 	statefulSetLister algorithm.StatefulSetLister
 }
 
+// NewPriorityMetadataFactory creates a PriorityMetadataFactory.
 func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister) algorithm.PriorityMetadataProducer {
 	factory := &PriorityMetadataFactory{
 		serviceLister:     serviceLister,

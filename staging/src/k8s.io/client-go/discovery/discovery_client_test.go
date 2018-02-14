@@ -74,6 +74,17 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 					"v1",
 				},
 			}
+		case "/apis":
+			obj = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
+					{
+						Name: "extensions",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{GroupVersion: "extensions/v1beta1"},
+						},
+					},
+				},
+			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -95,8 +106,8 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	groupVersions := metav1.ExtractGroupVersions(apiGroupList)
-	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
-		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
+	if !reflect.DeepEqual(groupVersions, []string{"v1", "extensions/v1beta1"}) {
+		t.Errorf("expected: %q, got: %q", []string{"v1", "extensions/v1beta1"}, groupVersions)
 	}
 }
 

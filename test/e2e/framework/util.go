@@ -154,6 +154,21 @@ const (
 	// How long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
 
+	// How long claims have to become bound
+	ClaimBindingTimeout = 3 * time.Minute
+
+	// How long claims have to become deleted
+	ClaimDeletingTimeout = 3 * time.Minute
+
+	// How long PVs have to beome reclaimed
+	PVReclaimingTimeout = 3 * time.Minute
+
+	// How long PVs have to become bound
+	PVBindingTimeout = 3 * time.Minute
+
+	// How long PVs have to become deleted
+	PVDeletingTimeout = 3 * time.Minute
+
 	// How long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute
@@ -227,12 +242,6 @@ func GetServerArchitecture(c clientset.Interface) string {
 // GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
 func GetPauseImageName(c clientset.Interface) string {
 	return imageutils.GetE2EImageWithArch(imageutils.Pause, GetServerArchitecture(c))
-}
-
-// GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
-// TODO: move this function to the test/utils
-func GetPauseImageNameForHostArch() string {
-	return imageutils.GetE2EImage(imageutils.Pause)
 }
 
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
@@ -1671,7 +1680,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
-// proxy) and verifying that they answer with ther own pod name.
+// proxy) and verifying that they answer with there own pod name.
 type podProxyResponseChecker struct {
 	c              clientset.Interface
 	ns             string
@@ -2181,6 +2190,21 @@ func RunKubectl(args ...string) (string, error) {
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
+}
+
+// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
+// It assumes that kubemci exists in PATH.
+func RunKubemciCmd(args ...string) (string, error) {
+	// kubemci is assumed to be in PATH.
+	kubemci := "kubemci"
+	b := new(kubectlBuilder)
+	if TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	}
+	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
+
+	b.cmd = exec.Command(kubemci, args...)
+	return b.Exec()
 }
 
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
@@ -3958,7 +3982,7 @@ func RestartControllerManager() error {
 }
 
 func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
@@ -5050,7 +5074,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 }
 
 func IsRetryableAPIError(err error) bool {
-	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || apierrs.IsInternalError(err)
+	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err)
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.

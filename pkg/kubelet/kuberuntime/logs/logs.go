@@ -33,7 +33,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 
@@ -307,7 +307,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 					return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
 				}
 				if watcher == nil {
-					// Intialize the watcher if it has not been initialized yet.
+					// Initialize the watcher if it has not been initialized yet.
 					if watcher, err = fsnotify.NewWatcher(); err != nil {
 						return fmt.Errorf("failed to create fsnotify watcher: %v", err)
 					}
@@ -330,7 +330,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 			glog.Warningf("Incomplete line in log file %q: %q", path, l)
 		}
 		if parse == nil {
-			// Intialize the log parsing function.
+			// Initialize the log parsing function.
 			parse, err = getParseFunc(l)
 			if err != nil {
 				return fmt.Errorf("failed to get parse function: %v", err)

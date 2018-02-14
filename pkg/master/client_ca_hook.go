@@ -50,7 +50,7 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 	// We've seen lagging etcd before, so we want to retry this a few times before we decide to crashloop
 	// the API server on it.
 	err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
-		// retry building the config since sometimes the server can be in an inbetween state which caused
+		// retry building the config since sometimes the server can be in an in-between state which caused
 		// some kind of auto detection failure as I recall from other post start hooks.
 		// TODO see if this is still true and fix the RBAC one too if it isn't.
 		client, err := coreclient.NewForConfig(hookContext.LoopbackClientConfig)

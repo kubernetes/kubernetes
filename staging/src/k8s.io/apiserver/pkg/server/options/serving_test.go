@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -47,7 +48,6 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
-	"strconv"
 )
 
 func setUp(t *testing.T) Config {
@@ -471,7 +471,7 @@ NextTest:
 			config.Version = &v
 
 			config.EnableIndex = true
-			secureOptions := &SecureServingOptions{
+			secureOptions := WithLoopback(&SecureServingOptions{
 				BindAddress: net.ParseIP("127.0.0.1"),
 				BindPort:    6443,
 				ServerCert: GeneratableKeyCert{
@@ -481,7 +481,7 @@ NextTest:
 					},
 				},
 				SNICertKeys: namedCertKeys,
-			}
+			})
 			// use a random free port
 			ln, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {

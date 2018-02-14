@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// InterPodAffinity contains information to calculate inter pod affinity.
 type InterPodAffinity struct {
 	info                  predicates.NodeInfo
 	nodeLister            algorithm.NodeLister
@@ -39,6 +40,7 @@ type InterPodAffinity struct {
 	hardPodAffinityWeight int32
 }
 
+// NewInterPodAffinityPriority creates an InterPodAffinity.
 func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,

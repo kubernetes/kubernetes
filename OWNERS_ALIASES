@@ -223,3 +223,7 @@ aliases:
     - piosz
     - jsafrane
     - jbeda
+  vendor-reviewers:
+    - thockin
+  vendor-approvers:
+    - thockin

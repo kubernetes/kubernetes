@@ -19,6 +19,7 @@ package dockershim
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -96,20 +97,23 @@ func TestSandboxStatus(t *testing.T) {
 	labels := map[string]string{"label": "foobar1"}
 	annotations := map[string]string{"annotation": "abc"}
 	config := makeSandboxConfigWithLabelsAndAnnotations("foo", "bar", "1", 0, labels, annotations)
-
-	// TODO: The following variables depend on the internal
-	// implementation of FakeDockerClient, and should be fixed.
-	fakeIP := "2.3.4.5"
+	r := rand.New(rand.NewSource(0)).Uint32()
+	podIP := fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
-	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		State:     state,
+		CreatedAt: ct,
+		Metadata:  config.Metadata,
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP},
+		Linux: &runtimeapi.LinuxPodSandboxStatus{
+			Namespaces: &runtimeapi.Namespace{
+				Options: &runtimeapi.NamespaceOption{
+					Pid: runtimeapi.NamespaceMode_CONTAINER,
+				},
+			},
+		},
 		Labels:      labels,
 		Annotations: annotations,
 	}
@@ -155,20 +159,23 @@ func TestSandboxStatus(t *testing.T) {
 func TestSandboxStatusAfterRestart(t *testing.T) {
 	ds, _, fClock := newTestDockerService()
 	config := makeSandboxConfig("foo", "bar", "1", 0)
-
-	// TODO: The following variables depend on the internal
-	// implementation of FakeDockerClient, and should be fixed.
-	fakeIP := "2.3.4.5"
+	r := rand.New(rand.NewSource(0)).Uint32()
+	podIP := fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
 
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
-	hostNetwork := false
 	expected := &runtimeapi.PodSandboxStatus{
-		State:       state,
-		CreatedAt:   ct,
-		Metadata:    config.Metadata,
-		Network:     &runtimeapi.PodSandboxNetworkStatus{Ip: fakeIP},
-		Linux:       &runtimeapi.LinuxPodSandboxStatus{Namespaces: &runtimeapi.Namespace{Options: &runtimeapi.NamespaceOption{HostNetwork: hostNetwork}}},
+		State:     state,
+		CreatedAt: ct,
+		Metadata:  config.Metadata,
+		Network:   &runtimeapi.PodSandboxNetworkStatus{Ip: podIP},
+		Linux: &runtimeapi.LinuxPodSandboxStatus{
+			Namespaces: &runtimeapi.Namespace{
+				Options: &runtimeapi.NamespaceOption{
+					Pid: runtimeapi.NamespaceMode_CONTAINER,
+				},
+			},
+		},
 		Labels:      map[string]string{},
 		Annotations: map[string]string{},
 	}
@@ -238,11 +245,10 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 		map[string]string{"label": name},
 		map[string]string{"annotation": ns},
 	)
-	hostNetwork := true
 	c.Linux = &runtimeapi.LinuxPodSandboxConfig{
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeapi.NamespaceOption{
-				HostNetwork: hostNetwork,
+				Network: runtimeapi.NamespaceMode_NODE,
 			},
 		},
 	}

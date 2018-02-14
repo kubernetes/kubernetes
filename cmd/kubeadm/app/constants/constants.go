@@ -165,10 +165,10 @@ const (
 	KubeletBaseConfigurationFile = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.0.14"
+	MinExternalEtcdVersion = "3.1.11"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.1.10"
+	DefaultEtcdVersion = "3.2.14"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -203,6 +203,19 @@ const (
 
 	// CRICtlPackage defines the go package that installs crictl
 	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
+
+	// KubeAuditPolicyVolumeName is the name of the volume that will contain the audit policy
+	KubeAuditPolicyVolumeName = "audit"
+	// AuditPolicyDir is the directory that will contain the audit policy
+	AuditPolicyDir = "audit"
+	// AuditPolicyFile is the name of the audit policy file itself
+	AuditPolicyFile = "audit.yaml"
+	// AuditPolicyLogFile is the name of the file audit logs get written to
+	AuditPolicyLogFile = "audit.log"
+	// KubeAuditPolicyLogVolumeName is the name of the volume that will contain the audit logs
+	KubeAuditPolicyLogVolumeName = "audit-log"
+	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
+	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
 )
 
 var (
@@ -237,10 +250,9 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		8:  "3.0.17",
-		9:  "3.1.10",
-		10: "3.1.10",
-		11: "3.1.10",
+		9:  "3.1.11",
+		10: "3.2.14",
+		11: "3.2.14",
 	}
 )
 
@@ -311,4 +323,9 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	}
 
 	return dnsIP, nil
+}
+
+// GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
+func GetStaticPodAuditPolicyFile() string {
+	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
 }

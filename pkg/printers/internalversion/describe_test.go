@@ -80,7 +80,8 @@ func TestDescribePodNode(t *testing.T) {
 			NodeName: "all-in-one",
 		},
 		Status: api.PodStatus{
-			HostIP: "127.0.0.1",
+			HostIP:            "127.0.0.1",
+			NominatedNodeName: "nodeA",
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
@@ -90,6 +91,9 @@ func TestDescribePodNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "all-in-one/127.0.0.1") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "nodeA") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -2100,6 +2104,32 @@ Tokens:              <none>
 Events:              <none>` + "\n"
 	if out != expectedOut {
 		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
+	}
+
+}
+
+func TestDescribeNode(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: api.NodeSpec{
+			Unschedulable: true,
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := []string{"Unschedulable", "true"}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
 	}
 
 }

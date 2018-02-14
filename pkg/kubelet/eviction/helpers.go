@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -108,7 +107,6 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 		return nil, err
 	}
 	results = append(results, hardThresholds...)
-
 	softThresholds, err := parseThresholdStatements(evictionSoft)
 	if err != nil {
 		return nil, err
@@ -152,26 +150,36 @@ func parseThresholdStatements(statements map[string]string) ([]evictionapi.Thres
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, result)
+		if result != nil {
+			results = append(results, *result)
+		}
 	}
 	return results, nil
 }
 
-// parseThresholdStatement parses a threshold statement.
-func parseThresholdStatement(signal evictionapi.Signal, val string) (evictionapi.Threshold, error) {
+// parseThresholdStatement parses a threshold statement and returns a threshold,
+// or nil if the threshold should be ignored.
+func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionapi.Threshold, error) {
 	if !validSignal(signal) {
-		return evictionapi.Threshold{}, fmt.Errorf(unsupportedEvictionSignal, signal)
+		return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
 	}
 	operator := evictionapi.OpForSignal[signal]
 	if strings.HasSuffix(val, "%") {
+		// ignore 0% and 100%
+		if val == "0%" || val == "100%" {
+			return nil, nil
+		}
 		percentage, err := parsePercentage(val)
 		if err != nil {
-			return evictionapi.Threshold{}, err
+			return nil, err
 		}
-		if percentage <= 0 {
-			return evictionapi.Threshold{}, fmt.Errorf("eviction percentage threshold %v must be positive: %s", signal, val)
+		if percentage < 0 {
+			return nil, fmt.Errorf("eviction percentage threshold %v must be >= 0%%: %s", signal, val)
 		}
-		return evictionapi.Threshold{
+		if percentage > 100 {
+			return nil, fmt.Errorf("eviction percentage threshold %v must be <= 100%%: %s", signal, val)
+		}
+		return &evictionapi.Threshold{
 			Signal:   signal,
 			Operator: operator,
 			Value: evictionapi.ThresholdValue{
@@ -181,12 +189,12 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (evictionapi
 	}
 	quantity, err := resource.ParseQuantity(val)
 	if err != nil {
-		return evictionapi.Threshold{}, err
+		return nil, err
 	}
 	if quantity.Sign() < 0 || quantity.IsZero() {
-		return evictionapi.Threshold{}, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
+		return nil, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
 	}
-	return evictionapi.Threshold{
+	return &evictionapi.Threshold{
 		Signal:   signal,
 		Operator: operator,
 		Value: evictionapi.ThresholdValue{
@@ -715,12 +723,7 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc, error) {
-	updateStats := true
-	summary, err := summaryProvider.Get(updateStats)
-	if err != nil {
-		return nil, nil, err
-	}
+func makeSignalObservations(summary *statsapi.Summary, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
@@ -787,7 +790,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 		glog.Errorf("Could not find capacity information for resource %v", v1.ResourceMemory)
 	}
 
-	return result, statsFunc, nil
+	return result, statsFunc
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period

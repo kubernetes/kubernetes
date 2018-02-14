@@ -28,7 +28,6 @@ import (
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -47,7 +46,7 @@ const (
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
-	DefaultImageRepository = "gcr.io/google_containers"
+	DefaultImageRepository = "k8s.gcr.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 
@@ -67,6 +66,12 @@ const (
 	DefaultProxyBindAddressv6 = "::"
 	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
+)
+
+var (
+	// DefaultAuditPolicyLogMaxAge is defined as a var so its address can be taken
+	// It is the number of days to store audit logs
+	DefaultAuditPolicyLogMaxAge = int32(2)
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -118,6 +123,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		SetDefaults_KubeletConfiguration(obj)
 	}
 	SetDefaults_ProxyConfiguration(obj)
+	SetDefaults_AuditPolicyConfiguration(obj)
 }
 
 // SetDefaults_ProxyConfiguration assigns default values for the Proxy
@@ -202,12 +208,19 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	if obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile == "" {
 		obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath
 	}
-	if obj.KubeletConfiguration.BaseConfig.CAdvisorPort == nil {
-		obj.KubeletConfiguration.BaseConfig.CAdvisorPort = utilpointer.Int32Ptr(0)
-	}
 
 	scheme, _, _ := kubeletscheme.NewSchemeAndCodecs()
 	if scheme != nil {
 		scheme.Default(obj.KubeletConfiguration.BaseConfig)
+	}
+}
+
+// SetDefaults_AuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
+func SetDefaults_AuditPolicyConfiguration(obj *MasterConfiguration) {
+	if obj.AuditPolicyConfiguration.LogDir == "" {
+		obj.AuditPolicyConfiguration.LogDir = constants.StaticPodAuditPolicyLogDir
+	}
+	if obj.AuditPolicyConfiguration.LogMaxAge == nil {
+		obj.AuditPolicyConfiguration.LogMaxAge = &DefaultAuditPolicyLogMaxAge
 	}
 }

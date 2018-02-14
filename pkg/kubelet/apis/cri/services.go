@@ -19,7 +19,7 @@ package cri
 import (
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // RuntimeVersioner contains methods for runtime name, version and API version.
@@ -77,7 +77,7 @@ type PodSandboxManager interface {
 	PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 }
 
-// ContainerStatsManager contains methods for retriving the container
+// ContainerStatsManager contains methods for retrieving the container
 // statistics.
 type ContainerStatsManager interface {
 	// ContainerStats returns stats of the container. If the container does not

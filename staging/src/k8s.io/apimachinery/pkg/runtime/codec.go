@@ -281,7 +281,7 @@ func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersi
 // GroupVersioners implements GroupVersioner and resolves to the first exact match for any kind.
 type GroupVersioners []GroupVersioner
 
-// KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occured.
+// KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occurred.
 func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	for _, gv := range gvs {
 		target, ok := gv.KindForGroupVersionKinds(kinds)

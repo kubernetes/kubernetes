@@ -33,6 +33,7 @@ import (
 )
 
 const (
+	// DefaultExtenderTimeout defines the default extender timeout in second.
 	DefaultExtenderTimeout = 5 * time.Second
 )
 
@@ -52,7 +53,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 	if config.TLSConfig != nil {
 		cfg.TLSClientConfig = *config.TLSConfig
 	}
-	if config.EnableHttps {
+	if config.EnableHTTPS {
 		hasCA := len(cfg.CAFile) > 0 || len(cfg.CAData) > 0
 		if !hasCA {
 			cfg.Insecure = true
@@ -70,6 +71,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 	return utilnet.SetTransportDefaults(&http.Transport{}), nil
 }
 
+// NewHTTPExtender creates an HTTPExtender object.
 func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerExtender, error) {
 	if config.HTTPTimeout.Nanoseconds() == 0 {
 		config.HTTPTimeout = time.Duration(DefaultExtenderTimeout)

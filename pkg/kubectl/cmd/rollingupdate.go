@@ -372,7 +372,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	if outputFormat != "" {
 		return f.PrintObject(cmd, false, mapper, newRc, out)
 	}
-	f.PrintSuccess(mapper, false, out, "replicationcontrollers", oldName, dryrun, message)
+	f.PrintSuccess(false, out, "replicationcontrollers", oldName, dryrun, message)
 	return nil
 }
 

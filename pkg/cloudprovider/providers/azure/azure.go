@@ -102,6 +102,12 @@ type Config struct {
 	// Rate limit Bucket Size
 	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
 
+	// Use instance metadata service where possible
+	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
+
+	// Use managed service identity for the virtual machine to access Azure ARM APIs
+	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
+
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
 }
@@ -122,11 +128,17 @@ type Cloud struct {
 	DisksClient             DisksClient
 	FileClient              FileClient
 	resourceRequestBackoff  wait.Backoff
+	metadata                *InstanceMetadata
 	vmSet                   VMSet
 
 	// Clients for vmss.
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
+
+	vmCache  *timedCache
+	lbCache  *timedCache
+	nsgCache *timedCache
+	rtCache  *timedCache
 
 	*BlobDiskController
 	*ManagedDiskController
@@ -225,14 +237,39 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			az.CloudProviderBackoffJitter)
 	}
 
+	az.metadata = NewInstanceMetadata()
+
 	if az.MaximumLoadBalancerRuleCount == 0 {
 		az.MaximumLoadBalancerRuleCount = maximumLoadBalancerRuleCount
 	}
 
 	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
-		az.vmSet = newScaleSet(&az)
+		az.vmSet, err = newScaleSet(&az)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		az.vmSet = newAvailabilitySet(&az)
+	}
+
+	az.vmCache, err = az.newVMCache()
+	if err != nil {
+		return nil, err
+	}
+
+	az.lbCache, err = az.newLBCache()
+	if err != nil {
+		return nil, err
+	}
+
+	az.nsgCache, err = az.newNSGCache()
+	if err != nil {
+		return nil, err
+	}
+
+	az.rtCache, err = az.newRouteTableCache()
+	if err != nil {
+		return nil, err
 	}
 
 	if err := initDiskControllers(&az); err != nil {

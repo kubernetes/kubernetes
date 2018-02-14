@@ -257,7 +257,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 				podsPerNode: 100,
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 350 * 1024 * 1024},
 				},
 			},
 		}

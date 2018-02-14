@@ -503,24 +503,18 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	Describe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
+			vspheretest.Bootstrap(f)
+			nodeInfo := vspheretest.GetReadySchedulableRandomNodeInfo()
 			var volumePath string
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "vsphere",
 			}
-			By("creating a test vsphere volume")
-			c, err := framework.LoadClientset()
-			if err != nil {
-				return
-			}
-			vsp, err := vspheretest.GetVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
-
-			volumePath, err = vspheretest.CreateVSphereVolume(vsp, nil)
+			volumePath, err := nodeInfo.VSphere.CreateVolume(&vspheretest.VolumeOptions{}, nodeInfo.DataCenterRef)
 			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {
-				vsp.DeleteVolume(volumePath)
+				nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 			}()
 
 			defer func() {

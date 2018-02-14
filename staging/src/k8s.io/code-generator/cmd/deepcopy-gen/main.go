@@ -52,6 +52,7 @@ import (
 	"k8s.io/gengo/examples/deepcopy-gen/generators"
 
 	generatorargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
+	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
@@ -59,7 +60,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of deepcopy-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)

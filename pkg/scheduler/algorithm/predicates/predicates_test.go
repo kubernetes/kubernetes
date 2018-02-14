@@ -3145,7 +3145,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			nodeInfo.SetNode(&node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
 
-			var meta algorithm.PredicateMetadata = nil
+			var meta algorithm.PredicateMetadata
 
 			if !test.nometa {
 				meta = PredicateMetadata(test.pod, nodeInfoMap)

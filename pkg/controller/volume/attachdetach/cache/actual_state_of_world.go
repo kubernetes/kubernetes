@@ -73,7 +73,7 @@ type ActualStateOfWorld interface {
 	// SetNodeStatusUpdateNeeded sets statusUpdateNeeded for the specified
 	// node to true indicating the AttachedVolume field in the Node's Status
 	// object needs to be updated by the node updater again.
-	// If the specifed node does not exist in the nodesToUpdateStatusFor list,
+	// If the specified node does not exist in the nodesToUpdateStatusFor list,
 	// log the error and return
 	SetNodeStatusUpdateNeeded(nodeName types.NodeName)
 
@@ -467,7 +467,7 @@ func (asw *actualStateOfWorld) addVolumeToReportAsAttached(
 
 // Update the flag statusUpdateNeeded to indicate whether node status is already updated or
 // needs to be updated again by the node status updater.
-// If the specifed node does not exist in the nodesToUpdateStatusFor list, log the error and return
+// If the specified node does not exist in the nodesToUpdateStatusFor list, log the error and return
 // This is an internal function and caller should acquire and release the lock
 func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeName, needed bool) error {
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]

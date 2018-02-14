@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: spark-worker
-          image: gcr.io/google_containers/spark:1.5.2_v1
+          image: k8s.gcr.io/spark:1.5.2_v1
           command: ["/start-worker"]
           ports:
             - containerPort: 8081

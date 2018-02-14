@@ -226,9 +226,6 @@ type KubeControllerManagerConfiguration struct {
 	ConcurrentSATokenSyncs int32
 	// lookupCacheSizeForRC is the size of lookup cache for replication controllers.
 	// Larger number = more responsive replica management, but more MEM load.
-	// serviceSyncPeriod is the period for syncing services with their external
-	// load balancers.
-	ServiceSyncPeriod metav1.Duration
 	// nodeSyncPeriod is the period for syncing nodes from cloudprovider. Longer
 	// periods will result in fewer calls to cloud provider, but may delay addition
 	// of new nodes to cluster.

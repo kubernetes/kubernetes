@@ -48,7 +48,7 @@ Running this command will execute the following operations on your cluster:
    dependent ReplicaSet resource. Verify with `kubectl get deployments`.
 
 Each step is separated by an interactive prompt. You must hit the
-<kbd>Return</kbd> key to proceeed to the next step. You can use these prompts as
+<kbd>Return</kbd> key to proceed to the next step. You can use these prompts as
 a break to take time to  run `kubectl` and inspect the result of the operations
 executed.
 

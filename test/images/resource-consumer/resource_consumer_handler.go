@@ -75,7 +75,7 @@ func (handler *ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *ht
 }
 
 func (handler *ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
-	// geting string data for consumeCPU
+	// getting string data for consumeCPU
 	durationSecString := query.Get(DurationSecQuery)
 	millicoresString := query.Get(MillicoresQuery)
 	if durationSecString == "" || millicoresString == "" {
@@ -98,7 +98,7 @@ func (handler *ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, 
 }
 
 func (handler *ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, query url.Values) {
-	// geting string data for consumeMem
+	// getting string data for consumeMem
 	durationSecString := query.Get(DurationSecQuery)
 	megabytesString := query.Get(MegabytesQuery)
 	if durationSecString == "" || megabytesString == "" {
@@ -153,7 +153,7 @@ func (handler *ResourceConsumerHandler) bumpMetric(metric string, delta float64,
 }
 
 func (handler *ResourceConsumerHandler) handleBumpMetric(w http.ResponseWriter, query url.Values) {
-	// geting string data for handleBumpMetric
+	// getting string data for handleBumpMetric
 	metric := query.Get(MetricNameQuery)
 	deltaString := query.Get(DeltaQuery)
 	durationSecString := query.Get(DurationSecQuery)

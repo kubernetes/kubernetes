@@ -484,7 +484,6 @@ func TestSetResourcesRemote(t *testing.T) {
 			cmd.Flags().Set("output", "yaml")
 			opts := ResourcesOptions{
 				Out:               buf,
-				Local:             true,
 				Limits:            "cpu=200m,memory=512Mi",
 				ContainerSelector: "*"}
 			err := opts.Complete(f, cmd, input.args)

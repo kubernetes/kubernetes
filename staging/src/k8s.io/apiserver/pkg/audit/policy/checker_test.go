@@ -105,6 +105,21 @@ var (
 			Verbs:     []string{"get"},
 			Resources: []audit.GroupResources{{Resources: []string{"pods/log"}}},
 		},
+		"getPodWildcardMatching": {
+			Level:     audit.LevelRequest,
+			Verbs:     []string{"get"},
+			Resources: []audit.GroupResources{{Resources: []string{"*"}}},
+		},
+		"getPodResourceWildcardMatching": {
+			Level:     audit.LevelRequest,
+			Verbs:     []string{"get"},
+			Resources: []audit.GroupResources{{Resources: []string{"*/log"}}},
+		},
+		"getPodSubResourceWildcardMatching": {
+			Level:     audit.LevelRequest,
+			Verbs:     []string{"get"},
+			Resources: []audit.GroupResources{{Resources: []string{"pods/*"}}},
+		},
 		"getClusterRoles": {
 			Level: audit.LevelRequestResponse,
 			Verbs: []string{"get"},
@@ -208,6 +223,9 @@ func testAuditLevel(t *testing.T, stages []audit.Stage) {
 	test(t, "nonResource", audit.LevelNone, stages, stages, "getPodLogs", "getPods")
 
 	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodLogs", "getPods")
+	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodWildcardMatching")
+	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodResourceWildcardMatching")
+	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodSubResourceWildcardMatching")
 
 }
 

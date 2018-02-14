@@ -28,7 +28,7 @@ files_need_boilerplate=($(${boiler} "$@"))
 # Run boilerplate check
 if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
   for file in "${files_need_boilerplate[@]}"; do
-    echo "Boilerplate header is wrong for: ${file}"
+    echo "Boilerplate header is wrong for: ${file}" >&2
   done
 
   exit 1

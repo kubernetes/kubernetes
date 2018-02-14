@@ -22,10 +22,8 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"sync"
-
-	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -60,15 +58,11 @@ type BlobDiskController struct {
 }
 
 var (
-	defaultContainerName     = ""
-	storageAccountNamePrefix = ""
-	storageAccountNameMatch  = ""
-	accountsLock             = &sync.Mutex{}
+	accountsLock = &sync.Mutex{}
 )
 
 func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error) {
 	c := BlobDiskController{common: common}
-	c.setUniqueStrings()
 
 	// get accounts
 	accounts, err := c.getAllStorageAccounts()
@@ -84,46 +78,26 @@ func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error
 // CreateVolume creates a VHD blob in a storage account that has storageType and location using the given storage account.
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
-func (c *BlobDiskController) CreateVolume(name, storageAccount, storageAccountType, location string, requestGB int) (string, string, int, error) {
-	var err error
-	accounts := []accountWithLocation{}
-	if len(storageAccount) > 0 {
-		accounts = append(accounts, accountWithLocation{Name: storageAccount})
-	} else {
-		// find a storage account
-		accounts, err = c.common.cloud.getStorageAccounts()
-		if err != nil {
-			// TODO: create a storage account and container
-			return "", "", 0, err
-		}
+func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, location string, requestGB int) (string, string, int, error) {
+	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, location, dedicatedDiskAccountNamePrefix)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
-	for _, account := range accounts {
-		glog.V(4).Infof("account %s type %s location %s", account.Name, account.StorageType, account.Location)
-		if (storageAccountType == "" || account.StorageType == storageAccountType) && (location == "" || account.Location == location) || len(storageAccount) > 0 {
-			// find the access key with this account
-			key, err := c.common.cloud.getStorageAccesskey(account.Name)
-			if err != nil {
-				glog.V(2).Infof("no key found for storage account %s", account.Name)
-				continue
-			}
 
-			client, err := azstorage.NewBasicClientOnSovereignCloud(account.Name, key, c.common.cloud.Environment)
-			if err != nil {
-				return "", "", 0, err
-			}
-			blobClient := client.GetBlobService()
-
-			// create a page blob in this account's vhd container
-			diskName, diskURI, err := c.createVHDBlobDisk(blobClient, account.Name, name, vhdContainerName, int64(requestGB))
-			if err != nil {
-				return "", "", 0, err
-			}
-
-			glog.V(4).Infof("azureDisk - created vhd blob uri: %s", diskURI)
-			return diskName, diskURI, requestGB, err
-		}
+	client, err := azstorage.NewBasicClientOnSovereignCloud(account, key, c.common.cloud.Environment)
+	if err != nil {
+		return "", "", 0, err
 	}
-	return "", "", 0, fmt.Errorf("failed to find a matching storage account")
+	blobClient := client.GetBlobService()
+
+	// create a page blob in this account's vhd container
+	diskName, diskURI, err := c.createVHDBlobDisk(blobClient, account, blobName, vhdContainerName, int64(requestGB))
+	if err != nil {
+		return "", "", 0, err
+	}
+
+	glog.V(4).Infof("azureDisk - created vhd blob uri: %s", diskURI)
+	return diskName, diskURI, requestGB, err
 }
 
 // DeleteVolume deletes a VHD blob
@@ -252,7 +226,7 @@ func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountT
 		return "", err
 	}
 
-	_, diskURI, err := c.createVHDBlobDisk(blobClient, storageAccountName, dataDiskName, defaultContainerName, int64(sizeGB))
+	_, diskURI, err := c.createVHDBlobDisk(blobClient, storageAccountName, dataDiskName, vhdContainerName, int64(sizeGB))
 	if err != nil {
 		return "", err
 	}
@@ -281,9 +255,9 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 		return err
 	}
 
-	glog.V(4).Infof("azureDisk - About to delete vhd file %s on storage account %s container %s", vhdName, storageAccountName, defaultContainerName)
+	glog.V(4).Infof("azureDisk - About to delete vhd file %s on storage account %s container %s", vhdName, storageAccountName, vhdContainerName)
 
-	container := blobSvc.GetContainerReference(defaultContainerName)
+	container := blobSvc.GetContainerReference(vhdContainerName)
 	blob := container.GetBlobReference(vhdName)
 	_, err = blob.DeleteIfExists(nil)
 
@@ -299,19 +273,6 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 	return err
 }
 
-//Sets unique strings to be used as accountnames && || blob containers names
-func (c *BlobDiskController) setUniqueStrings() {
-	uniqueString := c.common.resourceGroup + c.common.location + c.common.subscriptionID
-	hash := MakeCRC32(uniqueString)
-	//used to generate a unique container name used by this cluster PVC
-	defaultContainerName = hash
-
-	storageAccountNamePrefix = fmt.Sprintf(storageAccountNameTemplate, hash)
-	// Used to filter relevant accounts (accounts used by shared PVC)
-	storageAccountNameMatch = storageAccountNamePrefix
-	// Used as a template to create new names for relevant accounts
-	storageAccountNamePrefix = storageAccountNamePrefix + "%s"
-}
 func (c *BlobDiskController) getStorageAccountKey(SAName string) (string, error) {
 	if account, exists := c.accounts[SAName]; exists && account.key != "" {
 		return c.accounts[SAName].key, nil
@@ -383,7 +344,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 			counter = counter + 1
 			// check if we passed the max sleep
 			if counter >= 20 {
-				return fmt.Errorf("azureDisk - timeout waiting to aquire lock to validate account:%s readiness", storageAccountName)
+				return fmt.Errorf("azureDisk - timeout waiting to acquire lock to validate account:%s readiness", storageAccountName)
 			}
 		}
 
@@ -426,13 +387,13 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 		return err
 	}
 
-	container := blobSvc.GetContainerReference(defaultContainerName)
+	container := blobSvc.GetContainerReference(vhdContainerName)
 	bCreated, err := container.CreateIfNotExists(&azstorage.CreateContainerOptions{Access: azstorage.ContainerAccessTypePrivate})
 	if err != nil {
 		return err
 	}
 	if bCreated {
-		glog.V(2).Infof("azureDisk - storage account:%s had no default container(%s) and it was created \n", storageAccountName, defaultContainerName)
+		glog.V(2).Infof("azureDisk - storage account:%s had no default container(%s) and it was created \n", storageAccountName, vhdContainerName)
 	}
 
 	// flag so we no longer have to check on ARM
@@ -459,7 +420,7 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 	}
 	params := azstorage.ListBlobsParameters{}
 
-	container := blobSvc.GetContainerReference(defaultContainerName)
+	container := blobSvc.GetContainerReference(vhdContainerName)
 	response, err := container.ListBlobs(params)
 	if err != nil {
 		return 0, err
@@ -481,11 +442,11 @@ func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccount
 
 	accounts := make(map[string]*storageAccountState)
 	for _, v := range *accountListResult.Value {
-		if strings.Index(*v.Name, storageAccountNameMatch) != 0 {
-			continue
-		}
 		if v.Name == nil || v.Sku == nil {
 			glog.Info("azureDisk - accountListResult Name or Sku is nil")
+			continue
+		}
+		if !strings.HasPrefix(*v.Name, sharedDiskAccountNamePrefix) {
 			continue
 		}
 		glog.Infof("azureDisk - identified account %s as part of shared PVC accounts", *v.Name)
@@ -555,7 +516,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	countAccounts := 0 // account of this type.
 	for _, v := range c.accounts {
 		// filter out any stand-alone disks/accounts
-		if strings.Index(v.name, storageAccountNameMatch) != 0 {
+		if !strings.HasPrefix(v.name, sharedDiskAccountNamePrefix) {
 			continue
 		}
 
@@ -587,7 +548,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	// if we failed to find storageaccount
 	if SAName == "" {
 		glog.V(2).Infof("azureDisk - failed to identify a suitable account for new disk and will attempt to create new account")
-		SAName = getAccountNameForNum(c.getNextAccountNum())
+		SAName = generateStorageAccountName(sharedDiskAccountNamePrefix)
 		err := c.createStorageAccount(SAName, storageAccountType, c.common.location, true)
 		if err != nil {
 			return "", err
@@ -603,7 +564,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 	// avg are not create and we should create more accounts if we can
 	if aboveAvg && countAccounts < maxStorageAccounts {
 		glog.V(2).Infof("azureDisk - shared storageAccounts utilization(%v) >  grow-at-avg-utilization (%v). New storage account will be created", avgUtilization, storageAccountUtilizationBeforeGrowing)
-		SAName = getAccountNameForNum(c.getNextAccountNum())
+		SAName = generateStorageAccountName(sharedDiskAccountNamePrefix)
 		err := c.createStorageAccount(SAName, storageAccountType, c.common.location, true)
 		if err != nil {
 			return "", err
@@ -619,22 +580,6 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 
 	// we found a  storage accounts && [ avg are ok || we reached max sa count ]
 	return SAName, nil
-}
-func (c *BlobDiskController) getNextAccountNum() int {
-	max := 0
-
-	for k := range c.accounts {
-		// filter out accounts that are for standalone
-		if strings.Index(k, storageAccountNameMatch) != 0 {
-			continue
-		}
-		num := getAccountNumFromName(k)
-		if num > max {
-			max = num
-		}
-	}
-
-	return max + 1
 }
 
 //Gets storage account exist, provisionStatus, Error if any
@@ -653,27 +598,6 @@ func (c *BlobDiskController) addAccountState(key string, state *storageAccountSt
 	if _, ok := c.accounts[key]; !ok {
 		c.accounts[key] = state
 	}
-}
-
-// pads account num with zeros as needed
-func getAccountNameForNum(num int) string {
-	sNum := strconv.Itoa(num)
-	missingZeros := 3 - len(sNum)
-	strZero := ""
-	for missingZeros > 0 {
-		strZero = strZero + "0"
-		missingZeros = missingZeros - 1
-	}
-
-	sNum = strZero + sNum
-	return fmt.Sprintf(storageAccountNamePrefix, sNum)
-}
-
-func getAccountNumFromName(accountName string) int {
-	nameLen := len(accountName)
-	num, _ := strconv.Atoi(accountName[nameLen-3:])
-
-	return num
 }
 
 func createVHDHeader(size uint64) ([]byte, error) {

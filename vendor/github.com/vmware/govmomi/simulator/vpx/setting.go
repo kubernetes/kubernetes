@@ -57,4 +57,16 @@ var Setting = []types.BaseOptionValue{
 		Key:   "config.vpxd.sso.admin.uri",
 		Value: "https://127.0.0.1/sso-adminserver/sdk/vsphere.local",
 	},
+	&types.OptionValue{
+		Key:   "event.batchsize",
+		Value: int32(2000),
+	},
+	&types.OptionValue{
+		Key:   "event.maxAge",
+		Value: int32(30),
+	},
+	&types.OptionValue{
+		Key:   "event.maxAgeEnabled",
+		Value: bool(true),
+	},
 }

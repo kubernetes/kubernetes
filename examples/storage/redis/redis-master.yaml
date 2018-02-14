@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: master
-      image: gcr.io/google_containers/redis:v1
+      image: k8s.gcr.io/redis:v1
       env:
         - name: MASTER
           value: "true"

@@ -25,7 +25,6 @@ go_test(
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/ipvs/testing:go_default_library",
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
@@ -93,7 +92,6 @@ go_library(
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -103,6 +101,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netlink:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),

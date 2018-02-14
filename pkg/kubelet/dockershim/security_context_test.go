@@ -25,7 +25,7 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -228,25 +228,24 @@ func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 }
 
 func TestModifySandboxNamespaceOptions(t *testing.T) {
-	set := true
 	cases := []struct {
 		name     string
 		nsOpt    *runtimeapi.NamespaceOption
 		expected *dockercontainer.HostConfig
 	}{
 		{
-			name: "NamespaceOption.HostNetwork",
+			name: "Host Network NamespaceOption",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostNetwork: set,
+				Network: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: namespaceModeHost,
 			},
 		},
 		{
-			name: "NamespaceOption.HostIpc",
+			name: "Host IPC NamespaceOption",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostIpc: set,
+				Ipc: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				IpcMode:     namespaceModeHost,
@@ -254,9 +253,9 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "NamespaceOption.HostPid",
+			name: "Host PID NamespaceOption",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostPid: set,
+				Pid: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				PidMode:     namespaceModeHost,
@@ -272,7 +271,6 @@ func TestModifySandboxNamespaceOptions(t *testing.T) {
 }
 
 func TestModifyContainerNamespaceOptions(t *testing.T) {
-	set := true
 	sandboxID := "sandbox"
 	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
 	cases := []struct {
@@ -281,9 +279,9 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		expected *dockercontainer.HostConfig
 	}{
 		{
-			name: "NamespaceOption.HostNetwork",
+			name: "Host Network NamespaceOption",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostNetwork: set,
+				Network: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -293,9 +291,9 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "NamespaceOption.HostIpc",
+			name: "Host IPC NamespaceOption",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostIpc: set,
+				Ipc: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -304,9 +302,9 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "NamespaceOption.HostPid",
+			name: "Host PID NamespaceOption",
 			nsOpt: &runtimeapi.NamespaceOption{
-				HostPid: set,
+				Pid: runtimeapi.NamespaceMode_NODE,
 			},
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),

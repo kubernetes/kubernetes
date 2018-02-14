@@ -21,11 +21,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -52,6 +52,9 @@ import (
 
 var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
+	const (
+		NodeLabelKey = "vsphere_e2e_label_volume_diskformat"
+	)
 	var (
 		client            clientset.Interface
 		namespace         string
@@ -62,26 +65,22 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			nodeName = nodeList.Items[0].Name
-		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
 		if !isNodeLabeled {
+			nodeName = GetReadySchedulableRandomNodeInfo().Name
 			nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 			nodeKeyValueLabel = make(map[string]string)
-			nodeKeyValueLabel["vsphere_e2e_label"] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(client, nodeName, "vsphere_e2e_label", nodeLabelValue)
+			nodeKeyValueLabel[NodeLabelKey] = nodeLabelValue
+			framework.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
 			isNodeLabeled = true
 		}
 	})
 	framework.AddCleanupAction(func() {
 		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
 		if len(namespace) > 0 && len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(client, nodeName, "vsphere_e2e_label")
+			framework.RemoveLabelOffNode(client, nodeName, NodeLabelKey)
 		}
 	})
 
@@ -143,19 +142,21 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	pod, err := client.CoreV1().Pods(namespace).Create(podSpec)
 	Expect(err).NotTo(HaveOccurred())
 
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
-	verifyVSphereDiskAttached(client, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(nodeName))
-
 	By("Waiting for pod to be running")
 	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
+
+	isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
+	Expect(isAttached).To(BeTrue())
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Verify Disk Format")
 	Expect(verifyDiskFormat(client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(BeTrue(), "DiskFormat Verification Failed")
 
 	var volumePaths []string
 	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
 
 	By("Delete pod and wait for volume to be detached from node")
-	deletePodAndWaitForVolumeToDetach(f, client, pod, vsp, nodeName, volumePaths)
+	deletePodAndWaitForVolumeToDetach(f, client, pod, nodeName, volumePaths)
 
 }
 
@@ -169,12 +170,9 @@ func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
-	nodeInfo, err := vsp.NodeManager().GetNodeInfo(k8stype.NodeName(nodeName))
-	Expect(err).NotTo(HaveOccurred())
-
-	vmDevices, err := nodeInfo.VM().Device(ctx)
+	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
+	vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
+	vmDevices, err := vm.Device(ctx)
 	Expect(err).NotTo(HaveOccurred())
 
 	disks := vmDevices.SelectByType((*types.VirtualDisk)(nil))

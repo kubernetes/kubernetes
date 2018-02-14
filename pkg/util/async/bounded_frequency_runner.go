@@ -109,7 +109,7 @@ var _ timer = realTimer{}
 // multiple runs are serialized. If the function needs to hold locks, it must
 // take them internally.
 //
-// Runs of the funtion will have at least minInterval between them (from
+// Runs of the function will have at least minInterval between them (from
 // completion to next start), except that up to bursts may be allowed.  Burst
 // runs are "accumulated" over time, one per minInterval up to burstRuns total.
 // This can be used, for example, to mitigate the impact of expensive operations

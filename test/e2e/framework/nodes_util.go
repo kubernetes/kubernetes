@@ -67,7 +67,7 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.1.10")
+		"TEST_ETCD_IMAGE=3.2.14")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -83,7 +83,7 @@ func ingressUpgradeGCE(isUpgrade bool) error {
 		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/k8s-ingress-image-push\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest"
 	} else {
 		// Downgrade
-		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
 	}
 	sshResult, err := NodeExec(GetMasterHost(), command)
 	LogSSHResult(sshResult)
@@ -103,7 +103,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.1.10")
+			"TEST_ETCD_IMAGE=3.2.14")
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
 		// implicit etcd upgrades to simulate the user entering "y".

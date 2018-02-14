@@ -302,6 +302,83 @@ func PackProtocolsPortsFromFirewall(alloweds []*compute.FirewallAllowed) []strin
 	return protocolPorts
 }
 
+type portRange struct {
+	protocol string
+	min, max int
+}
+
+func toPortRange(s string) (pr portRange, err error) {
+	protoPorts := strings.Split(s, "/")
+	// Set protocol
+	pr.protocol = strings.ToUpper(protoPorts[0])
+
+	if len(protoPorts) != 2 {
+		return pr, fmt.Errorf("expected a single '/' in %q", s)
+	}
+
+	ports := strings.Split(protoPorts[1], "-")
+	switch len(ports) {
+	case 1:
+		v, err := strconv.Atoi(ports[0])
+		if err != nil {
+			return pr, err
+		}
+		pr.min, pr.max = v, v
+	case 2:
+		start, err := strconv.Atoi(ports[0])
+		if err != nil {
+			return pr, err
+		}
+		end, err := strconv.Atoi(ports[1])
+		if err != nil {
+			return pr, err
+		}
+		pr.min, pr.max = start, end
+	default:
+		return pr, fmt.Errorf("unexpected range value %q", protoPorts[1])
+	}
+
+	return pr, nil
+}
+
+// isPortsSubset asserts that the "requiredPorts" are covered by the "coverage" ports.
+// requiredPorts - must be single-port, examples: 'tcp/50', 'udp/80'.
+// coverage - single or port-range values, example: 'tcp/50', 'udp/80-1000'.
+// Returns true if every requiredPort exists in the list of coverage rules.
+func isPortsSubset(requiredPorts, coverage []string) error {
+	for _, reqPort := range requiredPorts {
+		rRange, err := toPortRange(reqPort)
+		if err != nil {
+			return err
+		}
+		if rRange.min != rRange.max {
+			return fmt.Errorf("requiring a range is not supported: %q", reqPort)
+		}
+
+		var covered bool
+		for _, c := range coverage {
+			cRange, err := toPortRange(c)
+			if err != nil {
+				return err
+			}
+
+			if rRange.protocol != cRange.protocol {
+				continue
+			}
+
+			if rRange.min >= cRange.min && rRange.min <= cRange.max {
+				covered = true
+				break
+			}
+		}
+
+		if !covered {
+			return fmt.Errorf("%q is not covered by %v", reqPort, coverage)
+		}
+	}
+	return nil
+}
+
 // SameStringArray verifies whether two string arrays have the same strings, return error if not.
 // Order does not matter.
 // When `include` is set to true, verifies whether result includes all elements from expected.
@@ -334,10 +411,19 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 	if !strings.HasSuffix(res.Network, "/"+network) {
 		return fmt.Errorf("incorrect network: %v, expected ends with: %v", res.Network, "/"+network)
 	}
-	if err := SameStringArray(PackProtocolsPortsFromFirewall(res.Allowed),
-		PackProtocolsPortsFromFirewall(exp.Allowed), portsSubset); err != nil {
-		return fmt.Errorf("incorrect allowed protocols ports: %v", err)
+
+	actualPorts := PackProtocolsPortsFromFirewall(res.Allowed)
+	expPorts := PackProtocolsPortsFromFirewall(exp.Allowed)
+	if portsSubset {
+		if err := isPortsSubset(expPorts, actualPorts); err != nil {
+			return fmt.Errorf("incorrect allowed protocol ports: %v", err)
+		}
+	} else {
+		if err := SameStringArray(actualPorts, expPorts, false); err != nil {
+			return fmt.Errorf("incorrect allowed protocols ports: %v", err)
+		}
 	}
+
 	if err := SameStringArray(res.SourceRanges, exp.SourceRanges, false); err != nil {
 		return fmt.Errorf("incorrect source ranges %v, expected %v: %v", res.SourceRanges, exp.SourceRanges, err)
 	}

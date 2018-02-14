@@ -90,7 +90,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() 
 					if len(filename) == 0 {
 						continue
 					}
-					framework.Logf("Removing checkpiont %q", filename)
+					framework.Logf("Removing checkpoint %q", filename)
 					_, err := exec.Command("sudo", "rm", filename).CombinedOutput()
 					framework.ExpectNoError(err, "Failed to remove checkpoint file %q: %v", string(filename), err)
 				}

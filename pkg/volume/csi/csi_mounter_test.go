@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1alpha1"
+	storage "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
@@ -135,7 +135,7 @@ func TestMounterSetUp(t *testing.T) {
 			DetachError: nil,
 		},
 	}
-	_, err = csiMounter.k8s.StorageV1alpha1().VolumeAttachments().Create(attachment)
+	_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}

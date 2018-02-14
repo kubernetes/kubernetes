@@ -107,7 +107,7 @@ func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 // ClientConfig implements ClientConfig
 func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	// check that getAuthInfo, getContext, and getCluster do not return an error.
-	// Do this before checking if the curent config is usable in the event that an
+	// Do this before checking if the current config is usable in the event that an
 	// AuthInfo, Context, or Cluster config with user-defined names are not found.
 	// This provides a user with the immediate cause for error if one is found
 	configAuthInfo, err := config.getAuthInfo()
@@ -202,7 +202,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 
 // clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
 // both, so we have to split the objects and merge them separately
-// we want this order of precedence for user identifcation
+// we want this order of precedence for user identification
 // 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
 // 3.  if there is not enough information to identify the user, load try the ~/.kubernetes_auth file
@@ -474,7 +474,7 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 	}
 
 	// in-cluster configs only takes a host, token, or CA file
-	// if any of them were individually provided, ovewrite anything else
+	// if any of them were individually provided, overwrite anything else
 	if config.overrides != nil {
 		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
 			icc.Host = server

@@ -216,7 +216,7 @@ func TestCordon(t *testing.T) {
 				t.Fatalf("%s: unexpected non-error", test.description)
 			}
 			if updated {
-				t.Fatalf("%s: unexpcted update", test.description)
+				t.Fatalf("%s: unexpected update", test.description)
 			}
 		}
 

@@ -563,8 +563,7 @@ func TestAnnotateLocal(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
-	cmd.Flags().Set("local", "true")
-	options := &AnnotateOptions{}
+	options := &AnnotateOptions{local: true}
 	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b"}
 	if err := options.Complete(buf, cmd, args); err != nil {
@@ -618,8 +617,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(f, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("all", "true")
-	options := &AnnotateOptions{}
+	options := &AnnotateOptions{all: true}
 	args := []string{"pods", "a=b", "c-"}
 	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)

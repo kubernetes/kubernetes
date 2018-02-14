@@ -32,7 +32,7 @@ func newZonesMetricContext(request, region string) *metricContext {
 }
 
 // GetZone creates a cloudprovider.Zone of the current zone and region
-func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
+func (gce *GCECloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{
 		FailureDomain: gce.localZone,
 		Region:        gce.region,
@@ -42,7 +42,7 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (gce *GCECloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+func (gce *GCECloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	_, zone, _, err := splitProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
@@ -57,7 +57,7 @@ func (gce *GCECloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone,
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (gce *GCECloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (gce *GCECloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {

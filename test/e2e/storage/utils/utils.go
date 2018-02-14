@@ -156,7 +156,8 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 }
 
 // TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
-func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+// forceDelete is true indicating whether the pod is forcelly deleted.
+func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, forceDelete bool) {
 	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
@@ -175,7 +176,11 @@ func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 		}
 	}()
 	By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
-	err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+	if forceDelete {
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, metav1.NewDeleteOptions(0))
+	} else {
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+	}
 	Expect(err).NotTo(HaveOccurred())
 	By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
@@ -184,12 +189,27 @@ func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 		Expect(err).NotTo(HaveOccurred(), "Expected pod to terminate.")
 	}
 
+	if forceDelete {
+		// With forceDelete, since pods are immediately deleted from API server, there is no way to be sure when volumes are torn down
+		// so wait some time to finish
+		time.Sleep(30 * time.Second)
+	}
 	By("Expecting the volume mount not to be found.")
 	result, err = framework.SSH(fmt.Sprintf("mount | grep %s", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	framework.LogSSHResult(result)
 	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
 	Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
 	framework.Logf("Volume unmounted on node %s", clientPod.Spec.NodeName)
+}
+
+// TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
+func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, pvc, pv, false)
+}
+
+// TestVolumeUnmountsFromFoceDeletedPod tests that a volume unmounts if the client pod was forcelly deleted while the kubelet was down.
+func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, pvc, pv, true)
 }
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.

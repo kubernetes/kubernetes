@@ -69,6 +69,10 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	storageClassStorage := storageclassstore.NewREST(restOptionsGetter)
 	storage["storageclasses"] = storageClassStorage
 
+	// volumeattachments
+	volumeAttachmentStorage := volumeattachmentstore.NewREST(restOptionsGetter)
+	storage["volumeattachments"] = volumeAttachmentStorage
+
 	return storage
 }
 

@@ -570,7 +570,7 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 	return nil
 }
 
-// checkCNIPlugin returns if all kubenet required cni plugins can be found at /opt/cni/bin or user specifed NetworkPluginDir.
+// checkCNIPlugin returns if all kubenet required cni plugins can be found at /opt/cni/bin or user specified NetworkPluginDir.
 func (plugin *kubenetNetworkPlugin) checkCNIPlugin() bool {
 	if plugin.checkCNIPluginInDir(DefaultCNIDir) || plugin.checkCNIPluginInDir(plugin.vendorDir) {
 		return true

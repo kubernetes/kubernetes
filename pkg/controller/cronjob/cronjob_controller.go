@@ -297,7 +297,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		// there is some risk that we won't see an active job when there is one.
 		// (because we haven't seen the status update to the SJ or the created pod).
 		// So it is theoretically possible to have concurrency with Forbid.
-		// As long the as the invokations are "far enough apart in time", this usually won't happen.
+		// As long the as the invocations are "far enough apart in time", this usually won't happen.
 		//
 		// TODO: for Forbid, we could use the same name for every execution, as a lock.
 		// With replace, we could use a name that is deterministic per execution time.

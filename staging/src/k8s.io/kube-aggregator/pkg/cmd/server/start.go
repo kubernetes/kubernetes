@@ -50,9 +50,9 @@ type AggregatorOptions struct {
 }
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
-func NewCommandStartAggregator(out, err io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewDefaultOptions(out, err)
-
+// with a default AggregatorOptions.
+func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct{}) *cobra.Command {
+	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",

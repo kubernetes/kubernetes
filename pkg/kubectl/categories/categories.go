@@ -21,10 +21,14 @@ import (
 	"k8s.io/client-go/discovery"
 )
 
+// CategoryExpander maps category strings to GroupResouces.
+// Categories are classification or 'tag' of a group of resources.
 type CategoryExpander interface {
 	Expand(category string) ([]schema.GroupResource, bool)
 }
 
+// SimpleCategoryExpander implements CategoryExpander interface
+// using a static mapping of categories to GroupResource mapping.
 type SimpleCategoryExpander struct {
 	Expansions map[string][]schema.GroupResource
 }
@@ -34,6 +38,8 @@ func (e SimpleCategoryExpander) Expand(category string) ([]schema.GroupResource,
 	return ret, ok
 }
 
+// discoveryCategoryExpander struct lets a REST Client wrapper (discoveryClient) to retrieve list of APIResourceList,
+// and then convert to fallbackExpander
 type discoveryCategoryExpander struct {
 	fallbackExpander CategoryExpander
 	discoveryClient  discovery.DiscoveryInterface
@@ -50,6 +56,7 @@ func NewDiscoveryCategoryExpander(fallbackExpander CategoryExpander, client disc
 }
 
 func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
+	// Get all supported resources for groups and versions from server, if no resource found, fallback anyway.
 	apiResourceLists, _ := e.discoveryClient.ServerResources()
 	if len(apiResourceLists) == 0 {
 		return e.fallbackExpander.Expand(category)
@@ -62,7 +69,7 @@ func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResour
 		if err != nil {
 			return e.fallbackExpander.Expand(category)
 		}
-
+		// Collect GroupVersions by categories
 		for _, apiResource := range apiResourceList.APIResources {
 			if categories := apiResource.Categories; len(categories) > 0 {
 				for _, category := range categories {
@@ -86,14 +93,15 @@ func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResour
 	return ret, ok
 }
 
+// discoveryFilteredExpander expands the given CategoryExpander (delegate) to filter group and resource returned from server
 type discoveryFilteredExpander struct {
 	delegate CategoryExpander
 
 	discoveryClient discovery.DiscoveryInterface
 }
 
-// NewDiscoveryFilteredExpander returns a category expander that filters the returned groupresources by
-// what the server has available
+// NewDiscoveryFilteredExpander returns a category expander that filters the returned groupresources
+// by what the server has available
 func NewDiscoveryFilteredExpander(delegate CategoryExpander, client discovery.DiscoveryInterface) (discoveryFilteredExpander, error) {
 	if client == nil {
 		panic("Please provide discovery client to shortcut expander")
@@ -129,12 +137,15 @@ func (e discoveryFilteredExpander) Expand(category string) ([]schema.GroupResour
 	return available, ok
 }
 
+// UnionCategoryExpander implements CategoryExpander interface.
+// It maps given category string to union of expansions returned by all the CategoryExpanders in the list.
 type UnionCategoryExpander []CategoryExpander
 
 func (u UnionCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
 	ret := []schema.GroupResource{}
 	ok := false
 
+	// Expand the category for each CategoryExpander in the list and merge/combine the results.
 	for _, expansion := range u {
 		curr, currOk := expansion.Expand(category)
 

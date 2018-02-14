@@ -16,6 +16,7 @@ go_library(
         "firewall.go",
         "framework.go",
         "ingress.go",
+        "ingress_scale.go",
         "kube_proxy.go",
         "network_policy.go",
         "network_tiers.go",
@@ -40,6 +41,7 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/manifest:go_default_library",
+        "//test/e2e/network/scale:go_default_library",
         "//test/images/net/nat:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
@@ -80,6 +82,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/network/scale:all-srcs",
+    ],
     tags = ["automanaged"],
 )

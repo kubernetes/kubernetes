@@ -39,7 +39,7 @@ NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
-# configurations by seperating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
+# configurations by separating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
 # is a request for 2 SCSI formatted and mounted SSDs and 1 NVMe block device SSD.
 NODE_LOCAL_SSDS_EXT=${NODE_LOCAL_SSDS_EXT:-}
 NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
@@ -80,7 +80,8 @@ NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
-LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-docker load -i}
+CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
+LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
 RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
@@ -149,7 +150,7 @@ ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.1.10) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.2.14) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -249,12 +250,6 @@ DNS_DOMAIN="cluster.local"
 # Optional: Enable DNS horizontal autoscaler
 ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}"
 
-# Optional: Install cluster docker registry.
-ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-false}"
-CLUSTER_REGISTRY_DISK="${CLUSTER_REGISTRY_DISK:-${INSTANCE_PREFIX}-kube-system-kube-registry}"
-CLUSTER_REGISTRY_DISK_SIZE="${CLUSTER_REGISTRY_DISK_SIZE:-200GB}"
-CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
-
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
@@ -346,11 +341,7 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-}
 # Storage media type: application/json and application/vnd.kubernetes.protobuf are supported.
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-}
 
-# OpenContrail networking plugin specific settings
-NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, kubenet
-OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
-OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
-OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 
 # Network Policy plugin specific settings.
 NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
@@ -380,10 +371,6 @@ ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 # Disabling this by default in tests ensures default RBAC policies are sufficient from 1.6+
 # Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.
 ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
-
-# TODO(dawn1107): Remove this once the flag is built into CVM image.
-# Kernel panic upon soft lockup issue
-SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-true}" # true, false
 
 # Enable a simple "AdvancedAuditing" setup for testing.
 ENABLE_APISERVER_ADVANCED_AUDIT="${ENABLE_APISERVER_ADVANCED_AUDIT:-true}" # true, false
@@ -423,6 +410,9 @@ ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-true}"
 # TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
 # Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
+
+# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
+KUBE_PROXY_MODE="${KUBE_PROXY_MODE:-iptables}"
 
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"

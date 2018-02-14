@@ -19,7 +19,6 @@ package scheduler
 // This file tests the VolumeScheduling feature.
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -82,7 +81,7 @@ func TestLocalPVNegativeAffinity(t *testing.T) {
 		}
 		// Give time to shceduler to attempt to schedule pod
 		if err := waitForPodToSchedule(config.client, pod); err == nil {
-			t.Errorf("Failed as Pod %s was scheduled sucessfully but expected to fail", pod.Name)
+			t.Errorf("Failed as Pod %s was scheduled successfully but expected to fail", pod.Name)
 		}
 		// Deleting test pod
 		p, err := config.client.CoreV1().Pods(config.ns).Get(podName, metav1.GetOptions{})
@@ -95,8 +94,8 @@ func TestLocalPVNegativeAffinity(t *testing.T) {
 		if strings.Compare(p.Status.Conditions[0].Reason, "Unschedulable") != 0 {
 			t.Fatalf("Failed as Pod %s reason was: %s but expected: Unschedulable", podName, p.Status.Conditions[0].Reason)
 		}
-		if !strings.Contains(p.Status.Conditions[0].Message, "MatchNodeSelector") || !strings.Contains(p.Status.Conditions[0].Message, "VolumeNodeAffinityConflict") {
-			t.Fatalf("Failed as Pod's %s failure message does not contain expected keywords: MatchNodeSelector, VolumeNodeAffinityConflict", podName)
+		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match node selector") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
+			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict", podName)
 		}
 		if err := config.client.CoreV1().Pods(config.ns).Delete(podName, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
@@ -136,6 +135,7 @@ func setupNodes(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),
+		PodInformer:               informers.Core().V1().Pods(),
 		EventRecorder:             nil, // TODO: add one so we can test PV events
 		EnableDynamicProvisioning: true,
 	}
@@ -309,14 +309,4 @@ func markNodeSelector(pod *v1.Pod, node string) {
 		"kubernetes.io/hostname": node,
 	}
 	pod.Spec.NodeSelector = ns
-}
-
-func printIndentedJson(data interface{}) string {
-	var indentedJSON []byte
-
-	indentedJSON, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return fmt.Sprintf("JSON parse error: %v", err)
-	}
-	return string(indentedJSON)
 }

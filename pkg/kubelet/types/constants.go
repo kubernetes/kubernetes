@@ -29,4 +29,5 @@ const (
 	NodeAllocatableEnforcementKey = "pods"
 	SystemReservedEnforcementKey  = "system-reserved"
 	KubeReservedEnforcementKey    = "kube-reserved"
+	NodeAllocatableNoneKey        = "none"
 )

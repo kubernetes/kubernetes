@@ -43,7 +43,7 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating DaemonSets controller: %v", err)
 	}
-	go dsc.Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
+	go dsc.Run(int(ctx.ComponentConfig.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -60,7 +60,7 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
+	go dc.Run(int(ctx.ComponentConfig.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -73,6 +73,6 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
+	).Run(int(ctx.ComponentConfig.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }

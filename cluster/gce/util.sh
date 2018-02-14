@@ -53,9 +53,6 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
     # If the master image is not set, we use the latest GCI image.
     # Otherwise, we respect whatever is set by the user.
     MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
-elif [[ "${MASTER_OS_DISTRIBUTION}" == "debian" ]]; then
-    MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${CVM_VERSION}}
-    MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
@@ -71,9 +68,6 @@ function set-node-image() {
         # Otherwise, we respect whatever is set by the user.
         NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
         NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
-    elif [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-        NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
-        NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
     fi
 }
 
@@ -216,7 +210,6 @@ function copy-to-staging() {
 #   ZONE
 # Vars set:
 #   PREFERRED_REGION
-#   KUBE_ADDON_REGISTRY
 function set-preferred-region() {
   case ${ZONE} in
     asia-*)
@@ -229,25 +222,11 @@ function set-preferred-region() {
       PREFERRED_REGION=("us" "eu" "asia")
       ;;
   esac
-  local -r preferred="${PREFERRED_REGION[0]}"
 
   if [[ "${RELEASE_REGION_FALLBACK}" != "true" ]]; then
-    PREFERRED_REGION=( "${preferred}" )
-  fi
-
-  # If we're using regional GCR, and we're outside the US, go to the
-  # regional registry. The gcr.io/google_containers registry is
-  # appropriate for US (for now).
-  if [[ "${REGIONAL_KUBE_ADDONS}" == "true" ]] && [[ "${preferred}" != "us" ]]; then
-    KUBE_ADDON_REGISTRY="${preferred}.gcr.io/google_containers"
-  else
-    KUBE_ADDON_REGISTRY="gcr.io/google_containers"
+    PREFERRED_REGION=( "${PREFERRED_REGION[0]}" )
   fi
 }
-
-if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
-  DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
-fi
 
 # Take the local tar files and upload them to Google Storage.  They will then be
 # downloaded by the master as part of the start up script for the master.
@@ -280,6 +259,10 @@ function upload-server-tars() {
   project_hash=${project_hash:0:10}
 
   set-preferred-region
+
+  if [[ "${ENABLE_DOCKER_REGISTRY_CACHE:-}" == "true" ]]; then
+    DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
+  fi
 
   SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
@@ -677,61 +660,6 @@ function create-node-template() {
   done
 }
 
-# Robustly try to add metadata on an instance.
-# $1: The name of the instance.
-# $2...$n: The metadata key=value pairs to add.
-function add-instance-metadata() {
-  local -r instance=$1
-  shift 1
-  local -r kvs=( "$@" )
-  detect-project
-  local attempt=0
-  while true; do
-    if ! gcloud compute instances add-metadata "${instance}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --metadata "${kvs[@]}"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $((5 * $attempt))
-    else
-        break
-    fi
-  done
-}
-
-# Robustly try to add metadata on an instance, from a file.
-# $1: The name of the instance.
-# $2...$n: The metadata key=file pairs to add.
-function add-instance-metadata-from-file() {
-  local -r instance=$1
-  shift 1
-  local -r kvs=( "$@" )
-  detect-project
-  local attempt=0
-  while true; do
-    echo "${kvs[@]}"
-    if ! gcloud compute instances add-metadata "${instance}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --metadata-from-file "$(join_csv ${kvs[@]})"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}" >&2
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $(($attempt * 5))
-    else
-        break
-    fi
-  done
-}
-
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -758,8 +686,8 @@ function kube-up() {
     detect-subnetworks
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
-    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
-      echo "Master replication supported only for gci, debian, and ubuntu"
+    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "ubuntu" ]]; then
+      echo "Master replication supported only for gci and ubuntu"
       return 1
     fi
     create-loadbalancer
@@ -1075,15 +1003,6 @@ function create-master() {
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
 
-  # Create disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    gcloud compute disks create "${CLUSTER_REGISTRY_DISK}" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
-      --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
-  fi
-
   # Create rule for accessing and securing etcd servers.
   if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
     gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
@@ -1098,7 +1017,6 @@ function create-master() {
   # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
   # http://issue.k8s.io/3168
-  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
@@ -1683,17 +1601,6 @@ function kube-down() {
       "${replica_pd}"
   fi
 
-  # Delete disk for cluster registry if enabled
-  if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
-    if gcloud compute disks describe "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-      gcloud compute disks delete \
-        --project "${PROJECT}" \
-        --quiet \
-        --zone "${ZONE}" \
-        "${CLUSTER_REGISTRY_DISK}"
-    fi
-  fi
-
   # Check if this are any remaining master replicas.
   local REMAINING_MASTER_COUNT=$(gcloud compute instances list \
     --project "${PROJECT}" \
@@ -1939,11 +1846,6 @@ function check-resources() {
 
   if gcloud compute disks describe --project "${PROJECT}" "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Persistent disk ${MASTER_NAME}-pd"
-    return 1
-  fi
-
-  if gcloud compute disks describe --project "${PROJECT}" "${CLUSTER_REGISTRY_DISK}" --zone "${ZONE}" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Persistent disk ${CLUSTER_REGISTRY_DISK}"
     return 1
   fi
 

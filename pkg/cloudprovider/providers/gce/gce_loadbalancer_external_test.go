@@ -23,8 +23,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	computealpha "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -236,4 +242,260 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 			}
 		})
 	}
+}
+
+const (
+	gceProjectId = "test-project"
+	gceRegion    = "us-central1"
+	zoneName     = "us-central1-b"
+	nodeName     = "test-node-1"
+	clusterName  = "Test Cluster Name"
+	clusterID    = "test-cluster-id"
+)
+
+var apiService = &v1.Service{
+	Spec: v1.ServiceSpec{
+		SessionAffinity: v1.ServiceAffinityClientIP,
+		Type:            v1.ServiceTypeClusterIP,
+		Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
+	},
+}
+
+func fakeGCECloud() (*GCECloud, error) {
+	client, err := newOauthClient(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	service, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	// Used in disk unit tests
+	fakeManager := newFakeManager(gceProjectId, gceRegion)
+	zonesWithNodes := createNodeZones([]string{zoneName})
+
+	alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
+	if err != nil {
+		return nil, err
+	}
+
+	cloud := cloud.NewMockGCE()
+	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
+	cloud.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+
+	gce := GCECloud{
+		region:             gceRegion,
+		service:            service,
+		manager:            fakeManager,
+		managedZones:       []string{zoneName},
+		projectID:          gceProjectId,
+		AlphaFeatureGate:   alphaFeatureGate,
+		nodeZones:          zonesWithNodes,
+		nodeInformerSynced: func() bool { return true },
+		c:                  cloud,
+	}
+
+	return &gce, nil
+}
+
+func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error) {
+	nodes := []*v1.Node{}
+
+	for _, name := range nodeNames {
+		// Inserting the same node name twice causes an error - here we check if
+		// the instance exists already before insertion.
+		// TestUpdateExternalLoadBalancer inserts a new node, and relies on an older
+		// node to already have been inserted.
+		instance, _ := gce.getInstanceByName(name)
+
+		if instance == nil {
+			err := gce.InsertInstance(
+				gceProjectId,
+				zoneName,
+				&compute.Instance{
+					Name: name,
+					Tags: &compute.Tags{
+						Items: []string{name},
+					},
+				},
+			)
+			if err != nil {
+				return nodes, err
+			}
+		}
+
+		nodes = append(
+			nodes,
+			&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+					Labels: map[string]string{
+						kubeletapis.LabelHostname: name,
+					},
+				},
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						KubeProxyVersion: "v1.7.2",
+					},
+				},
+			},
+		)
+
+	}
+
+	return nodes, nil
+}
+
+func createExternalLoadBalancer(gce *GCECloud) (*v1.LoadBalancerStatus, error) {
+	nodes, err := createAndInsertNodes(gce, []string{nodeName})
+	if err != nil {
+		return nil, err
+	}
+
+	return gce.ensureExternalLoadBalancer(
+		clusterName,
+		clusterID,
+		apiService,
+		nil,
+		nodes,
+	)
+}
+
+func TestEnsureExternalLoadBalancer(t *testing.T) {
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+
+	status, err := createExternalLoadBalancer(gce)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	hcName := MakeNodesHealthCheckName(clusterID)
+
+	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
+	fwNames := []string{
+		MakeFirewallName(lbName),
+		MakeHealthCheckFirewallName(clusterID, hcName, true),
+	}
+
+	for _, fwName := range fwNames {
+		firewall, err := gce.GetFirewall(fwName)
+		require.NoError(t, err)
+		assert.Equal(t, []string{nodeName}, firewall.TargetTags)
+		assert.NotEmpty(t, firewall.SourceRanges)
+	}
+
+	// Check that TargetPool is Created
+	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, pool.Name)
+	assert.NotEmpty(t, pool.HealthChecks)
+	assert.Equal(t, 1, len(pool.Instances))
+
+	// Check that HealthCheck is created
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.NoError(t, err)
+	assert.Equal(t, hcName, healthcheck.Name)
+
+	// Check that ForwardingRule is created
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, fwdRule.Name)
+	assert.Equal(t, "TCP", fwdRule.IPProtocol)
+	assert.Equal(t, "123-123", fwdRule.PortRange)
+}
+
+func TestUpdateExternalLoadBalancer(t *testing.T) {
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+
+	_, err = createExternalLoadBalancer(gce)
+	assert.NoError(t, err)
+
+	newNodeName := "test-node-2"
+	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName})
+	assert.NoError(t, err)
+
+	// Add the new node, then check that it is properly added to the TargetPool
+	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
+	assert.NoError(t, err)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+
+	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.NoError(t, err)
+
+	// TODO: when testify is updated to v1.2.0+, use ElementsMatch instead
+	assert.Contains(
+		t,
+		pool.Instances,
+		fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName),
+	)
+
+	assert.Contains(
+		t,
+		pool.Instances,
+		fmt.Sprintf("/zones/%s/instances/%s", zoneName, newNodeName),
+	)
+
+	newNodes, err = createAndInsertNodes(gce, []string{nodeName})
+	assert.NoError(t, err)
+
+	// Remove the new node by calling updateExternalLoadBalancer with a list
+	// only containing the old node, and test that the TargetPool no longer
+	// contains the new node.
+	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
+	assert.NoError(t, err)
+
+	pool, err = gce.GetTargetPool(lbName, gceRegion)
+	require.NoError(t, err)
+
+	assert.Equal(
+		t,
+		[]string{fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName)},
+		pool.Instances,
+	)
+}
+
+func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+
+	_, err = createExternalLoadBalancer(gce)
+	assert.NoError(t, err)
+
+	err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, apiService)
+	assert.NoError(t, err)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	hcName := MakeNodesHealthCheckName(clusterID)
+
+	// Check that Firewalls are deleted for the LoadBalancer and the HealthCheck
+	fwNames := []string{
+		MakeFirewallName(lbName),
+		MakeHealthCheckFirewallName(clusterID, hcName, true),
+	}
+
+	for _, fwName := range fwNames {
+		firewall, err := gce.GetFirewall(fwName)
+		require.Error(t, err)
+		assert.Nil(t, firewall)
+	}
+
+	// Check that TargetPool is deleted
+	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	require.Error(t, err)
+	assert.Nil(t, pool)
+
+	// Check that HealthCheck is deleted
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.Error(t, err)
+	assert.Nil(t, healthcheck)
+
+	// Check forwarding rule is deleted
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
+	require.Error(t, err)
+	assert.Nil(t, fwdRule)
 }

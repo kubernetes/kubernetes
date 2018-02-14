@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	dstrings "strings"
 
 	"github.com/golang/glog"
@@ -100,11 +101,7 @@ func (plugin *rbdPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
-	if (spec.Volume != nil && spec.Volume.RBD == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil) {
-		return false
-	}
-
-	return true
+	return (spec.Volume != nil && spec.Volume.RBD != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil)
 }
 
 func (plugin *rbdPlugin) RequiresRemount() bool {
@@ -401,13 +398,13 @@ func (plugin *rbdPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, 
 	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 	globalMapPath := filepath.Dir(globalMapPathUUID)
 	if len(globalMapPath) == 1 {
-		return nil, fmt.Errorf("failed to retreive volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
+		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 	return getVolumeSpecFromGlobalMapPath(globalMapPath)
 }
 
 func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) {
-	// Retreive volume spec information from globalMapPath
+	// Retrieve volume spec information from globalMapPath
 	// globalMapPath example:
 	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}
 	pool, image, err := getPoolAndImageFromMapPath(globalMapPath)
@@ -585,6 +582,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	secret := ""
 	secretName := ""
 	secretNamespace := ""
+	keyring := ""
 	imageFormat := rbdImageFormat2
 	fstype := ""
 
@@ -609,6 +607,8 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			secretName = v
 		case "usersecretnamespace":
 			secretNamespace = v
+		case "keyring":
+			keyring = v
 		case "imageformat":
 			imageFormat = v
 		case "imagefeatures":
@@ -642,8 +642,8 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	if len(r.Mon) < 1 {
 		return nil, fmt.Errorf("missing Ceph monitors")
 	}
-	if secretName == "" {
-		return nil, fmt.Errorf("missing user secret name")
+	if secretName == "" && keyring == "" {
+		return nil, fmt.Errorf("must specify either keyring or user secret name")
 	}
 	if r.adminId == "" {
 		r.adminId = rbdDefaultAdminId
@@ -666,9 +666,19 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	glog.Infof("successfully created rbd image %q", image)
 	pv := new(v1.PersistentVolume)
 	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volumehelper.VolumeDynamicallyCreatedByKey, "rbd-dynamic-provisioner")
-	rbd.SecretRef = new(v1.SecretReference)
-	rbd.SecretRef.Name = secretName
-	rbd.SecretRef.Namespace = secretNamespace
+
+	if secretName != "" {
+		rbd.SecretRef = new(v1.SecretReference)
+		rbd.SecretRef.Name = secretName
+		rbd.SecretRef.Namespace = secretNamespace
+	} else {
+		var filePathRegex = regexp.MustCompile(`^(?:/[^/!;` + "`" + ` ]+)+$`)
+		if keyring != "" && !filePathRegex.MatchString(keyring) {
+			return nil, fmt.Errorf("keyring field must contain a path to a file")
+		}
+		rbd.Keyring = keyring
+	}
+
 	rbd.RadosUser = r.Id
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd

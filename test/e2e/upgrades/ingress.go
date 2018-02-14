@@ -81,7 +81,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 		Client: jig.Client,
 		Cloud:  framework.TestContext.CloudConfig,
 	}
-	gceController.Init()
+	framework.ExpectNoError(gceController.Init())
 
 	t.gceController = gceController
 	t.jig = jig
@@ -94,8 +94,8 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	// Create a working basic Ingress
 	By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", t.ipName, t.ip))
 	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip-2"), ns.Name, map[string]string{
-		"kubernetes.io/ingress.global-static-ip-name": t.ipName,
-		"kubernetes.io/ingress.allow-http":            "false",
+		framework.IngressStaticIPKey:  t.ipName,
+		framework.IngressAllowHTTPKey: "false",
 	}, map[string]string{})
 	t.jig.AddHTTPS("tls-secret", "ingress.test.com")
 
@@ -142,7 +142,7 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	}
 
 	By("Cleaning up cloud resources")
-	framework.CleanupGCEIngressController(t.gceController)
+	framework.ExpectNoError(t.gceController.CleanupGCEIngressController())
 }
 
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
@@ -176,6 +176,15 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	By("comparing GCP resources post-upgrade")
 	postUpgradeResourceStore := &GCPResourceStore{}
 	t.populateGCPResourceStore(postUpgradeResourceStore)
+
+	// Ignore certain fields in compute.Firewall that we know will change
+	// due to the upgrade/downgrade.
+	// TODO(rramkumar): Remove this once glbc 0.9.8 is released.
+	t.resourceStore.Fw.Allowed = nil
+	t.resourceStore.Fw.SourceRanges = nil
+	postUpgradeResourceStore.Fw.Allowed = nil
+	postUpgradeResourceStore.Fw.SourceRanges = nil
+
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()
 		i2 := v2.Interface()

@@ -157,7 +157,7 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 	return NewCustomProxier(loadBalancer, listenIP, iptables, exec, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, newProxySocket)
 }
 
-// NewCustomProxier functions similarly to NewProxier, returing a new Proxier
+// NewCustomProxier functions similarly to NewProxier, returning a new Proxier
 // for the given LoadBalancer and address.  The new proxier is constructed using
 // the ProxySocket constructor provided, however, instead of constructing the
 // default ProxySockets.
