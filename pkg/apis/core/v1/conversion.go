@@ -349,6 +349,10 @@ func Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec
 		return err
 	}
 
+	// drop init container annotations so they don't take effect on legacy kubelets.
+	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
+
 	return nil
 }
 
@@ -356,6 +360,9 @@ func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, 
 	if err := autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
+
+	// drop init container annotations so they don't show up as differences when receiving requests from old clients
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
 	return nil
 }
@@ -404,6 +411,17 @@ func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s con
 	return nil
 }
 
+func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) error {
+	if err := autoConvert_v1_Pod_To_core_Pod(in, out, s); err != nil {
+		return err
+	}
+
+	// drop init container annotations so they don't show up as differences when receiving requests from old clients
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
+
+	return nil
+}
+
 func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) error {
 	if err := autoConvert_core_Pod_To_v1_Pod(in, out, s); err != nil {
 		return err
@@ -411,17 +429,7 @@ func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) e
 
 	// drop init container annotations so they don't take effect on legacy kubelets.
 	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
-	if len(out.Annotations) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, "pod.beta.kubernetes.io/init-containers")
-		delete(out.Annotations, "pod.alpha.kubernetes.io/init-containers")
-		delete(out.Annotations, "pod.beta.kubernetes.io/init-container-statuses")
-		delete(out.Annotations, "pod.alpha.kubernetes.io/init-container-statuses")
-	}
+	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
 	return nil
 }
@@ -568,4 +576,41 @@ func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
 		})
+}
+
+var initContainerAnnotations = map[string]bool{
+	"pod.beta.kubernetes.io/init-containers":          true,
+	"pod.alpha.kubernetes.io/init-containers":         true,
+	"pod.beta.kubernetes.io/init-container-statuses":  true,
+	"pod.alpha.kubernetes.io/init-container-statuses": true,
+}
+
+// dropInitContainerAnnotations returns a copy of the annotations with init container annotations removed,
+// or the original annotations if no init container annotations were present.
+//
+// this can be removed once no clients prior to 1.8 are supported, and no kubelets prior to 1.8 can be run
+// (we don't support kubelets older than 2 versions skewed from the apiserver, but we don't prevent them, either)
+func dropInitContainerAnnotations(oldAnnotations map[string]string) map[string]string {
+	if len(oldAnnotations) == 0 {
+		return oldAnnotations
+	}
+
+	found := false
+	for k := range initContainerAnnotations {
+		if _, ok := oldAnnotations[k]; ok {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return oldAnnotations
+	}
+
+	newAnnotations := make(map[string]string, len(oldAnnotations))
+	for k, v := range oldAnnotations {
+		if !initContainerAnnotations[k] {
+			newAnnotations[k] = v
+		}
+	}
+	return newAnnotations
 }
