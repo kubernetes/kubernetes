@@ -17,12 +17,15 @@ limitations under the License.
 package azure
 
 import (
+	"context"
+	"net/http"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/golang/glog"
@@ -79,21 +82,20 @@ type SecurityGroupsClient interface {
 	List(resourceGroupName string) (result network.SecurityGroupListResult, err error)
 }
 
-// VirtualMachineScaleSetsClient defines needed functions for azure compute.VirtualMachineScaleSetsClient
+// VirtualMachineScaleSetsClient defines needed functions for azure computepreview.VirtualMachineScaleSetsClient
 type VirtualMachineScaleSetsClient interface {
-	CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error)
-	Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
-	List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error)
-	ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error)
-	UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters computepreview.VirtualMachineScaleSet) (resp *http.Response, err error)
+	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result computepreview.VirtualMachineScaleSet, err error)
+	List(ctx context.Context, resourceGroupName string) (result []computepreview.VirtualMachineScaleSet, err error)
+	UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs computepreview.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error)
 }
 
-// VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
+// VirtualMachineScaleSetVMsClient defines needed functions for azure computepreview.VirtualMachineScaleSetVMsClient
 type VirtualMachineScaleSetVMsClient interface {
-	Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error)
-	GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error)
-	List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error)
-	ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error)
+	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result computepreview.VirtualMachineScaleSetVM, err error)
+	GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result computepreview.VirtualMachineScaleSetVMInstanceView, err error)
+	List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []computepreview.VirtualMachineScaleSetVM, err error)
+	Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters computepreview.VirtualMachineScaleSetVM) (resp *http.Response, err error)
 }
 
 // RoutesClient defines needed functions for azure network.RoutesClient
@@ -136,6 +138,10 @@ type azClientConfig struct {
 type azVirtualMachinesClient struct {
 	client      compute.VirtualMachinesClient
 	rateLimiter flowcontrol.RateLimiter
+}
+
+func getContextWithCancel() (context.Context, context.CancelFunc) {
+	return context.WithCancel(context.Background())
 }
 
 func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient {
@@ -603,12 +609,12 @@ func (az *azSecurityGroupsClient) List(resourceGroupName string) (result network
 
 // azVirtualMachineScaleSetsClient implements VirtualMachineScaleSetsClient.
 type azVirtualMachineScaleSetsClient struct {
-	client      compute.VirtualMachineScaleSetsClient
+	client      computepreview.VirtualMachineScaleSetsClient
 	rateLimiter flowcontrol.RateLimiter
 }
 
 func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachineScaleSetsClient {
-	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(config.subscriptionID)
+	virtualMachineScaleSetsClient := computepreview.NewVirtualMachineScaleSetsClient(config.subscriptionID)
 	virtualMachineScaleSetsClient.BaseURI = config.resourceManagerEndpoint
 	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	virtualMachineScaleSetsClient.PollingDelay = 5 * time.Second
@@ -620,23 +626,26 @@ func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachin
 	}
 }
 
-func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet, cancel <-chan struct{}) (<-chan compute.VirtualMachineScaleSet, <-chan error) {
+func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters computepreview.VirtualMachineScaleSet) (resp *http.Response, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, VMScaleSetName)
 	defer func() {
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, VMScaleSetName)
 	}()
 
-	errChan := make(chan error, 1)
 	mc := newMetricContext("vmss", "create_or_update", resourceGroupName, az.client.SubscriptionID)
-	resultChan, proxyErrChan := az.client.CreateOrUpdate(resourceGroupName, VMScaleSetName, parameters, cancel)
-	err := <-proxyErrChan
+	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, VMScaleSetName, parameters)
 	mc.Observe(err)
-	errChan <- err
-	return resultChan, errChan
+	if err != nil {
+		return future.Response(), err
+	}
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
-func (az *azVirtualMachineScaleSetsClient) Get(resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error) {
+func (az *azVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result computepreview.VirtualMachineScaleSet, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetsClient.Get(%q,%q): start", resourceGroupName, VMScaleSetName)
 	defer func() {
@@ -644,12 +653,12 @@ func (az *azVirtualMachineScaleSetsClient) Get(resourceGroupName string, VMScale
 	}()
 
 	mc := newMetricContext("vmss", "get", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.Get(resourceGroupName, VMScaleSetName)
+	result, err = az.client.Get(ctx, resourceGroupName, VMScaleSetName)
 	mc.Observe(err)
 	return
 }
 
-func (az *azVirtualMachineScaleSetsClient) List(resourceGroupName string) (result compute.VirtualMachineScaleSetListResult, err error) {
+func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGroupName string) (result []computepreview.VirtualMachineScaleSet, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q,%q): start", resourceGroupName)
 	defer func() {
@@ -657,48 +666,51 @@ func (az *azVirtualMachineScaleSetsClient) List(resourceGroupName string) (resul
 	}()
 
 	mc := newMetricContext("vmss", "list", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.List(resourceGroupName)
+	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
-	return
+	if err != nil {
+		return nil, err
+	}
+
+	result = make([]computepreview.VirtualMachineScaleSet, 0)
+	for ; iterator.NotDone(); err = iterator.Next() {
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, iterator.Value())
+	}
+
+	return result, nil
 }
 
-func (az *azVirtualMachineScaleSetsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetListResult) (result compute.VirtualMachineScaleSetListResult, err error) {
-	az.rateLimiter.Accept()
-	glog.V(10).Infof("azVirtualMachineScaleSetsClient.ListNextResults(%q): start", lastResults)
-	defer func() {
-		glog.V(10).Infof("azVirtualMachineScaleSetsClient.ListNextResults(%q): end", lastResults)
-	}()
-
-	mc := newMetricContext("vmss", "list_next_results", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.ListNextResults(lastResults)
-	mc.Observe(err)
-	return
-}
-
-func (az *azVirtualMachineScaleSetsClient) UpdateInstances(resourceGroupName string, VMScaleSetName string, VMInstanceIDs compute.VirtualMachineScaleSetVMInstanceRequiredIDs, cancel <-chan struct{}) (<-chan compute.OperationStatusResponse, <-chan error) {
+func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, resourceGroupName string, VMScaleSetName string, VMInstanceIDs computepreview.VirtualMachineScaleSetVMInstanceRequiredIDs) (resp *http.Response, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): start", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	defer func() {
 		glog.V(10).Infof("azVirtualMachineScaleSetsClient.UpdateInstances(%q,%q,%q): end", resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	}()
 
-	errChan := make(chan error, 1)
 	mc := newMetricContext("vmss", "update_instances", resourceGroupName, az.client.SubscriptionID)
-	resultChan, proxyErrChan := az.client.UpdateInstances(resourceGroupName, VMScaleSetName, VMInstanceIDs, cancel)
-	err := <-proxyErrChan
+	future, err := az.client.UpdateInstances(ctx, resourceGroupName, VMScaleSetName, VMInstanceIDs)
 	mc.Observe(err)
-	errChan <- err
-	return resultChan, errChan
+	if err != nil {
+		return future.Response(), err
+	}
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
 // azVirtualMachineScaleSetVMsClient implements VirtualMachineScaleSetVMsClient.
 type azVirtualMachineScaleSetVMsClient struct {
-	client      compute.VirtualMachineScaleSetVMsClient
+	client      computepreview.VirtualMachineScaleSetVMsClient
 	rateLimiter flowcontrol.RateLimiter
 }
 
 func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMachineScaleSetVMsClient {
-	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(config.subscriptionID)
+	virtualMachineScaleSetVMsClient := computepreview.NewVirtualMachineScaleSetVMsClient(config.subscriptionID)
 	virtualMachineScaleSetVMsClient.BaseURI = config.resourceManagerEndpoint
 	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
 	virtualMachineScaleSetVMsClient.PollingDelay = 5 * time.Second
@@ -710,7 +722,7 @@ func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMach
 	}
 }
 
-func (az *azVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result computepreview.VirtualMachineScaleSetVM, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Get(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
 	defer func() {
@@ -718,12 +730,12 @@ func (az *azVirtualMachineScaleSetVMsClient) Get(resourceGroupName string, VMSca
 	}()
 
 	mc := newMetricContext("vmssvm", "get", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.Get(resourceGroupName, VMScaleSetName, instanceID)
+	result, err = az.client.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
 	mc.Observe(err)
 	return
 }
 
-func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
+func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result computepreview.VirtualMachineScaleSetVMInstanceView, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
 	defer func() {
@@ -731,12 +743,12 @@ func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(resourceGroupName s
 	}()
 
 	mc := newMetricContext("vmssvm", "get_instance_view", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.GetInstanceView(resourceGroupName, VMScaleSetName, instanceID)
+	result, err = az.client.GetInstanceView(ctx, resourceGroupName, VMScaleSetName, instanceID)
 	mc.Observe(err)
 	return
 }
 
-func (az *azVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+func (az *azVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []computepreview.VirtualMachineScaleSetVM, err error) {
 	az.rateLimiter.Accept()
 	glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.List(%q,%q,%q): start", resourceGroupName, virtualMachineScaleSetName, filter)
 	defer func() {
@@ -744,22 +756,41 @@ func (az *azVirtualMachineScaleSetVMsClient) List(resourceGroupName string, virt
 	}()
 
 	mc := newMetricContext("vmssvm", "list", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.List(resourceGroupName, virtualMachineScaleSetName, filter, selectParameter, expand)
+	iterator, err := az.client.ListComplete(ctx, resourceGroupName, virtualMachineScaleSetName, filter, selectParameter, expand)
 	mc.Observe(err)
-	return
+	if err != nil {
+		return nil, err
+	}
+
+	result = make([]computepreview.VirtualMachineScaleSetVM, 0)
+	for ; iterator.NotDone(); err = iterator.Next() {
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, iterator.Value())
+	}
+
+	return result, nil
 }
 
-func (az *azVirtualMachineScaleSetVMsClient) ListNextResults(resourceGroupName string, lastResults compute.VirtualMachineScaleSetVMListResult) (result compute.VirtualMachineScaleSetVMListResult, err error) {
+func (az *azVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters computepreview.VirtualMachineScaleSetVM) (resp *http.Response, err error) {
 	az.rateLimiter.Accept()
-	glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.ListNextResults(%q,%q,%q): start", lastResults)
+	glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Update(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
 	defer func() {
-		glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.ListNextResults(%q,%q,%q): end", lastResults)
+		glog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Update(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 	}()
 
-	mc := newMetricContext("vmssvm", "list_next_results", resourceGroupName, az.client.SubscriptionID)
-	result, err = az.client.ListNextResults(lastResults)
+	mc := newMetricContext("vmssvm", "update", resourceGroupName, az.client.SubscriptionID)
+	future, err := az.client.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
 	mc.Observe(err)
-	return
+	if err != nil {
+		return future.Response(), err
+	}
+
+	err = future.WaitForCompletion(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
 }
 
 // azRoutesClient implements RoutesClient.

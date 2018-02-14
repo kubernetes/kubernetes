@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	mimeTypeJSON     = "application/json"
-	mimeTypeFormPost = "application/x-www-form-urlencoded"
+	mimeTypeJSON        = "application/json"
+	mimeTypeOctetStream = "application/octet-stream"
+	mimeTypeFormPost    = "application/x-www-form-urlencoded"
 
 	headerAuthorization = "Authorization"
 	headerContentType   = "Content-Type"
@@ -112,6 +113,28 @@ func WithHeader(header string, value string) PrepareDecorator {
 	}
 }
 
+// WithHeaders returns a PrepareDecorator that sets the specified HTTP headers of the http.Request to
+// the passed value. It canonicalizes the passed headers name (via http.CanonicalHeaderKey) before
+// adding them.
+func WithHeaders(headers map[string]interface{}) PrepareDecorator {
+	h := ensureValueStrings(headers)
+	return func(p Preparer) Preparer {
+		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
+			r, err := p.Prepare(r)
+			if err == nil {
+				if r.Header == nil {
+					r.Header = make(http.Header)
+				}
+
+				for name, value := range h {
+					r.Header.Set(http.CanonicalHeaderKey(name), value)
+				}
+			}
+			return r, err
+		})
+	}
+}
+
 // WithBearerAuthorization returns a PrepareDecorator that adds an HTTP Authorization header whose
 // value is "Bearer " followed by the supplied token.
 func WithBearerAuthorization(token string) PrepareDecorator {
@@ -140,6 +163,11 @@ func AsFormURLEncoded() PrepareDecorator {
 // "application/json".
 func AsJSON() PrepareDecorator {
 	return AsContentType(mimeTypeJSON)
+}
+
+// AsOctetStream returns a PrepareDecorator that adds the "application/octet-stream" Content-Type header.
+func AsOctetStream() PrepareDecorator {
+	return AsContentType(mimeTypeOctetStream)
 }
 
 // WithMethod returns a PrepareDecorator that sets the HTTP method of the passed request. The
@@ -215,6 +243,11 @@ func WithFormData(v url.Values) PrepareDecorator {
 			r, err := p.Prepare(r)
 			if err == nil {
 				s := v.Encode()
+
+				if r.Header == nil {
+					r.Header = make(http.Header)
+				}
+				r.Header.Set(http.CanonicalHeaderKey(headerContentType), mimeTypeFormPost)
 				r.ContentLength = int64(len(s))
 				r.Body = ioutil.NopCloser(strings.NewReader(s))
 			}
@@ -430,11 +463,16 @@ func WithQueryParameters(queryParameters map[string]interface{}) PrepareDecorato
 				if r.URL == nil {
 					return r, NewError("autorest", "WithQueryParameters", "Invoked with a nil URL")
 				}
+
 				v := r.URL.Query()
 				for key, value := range parameters {
-					v.Add(key, value)
+					d, err := url.QueryUnescape(value)
+					if err != nil {
+						return r, err
+					}
+					v.Add(key, d)
 				}
-				r.URL.RawQuery = createQuery(v)
+				r.URL.RawQuery = v.Encode()
 			}
 			return r, err
 		})

@@ -16,19 +16,19 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
+			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-oidc/http",
