@@ -19,6 +19,8 @@ package azure
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -100,24 +102,57 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
 	nodeName := mapNodeNameToVMName(name)
 	metadataName, err := az.metadata.Text("instance/compute/name")
+	if err != nil {
+		return false, err
+	}
+
+	if az.VMType == vmTypeVMSS {
+		// VMSS vmName is not same with hostname, use hostname instead.
+		metadataName, err = os.Hostname()
+		if err != nil {
+			return false, err
+		}
+	}
+
+	metadataName = strings.ToLower(metadataName)
 	return (metadataName == nodeName), err
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
+	nodeName := mapNodeNameToVMName(name)
+
 	if az.UseInstanceMetadata {
 		isLocalInstance, err := az.isCurrentInstance(name)
 		if err != nil {
 			return "", err
 		}
-		if isLocalInstance {
-			nodeName := mapNodeNameToVMName(name)
-			return az.getMachineID(nodeName), nil
+
+		// Not local instance, get instanceID from Azure ARM API.
+		if !isLocalInstance {
+			return az.vmSet.GetInstanceIDByNodeName(nodeName)
 		}
+
+		// Compose instanceID based on nodeName for standard instance.
+		if az.VMType == vmTypeStandard {
+			return az.getStandardMachineID(nodeName), nil
+		}
+
+		// Get scale set name and instanceID from vmName for vmss.
+		metadataName, err := az.metadata.Text("instance/compute/name")
+		if err != nil {
+			return "", err
+		}
+		ssName, instanceID, err := extractVmssVMName(metadataName)
+		if err != nil {
+			return "", err
+		}
+		// Compose instanceID based on ssName and instanceID for vmss instance.
+		return az.getVmssMachineID(ssName, instanceID), nil
 	}
 
-	return az.vmSet.GetInstanceIDByNodeName(string(name))
+	return az.vmSet.GetInstanceIDByNodeName(nodeName)
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
