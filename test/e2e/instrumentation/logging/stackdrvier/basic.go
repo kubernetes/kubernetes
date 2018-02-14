@@ -178,9 +178,9 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 				framework.ExpectNoError(err)
 			})
 
-			ginkgo.By("Waiting for some docker logs to be ingested from each node", func() {
+			ginkgo.By("Waiting for some container runtime logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)
-				log := fmt.Sprintf("projects/%s/logs/docker", framework.TestContext.CloudConfig.ProjectID)
+				log := fmt.Sprintf("projects/%s/logs/container-runtime", framework.TestContext.CloudConfig.ProjectID)
 				c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLog(log), utils.JustTimeout, nodeIds...)
 				err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)

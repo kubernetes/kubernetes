@@ -2028,6 +2028,12 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd ${fluentd_gcp_yaml} &
 }
 
+# Update {{ container-runtime }} with actual container runtime name.
+function update-container-runtime {
+  local -r configmap_yaml="$1"
+  sed -i -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" "${configmap_yaml}"
+}
+
 # Updates parameters in yaml file for prometheus-to-sd configuration, or
 # removes component if it is disabled.
 function update-prometheus-to-sd-parameters {
@@ -2180,15 +2186,19 @@ EOF
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
     setup-addon-manifests "addons" "fluentd-elasticsearch"
+    local -r fluentd_es_configmap_yaml="${dst_dir}/fluentd-elasticsearch/fluentd-es-configmap.yaml"
+    update-container-runtime ${fluentd_es_configmap_yaml}
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     setup-addon-manifests "addons" "fluentd-gcp"
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
     local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
+    local -r fluentd_gcp_configmap_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-configmap.yaml"
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
     start-fluentd-resource-update ${fluentd_gcp_yaml}
+    update-container-runtime ${fluentd_gcp_configmap_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
