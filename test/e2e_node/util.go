@@ -232,7 +232,7 @@ func getKubeletConfigOkCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition 
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Response {
-	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/proxy/nodes/%s/configz", framework.TestContext.NodeName)
+	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	framework.ExpectNoError(err)
