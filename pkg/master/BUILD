@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client_ca_hook.go",
+        "client_util.go",
         "controller.go",
         "doc.go",
         "import_known_versions.go",

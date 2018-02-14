@@ -16,9 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver",
     deps = [
-        "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/go-openapi/strfmt:go_default_library",
-        "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install:go_default_library",

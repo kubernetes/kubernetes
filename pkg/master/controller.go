@@ -158,7 +158,7 @@ func (c *Controller) RunKubernetesNamespaces(ch chan struct{}) {
 	wait.Until(func() {
 		// Loop the system namespace list, and create them if they do not exist
 		for _, ns := range c.SystemNamespaces {
-			if err := c.CreateNamespaceIfNeeded(ns); err != nil {
+			if err := createNamespaceIfNeeded(c.NamespaceClient, ns); err != nil {
 				runtime.HandleError(fmt.Errorf("unable to create required kubernetes system namespace %s: %v", ns, err))
 			}
 		}
@@ -183,7 +183,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// TODO: when it becomes possible to change this stuff,
 	// stop polling and start watching.
 	// TODO: add endpoints of all replicas, not just the elected master.
-	if err := c.CreateNamespaceIfNeeded(metav1.NamespaceDefault); err != nil {
+	if err := createNamespaceIfNeeded(c.NamespaceClient, metav1.NamespaceDefault); err != nil {
 		return err
 	}
 
@@ -196,25 +196,6 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 	return nil
-}
-
-// CreateNamespaceIfNeeded will create a namespace if it doesn't already exist
-func (c *Controller) CreateNamespaceIfNeeded(ns string) error {
-	if _, err := c.NamespaceClient.Namespaces().Get(ns, metav1.GetOptions{}); err == nil {
-		// the namespace already exists
-		return nil
-	}
-	newNs := &api.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ns,
-			Namespace: "",
-		},
-	}
-	_, err := c.NamespaceClient.Namespaces().Create(newNs)
-	if err != nil && errors.IsAlreadyExists(err) {
-		err = nil
-	}
-	return err
 }
 
 // createPortAndServiceSpec creates an array of service ports.
