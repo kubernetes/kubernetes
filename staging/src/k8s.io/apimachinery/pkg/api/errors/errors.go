@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -202,6 +204,7 @@ func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorLis
 			Field:   err.Field,
 		})
 	}
+	glog.Errorf("AAA (%s %s) %v", qualifiedKind.String(), name, errs.ToAggregate())
 	return &StatusError{metav1.Status{
 		Status: metav1.StatusFailure,
 		Code:   http.StatusUnprocessableEntity,
