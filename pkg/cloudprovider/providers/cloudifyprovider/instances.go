@@ -68,19 +68,19 @@ func (r *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, e
 			})
 		}
 
-		hostPrivateIp := nodeInstance.GetStringProperty("ip")
-		if hostPrivateIp != "" {
+		hostPrivateIP := nodeInstance.GetStringProperty("ip")
+		if hostPrivateIP != "" {
 			addresses = append(addresses, api.NodeAddress{
 				Type:    api.NodeInternalIP,
-				Address: hostPrivateIp,
+				Address: hostPrivateIP,
 			})
 		}
 
-		hostPublicIp := nodeInstance.GetStringProperty("public_ip")
-		if hostPublicIp != "" {
+		hostPublicIP := nodeInstance.GetStringProperty("public_ip")
+		if hostPublicIP != "" {
 			addresses = append(addresses, api.NodeAddress{
 				Type:    api.NodeExternalIP,
-				Address: hostPublicIp,
+				Address: hostPublicIP,
 			})
 		}
 	}
