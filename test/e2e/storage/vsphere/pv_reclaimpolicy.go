@@ -25,9 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -40,6 +38,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		volumePath string
 		pv         *v1.PersistentVolume
 		pvc        *v1.PersistentVolumeClaim
+		nodeInfo   *NodeInfo
 	)
 
 	BeforeEach(func() {
@@ -51,15 +50,15 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("vsphere")
+			Bootstrap(f)
+			nodeInfo = GetReadySchedulableRandomNodeInfo()
 			pv = nil
 			pvc = nil
 			volumePath = ""
 		})
 
 		AfterEach(func() {
-			vsp, err := getVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
-			testCleanupVSpherePersistentVolumeReclaim(vsp, c, ns, volumePath, pv, pvc)
+			testCleanupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, volumePath, pv, pvc)
 		})
 
 		/*
@@ -75,10 +74,8 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			6. Verify PV is deleted automatically.
 		*/
 		It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func() {
-			vsp, err := getVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
-
-			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(vsp, c, ns, v1.PersistentVolumeReclaimDelete)
+			var err error
+			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
 			Expect(err).NotTo(HaveOccurred())
 
 			deletePVCAfterBind(c, ns, pvc, pv)
@@ -105,10 +102,9 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			9. Verify PV should be detached from the node and automatically deleted.
 		*/
 		It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func() {
-			vsp, err := getVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
+			var err error
 
-			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(vsp, c, ns, v1.PersistentVolumeReclaimDelete)
+			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
 			Expect(err).NotTo(HaveOccurred())
 			// Wait for PV and PVC to Bind
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
@@ -116,7 +112,6 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			By("Creating the Pod")
 			pod, err := framework.CreateClientPod(c, ns, pvc)
 			Expect(err).NotTo(HaveOccurred())
-			node := types.NodeName(pod.Spec.NodeName)
 
 			By("Deleting the Claim")
 			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
@@ -128,19 +123,19 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			Expect(framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)).NotTo(HaveOccurred())
 
 			By("Verify the volume is attached to the node")
-			isVolumeAttached, verifyDiskAttachedError := verifyVSphereDiskAttached(c, vsp, pv.Spec.VsphereVolume.VolumePath, node)
+			isVolumeAttached, verifyDiskAttachedError := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 			Expect(verifyDiskAttachedError).NotTo(HaveOccurred())
 			Expect(isVolumeAttached).To(BeTrue())
 
 			By("Verify the volume is accessible and available in the pod")
-			verifyVSphereVolumesAccessible(c, pod, []*v1.PersistentVolume{pv}, vsp)
+			verifyVSphereVolumesAccessible(c, pod, []*v1.PersistentVolume{pv})
 			framework.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
 
 			By("Deleting the Pod")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
 
 			By("Verify PV is detached from the node after Pod is deleted")
-			Expect(waitForVSphereDiskToDetach(c, vsp, pv.Spec.VsphereVolume.VolumePath, types.NodeName(pod.Spec.NodeName))).NotTo(HaveOccurred())
+			Expect(waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)).NotTo(HaveOccurred())
 
 			By("Verify PV should be deleted automatically")
 			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
@@ -167,11 +162,10 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		*/
 
 		It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
+			var err error
 			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
-			vsp, err := getVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
 
-			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(vsp, c, ns, v1.PersistentVolumeReclaimRetain)
+			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimRetain)
 			Expect(err).NotTo(HaveOccurred())
 
 			writeContentToVSpherePV(c, pvc, volumeFileContent)
@@ -205,10 +199,10 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 })
 
 // Test Setup for persistentvolumereclaim tests for vSphere Provider
-func testSetupVSpherePersistentVolumeReclaim(vsp *vsphere.VSphere, c clientset.Interface, ns string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy) (volumePath string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, err error) {
+func testSetupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *NodeInfo, ns string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy) (volumePath string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, err error) {
 	By("running testSetupVSpherePersistentVolumeReclaim")
 	By("creating vmdk")
-	volumePath, err = createVSphereVolume(vsp, nil)
+	volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 	if err != nil {
 		return
 	}
@@ -225,10 +219,11 @@ func testSetupVSpherePersistentVolumeReclaim(vsp *vsphere.VSphere, c clientset.I
 }
 
 // Test Cleanup for persistentvolumereclaim tests for vSphere Provider
-func testCleanupVSpherePersistentVolumeReclaim(vsp *vsphere.VSphere, c clientset.Interface, ns string, volumePath string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+func testCleanupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *NodeInfo, ns string, volumePath string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
 	By("running testCleanupVSpherePersistentVolumeReclaim")
 	if len(volumePath) > 0 {
-		vsp.DeleteVolume(volumePath)
+		err := nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
+		Expect(err).NotTo(HaveOccurred())
 	}
 	if pv != nil {
 		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)

@@ -90,9 +90,8 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 
 	for _, node := range nodeList.Items {
 		n := node
-
 		go func() {
-			nodeUUID := n.Status.NodeInfo.SystemUUID
+			nodeUUID := getUUIDFromProviderID(n.Spec.ProviderID)
 			framework.Logf("Searching for node with UUID: %s", nodeUUID)
 			for _, res := range queueChannel {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -107,7 +106,7 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 					framework.Logf("Found node %s as vm=%+v in vc=%s and datacenter=%s",
 						n.Name, vm, res.vs.Config.Hostname, res.datacenter.Name())
 					nodeInfo := &NodeInfo{Name: n.Name, DataCenterRef: res.datacenter.Reference(), VirtualMachineRef: vm.Reference(), VSphere: res.vs}
-					nameToNodeInfo[n.Name] = nodeInfo
+					nm.SetNodeInfo(n.Name, nodeInfo)
 					break
 				}
 			}
