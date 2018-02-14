@@ -525,6 +525,7 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+	fakeASW := cache.NewActualStateOfWorld("fake", fakeVolumePluginMgr)
 	fakeRuntime := &containertest.FakeRuntime{}
 
 	fakeStatusManager := status.NewManager(fakeClient, fakePodManager, &statustest.FakePodDeletionSafetyProvider{})
@@ -536,6 +537,7 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 		podManager:                fakePodManager,
 		podStatusProvider:         fakeStatusManager,
 		desiredStateOfWorld:       fakesDSW,
+		actualStateOfWorld:        fakeASW,
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,
