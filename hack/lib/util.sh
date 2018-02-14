@@ -30,13 +30,13 @@ kube::util::wait_for_url() {
   }
 
   local i
-  for i in $(seq 1 $times); do
+  for i in $(seq 1 "$times"); do
     local out
-    if out=$(curl --max-time 1 -gkfs $url 2>/dev/null); then
+    if out=$(curl --max-time 1 -gkfs "$url" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
-    sleep ${wait}
+    sleep "${wait}"
   done
   kube::log::error "Timed out waiting for ${prefix} to answer at ${url}; tried ${times} waiting ${wait} between each"
   return 1
@@ -209,7 +209,7 @@ kube::util::gen-docs() {
 # Puts a placeholder for every generated doc. This makes the link checker work.
 kube::util::set-placeholder-gen-docs() {
   local list_file="${KUBE_ROOT}/docs/.generated_docs"
-  if [ -e ${list_file} ]; then
+  if [[ -e "${list_file}" ]]; then
     # remove all of the old docs; we don't want to check them in.
     while read file; do
       if [[ "${list_file}" != "${KUBE_ROOT}/${file}" ]]; then
