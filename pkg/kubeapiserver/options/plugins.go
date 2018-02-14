@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
-	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
@@ -84,7 +83,6 @@ var AllOrderedPlugins = []string{
 	exec.DenyExecOnPrivileged,             // DenyExecOnPrivileged
 	eventratelimit.PluginName,             // EventRateLimit
 	extendedresourcetoleration.PluginName, // ExtendedResourceToleration
-	label.PluginName,                      // PersistentVolumeLabel
 	setdefault.PluginName,                 // DefaultStorageClass
 	storageprotection.PluginName,          // StorageProtection
 	gc.PluginName,                         // OwnerReferencesPermissionEnforcement
@@ -114,7 +112,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	autoprovision.Register(plugins)
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
-	label.Register(plugins) // DEPRECATED in favor of NewPersistentVolumeLabelController in CCM
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)

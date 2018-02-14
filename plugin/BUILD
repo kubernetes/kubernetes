@@ -26,7 +26,6 @@ filegroup(
         "//plugin/pkg/admission/namespace/autoprovision:all-srcs",
         "//plugin/pkg/admission/namespace/exists:all-srcs",
         "//plugin/pkg/admission/noderestriction:all-srcs",
-        "//plugin/pkg/admission/persistentvolume/label:all-srcs",
         "//plugin/pkg/admission/persistentvolume/resize:all-srcs",
         "//plugin/pkg/admission/podnodeselector:all-srcs",
         "//plugin/pkg/admission/podpreset:all-srcs",
