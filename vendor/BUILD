@@ -387,6 +387,7 @@ filegroup(
         "//vendor/golang.org/x/text/unicode/norm:all-srcs",
         "//vendor/golang.org/x/text/width:all-srcs",
         "//vendor/golang.org/x/time/rate:all-srcs",
+        "//vendor/golang.org/x/tools/benchmark/parse:all-srcs",
         "//vendor/golang.org/x/tools/container/intsets:all-srcs",
         "//vendor/golang.org/x/tools/go/ast/astutil:all-srcs",
         "//vendor/golang.org/x/tools/go/vcs:all-srcs",
