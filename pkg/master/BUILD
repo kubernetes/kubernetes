@@ -114,6 +114,7 @@ go_library(
 go_test(
     name = "go_default_test",
     size = "medium",
+    timeout = "long",
     srcs = [
         "client_ca_hook_test.go",
         "controller_test.go",
