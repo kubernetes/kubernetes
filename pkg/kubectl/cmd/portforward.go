@@ -23,6 +23,8 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -35,6 +37,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -131,6 +134,38 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 	return fw.ForwardPorts()
 }
 
+// Translates service port to target port
+// It rewrites ports as needed if the Service port declares targetPort.
+// It returns an error when a named targetPort can't find a match in the pod, or the Service did not declare
+// the port.
+func translateServicePortToTargetPort(ports []string, svc api.Service, pod api.Pod) ([]string, error) {
+	var translated []string
+	for _, port := range ports {
+		// port is in the form of [LOCAL PORT]:REMOTE PORT
+		parts := strings.Split(port, ":")
+		input := parts[0]
+		if len(parts) == 2 {
+			input = parts[1]
+		}
+		portnum, err := strconv.Atoi(input)
+		if err != nil {
+			return ports, err
+		}
+		containerPort, err := util.LookupContainerPortNumberByServicePort(svc, pod, int32(portnum))
+		if err != nil {
+			// can't resolve a named port, or Service did not declare this port, return an error
+			return nil, err
+		} else {
+			if int32(portnum) != containerPort {
+				translated = append(translated, fmt.Sprintf("%s:%d", parts[0], containerPort))
+			} else {
+				translated = append(translated, port)
+			}
+		}
+	}
+	return translated, nil
+}
+
 // Complete completes all the required options for port-forward cmd.
 func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
@@ -167,7 +202,17 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.PodName = forwardablePod.Name
-	o.Ports = args[1:]
+
+	// handle service port mapping to target port if needed
+	switch t := obj.(type) {
+	case *api.Service:
+		o.Ports, err = translateServicePortToTargetPort(args[1:], *t, *forwardablePod)
+		if err != nil {
+			return err
+		}
+	default:
+		o.Ports = args[1:]
+	}
 
 	clientset, err := f.ClientSet()
 	if err != nil {

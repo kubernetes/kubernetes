@@ -21,11 +21,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -131,4 +133,218 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 
 func TestPortForward(t *testing.T) {
 	testPortForward(t, nil, []string{"foo", ":5000", ":1000"})
+}
+
+func TestTranslateServicePortToTargetPort(t *testing.T) {
+	cases := []struct {
+		name       string
+		svc        api.Service
+		pod        api.Pod
+		ports      []string
+		translated []string
+		err        bool
+	}{
+		{
+			name: "test success 1 (int port)",
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Ports: []api.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"80"},
+			translated: []string{"80:8080"},
+			err:        false,
+		},
+		{
+			name: "test success 2 (clusterIP: None)",
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP: "None",
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Ports: []api.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"80"},
+			translated: []string{"80"},
+			err:        false,
+		},
+		{
+			name: "test success 3 (named port)",
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromString("http"),
+						},
+						{
+							Port:       443,
+							TargetPort: intstr.FromString("https"),
+						},
+					},
+				},
+			},
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Ports: []api.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+								{
+									Name:          "https",
+									ContainerPort: int32(8443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"80", "443"},
+			translated: []string{"80:8080", "443:8443"},
+			err:        false,
+		},
+		{
+			name: "test success (targetPort omitted)",
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Ports: []api.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"80"},
+			translated: []string{"80"},
+			err:        false,
+		},
+		{
+			name: "test failure 1 (named port lookup failure)",
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromString("http"),
+						},
+					},
+				},
+			},
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Ports: []api.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: int32(443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"80"},
+			translated: []string{},
+			err:        true,
+		},
+		{
+			name: "test failure 2 (service port not declared)",
+			svc: api.Service{
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromString("http"),
+						},
+					},
+				},
+			},
+			pod: api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Ports: []api.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: int32(443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"443"},
+			translated: []string{},
+			err:        true,
+		},
+	}
+
+	for _, tc := range cases {
+		translated, err := translateServicePortToTargetPort(tc.ports, tc.svc, tc.pod)
+		if err != nil {
+			if tc.err {
+				continue
+			}
+
+			t.Errorf("%v: unexpected error: %v", tc.name, err)
+			continue
+		}
+
+		if tc.err {
+			t.Errorf("%v: unexpected success", tc.name)
+			continue
+		}
+
+		if !reflect.DeepEqual(translated, tc.translated) {
+			t.Errorf("%v: expected %v; got %v", tc.name, tc.translated, translated)
+		}
+	}
 }
