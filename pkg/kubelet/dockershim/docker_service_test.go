@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
 
 func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
-	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
+	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23").WithRandSource(rand.NewSource(0))
 	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
 	return &dockerService{
 		client:            c,
