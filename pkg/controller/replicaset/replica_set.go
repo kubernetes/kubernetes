@@ -37,6 +37,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,6 +92,8 @@ type ReplicaSetController struct {
 
 	// A store of ReplicaSets, populated by the shared informer passed to NewReplicaSetController
 	rsLister extensionslisters.ReplicaSetLister
+
+	dLister extensionslisters.DeploymentLister
 	// rsListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	rsListerSynced cache.InformerSynced
@@ -106,12 +109,12 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(dInformer extensionsinformers.DeploymentInformer, rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
-		extensions.SchemeGroupVersion.WithKind("ReplicaSet"),
+	return NewBaseController(dInformer, rsInformer, podInformer, kubeClient, burstReplicas,
+		v1beta1.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
 		controller.RealPodControl{
@@ -123,7 +126,7 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
-func NewBaseController(rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
+func NewBaseController(dInfomer extensionsinformers.DeploymentInformer, rsInformer extensionsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -147,6 +150,7 @@ func NewBaseController(rsInformer extensionsinformers.ReplicaSetInformer, podInf
 		DeleteFunc: rsc.enqueueReplicaSet,
 	})
 	rsc.rsLister = rsInformer.Lister()
+	rsc.dLister = dInfomer.Lister()
 	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -656,6 +660,22 @@ func (rsc *ReplicaSetController) claimPods(rs *extensions.ReplicaSet, selector l
 	})
 	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, rsc.GroupVersionKind, canAdoptFunc)
 	return cm.ClaimPods(filteredPods)
+}
+
+// getDeployment returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the correct Kind.
+func (rsc *ReplicaSetController) getDeployment(namespace string, controllerRef *metav1.OwnerReference) *extensions.Deployment {
+	d, err := rsc.dLister.Deployments(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if d.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return d
 }
 
 // slowStartBatch tries to call the provided function a total of 'count' times,

@@ -241,6 +241,7 @@ func startEndpointController(ctx ControllerContext) (bool, error) {
 
 func startReplicationController(ctx ControllerContext) (bool, error) {
 	go replicationcontroller.NewReplicationManager(
+	    ctx.InformerFactory.Extensions().V1beta1().Deployments(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),

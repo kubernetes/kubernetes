@@ -69,6 +69,7 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 	go replicaset.NewReplicaSetController(
+		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
 		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
