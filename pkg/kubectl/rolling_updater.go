@@ -549,8 +549,8 @@ func Rename(c coreclient.ReplicationControllersGetter, rc *api.ReplicationContro
 	rc.Name = newName
 	rc.ResourceVersion = ""
 	// First delete the oldName RC and orphan its pods.
-	trueVar := true
-	err := c.ReplicationControllers(rc.Namespace).Delete(oldName, &metav1.DeleteOptions{OrphanDependents: &trueVar})
+	policy := metav1.DeletePropagationOrphan
+	err := c.ReplicationControllers(rc.Namespace).Delete(oldName, &metav1.DeleteOptions{PropagationPolicy: &policy})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
