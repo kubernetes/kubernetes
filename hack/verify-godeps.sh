@@ -85,14 +85,14 @@ ret=0
 pushd "${KUBE_ROOT}" 2>&1 > /dev/null
   # Test for diffs
   if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
-    echo "Your Godeps.json is different:"
-    echo "${_out}"
-    echo "Godeps Verify failed."
+    echo "Your Godeps.json is different:" >&2
+    echo "${_out}" >&2
+    echo "Godeps Verify failed." >&2
     echo "${_out}" > godepdiff.patch
-    echo "If you're seeing this locally, run the below command to fix your Godeps.json:"
-    echo "patch -p0 < godepdiff.patch"
-    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
-    echo "(The patch file should also be exported as a build artifact if run through CI)"
+    echo "If you're seeing this locally, run the below command to fix your Godeps.json:" >&2
+    echo "patch -p0 < godepdiff.patch" >&2
+    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)" >&2
+    echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
     KEEP_TMP=true
     if [[ -f godepdiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
       echo "Copying patch to artifacts.."
@@ -102,14 +102,14 @@ pushd "${KUBE_ROOT}" 2>&1 > /dev/null
   fi
 
   if ! _out="$(diff -Naupr -x "BUILD" -x "OWNERS" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor ${_kubetmp}/vendor)"; then
-    echo "Your vendored results are different:"
-    echo "${_out}"
-    echo "Godeps Verify failed."
+    echo "Your vendored results are different:" >&2
+    echo "${_out}" >&2
+    echo "Godeps Verify failed." >&2
     echo "${_out}" > vendordiff.patch
-    echo "If you're seeing this locally, run the below command to fix your directories:"
-    echo "patch -p0 < vendordiff.patch"
-    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
-    echo "(The patch file should also be exported as a build artifact if run through CI)"
+    echo "If you're seeing this locally, run the below command to fix your directories:" >&2
+    echo "patch -p0 < vendordiff.patch" >&2
+    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)" >&2
+    echo "(The patch file should also be exported as a build artifact if run through CI)" >&2
     KEEP_TMP=true
     if [[ -f vendordiff.patch && -d "${ARTIFACTS_DIR:-}" ]]; then
       echo "Copying patch to artifacts.."
