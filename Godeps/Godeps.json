@@ -2993,6 +2993,10 @@
 			"Rev": "f51c12702a4d776e4c1fa9b0fabab841babae631"
 		},
 		{
+			"ImportPath": "golang.org/x/tools/benchmark/parse",
+			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
+		},
+		{
 			"ImportPath": "golang.org/x/tools/container/intsets",
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
 		},
