@@ -154,6 +154,21 @@ const (
 	// How long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
 
+	// How long claims have to become bound
+	ClaimBindingTimeout = 3 * time.Minute
+
+	// How long claims have to become deleted
+	ClaimDeletingTimeout = 3 * time.Minute
+
+	// How long PVs have to beome reclaimed
+	PVReclaimingTimeout = 3 * time.Minute
+
+	// How long PVs have to become bound
+	PVBindingTimeout = 3 * time.Minute
+
+	// How long PVs have to become deleted
+	PVDeletingTimeout = 3 * time.Minute
+
 	// How long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute
