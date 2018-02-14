@@ -32,6 +32,7 @@ go_library(
         "attributes.go",
         "chain.go",
         "config.go",
+        "decorator.go",
         "errors.go",
         "handler.go",
         "interfaces.go",
