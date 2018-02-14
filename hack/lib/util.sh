@@ -244,11 +244,9 @@ kube::util::remove-gen-docs() {
 kube::util::group-version-to-pkg-path() {
   staging_apis=(
   $(
-    pushd ${KUBE_ROOT}/staging/src/k8s.io/api > /dev/null
-      find . -name types.go | xargs -n1 dirname | sed "s|\./||g" | sort
-    popd > /dev/null
-  )
-  )
+    cd "${KUBE_ROOT}/staging/src/k8s.io/api" &&
+    find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort
+  ))
 
   local group_version="$1"
 
