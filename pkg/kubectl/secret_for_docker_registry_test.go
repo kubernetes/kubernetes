@@ -70,7 +70,7 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-548cm7fgdh",
+					Name: "foo-td6m9k5td8",
 				},
 				Data: map[string][]byte{
 					v1.DockerConfigJsonKey: secretData,
@@ -109,16 +109,18 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 	}
 
 	generator := SecretForDockerRegistryGeneratorV1{}
-	for _, test := range tests {
-		obj, err := generator.Generate(test.params)
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectErr && err != nil {
-			continue
-		}
-		if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Secret))
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			obj, err := generator.Generate(test.params)
+			if !test.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectErr && err != nil {
+				return
+			}
+			if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
+				t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Secret))
+			}
+		})
 	}
 }

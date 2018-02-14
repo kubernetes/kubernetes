@@ -244,7 +244,7 @@ func TestDockerConfigEntryJSONCompatibleEncode(t *testing.T) {
 	}{
 		// simple case, just decode the fields
 		{
-			expect: []byte(`{"username":"foo","password":"bar","email":"foo@example.com","auth":"Zm9vOmJhcg=="}`),
+			expect: []byte(`{"auth":"Zm9vOmJhcg=="}`),
 			input: DockerConfigEntry{
 				Username: "foo",
 				Password: "bar",

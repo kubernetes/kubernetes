@@ -262,7 +262,7 @@ func (ident *DockerConfigEntry) UnmarshalJSON(data []byte) error {
 }
 
 func (ident DockerConfigEntry) MarshalJSON() ([]byte, error) {
-	toEncode := dockerConfigEntryWithAuth{ident.Username, ident.Password, ident.Email, ""}
+	toEncode := dockerConfigEntryWithAuth{}
 	toEncode.Auth = encodeDockerConfigFieldAuth(ident.Username, ident.Password)
 
 	return json.Marshal(toEncode)
