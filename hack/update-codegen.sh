@@ -38,40 +38,32 @@ informergen=$(kube::util::find-binary "informer-gen")
 # that generates the set-gen program.
 #
 
-IFS=" " read -ra GROUP_VERSIONS <<< "$KUBE_AVAILABLE_GROUP_VERSIONS"
+GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
 GV_DIRS=()
 INTERNAL_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
-	# add items, but strip off any leading apis/ you find to match command expectations
-	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
-	nopkg_dir=${api_dir#pkg/}
-	nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
-	pkg_dir=${nopkg_dir#apis/}
+  # add items, but strip off any leading apis/ you find to match command expectations
+  api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
+  nopkg_dir=${api_dir#pkg/}
+  nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
+  pkg_dir=${nopkg_dir#apis/}
 
 
-	# skip groups that aren't being served, clients for these don't matter
-	if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
-		continue
-	fi
+  # skip groups that aren't being served, clients for these don't matter
+    if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+      continue
+    fi
 
-	GV_DIRS+=("${pkg_dir}")
+  GV_DIRS+=("${pkg_dir}")
 
-	# collect internal groups
-	int_group="${pkg_dir%/*}/"
-	if [[ "${pkg_dir}" = core/* ]]; then
-		int_group="api/"
-	fi
-
-	found=0
-	for dir in "${INTERNAL_DIRS[@]}"; do
-		if [[ "$dir" = "$int_group" ]]; then
-			found=1
-			break
-		fi
-	done
-	if [[ $found = 0 ]]; then
-		INTERNAL_DIRS+=("$int_group")
-	fi
+  # collect internal groups
+  int_group="${pkg_dir%/*}/"
+  if [[ "${pkg_dir}" = core/* ]]; then
+    int_group="api/"
+  fi
+    if ! [[ " ${INTERNAL_DIRS[@]:-} " =~ " ${int_group} " ]]; then
+      INTERNAL_DIRS+=("${int_group}")
+    fi
 done
 # delimit by commas for the command
 GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
@@ -82,26 +74,32 @@ INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 ${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
 ${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt "$@"
 
-mapfile -t listergen_internal_apis < <(
-	cd "${KUBE_ROOT}"
-	sort <(find pkg/apis -maxdepth 2 -name types.go -exec dirname {} \;)
+listergen_internal_apis=(
+$(
+  cd ${KUBE_ROOT}
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
-listergen_internal_apis=("${listergen_internal_apis[@]/#/k8s.io/kubernetes/}")
+)
+listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
 listergen_internal_apis_csv=$(IFS=,; echo "${listergen_internal_apis[*]}")
 ${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
 
-mapfile -t listergen_external_apis < <(
-	cd "${KUBE_ROOT}/staging/src"
-	sort <(find k8s.io/api -name types.go -exec dirname {} \;)
+listergen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort
+)
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
 ${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt "$@"
 
-mapfile -t informergen_internal_apis < <(
-	cd "${KUBE_ROOT}"
-	sort <(find pkg/apis -maxdepth 2 -name types.go -exec dirname {} \;)
+informergen_internal_apis=(
+$(
+  cd ${KUBE_ROOT}
+  find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
 )
-informergen_internal_apis=("${informergen_internal_apis[@]/#/k8s.io/kubernetes/}")
+)
+informergen_internal_apis=(${informergen_internal_apis[@]/#/k8s.io/kubernetes/})
 informergen_internal_apis_csv=$(IFS=,; echo "${informergen_internal_apis[*]}")
 ${informergen} \
   --input-dirs "${informergen_internal_apis_csv}" \
@@ -110,10 +108,12 @@ ${informergen} \
   --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.go.txt \
   "$@"
 
-mapfile -t informergen_external_apis < <(
-	cd "${KUBE_ROOT}/staging/src"
-	# because client-gen doesn't do policy/v1alpha1, we have to skip it too
-	sort <(find k8s.io/api -name types.go -exec dirname {} \;) | grep -v pkg.apis.policy.v1alpha1
+informergen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
+  find k8s.io/api -name types.go | xargs -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
+)
 )
 
 informergen_external_apis_csv=$(IFS=,; echo "${informergen_external_apis[*]}")
