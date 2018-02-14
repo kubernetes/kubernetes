@@ -369,7 +369,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidatePodSecurityContext(v.pod, field.NewPath(""))
+		errs := provider.ValidatePod(v.pod, field.NewPath(""))
 		if len(errs) == 0 {
 			t.Errorf("%s expected validation failure but did not receive errors", k)
 			continue
@@ -732,7 +732,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		errs := provider.ValidatePodSecurityContext(v.pod, field.NewPath(""))
+		errs := provider.ValidatePod(v.pod, field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("%s expected validation pass but received errors %v", k, errs)
 			continue
@@ -1094,7 +1094,7 @@ func TestValidateAllowedVolumes(t *testing.T) {
 		}
 
 		// expect a denial for this PSP and test the error message to ensure it's related to the volumesource
-		errs := provider.ValidatePodSecurityContext(pod, field.NewPath(""))
+		errs := provider.ValidatePod(pod, field.NewPath(""))
 		if len(errs) != 1 {
 			t.Errorf("expected exactly 1 error for %s but got %v", fieldVal.Name, errs)
 		} else {
@@ -1105,14 +1105,14 @@ func TestValidateAllowedVolumes(t *testing.T) {
 
 		// now add the fstype directly to the psp and it should validate
 		psp.Spec.Volumes = []extensions.FSType{fsType}
-		errs = provider.ValidatePodSecurityContext(pod, field.NewPath(""))
+		errs = provider.ValidatePod(pod, field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("directly allowing volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
 
 		// now change the psp to allow any volumes and the pod should still validate
 		psp.Spec.Volumes = []extensions.FSType{extensions.All}
-		errs = provider.ValidatePodSecurityContext(pod, field.NewPath(""))
+		errs = provider.ValidatePod(pod, field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("wildcard volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
