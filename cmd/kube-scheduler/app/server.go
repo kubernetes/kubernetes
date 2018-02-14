@@ -182,17 +182,26 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer().HasSynced)
 
 	// Prepare a reusable run function.
-	run := func(stopCh <-chan struct{}) {
+	run := func(ctx context.Context) {
 		sched.Run()
-		<-stopCh
+		<-ctx.Done()
 	}
+
+	runCtx, cancel := context.WithCancel(context.TODO()) // once Run() accepts a context, it should be used here
+	defer cancel()
+
+	go func() {
+		select {
+		case <-stopCh:
+			cancel()
+		case <-runCtx.Done():
+		}
+	}()
 
 	// If leader election is enabled, run via LeaderElector until done and exit.
 	if c.LeaderElection != nil {
 		c.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				run(ctx.Done())
-			},
+			OnStartedLeading: run,
 			OnStoppedLeading: func() {
 				utilruntime.HandleError(fmt.Errorf("lost master"))
 			},
@@ -202,13 +211,13 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
 
-		leaderElector.Run(context.TODO())
+		leaderElector.Run(runCtx)
 
 		return fmt.Errorf("lost lease")
 	}
 
 	// Leader election is disabled, so run inline until done.
-	run(stopCh)
+	run(runCtx)
 	return fmt.Errorf("finished without leader elect")
 }
 
