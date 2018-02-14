@@ -863,6 +863,11 @@ message PodSecurityPolicySpec {
   // is allowed in the "Volumes" field.
   // +optional
   repeated AllowedFlexVolume allowedFlexVolumes = 18;
+
+  // The priority value defines the order when multiple policies are available.
+  // The higher the value, the higher the order.
+  // +optional
+  optional int32 priority = 19;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
