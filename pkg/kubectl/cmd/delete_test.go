@@ -104,17 +104,17 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	}
 }
 
-func hasExpectedOrphanDependents(body io.ReadCloser, expectedOrphanDependents *bool) bool {
-	if body == nil || expectedOrphanDependents == nil {
-		return body == nil && expectedOrphanDependents == nil
+func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPropagation) bool {
+	if body == nil || policy == nil {
+		return body == nil && policy == nil
 	}
 	var parsedBody metav1.DeleteOptions
 	rawBody, _ := ioutil.ReadAll(body)
 	json.Unmarshal(rawBody, &parsedBody)
-	if parsedBody.OrphanDependents == nil {
+	if parsedBody.PropagationPolicy == nil {
 		return false
 	}
-	return *expectedOrphanDependents == *parsedBody.OrphanDependents
+	return *policy == *parsedBody.PropagationPolicy
 }
 
 // Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
@@ -127,13 +127,13 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	var expectedOrphanDependents *bool
+	var policy *metav1.DeletionPropagation
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, b := req.URL.Path, req.Method, req.Body; {
 
-			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedOrphanDependents(b, expectedOrphanDependents):
+			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedPropagationPolicy(b, policy):
 
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
@@ -143,9 +143,9 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	}
 	tf.Namespace = "test"
 
-	// DeleteOptions.OrphanDependents should be false, when cascade is true (default).
-	falseVar := false
-	expectedOrphanDependents = &falseVar
+	// DeleteOptions.PropagationPolicy should be Foreground, when cascade is true (default).
+	foregroundPolicy := metav1.DeletePropagationForeground
+	policy = &foregroundPolicy
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
@@ -156,8 +156,8 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	}
 
 	// Test that delete options should be set to orphan when cascade is false.
-	trueVar := true
-	expectedOrphanDependents = &trueVar
+	orphanPolicy := metav1.DeletePropagationOrphan
+	policy = &orphanPolicy
 	streams, _, buf, _ = genericclioptions.NewTestIOStreams()
 	cmd = NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
