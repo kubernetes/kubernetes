@@ -74,7 +74,6 @@ func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInform
 }
 
 func (c *DiscoveryController) sync(version schema.GroupVersion) error {
-
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
 
@@ -97,8 +96,14 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			GroupVersion: crd.Spec.Group + "/" + crd.Spec.Version,
 			Version:      crd.Spec.Version,
 		})
+		if len(crd.Spec.TransitionalVersionAlias) != 0 {
+			apiVersionsForDiscovery = append(apiVersionsForDiscovery, metav1.GroupVersionForDiscovery{
+				GroupVersion: crd.Spec.Group + "/" + crd.Spec.TransitionalVersionAlias,
+				Version:      crd.Spec.TransitionalVersionAlias,
+			})
+		}
 
-		if crd.Spec.Version != version.Version {
+		if crd.Spec.Version != version.Version && crd.Spec.TransitionalVersionAlias != version.Version {
 			continue
 		}
 		foundVersion = true
@@ -189,6 +194,9 @@ func (c *DiscoveryController) processNextWorkItem() bool {
 
 func (c *DiscoveryController) enqueue(obj *apiextensions.CustomResourceDefinition) {
 	c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: obj.Spec.Version})
+	if len(obj.Spec.TransitionalVersionAlias) != 0 {
+		c.queue.Add(schema.GroupVersion{Group: obj.Spec.Group, Version: obj.Spec.TransitionalVersionAlias})
+	}
 }
 
 func (c *DiscoveryController) addCustomResourceDefinition(obj interface{}) {

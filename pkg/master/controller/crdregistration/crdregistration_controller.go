@@ -123,6 +123,11 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 			if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version}); err != nil {
 				utilruntime.HandleError(err)
 			}
+			if len(crd.Spec.TransitionalVersionAlias) != 0 {
+				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.TransitionalVersionAlias}); err != nil {
+					utilruntime.HandleError(err)
+				}
+			}
 		}
 	}
 	close(c.syncedInitialSet)
@@ -183,6 +188,9 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 
 func (c *crdRegistrationController) enqueueCRD(crd *apiextensions.CustomResourceDefinition) {
 	c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version})
+	if len(crd.Spec.TransitionalVersionAlias) != 0 {
+		c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.TransitionalVersionAlias})
+	}
 }
 
 func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.GroupVersion) error {
@@ -195,7 +203,8 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 		return err
 	}
 	for _, crd := range crds {
-		if crd.Spec.Version == groupVersion.Version && crd.Spec.Group == groupVersion.Group {
+		if crd.Spec.Group == groupVersion.Group &&
+			(crd.Spec.Version == groupVersion.Version || crd.Spec.TransitionalVersionAlias == groupVersion.Version) {
 			found = true
 			break
 		}

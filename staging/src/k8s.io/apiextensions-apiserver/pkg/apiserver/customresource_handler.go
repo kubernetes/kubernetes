@@ -89,6 +89,9 @@ type crdInfo struct {
 
 	storage      *customresource.REST
 	requestScope handlers.RequestScope
+
+	transitionalVersionStorage      *customresource.REST
+	transitionalVersionRequestScope handlers.RequestScope
 }
 
 // crdStorageMap goes from customresourcedefinition to its storage
@@ -164,7 +167,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if crd.Spec.Version != requestInfo.APIVersion {
+	if crd.Spec.Version != requestInfo.APIVersion && crd.Spec.TransitionalVersionAlias != requestInfo.APIVersion {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -187,6 +190,10 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	storage := crdInfo.storage
 	requestScope := crdInfo.requestScope
+	if crd.Spec.Version != requestInfo.APIVersion {
+		storage = crdInfo.transitionalVersionStorage
+		requestScope = crdInfo.transitionalVersionRequestScope
+	}
 	minRequestTimeout := 1 * time.Minute
 
 	verb := strings.ToUpper(requestInfo.Verb)
@@ -328,10 +335,43 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		return ret, nil
 	}
 
+	storage, requestScope, err := r.storageAndRequestScope(crd, crd.Spec.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := &crdInfo{
+		spec:          &crd.Spec,
+		acceptedNames: &crd.Status.AcceptedNames,
+
+		storage:      storage,
+		requestScope: *requestScope,
+	}
+
+	if len(crd.Spec.TransitionalVersionAlias) != 0 {
+		storage, requestScope, err := r.storageAndRequestScope(crd, crd.Spec.TransitionalVersionAlias)
+		if err != nil {
+			return nil, err
+		}
+		ret.transitionalVersionStorage = storage
+		ret.transitionalVersionRequestScope = *requestScope
+	}
+
+	// Copy because we cannot write to storageMap without a race
+	// as it is used without locking elsewhere.
+	storageMap2 := storageMap.clone()
+
+	storageMap2[crd.UID] = ret
+	r.customStorage.Store(storageMap2)
+
+	return ret, nil
+}
+
+func (r *crdHandler) storageAndRequestScope(crd *apiextensions.CustomResourceDefinition, version string) (*customresource.REST, *handlers.RequestScope, error) {
 	// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
 	// decode unversioned Options objects, so we delegate to parameterScheme for such types.
 	parameterScheme := runtime.NewScheme()
-	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: crd.Spec.Group, Version: crd.Spec.Version},
+	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: crd.Spec.Group, Version: version},
 		&metav1.ListOptions{},
 		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
@@ -339,7 +379,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	)
 	parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
-	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.Kind}
+	kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: version, Kind: crd.Status.AcceptedNames.Kind}
 	typer := unstructuredObjectTyper{
 		delegate:          parameterScheme,
 		unstructuredTyper: discovery.NewUnstructuredObjectTyper(nil),
@@ -348,12 +388,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 	validator, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	storage := customresource.NewREST(
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Status.AcceptedNames.Plural},
-		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.ListKind},
+		schema.GroupVersionKind{Group: crd.Spec.Group, Version: version, Kind: crd.Status.AcceptedNames.ListKind},
 		customresource.NewStrategy(
 			typer,
 			crd.Spec.Scope == apiextensions.NamespaceScoped,
@@ -366,9 +406,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	selfLinkPrefix := ""
 	switch crd.Spec.Scope {
 	case apiextensions.ClusterScoped:
-		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version) + "/" + crd.Status.AcceptedNames.Plural + "/"
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, version) + "/" + crd.Status.AcceptedNames.Plural + "/"
 	case apiextensions.NamespaceScoped:
-		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version, "namespaces") + "/"
+		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, version, "namespaces") + "/"
 	}
 
 	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
@@ -400,29 +440,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		Typer:           typer,
 		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
 
-		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Status.AcceptedNames.Plural},
+		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: version, Resource: crd.Status.AcceptedNames.Plural},
 		Kind:        kind,
 		Subresource: "",
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
 	}
 
-	ret := &crdInfo{
-		spec:          &crd.Spec,
-		acceptedNames: &crd.Status.AcceptedNames,
-
-		storage:      storage,
-		requestScope: requestScope,
-	}
-
-	// Copy because we cannot write to storageMap without a race
-	// as it is used without locking elsewhere.
-	storageMap2 := storageMap.clone()
-
-	storageMap2[crd.UID] = ret
-	r.customStorage.Store(storageMap2)
-
-	return ret, nil
+	return storage, &requestScope, nil
 }
 
 // crdObjectConverter is a converter that supports field selectors for CRDs.
