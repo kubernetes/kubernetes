@@ -233,24 +233,8 @@ def set_app_version():
 
 
 @when('kubernetes-worker.snaps.installed')
-@when_not('kube-control.dns.available')
-def notify_user_transient_status():
-    ''' Notify to the user we are in a transient state and the application
-    is still converging. Potentially remotely, or we may be in a detached loop
-    wait state '''
-
-    # During deployment the worker has to start kubelet without cluster dns
-    # configured. If this is the first unit online in a service pool waiting
-    # to self host the dns pod, and configure itself to query the dns service
-    # declared in the kube-system namespace
-
-    hookenv.status_set('waiting', 'Waiting for cluster DNS.')
-
-
-@when('kubernetes-worker.snaps.installed',
-      'kube-control.dns.available')
 @when_not('kubernetes-worker.snaps.upgrade-needed')
-def charm_status(kube_control):
+def charm_status():
     '''Update the status message with the current status of kubelet.'''
     update_kubelet_status()
 
@@ -314,8 +298,7 @@ def send_data(tls, kube_control):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
-@when('kube-api-endpoint.available', 'kube-control.dns.available',
-      'cni.available')
+@when('kube-api-endpoint.available', 'kube-control.connected', 'cni.available')
 def watch_for_changes(kube_api, kube_control, cni):
     ''' Watch for configuration changes and signal if we need to restart the
     worker services '''
@@ -334,10 +317,10 @@ def watch_for_changes(kube_api, kube_control, cni):
       'tls_client.ca.saved', 'tls_client.client.certificate.saved',
       'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
       'tls_client.server.key.saved',
-      'kube-control.dns.available', 'kube-control.auth.available',
+      'kube-control.auth.available',
       'cni.available', 'kubernetes-worker.restart-needed',
       'worker.auth.bootstrapped')
-def start_worker(kube_api, kube_control, auth_control, cni):
+def start_worker(kube_api, kube_control, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
     # Note that the DNS server doesn't necessarily exist at this point. We know
@@ -366,6 +349,8 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     restart_unit_services()
     update_kubelet_status()
     apply_node_labels()
+    dns_ready = True if dns['enable-kube-dns'] else False
+    kube_control.set_dns(dns_ready)
     remove_state('kubernetes-worker.restart-needed')
 
 

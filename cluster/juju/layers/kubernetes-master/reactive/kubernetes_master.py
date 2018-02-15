@@ -486,7 +486,7 @@ def etcd_data_change(etcd):
 
 
 @when('kube-control.connected')
-@when('cdk-addons.configured')
+@when('cdk-addons.dns.configured')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
     enableKubeDNS = hookenv.config('enable-kube-dns')
@@ -638,8 +638,30 @@ def kick_api_server(tls):
 def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
-    dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
+    remove_state('cdk-addons.dns.configured')
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
+
+    # if the admin requested dns but dns is not ready on the workers
+    if dnsEnabled and not is_state('kube-control.dns.available'):
+        args = [
+            'arch=' + arch(),
+            'dns-ip=' + get_deprecated_dns_ip(),
+            'dns-domain=' + hookenv.config('dns_domain'),
+            'enable-dashboard=false',
+            'enable-kube-dns=' + dnsEnabled
+        ]
+        check_call(['snap', 'set', 'cdk-addons'] + args)
+        if not addons_ready():
+            hookenv.status_set('waiting', 'Waiting to retry dns deployment')
+            remove_state('cdk-addons.dns.configured')
+            remove_state('cdk-addons.configured')
+            return
+        set_state('cdk-addons.dns.configured')
+        # We have to wait for 'kube-control.dns.available'
+        # so we exit here without setting 'cdk-addons.configured'
+        return
+
+    dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     args = [
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
@@ -653,6 +675,7 @@ def configure_cdk_addons():
         remove_state('cdk-addons.configured')
         return
 
+    set_state('cdk-addons.dns.configured')
     set_state('cdk-addons.configured')
 
 
