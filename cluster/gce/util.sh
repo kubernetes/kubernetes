@@ -472,6 +472,15 @@ function yaml-quote {
   echo "'$(echo "${@:-}" | sed -e "s/'/''/g")'"
 }
 
+# Writes the cluster location into a temporary file.
+# Assumed vars
+#   ZONE
+function write-cluster-location {
+  cat >"${KUBE_TEMP}/cluster-location.txt" << EOF
+${ZONE}
+EOF
+}
+
 # Writes the cluster name into a temporary file.
 # Assumed vars
 #   CLUSTER_NAME
@@ -1499,6 +1508,7 @@ function kube-up() {
     create-network
     create-subnetworks
     detect-subnetworks
+    write-cluster-location
     write-cluster-name
     create-autoscaler-config
     create-master
