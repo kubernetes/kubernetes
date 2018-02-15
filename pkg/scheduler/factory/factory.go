@@ -50,6 +50,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -258,6 +259,7 @@ func NewConfigFactory(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    c.onPvAdd,
+			UpdateFunc: c.onPvUpdate,
 			DeleteFunc: c.onPvDelete,
 		},
 	)
@@ -354,6 +356,56 @@ func (c *configFactory) onPvAdd(obj interface{}) {
 	}
 }
 
+func (c *configFactory) onPvUpdate(old, new interface{}) {
+	if c.enableEquivalenceClassCache {
+		newPV, ok := new.(*v1.PersistentVolume)
+		if !ok {
+			glog.Errorf("cannot convert to *v1.PersistentVolume: %v", new)
+			return
+		}
+		oldPV, ok := old.(*v1.PersistentVolume)
+		if !ok {
+			glog.Errorf("cannot convert to *v1.PersistentVolume: %v", old)
+			return
+		}
+		c.invalidatePredicatesForPvUpdate(oldPV, newPV)
+	}
+}
+
+func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.PersistentVolume) {
+	invalidPredicates := sets.NewString()
+	for k, v := range newPV.Labels {
+		// If PV update modifies the zone/region labels.
+		if isZoneRegionLabel(k) && !reflect.DeepEqual(v, oldPV.Labels[k]) {
+			invalidPredicates.Insert("NoVolumeZoneConflict")
+			break
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		oldAffinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(oldPV.Annotations)
+		if err != nil {
+			glog.Errorf("cannot get node affinity fo *v1.PersistentVolume: %v", oldPV)
+			return
+		}
+		newAffinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(newPV.Annotations)
+		if err != nil {
+			glog.Errorf("cannot get node affinity fo *v1.PersistentVolume: %v", newPV)
+			return
+		}
+
+		// If node affinity of PV is changed.
+		if !reflect.DeepEqual(oldAffinity, newAffinity) {
+			invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
+		}
+	}
+	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+}
+
+// isZoneRegionLabel check if given key of label is zone or region label.
+func isZoneRegionLabel(k string) bool {
+	return k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion
+}
+
 func (c *configFactory) onPvDelete(obj interface{}) {
 	if c.enableEquivalenceClassCache {
 		var pv *v1.PersistentVolume
@@ -392,8 +444,8 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 	}
 
 	// If PV contains zone related label, it may impact cached NoVolumeZoneConflict
-	for k := range pv.ObjectMeta.Labels {
-		if k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion {
+	for k := range pv.Labels {
+		if isZoneRegionLabel(k) {
 			invalidPredicates.Insert("NoVolumeZoneConflict")
 			break
 		}
@@ -487,8 +539,6 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 		}
 		// The bound volume type may change
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
-		// The bound volume's label may change
-		invalidPredicates.Insert("NoVolumeZoneConflict")
 	}
 
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
@@ -739,7 +789,7 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 					invalidPredicates.Insert("MatchInterPodAffinity")
 				}
 				// NoVolumeZoneConflict will only be affected by zone related label change
-				if k == kubeletapis.LabelZoneFailureDomain || k == kubeletapis.LabelZoneRegion {
+				if isZoneRegionLabel(k) {
 					if v != newNode.GetLabels()[k] {
 						invalidPredicates.Insert("NoVolumeZoneConflict")
 					}
