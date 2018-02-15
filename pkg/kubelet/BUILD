@@ -200,6 +200,7 @@ go_test(
         "//pkg/kubelet/volumemanager:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/host_path:go_default_library",

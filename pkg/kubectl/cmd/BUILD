@@ -230,6 +230,7 @@ go_test(
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",
         "//pkg/printers:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
