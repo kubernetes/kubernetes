@@ -1977,8 +1977,11 @@ function start-kube-registry-proxy {
   cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
 }
 
-# Starts a l7 loadbalancing controller for ingress.
+# Setups manifests for ingress controller and gce-specific policies for service controller.
 function start-lb-controller {
+  setup-addon-manifests "addons" "loadbalancing"
+
+  # Starts a l7 loadbalancing controller for ingress.
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
