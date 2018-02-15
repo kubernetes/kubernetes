@@ -1982,50 +1982,57 @@ function copy-manifests {
   chmod 644 "${dst_dir}"/*
 }
 
-# Fluentd manifest is modified using kubectl, which may not be available at
-# this point. Run this as a background process.
+# Fluentd resources are modified using ScalingPolicy CR, which may not be
+# available at this point. Run this as a background process.
 function wait-for-apiserver-and-update-fluentd {
-  local -r fluentd_gcp_yaml="${1}"
-
-  local modifying_flags=""
+  local any_overrides=false
   if [[ -n "${FLUENTD_GCP_MEMORY_LIMIT:-}" ]]; then
-    modifying_flags="${modifying_flags} --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT}"
+    any_overrides=true
   fi
-  local request_resources=""
   if [[ -n "${FLUENTD_GCP_CPU_REQUEST:-}" ]]; then
-    request_resources="cpu=${FLUENTD_GCP_CPU_REQUEST}"
+    any_overrides=true
   fi
   if [[ -n "${FLUENTD_GCP_MEMORY_REQUEST:-}" ]]; then
-    if [[ -n "${request_resources}" ]]; then
-      request_resources="${request_resources},"
-    fi
-    request_resources="memory=${FLUENTD_GCP_MEMORY_REQUEST}"
+    any_overrides=true
   fi
-  if [[ -n "${request_resources}" ]]; then
-    modifying_flags="${modifying_flags} --requests=${request_resources}"
+  if ! $any_overrides; then
+    # Nothing to do here.
+    exit
   fi
 
-  until kubectl get nodes
+  # Wait until ScalingPolicy CRD is in place.
+  until kubectl get scalingpolicies.scalingpolicy.kope.io
   do
     sleep 10
   done
 
-  local -r temp_fluentd_gcp_yaml="${fluentd_gcp_yaml}.tmp"
-  if kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} ${modifying_flags} \
-      --containers=fluentd-gcp -o yaml > ${temp_fluentd_gcp_yaml}; then
-    mv ${temp_fluentd_gcp_yaml} ${fluentd_gcp_yaml}
-  else
-    (echo "Failed to update fluentd resources. Used manifest:" && cat ${temp_fluentd_gcp_yaml}) >&2
-    rm ${temp_fluentd_gcp_yaml}
-  fi
+  # Single-shot, not managed by addon manager. Can be later modified or removed
+  # at will.
+  cat <<EOF | kubectl apply -f -
+apiVersion: scalingpolicy.kope.io/v1alpha1
+kind: ScalingPolicy
+metadata:
+  name: fluentd-gcp-scaling-policy
+  namespace: kube-system
+spec:
+  containers:
+  - name: fluentd-gcp
+    resources:
+      requests:
+      - resource: cpu
+        base: ${FLUENTD_GCP_CPU_REQUEST:-}
+      - resource: memory
+        base: ${FLUENTD_GCP_MEMORY_REQUEST:-}
+      limits:
+      - resource: memory
+        base: ${FLUENTD_GCP_MEMORY_LIMIT:-}
+EOF
 }
 
 # Trigger background process that will ultimately update fluentd resource
 # requirements.
 function start-fluentd-resource-update {
-  local -r fluentd_gcp_yaml="${1}"
-
-  wait-for-apiserver-and-update-fluentd ${fluentd_gcp_yaml} &
+  wait-for-apiserver-and-update-fluentd &
 }
 
 # Update {{ container-runtime }} with actual container runtime name.
