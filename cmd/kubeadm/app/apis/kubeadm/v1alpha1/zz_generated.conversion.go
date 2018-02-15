@@ -67,6 +67,7 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_API_To_kubeadm_API(in *API, out *kubeadm.API, s conversion.Scope) error {
 	out.AdvertiseAddress = in.AdvertiseAddress
+	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.BindPort = in.BindPort
 	return nil
 }
@@ -78,6 +79,7 @@ func Convert_v1alpha1_API_To_kubeadm_API(in *API, out *kubeadm.API, s conversion
 
 func autoConvert_kubeadm_API_To_v1alpha1_API(in *kubeadm.API, out *API, s conversion.Scope) error {
 	out.AdvertiseAddress = in.AdvertiseAddress
+	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.BindPort = in.BindPort
 	return nil
 }
