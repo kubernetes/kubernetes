@@ -270,7 +270,7 @@ def password_changed():
     elif password == "":
         # Password not initialised
         password = token_generator()
-    setup_basic_auth(password, "admin", "admin")
+    setup_basic_auth(password, "admin", "admin", "system:masters")
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
     set_state('client.password.initialised')

@@ -34,7 +34,6 @@ type BuiltInAuthenticationOptions struct {
 	Anonymous       *AnonymousAuthenticationOptions
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
-	Keystone        *KeystoneAuthenticationOptions
 	OIDC            *OIDCAuthenticationOptions
 	PasswordFile    *PasswordFileAuthenticationOptions
 	RequestHeader   *genericoptions.RequestHeaderAuthenticationOptions
@@ -52,11 +51,6 @@ type AnonymousAuthenticationOptions struct {
 
 type BootstrapTokenAuthenticationOptions struct {
 	Enable bool
-}
-
-type KeystoneAuthenticationOptions struct {
-	URL    string
-	CAFile string
 }
 
 type OIDCAuthenticationOptions struct {
@@ -99,7 +93,6 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithAnonymous().
 		WithBootstrapToken().
 		WithClientCert().
-		WithKeystone().
 		WithOIDC().
 		WithPasswordFile().
 		WithRequestHeader().
@@ -120,11 +113,6 @@ func (s *BuiltInAuthenticationOptions) WithBootstrapToken() *BuiltInAuthenticati
 
 func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOptions {
 	s.ClientCert = &genericoptions.ClientCertAuthenticationOptions{}
-	return s
-}
-
-func (s *BuiltInAuthenticationOptions) WithKeystone() *BuiltInAuthenticationOptions {
-	s.Keystone = &KeystoneAuthenticationOptions{}
 	return s
 }
 
@@ -187,15 +175,6 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	if s.ClientCert != nil {
 		s.ClientCert.AddFlags(fs)
-	}
-
-	if s.Keystone != nil {
-		fs.StringVar(&s.Keystone.URL, "experimental-keystone-url", s.Keystone.URL,
-			"If passed, activates the keystone authentication plugin.")
-
-		fs.StringVar(&s.Keystone.CAFile, "experimental-keystone-ca-file", s.Keystone.CAFile, ""+
-			"If set, the Keystone server's certificate will be verified by one of the authorities "+
-			"in the experimental-keystone-ca-file, otherwise the host's root CA set will be used.")
 	}
 
 	if s.OIDC != nil {
@@ -283,11 +262,6 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 
 	if s.ClientCert != nil {
 		ret.ClientCAFile = s.ClientCert.ClientCA
-	}
-
-	if s.Keystone != nil {
-		ret.KeystoneURL = s.Keystone.URL
-		ret.KeystoneCAFile = s.Keystone.CAFile
 	}
 
 	if s.OIDC != nil {

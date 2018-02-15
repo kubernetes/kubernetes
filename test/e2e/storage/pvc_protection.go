@@ -57,7 +57,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		pvcCreatedAndNotDeleted = true
 
 		By("Waiting for PVC to become Bound")
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
 
 		By("Checking that PVC Protection finalizer is set")
@@ -76,7 +76,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		By("Deleting the PVC")
 		err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred(), "Error deleting PVC")
-		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
@@ -100,7 +100,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 
@@ -137,7 +137,7 @@ var _ = utils.SIGDescribe("PVC Protection [Feature:StorageProtection]", func() {
 		Expect(err).NotTo(HaveOccurred(), "Error terminating and deleting pod")
 
 		By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
-		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		framework.WaitForPersistentVolumeClaimDeleted(client, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimDeletingTimeout)
 		pvcCreatedAndNotDeleted = false
 	})
 })

@@ -163,6 +163,7 @@ pkg/kubelet/apis
 pkg/kubelet/apis/cri/runtime/v1alpha2
 pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/deviceplugin/v1alpha
+pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/apis/kubeletconfig
 pkg/kubelet/apis/kubeletconfig/v1alpha1
 pkg/kubelet/cadvisor
@@ -602,7 +603,6 @@ staging/src/k8s.io/apiserver/pkg/util/trace
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
 staging/src/k8s.io/apiserver/plugin/pkg/audit/log
-staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/keystone
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/testing

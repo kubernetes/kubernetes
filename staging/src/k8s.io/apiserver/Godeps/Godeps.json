@@ -491,34 +491,6 @@
 			"Rev": "0c5108395e2debce0d731cf0287ddf7242066aba"
 		},
 		{
-			"ImportPath": "github.com/gophercloud/gophercloud",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tenants",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/openstack/utils",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
-			"Rev": "8e59687aa4b27ab22a0bf3295f1e165ff7bd5f97"
-		},
-		{
 			"ImportPath": "github.com/grpc-ecosystem/go-grpc-prometheus",
 			"Rev": "2500245aa6110c562d17020fb31a2c133d737799"
 		},

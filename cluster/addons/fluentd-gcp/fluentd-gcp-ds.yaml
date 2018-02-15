@@ -32,12 +32,6 @@ spec:
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
-        resources:
-          limits:
-            memory: 300Mi
-          requests:
-            cpu: 100m
-            memory: 200Mi
         volumeMounts:
         - name: varlog
           mountPath: /var/log
@@ -123,4 +117,4 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.2.3
+          name: fluentd-gcp-config-v1.2.4

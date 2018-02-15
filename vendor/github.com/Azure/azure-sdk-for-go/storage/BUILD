@@ -38,6 +38,7 @@ go_library(
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
+        "//vendor/github.com/marstr/guid:go_default_library",
         "//vendor/github.com/satori/go.uuid:go_default_library",
     ],
 )

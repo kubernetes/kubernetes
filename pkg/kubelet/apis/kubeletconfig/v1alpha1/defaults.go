@@ -46,16 +46,16 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 
 func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.Authentication.Anonymous.Enabled == nil {
-		obj.Authentication.Anonymous.Enabled = boolVar(true)
+		obj.Authentication.Anonymous.Enabled = boolVar(false)
 	}
 	if obj.Authentication.Webhook.Enabled == nil {
-		obj.Authentication.Webhook.Enabled = boolVar(false)
+		obj.Authentication.Webhook.Enabled = boolVar(true)
 	}
 	if obj.Authentication.Webhook.CacheTTL == zeroDuration {
 		obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
 	}
 	if obj.Authorization.Mode == "" {
-		obj.Authorization.Mode = KubeletAuthorizationModeAlwaysAllow
+		obj.Authorization.Mode = KubeletAuthorizationModeWebhook
 	}
 	if obj.Authorization.Webhook.CacheAuthorizedTTL == zeroDuration {
 		obj.Authorization.Webhook.CacheAuthorizedTTL = metav1.Duration{Duration: 5 * time.Minute}
@@ -87,9 +87,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.EnableDebuggingHandlers == nil {
 		obj.EnableDebuggingHandlers = boolVar(true)
-	}
-	if obj.EnableServer == nil {
-		obj.EnableServer = boolVar(true)
 	}
 	if obj.FileCheckFrequency == zeroDuration {
 		obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
@@ -140,9 +137,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
-	}
-	if obj.ReadOnlyPort == nil {
-		obj.ReadOnlyPort = utilpointer.Int32Ptr(ports.KubeletReadOnlyPort)
 	}
 	if obj.RegistryBurst == 0 {
 		obj.RegistryBurst = 10

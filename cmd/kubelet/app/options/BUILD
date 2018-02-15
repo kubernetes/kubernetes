@@ -61,6 +61,7 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/types:go_default_library",
+        "//pkg/master/ports:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

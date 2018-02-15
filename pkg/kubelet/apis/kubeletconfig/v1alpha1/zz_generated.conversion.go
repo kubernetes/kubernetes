@@ -147,14 +147,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
 	out.ManifestURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.ManifestURLHeader))
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
-		return err
-	}
 	out.Address = in.Address
 	out.Port = in.Port
-	if err := v1.Convert_Pointer_int32_To_int32(&in.ReadOnlyPort, &out.ReadOnlyPort, s); err != nil {
-		return err
-	}
+	out.ReadOnlyPort = in.ReadOnlyPort
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))
@@ -269,14 +264,9 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
 	out.ManifestURL = in.ManifestURL
 	out.ManifestURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.ManifestURLHeader))
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
-		return err
-	}
 	out.Address = in.Address
 	out.Port = in.Port
-	if err := v1.Convert_int32_To_Pointer_int32(&in.ReadOnlyPort, &out.ReadOnlyPort, s); err != nil {
-		return err
-	}
+	out.ReadOnlyPort = in.ReadOnlyPort
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))

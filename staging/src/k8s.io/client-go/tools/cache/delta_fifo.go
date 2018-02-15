@@ -31,11 +31,6 @@ import (
 // keyFunc is used to figure out what key an object should have. (It's
 // exposed in the returned DeltaFIFO's KeyOf() method, with bonus features.)
 //
-// 'compressor' may compress as many or as few items as it wants
-// (including returning an empty slice), but it should do what it
-// does quickly since it is called while the queue is locked.
-// 'compressor' may be nil if you don't want any delta compression.
-//
 // 'keyLister' is expected to return a list of keys that the consumer of
 // this queue "knows about". It is used to decide which items are missing
 // when Replace() is called; 'Deleted' deltas are produced for these items.
@@ -48,13 +43,12 @@ import (
 //                 fix.
 //
 // Also see the comment on DeltaFIFO.
-func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyListerGetter) *DeltaFIFO {
+func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 	f := &DeltaFIFO{
-		items:           map[string]Deltas{},
-		queue:           []string{},
-		keyFunc:         keyFunc,
-		deltaCompressor: compressor,
-		knownObjects:    knownObjects,
+		items:        map[string]Deltas{},
+		queue:        []string{},
+		keyFunc:      keyFunc,
+		knownObjects: knownObjects,
 	}
 	f.cond.L = &f.lock
 	return f
@@ -86,9 +80,6 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjects KeyL
 // items have been deleted when Replace() or Delete() are called. The deleted
 // object will be included in the DeleteFinalStateUnknown markers. These objects
 // could be stale.
-//
-// You may provide a function to compress deltas (e.g., represent a
-// series of Updates as a single Update).
 type DeltaFIFO struct {
 	// lock/cond protects access to 'items' and 'queue'.
 	lock sync.RWMutex
@@ -110,10 +101,6 @@ type DeltaFIFO struct {
 	// insertion and retrieval, and should be deterministic.
 	keyFunc KeyFunc
 
-	// deltaCompressor tells us how to combine two or more
-	// deltas. It may be nil.
-	deltaCompressor DeltaCompressor
-
 	// knownObjects list keys that are "known", for the
 	// purpose of figuring out which items have been deleted
 	// when Replace() or Delete() is called.
@@ -133,7 +120,6 @@ var (
 var (
 	// ErrZeroLengthDeltasObject is returned in a KeyError if a Deltas
 	// object with zero length is encountered (should be impossible,
-	// even if such an object is accidentally produced by a DeltaCompressor--
 	// but included for completeness).
 	ErrZeroLengthDeltasObject = errors.New("0 length Deltas object; can't get key")
 )
@@ -305,8 +291,8 @@ func (f *DeltaFIFO) willObjectBeDeletedLocked(id string) bool {
 	return len(deltas) > 0 && deltas[len(deltas)-1].Type == Deleted
 }
 
-// queueActionLocked appends to the delta list for the object, calling
-// f.deltaCompressor if needed. Caller must lock first.
+// queueActionLocked appends to the delta list for the object.
+// Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
 	id, err := f.KeyOf(obj)
 	if err != nil {
@@ -322,9 +308,6 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 
 	newDeltas := append(f.items[id], Delta{actionType, obj})
 	newDeltas = dedupDeltas(newDeltas)
-	if f.deltaCompressor != nil {
-		newDeltas = f.deltaCompressor.Compress(newDeltas)
-	}
 
 	_, exists := f.items[id]
 	if len(newDeltas) > 0 {
@@ -334,8 +317,7 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 		f.items[id] = newDeltas
 		f.cond.Broadcast()
 	} else if exists {
-		// The compression step removed all deltas, so
-		// we need to remove this from our map (extra items
+		// We need to remove this from our map (extra items
 		// in the queue are ignored if they are not in the
 		// map).
 		delete(f.items, id)
@@ -355,8 +337,8 @@ func (f *DeltaFIFO) List() []interface{} {
 func (f *DeltaFIFO) listLocked() []interface{} {
 	list := make([]interface{}, 0, len(f.items))
 	for _, item := range f.items {
-		// Copy item's slice so operations on this slice (delta
-		// compression) won't interfere with the object we return.
+		// Copy item's slice so operations on this slice
+		// won't interfere with the object we return.
 		item = copyDeltas(item)
 		list = append(list, item.Newest().Object)
 	}
@@ -394,8 +376,8 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 	defer f.lock.RUnlock()
 	d, exists := f.items[key]
 	if exists {
-		// Copy item's slice so operations on this slice (delta
-		// compression) won't interfere with the object we return.
+		// Copy item's slice so operations on this slice
+		// won't interfere with the object we return.
 		d = copyDeltas(d)
 	}
 	return d, exists, nil
@@ -603,23 +585,6 @@ type KeyGetter interface {
 	GetByKey(key string) (interface{}, bool, error)
 }
 
-// DeltaCompressor is an algorithm that removes redundant changes.
-type DeltaCompressor interface {
-	Compress(Deltas) Deltas
-}
-
-// DeltaCompressorFunc should remove redundant changes; but changes that
-// are redundant depend on one's desired semantics, so this is an
-// injectable function.
-//
-// DeltaCompressorFunc adapts a raw function to be a DeltaCompressor.
-type DeltaCompressorFunc func(Deltas) Deltas
-
-// Compress just calls dc.
-func (dc DeltaCompressorFunc) Compress(d Deltas) Deltas {
-	return dc(d)
-}
-
 // DeltaType is the type of a change (addition, deletion, etc)
 type DeltaType string
 
@@ -668,7 +633,7 @@ func (d Deltas) Newest() *Delta {
 
 // copyDeltas returns a shallow copy of d; that is, it copies the slice but not
 // the objects in the slice. This allows Get/List to return an object that we
-// know won't be clobbered by a subsequent call to a delta compressor.
+// know won't be clobbered by a subsequent modifications.
 func copyDeltas(d Deltas) Deltas {
 	d2 := make(Deltas, len(d))
 	copy(d2, d)

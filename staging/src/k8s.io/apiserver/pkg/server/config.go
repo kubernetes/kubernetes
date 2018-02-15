@@ -85,16 +85,13 @@ type Config struct {
 	// Authentication is the configuration for authentication
 	Authentication AuthenticationInfo
 
-	// Authentication is the configuration for authentication
+	// Authorization is the configuration for authorization
 	Authorization AuthorizationInfo
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	// TODO: move into SecureServing(WithLoopback) as soon as insecure serving is gone
 	LoopbackClientConfig *restclient.Config
-	// Authorizer determines whether the subject is allowed to make the request based only
-	// on the RequestURI
-	Authorizer authorizer.Authorizer
 	// RuleResolver is required to get the list of rules that apply to a given user
 	// in a given namespace
 	RuleResolver authorizer.RuleResolver

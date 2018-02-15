@@ -33,7 +33,7 @@ func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
 	}
 
 	opts := &jose.SignerOptions{
-		// Since this is a symetric key, go-jose doesn't automatically include
+		// Since this is a symmetric key, go-jose doesn't automatically include
 		// the KeyID as part of the protected header. We have to pass it here
 		// explicitly.
 		ExtraHeaders: map[jose.HeaderKey]interface{}{

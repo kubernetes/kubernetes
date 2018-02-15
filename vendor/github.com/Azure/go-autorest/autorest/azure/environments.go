@@ -15,9 +15,16 @@ package azure
 //  limitations under the License.
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 )
+
+// EnvironmentFilepathName captures the name of the environment variable containing the path to the file
+// to be used while populating the Azure Environment.
+const EnvironmentFilepathName = "AZURE_ENVIRONMENT_FILEPATH"
 
 var environments = map[string]Environment{
 	"AZURECHINACLOUD":        ChinaCloud,
@@ -76,10 +83,10 @@ var (
 		PublishSettingsURL:           "https://manage.windowsazure.us/publishsettings/index",
 		ServiceManagementEndpoint:    "https://management.core.usgovcloudapi.net/",
 		ResourceManagerEndpoint:      "https://management.usgovcloudapi.net/",
-		ActiveDirectoryEndpoint:      "https://login.microsoftonline.com/",
+		ActiveDirectoryEndpoint:      "https://login.microsoftonline.us/",
 		GalleryEndpoint:              "https://gallery.usgovcloudapi.net/",
 		KeyVaultEndpoint:             "https://vault.usgovcloudapi.net/",
-		GraphEndpoint:                "https://graph.usgovcloudapi.net/",
+		GraphEndpoint:                "https://graph.windows.net/",
 		StorageEndpointSuffix:        "core.usgovcloudapi.net",
 		SQLDatabaseDNSSuffix:         "database.usgovcloudapi.net",
 		TrafficManagerDNSSuffix:      "usgovtrafficmanager.net",
@@ -133,12 +140,37 @@ var (
 	}
 )
 
-// EnvironmentFromName returns an Environment based on the common name specified
+// EnvironmentFromName returns an Environment based on the common name specified.
 func EnvironmentFromName(name string) (Environment, error) {
+	// IMPORTANT
+	// As per @radhikagupta5:
+	// This is technical debt, fundamentally here because Kubernetes is not currently accepting
+	// contributions to the providers. Once that is an option, the provider should be updated to
+	// directly call `EnvironmentFromFile`. Until then, we rely on dispatching Azure Stack environment creation
+	// from this method based on the name that is provided to us.
+	if strings.EqualFold(name, "AZURESTACKCLOUD") {
+		return EnvironmentFromFile(os.Getenv(EnvironmentFilepathName))
+	}
+
 	name = strings.ToUpper(name)
 	env, ok := environments[name]
 	if !ok {
 		return env, fmt.Errorf("autorest/azure: There is no cloud environment matching the name %q", name)
 	}
+
 	return env, nil
+}
+
+// EnvironmentFromFile loads an Environment from a configuration file available on disk.
+// This function is particularly useful in the Hybrid Cloud model, where one must define their own
+// endpoints.
+func EnvironmentFromFile(location string) (unmarshaled Environment, err error) {
+	fileContents, err := ioutil.ReadFile(location)
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(fileContents, &unmarshaled)
+
+	return
 }

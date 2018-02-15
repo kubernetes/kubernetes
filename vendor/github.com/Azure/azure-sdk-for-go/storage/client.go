@@ -75,6 +75,12 @@ const (
 	connectionStringAccountKey       = "accountkey"
 	connectionStringEndpointSuffix   = "endpointsuffix"
 	connectionStringEndpointProtocol = "defaultendpointsprotocol"
+
+	connectionStringBlobEndpoint  = "blobendpoint"
+	connectionStringFileEndpoint  = "fileendpoint"
+	connectionStringQueueEndpoint = "queueendpoint"
+	connectionStringTableEndpoint = "tableendpoint"
+	connectionStringSAS           = "sharedaccesssignature"
 )
 
 var (
@@ -212,11 +218,8 @@ func (e UnexpectedStatusCodeError) Got() int {
 
 // NewClientFromConnectionString creates a Client from the connection string.
 func NewClientFromConnectionString(input string) (Client, error) {
-	var (
-		accountName, accountKey, endpointSuffix string
-		useHTTPS                                = defaultUseHTTPS
-	)
-
+	// build a map of connection string key/value pairs
+	parts := map[string]string{}
 	for _, pair := range strings.Split(input, ";") {
 		if pair == "" {
 			continue
@@ -227,26 +230,39 @@ func NewClientFromConnectionString(input string) (Client, error) {
 			return Client{}, fmt.Errorf("Invalid connection segment %q", pair)
 		}
 
-		value := pair[equalDex+1:]
-		key := strings.ToLower(pair[:equalDex])
-		switch key {
-		case connectionStringAccountName:
-			accountName = value
-		case connectionStringAccountKey:
-			accountKey = value
-		case connectionStringEndpointSuffix:
-			endpointSuffix = value
-		case connectionStringEndpointProtocol:
-			useHTTPS = value == "https"
-		default:
-			// ignored
-		}
+		value := strings.TrimSpace(pair[equalDex+1:])
+		key := strings.TrimSpace(strings.ToLower(pair[:equalDex]))
+		parts[key] = value
 	}
 
-	if accountName == StorageEmulatorAccountName {
+	// TODO: validate parameter sets?
+
+	if parts[connectionStringAccountName] == StorageEmulatorAccountName {
 		return NewEmulatorClient()
 	}
-	return NewClient(accountName, accountKey, endpointSuffix, DefaultAPIVersion, useHTTPS)
+
+	if parts[connectionStringSAS] != "" {
+		endpoint := ""
+		if parts[connectionStringBlobEndpoint] != "" {
+			endpoint = parts[connectionStringBlobEndpoint]
+		} else if parts[connectionStringFileEndpoint] != "" {
+			endpoint = parts[connectionStringFileEndpoint]
+		} else if parts[connectionStringQueueEndpoint] != "" {
+			endpoint = parts[connectionStringQueueEndpoint]
+		} else {
+			endpoint = parts[connectionStringTableEndpoint]
+		}
+
+		return NewAccountSASClientFromEndpointToken(endpoint, parts[connectionStringSAS])
+	}
+
+	useHTTPS := defaultUseHTTPS
+	if parts[connectionStringEndpointProtocol] != "" {
+		useHTTPS = parts[connectionStringEndpointProtocol] == "https"
+	}
+
+	return NewClient(parts[connectionStringAccountName], parts[connectionStringAccountKey],
+		parts[connectionStringEndpointSuffix], DefaultAPIVersion, useHTTPS)
 }
 
 // NewBasicClient constructs a Client with given storage service name and
@@ -328,6 +344,47 @@ func NewAccountSASClient(account string, token url.Values, env azure.Environment
 	c.apiVersion = token.Get("sv")
 	c.useHTTPS = token.Get("spr") == "https"
 	return c
+}
+
+// NewAccountSASClientFromEndpointToken constructs a client that uses accountSAS authorization
+// for its operations using the specified endpoint and SAS token.
+func NewAccountSASClientFromEndpointToken(endpoint string, sasToken string) (Client, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return Client{}, err
+	}
+
+	token, err := url.ParseQuery(sasToken)
+	if err != nil {
+		return Client{}, err
+	}
+
+	// the host name will look something like this
+	// - foo.blob.core.windows.net
+	// "foo" is the account name
+	// "core.windows.net" is the baseURL
+
+	// find the first dot to get account name
+	i1 := strings.IndexByte(u.Host, '.')
+	if i1 < 0 {
+		return Client{}, fmt.Errorf("failed to find '.' in %s", u.Host)
+	}
+
+	// now find the second dot to get the base URL
+	i2 := strings.IndexByte(u.Host[i1+1:], '.')
+	if i2 < 0 {
+		return Client{}, fmt.Errorf("failed to find '.' in %s", u.Host[i1+1:])
+	}
+
+	c := newSASClient()
+	c.accountSASToken = token
+	c.accountName = u.Host[:i1]
+	c.baseURL = u.Host[i1+i2+2:]
+
+	// Get API version and protocol from token
+	c.apiVersion = token.Get("sv")
+	c.useHTTPS = token.Get("spr") == "https"
+	return c, nil
 }
 
 func newSASClient() Client {
@@ -670,6 +727,13 @@ func (c Client) exec(verb, url string, headers map[string]string, body io.Reader
 
 	for k, v := range headers {
 		req.Header[k] = append(req.Header[k], v) // Must bypass case munging present in `Add` by using map functions directly. See https://github.com/Azure/azure-sdk-for-go/issues/645
+	}
+
+	if c.isAccountSASClient() {
+		// append the SAS token to the query params
+		v := req.URL.Query()
+		v = mergeParams(v, c.accountSASToken)
+		req.URL.RawQuery = v.Encode()
 	}
 
 	resp, err := c.Sender.Send(&c, req)

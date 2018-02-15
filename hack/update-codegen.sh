@@ -42,25 +42,25 @@ GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
 GV_DIRS=()
 INTERNAL_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
-	# add items, but strip off any leading apis/ you find to match command expectations
-	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
-	nopkg_dir=${api_dir#pkg/}
-	nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
-	pkg_dir=${nopkg_dir#apis/}
+  # add items, but strip off any leading apis/ you find to match command expectations
+  api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
+  nopkg_dir=${api_dir#pkg/}
+  nopkg_dir=${nopkg_dir#vendor/k8s.io/api/}
+  pkg_dir=${nopkg_dir#apis/}
 
 
-	# skip groups that aren't being served, clients for these don't matter
+  # skip groups that aren't being served, clients for these don't matter
     if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
       continue
     fi
 
-	GV_DIRS+=("${pkg_dir}")
+  GV_DIRS+=("${pkg_dir}")
 
-	# collect internal groups
-	int_group="${pkg_dir%/*}/"
-	if [[ "${pkg_dir}" = core/* ]]; then
-	  int_group="api/"
-	fi
+  # collect internal groups
+  int_group="${pkg_dir%/*}/"
+  if [[ "${pkg_dir}" = core/* ]]; then
+    int_group="api/"
+  fi
     if ! [[ " ${INTERNAL_DIRS[@]:-} " =~ " ${int_group} " ]]; then
       INTERNAL_DIRS+=("${int_group}")
     fi

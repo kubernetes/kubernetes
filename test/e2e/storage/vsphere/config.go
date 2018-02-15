@@ -42,6 +42,7 @@ type Config struct {
 	Datacenters       string
 	RoundTripperCount uint
 	DefaultDatastore  string
+	Folder            string
 }
 
 // ConfigFile represents the content of vsphere.conf file.
@@ -166,6 +167,7 @@ func populateInstanceMap(cfg *ConfigFile) (map[string]*VSphere, error) {
 		}
 
 		vcConfig.DefaultDatastore = cfg.Workspace.DefaultDatastore
+		vcConfig.Folder = cfg.Workspace.Folder
 
 		vsphereIns := VSphere{
 			Config: vcConfig,
