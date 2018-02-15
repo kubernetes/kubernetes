@@ -514,7 +514,7 @@ func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
 func (f *FakeFactory) BindExternalFlags(flags *pflag.FlagSet) {
 }
 
-func (f *FakeFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *FakeFactory) PrintObject(cmd *cobra.Command, isLocal bool, obj runtime.Object, out io.Writer) error {
 	return nil
 }
 
@@ -848,18 +848,25 @@ func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator
 	return cmdutil.DefaultGenerators(cmdName)
 }
 
-func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
-	if err != nil {
+func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, obj runtime.Object, out io.Writer) error {
+	// gate internal objects from being printed through this method
+	_, isUnstructured := obj.(*unstructured.Unstructured)
+
+	typer := legacyscheme.Scheme
+	gvks, unversioned, err := typer.ObjectKinds(obj)
+	if err != nil && !isUnstructured {
 		return err
 	}
 
-	mapping, err := mapper.RESTMapping(gvks[0].GroupKind())
-	if err != nil {
-		return err
+	if !isUnstructured {
+		for _, gvk := range gvks {
+			if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal || unversioned {
+				return fmt.Errorf("sent an internal object %v to print", gvk)
+			}
+		}
 	}
 
-	printer, err := f.PrinterForMapping(&printers.PrintOptions{}, mapping)
+	printer, err := f.PrinterForOptions(&printers.PrintOptions{})
 	if err != nil {
 		return err
 	}

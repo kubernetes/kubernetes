@@ -19,22 +19,25 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"net/url"
-
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	kubectlscheme "k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type CreateOptions struct {
@@ -360,5 +363,37 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 		return nil
 	}
 
-	return f.PrintObject(cmd, false, mapper, obj, out)
+	return ensurePrintVersionedObject(f, cmd, obj, out)
+}
+
+// ensurePrintVersionedObject receives a runtime.Object and ensures that it has been converted to an external version
+// before passing it through to the printer stack.
+func ensurePrintVersionedObject(f cmdutil.Factory, cmd *cobra.Command, obj kruntime.Object, out io.Writer) error {
+	options := cmdutil.ExtractCmdPrintOptions(cmd, false)
+	printer, err := f.PrinterForOptions(options)
+	if err != nil {
+		return err
+	}
+
+	// we don't care about converting the object if not printing in a generic
+	// format or if the object we are dealing with is unstructured.
+	_, isUnstructured := obj.(*unstructured.Unstructured)
+	if isUnstructured || !printer.IsGeneric() {
+		return f.PrintObject(cmd, false, obj, out)
+	}
+
+	gvks, _, err := kubectlscheme.Scheme.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+
+	preferredVersions := []schema.GroupVersion{}
+	for _, gvk := range gvks {
+		if len(gvk.Version) > 0 && gvk.Version != kruntime.APIVersionInternal {
+			preferredVersions = append(preferredVersions, gvk.GroupVersion())
+		}
+	}
+
+	printer = printers.NewVersionedPrinter(printer, kubectlscheme.Scheme, preferredVersions...)
+	return printer.PrintObj(obj, out)
 }
