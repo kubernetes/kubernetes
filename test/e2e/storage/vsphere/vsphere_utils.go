@@ -719,11 +719,10 @@ func diskIsAttached(volPath string, nodeName string) (bool, error) {
 			nodeName)
 		return false, err
 	}
-	if device != nil {
-		framework.Logf("diskIsAttached found the disk %q attached on node %q",
-			volPath,
-			nodeName)
+	if device == nil {
+		return false, nil
 	}
+	framework.Logf("diskIsAttached found the disk %q attached on node %q", volPath, nodeName)
 	return true, nil
 }
 

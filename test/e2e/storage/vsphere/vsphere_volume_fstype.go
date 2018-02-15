@@ -73,7 +73,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		Expect(GetReadySchedulableNodeInfos).NotTo(BeEmpty())
+		Expect(GetReadySchedulableNodeInfos()).NotTo(BeEmpty())
 	})
 
 	It("verify fstype - ext3 formatted volume", func() {
