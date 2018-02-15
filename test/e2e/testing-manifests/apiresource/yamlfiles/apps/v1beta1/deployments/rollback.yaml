@@ -1,0 +1,7 @@
+apiVersion: apps/v1beta1
+kind: DeploymentRollback
+metadata:
+  name: etcd-test-server
+name: etcd-test-server
+rollbackTo:
+  revision: 0

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PodTemplate
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+template:
+  spec:
+    containers:
+    - name: myapp-container
+      image: busybox
+      command: ['sh', '-c', 'echo Hello Kubernetes! && sleep 3600']

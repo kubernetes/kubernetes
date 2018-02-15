@@ -1,0 +1,50 @@
+# privileged-psp-users gives the privileged-psp-user role
+# to the group privileged-psp-users.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+    name: privileged-psp-users
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: privileged-psp-users
+roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: privileged-psp-user
+---
+# restricted-psp-users grants the restricted-psp-user role to
+# the groups restricted-psp-users and privileged-psp-users.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+    name: restricted-psp-users
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: restricted-psp-users
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: privileged-psp-users
+roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: restricted-psp-user
+---
+# edit grants edit role to the groups
+# restricted-psp-users and privileged-psp-users.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+    name: edit
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: privileged-psp-users
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: restricted-psp-users
+roleRef:
+   apiGroup: rbac.authorization.k8s.io
+   kind: ClusterRole
+   name: edit

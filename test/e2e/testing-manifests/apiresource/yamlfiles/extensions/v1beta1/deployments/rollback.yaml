@@ -1,0 +1,7 @@
+apiVersion: extensions/v1beta1
+kind: DeploymentRollback
+metadata:
+  name: hazelcast
+name: hazelcast
+rollbackTo:
+  revision: 0
