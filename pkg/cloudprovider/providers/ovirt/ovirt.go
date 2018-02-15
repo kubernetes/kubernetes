@@ -212,6 +212,11 @@ func (v *OVirtCloud) InstanceExistsByProviderID(ctx context.Context, providerID 
 	return false, cloudprovider.NotImplemented
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (v *OVirtCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (v *OVirtCloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	name := mapNodeNameToInstanceName(nodeName)

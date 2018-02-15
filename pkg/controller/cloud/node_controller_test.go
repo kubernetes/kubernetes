@@ -148,6 +148,115 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 
 }
 
+func TestNodeShutdown(t *testing.T) {
+
+	testCases := []struct {
+		testName           string
+		node               *v1.Node
+		existsByProviderID bool
+		shutdown           bool
+	}{
+		{
+			testName:           "node shutdowned add taint",
+			existsByProviderID: true,
+			shutdown:           true,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		{
+			testName:           "node started after shutdown remove taint",
+			existsByProviderID: true,
+			shutdown:           false,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "node0",
+					Taints: []v1.Taint{
+						{
+							Key:    algorithm.TaintNodeShutdown,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			fc := &fakecloud.FakeCloud{
+				ExistsByProviderID: tc.existsByProviderID,
+				NodeShutdown:       tc.shutdown,
+			}
+			fnh := &testutil.FakeNodeHandler{
+				Existing:      []*v1.Node{tc.node},
+				Clientset:     fake.NewSimpleClientset(),
+				PatchWaitChan: make(chan struct{}),
+			}
+
+			factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
+
+			eventBroadcaster := record.NewBroadcaster()
+			cloudNodeController := &CloudNodeController{
+				kubeClient:                fnh,
+				nodeInformer:              factory.Core().V1().Nodes(),
+				cloud:                     fc,
+				nodeMonitorPeriod:         1 * time.Second,
+				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+				nodeStatusUpdateFrequency: 1 * time.Second,
+			}
+			eventBroadcaster.StartLogging(glog.Infof)
+
+			cloudNodeController.Run()
+
+			select {
+			case <-fnh.PatchWaitChan:
+			case <-time.After(1 * time.Second):
+				t.Errorf("Timed out waiting %v for node to be updated", wait.ForeverTestTimeout)
+			}
+
+			assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
+			if tc.shutdown {
+				assert.Equal(t, 1, len(fnh.UpdatedNodes[0].Spec.Taints), "Node Taint was not added")
+				assert.Equal(t, "node.cloudprovider.kubernetes.io/shutdown", fnh.UpdatedNodes[0].Spec.Taints[0].Key, "Node Taint key is not correct")
+			} else {
+				assert.Equal(t, 0, len(fnh.UpdatedNodes[0].Spec.Taints), "Node Taint was not removed after node is back in ready state")
+			}
+
+		})
+	}
+
+}
+
 // This test checks that the node is deleted when kubelet stops reporting
 // and cloud provider says node is gone
 func TestNodeDeleted(t *testing.T) {
