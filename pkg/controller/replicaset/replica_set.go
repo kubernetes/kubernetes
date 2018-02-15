@@ -307,9 +307,16 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-
+	curControllerRef := metav1.GetControllerOf(curPod)
+	curNamespace := curPod.Namespace
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if curPod.DeletionTimestamp != nil {
+		d := rsc.getDeployment(curNamespace, curControllerRef)
+		// ignore if deployment is of recreate because replicas has to be synced
+		// ,only after the pods are actually deleted from the cluster
+		if d.Spec.Strategy.Type == extensions.RecreateDeploymentStrategyType {
+			return
+		}
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
@@ -323,7 +330,6 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
