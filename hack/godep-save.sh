@@ -20,7 +20,6 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::log::status "Ensuring prereqs"
 kube::util::ensure_single_dir_gopath
@@ -85,6 +84,16 @@ hack/update-bazel.sh >/dev/null
 
 kube::log::status "Updating LICENSES file"
 hack/update-godep-licenses.sh >/dev/null
+
+kube::log::status "Creating OWNERS file"
+rm -f "Godeps/OWNERS" "vendor/OWNERS"
+cat <<__EOF__ > "Godeps/OWNERS"
+reviewers:
+- dep-reviewers
+approvers:
+- dep-approvers
+__EOF__
+cp "Godeps/OWNERS" "vendor/OWNERS"
 
 # Clean up
 rm -rf "${BACKUP}"
