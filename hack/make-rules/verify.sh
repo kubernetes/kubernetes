@@ -39,6 +39,7 @@ QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
+  "verify-build-tags.sh"
   "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
