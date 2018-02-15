@@ -256,6 +256,16 @@ fi
 # Optional: Enable Rescheduler
 ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
+# Optional: Enable policy routing when GCP PTP CNI is used.
+#
+# ALPHA FEATURE.
+ENABLE_POLICY_ROUTING=${KUBE_GCE_ENABLE_POLICY_ROUTING:-false}
+POLICY_ROUTING_TABLE=${KUBE_GCE_POLICY_ROUTING_TABLE:-gcp.rt}
+if [ ${ENABLE_POLICY_ROUTING} = true ]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_POLICY_ROUTING"
+  PROVIDER_VARS="${PROVIDER_VARS:-} POLICY_ROUTING_TABLE"
+fi
+
 # Optional: Enable allocation of pod IPs using IP aliases.
 #
 # BETA FEATURE.

@@ -2282,6 +2282,34 @@ function setup-kubelet-dir {
     mount -B -o remount,exec,suid,dev /var/lib/kubelet
 }
 
+# Config policy routing.
+#
+# Specifically, with GCP PTP CNI, for traffic not coming from the network
+# interface that the default route points to, it is always sent to such a
+# network interface.
+function config-policy-routing {
+  sudo su
+  local -r tables="/etc/iproute2/rt_tables"
+  local reserved_tables="$(grep -v ^# ${tables} | awk '{print $1}')"
+  local nic0="$(ip route get 8.8.8.8 | sed -n 's/.*dev \([^\ ]*\) .*/\1/p')"
+  local gateway="$(ip route get 8.8.8.8 | sed -n 's/.*via \([^\ ]*\) .*/\1/p')"
+  local -r pr_table_name="${POLICY_ROUTING_TABLE}"
+  local pr_table
+  for table in {1..252}; do
+    if [[ ! "${reserved_tables[@]}" =~ table ]]; then
+      pr_table="${table}"
+      break
+    fi
+  done
+
+  if [[ "${pr_table}" ]]; then
+    echo "${pr_table} ${pr_table_name}" >> "${tables}"
+    ip route add default via "${gateway}" table "${pr_table_name}"
+    ip rule add not iif "${nic0}" table "${pr_table_name}"
+  fi
+  exit
+}
+
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
   local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
@@ -2440,6 +2468,11 @@ else
     start-node-problem-detector
   fi
 fi
+
+if [[ "${ENABLE_POLICY_ROUTING:-}" == "true" ]]; then
+  config-policy-routing
+fi
+
 reset-motd
 prepare-mounter-rootfs
 modprobe configs
