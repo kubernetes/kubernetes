@@ -238,6 +238,12 @@ const (
 	// Mount secret, configMap, downwardAPI and projected volumes ReadOnly. Note: this feature
 	// gate is present only for backward compatibility, it will be removed in the 1.11 release.
 	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
+
+	// owner: @k82cn
+	// alpha: v1.10
+	//
+	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
+	NoDaemonSetScheduler utilfeature.Feature = "NoDaemonSetScheduler"
 )
 
 func init() {
@@ -279,6 +285,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
+	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
