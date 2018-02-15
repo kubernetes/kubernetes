@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storageprotection
+package storageobjectinuseprotection
 
 import (
 	"fmt"
@@ -122,7 +122,7 @@ func TestAdmit(t *testing.T) {
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 
 	for _, test := range tests {
-		feature.DefaultFeatureGate.Set(fmt.Sprintf("StorageProtection=%v", test.featureEnabled))
+		feature.DefaultFeatureGate.Set(fmt.Sprintf("StorageObjectInUseProtection=%v", test.featureEnabled))
 		obj := test.object.DeepCopyObject()
 		attrs := admission.NewAttributesRecord(
 			obj,                  // new object
@@ -147,5 +147,5 @@ func TestAdmit(t *testing.T) {
 
 	// Disable the feature for rest of the tests.
 	// TODO: remove after alpha
-	feature.DefaultFeatureGate.Set("StorageProtection=false")
+	feature.DefaultFeatureGate.Set("StorageObjectInUseProtection=false")
 }

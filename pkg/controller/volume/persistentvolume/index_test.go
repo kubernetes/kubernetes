@@ -1043,7 +1043,7 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	toggleFeature(false, "BlockVolume", t)
 }
 
-func TestAlphaStorageProtectionFiltering(t *testing.T) {
+func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "pv1",
@@ -1072,39 +1072,39 @@ func TestAlphaStorageProtectionFiltering(t *testing.T) {
 	}
 
 	satisfyingTestCases := map[string]struct {
-		isExpectedMatch         bool
-		vol                     *v1.PersistentVolume
-		pvc                     *v1.PersistentVolumeClaim
-		enableStorageProtection bool
+		isExpectedMatch                    bool
+		vol                                *v1.PersistentVolume
+		pvc                                *v1.PersistentVolumeClaim
+		enableStorageObjectInUseProtection bool
 	}{
 		"feature enabled - pv deletionTimeStamp not set": {
 			isExpectedMatch: true,
 			vol:             pv,
 			pvc:             pvc,
-			enableStorageProtection: true,
+			enableStorageObjectInUseProtection: true,
 		},
 		"feature enabled - pv deletionTimeStamp set": {
 			isExpectedMatch: false,
 			vol:             pvToDelete,
 			pvc:             pvc,
-			enableStorageProtection: true,
+			enableStorageObjectInUseProtection: true,
 		},
 		"feature disabled - pv deletionTimeStamp not set": {
 			isExpectedMatch: true,
 			vol:             pv,
 			pvc:             pvc,
-			enableStorageProtection: false,
+			enableStorageObjectInUseProtection: false,
 		},
 		"feature disabled - pv deletionTimeStamp set": {
 			isExpectedMatch: true,
 			vol:             pvToDelete,
 			pvc:             pvc,
-			enableStorageProtection: false,
+			enableStorageObjectInUseProtection: false,
 		},
 	}
 
 	for name, testCase := range satisfyingTestCases {
-		toggleFeature(testCase.enableStorageProtection, "StorageProtection", t)
+		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
 		err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
 		// expected to match but got an error
 		if err != nil && testCase.isExpectedMatch {
@@ -1118,38 +1118,38 @@ func TestAlphaStorageProtectionFiltering(t *testing.T) {
 	}
 
 	filteringTestCases := map[string]struct {
-		isExpectedMatch         bool
-		vol                     persistentVolumeOrderedIndex
-		pvc                     *v1.PersistentVolumeClaim
-		enableStorageProtection bool
+		isExpectedMatch                    bool
+		vol                                persistentVolumeOrderedIndex
+		pvc                                *v1.PersistentVolumeClaim
+		enableStorageObjectInUseProtection bool
 	}{
 		"feature enabled - pv deletionTimeStamp not set": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(pv),
 			pvc:             pvc,
-			enableStorageProtection: true,
+			enableStorageObjectInUseProtection: true,
 		},
 		"feature enabled - pv deletionTimeStamp set": {
 			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(pvToDelete),
 			pvc:             pvc,
-			enableStorageProtection: true,
+			enableStorageObjectInUseProtection: true,
 		},
 		"feature disabled - pv deletionTimeStamp not set": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(pv),
 			pvc:             pvc,
-			enableStorageProtection: false,
+			enableStorageObjectInUseProtection: false,
 		},
 		"feature disabled - pv deletionTimeStamp set": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(pvToDelete),
 			pvc:             pvc,
-			enableStorageProtection: false,
+			enableStorageObjectInUseProtection: false,
 		},
 	}
 	for name, testCase := range filteringTestCases {
-		toggleFeature(testCase.enableStorageProtection, "StorageProtection", t)
+		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
 		pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
 		// expected to match but either got an error or no returned pvmatch
 		if pvmatch == nil && testCase.isExpectedMatch {
@@ -1168,7 +1168,7 @@ func TestAlphaStorageProtectionFiltering(t *testing.T) {
 	}
 
 	// make sure feature gate is turned off
-	toggleFeature(false, "StorageProtection", t)
+	toggleFeature(false, "StorageObjectInUseProtection", t)
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {

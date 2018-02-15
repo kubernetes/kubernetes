@@ -206,7 +206,7 @@ const (
 	// alpha: v1.9
 	//
 	// Postpone deletion of a PV or a PVC when they are being used
-	StorageProtection utilfeature.Feature = "StorageProtection"
+	StorageObjectInUseProtection utilfeature.Feature = "StorageObjectInUseProtection"
 
 	// owner: @aveshagarwal
 	// alpha: v1.9
@@ -280,7 +280,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
 	CustomPodDNS:                                {Default: false, PreRelease: utilfeature.Alpha},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	StorageProtection:                           {Default: false, PreRelease: utilfeature.Alpha},
+	StorageObjectInUseProtection:                {Default: false, PreRelease: utilfeature.Alpha},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
