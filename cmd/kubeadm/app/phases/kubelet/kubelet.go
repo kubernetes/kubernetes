@@ -38,7 +38,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 )
 
 // CreateBaseKubeletConfiguration creates base kubelet configuration for dynamic kubelet configuration feature.
@@ -50,7 +50,7 @@ func CreateBaseKubeletConfiguration(cfg *kubeadmapi.MasterConfiguration, client 
 	if err != nil {
 		return err
 	}
-	kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
+	kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1beta1.SchemeGroupVersion, *kubeletCodecs)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func WriteInitKubeletConfigToDiskOnMaster(cfg *kubeadmapi.MasterConfiguration) e
 		return err
 	}
 
-	kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1alpha1.SchemeGroupVersion, *kubeletCodecs)
+	kubeletBytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg.KubeletConfiguration.BaseConfig, kubeletconfigv1beta1.SchemeGroupVersion, *kubeletCodecs)
 	if err != nil {
 		return err
 	}

@@ -36,7 +36,7 @@ filegroup(
         ":package-srcs",
         "//pkg/kubelet/apis/kubeletconfig/fuzzer:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig/scheme:all-srcs",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:all-srcs",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:all-srcs",
         "//pkg/kubelet/apis/kubeletconfig/validation:all-srcs",
     ],
     tags = ["automanaged"],

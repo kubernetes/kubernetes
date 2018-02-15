@@ -57,7 +57,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/types:go_default_library",

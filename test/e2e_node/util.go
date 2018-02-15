@@ -39,7 +39,7 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -257,9 +257,9 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 // Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
 func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
 	// This hack because /configz reports the following structure:
-	// {"kubeletconfig": {the JSON representation of kubeletconfigv1alpha1.KubeletConfiguration}}
+	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
 	type configzWrapper struct {
-		ComponentConfig kubeletconfigv1alpha1.KubeletConfiguration `json:"kubeletconfig"`
+		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
 	}
 
 	configz := configzWrapper{}
@@ -298,7 +298,7 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	framework.ExpectNoError(err)
 
-	versioned := &kubeletconfigv1alpha1.KubeletConfiguration{}
+	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
 	err = scheme.Convert(internalKC, versioned, nil)
 	framework.ExpectNoError(err)
 
@@ -360,7 +360,7 @@ func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1alpha1.SchemeGroupVersion), nil
+	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1beta1.SchemeGroupVersion), nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an

@@ -28,7 +28,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfig_v1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfig_v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
@@ -190,7 +190,7 @@ func Convert_kubeadm_KubeProxy_To_v1alpha1_KubeProxy(in *kubeadm.KubeProxy, out 
 }
 
 func autoConvert_v1alpha1_KubeletConfiguration_To_kubeadm_KubeletConfiguration(in *KubeletConfiguration, out *kubeadm.KubeletConfiguration, s conversion.Scope) error {
-	out.BaseConfig = (*kubeletconfig_v1alpha1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
+	out.BaseConfig = (*v1beta1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
 	return nil
 }
 
@@ -200,7 +200,7 @@ func Convert_v1alpha1_KubeletConfiguration_To_kubeadm_KubeletConfiguration(in *K
 }
 
 func autoConvert_kubeadm_KubeletConfiguration_To_v1alpha1_KubeletConfiguration(in *kubeadm.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
-	out.BaseConfig = (*kubeletconfig_v1alpha1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
+	out.BaseConfig = (*v1beta1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
 	return nil
 }
 

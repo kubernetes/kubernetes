@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"time"
@@ -28,8 +28,6 @@ import (
 )
 
 const (
-	DefaultRootDir = "/var/lib/kubelet"
-
 	DefaultIPTablesMasqueradeBit = 14
 	DefaultIPTablesDropBit       = 15
 )
@@ -45,11 +43,26 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 }
 
 func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
+	if obj.SyncFrequency == zeroDuration {
+		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
+	}
+	if obj.FileCheckFrequency == zeroDuration {
+		obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
+	}
+	if obj.HTTPCheckFrequency == zeroDuration {
+		obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
+	}
+	if obj.Address == "" {
+		obj.Address = "0.0.0.0"
+	}
+	if obj.Port == 0 {
+		obj.Port = ports.KubeletPort
+	}
 	if obj.Authentication.Anonymous.Enabled == nil {
-		obj.Authentication.Anonymous.Enabled = boolVar(false)
+		obj.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 	}
 	if obj.Authentication.Webhook.Enabled == nil {
-		obj.Authentication.Webhook.Enabled = boolVar(true)
+		obj.Authentication.Webhook.Enabled = utilpointer.BoolPtr(true)
 	}
 	if obj.Authentication.Webhook.CacheTTL == zeroDuration {
 		obj.Authentication.Webhook.CacheTTL = metav1.Duration{Duration: 2 * time.Minute}
@@ -63,57 +76,67 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.Authorization.Webhook.CacheUnauthorizedTTL == zeroDuration {
 		obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
 	}
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
+	if obj.RegistryPullQPS == nil {
+		obj.RegistryPullQPS = utilpointer.Int32Ptr(5)
 	}
-	if obj.VolumeStatsAggPeriod == zeroDuration {
-		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
+	if obj.RegistryBurst == 0 {
+		obj.RegistryBurst = 10
 	}
-	if obj.RuntimeRequestTimeout == zeroDuration {
-		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
-	}
-	if obj.CPUCFSQuota == nil {
-		obj.CPUCFSQuota = boolVar(true)
+	if obj.EventRecordQPS == nil {
+		obj.EventRecordQPS = utilpointer.Int32Ptr(5)
 	}
 	if obj.EventBurst == 0 {
 		obj.EventBurst = 10
 	}
-	if obj.EventRecordQPS == nil {
-		temp := int32(5)
-		obj.EventRecordQPS = &temp
-	}
-	if obj.EnableControllerAttachDetach == nil {
-		obj.EnableControllerAttachDetach = boolVar(true)
-	}
 	if obj.EnableDebuggingHandlers == nil {
-		obj.EnableDebuggingHandlers = boolVar(true)
-	}
-	if obj.FileCheckFrequency == zeroDuration {
-		obj.FileCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
-	}
-	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = "127.0.0.1"
+		obj.EnableDebuggingHandlers = utilpointer.BoolPtr(true)
 	}
 	if obj.HealthzPort == nil {
 		obj.HealthzPort = utilpointer.Int32Ptr(10248)
 	}
-	if obj.HTTPCheckFrequency == zeroDuration {
-		obj.HTTPCheckFrequency = metav1.Duration{Duration: 20 * time.Second}
+	if obj.HealthzBindAddress == "" {
+		obj.HealthzBindAddress = "127.0.0.1"
+	}
+	if obj.OOMScoreAdj == nil {
+		obj.OOMScoreAdj = utilpointer.Int32Ptr(int32(qos.KubeletOOMScoreAdj))
+	}
+	if obj.StreamingConnectionIdleTimeout == zeroDuration {
+		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
+	}
+	if obj.NodeStatusUpdateFrequency == zeroDuration {
+		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}
 	if obj.ImageMinimumGCAge == zeroDuration {
 		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 	}
 	if obj.ImageGCHighThresholdPercent == nil {
 		// default is below docker's default dm.min_free_space of 90%
-		temp := int32(85)
-		obj.ImageGCHighThresholdPercent = &temp
+		obj.ImageGCHighThresholdPercent = utilpointer.Int32Ptr(85)
 	}
 	if obj.ImageGCLowThresholdPercent == nil {
-		temp := int32(80)
-		obj.ImageGCLowThresholdPercent = &temp
+		obj.ImageGCLowThresholdPercent = utilpointer.Int32Ptr(80)
 	}
-	if obj.MaxOpenFiles == 0 {
-		obj.MaxOpenFiles = 1000000
+	if obj.VolumeStatsAggPeriod == zeroDuration {
+		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
+	}
+	if obj.CgroupsPerQOS == nil {
+		obj.CgroupsPerQOS = utilpointer.BoolPtr(true)
+	}
+	if obj.CgroupDriver == "" {
+		obj.CgroupDriver = "cgroupfs"
+	}
+	if obj.CPUManagerPolicy == "" {
+		obj.CPUManagerPolicy = "none"
+	}
+	if obj.CPUManagerReconcilePeriod == zeroDuration {
+		// Keep the same as default NodeStatusUpdateFrequency
+		obj.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
+	if obj.RuntimeRequestTimeout == zeroDuration {
+		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
+	}
+	if obj.HairpinMode == "" {
+		obj.HairpinMode = PromiscuousBridge
 	}
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
@@ -122,53 +145,26 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int64(-1)
 		obj.PodPidsLimit = &temp
 	}
-	if obj.NodeStatusUpdateFrequency == zeroDuration {
-		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
-	}
-	if obj.CPUManagerPolicy == "" {
-		obj.CPUManagerPolicy = "none"
-	}
-	if obj.CPUManagerReconcilePeriod == zeroDuration {
-		obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
-	}
-	if obj.OOMScoreAdj == nil {
-		temp := int32(qos.KubeletOOMScoreAdj)
-		obj.OOMScoreAdj = &temp
-	}
-	if obj.Port == 0 {
-		obj.Port = ports.KubeletPort
-	}
-	if obj.RegistryBurst == 0 {
-		obj.RegistryBurst = 10
-	}
-	if obj.RegistryPullQPS == nil {
-		temp := int32(5)
-		obj.RegistryPullQPS = &temp
-	}
 	if obj.ResolverConfig == "" {
 		obj.ResolverConfig = kubetypes.ResolvConfDefault
 	}
-	if obj.SerializeImagePulls == nil {
-		obj.SerializeImagePulls = boolVar(true)
+	if obj.CPUCFSQuota == nil {
+		obj.CPUCFSQuota = utilpointer.BoolPtr(true)
 	}
-	if obj.StreamingConnectionIdleTimeout == zeroDuration {
-		obj.StreamingConnectionIdleTimeout = metav1.Duration{Duration: 4 * time.Hour}
-	}
-	if obj.SyncFrequency == zeroDuration {
-		obj.SyncFrequency = metav1.Duration{Duration: 1 * time.Minute}
+	if obj.MaxOpenFiles == 0 {
+		obj.MaxOpenFiles = 1000000
 	}
 	if obj.ContentType == "" {
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}
 	if obj.KubeAPIQPS == nil {
-		temp := int32(5)
-		obj.KubeAPIQPS = &temp
+		obj.KubeAPIQPS = utilpointer.Int32Ptr(5)
 	}
 	if obj.KubeAPIBurst == 0 {
 		obj.KubeAPIBurst = 10
 	}
-	if string(obj.HairpinMode) == "" {
-		obj.HairpinMode = PromiscuousBridge
+	if obj.SerializeImagePulls == nil {
+		obj.SerializeImagePulls = utilpointer.BoolPtr(true)
 	}
 	if obj.EvictionHard == nil {
 		obj.EvictionHard = map[string]string{
@@ -181,36 +177,22 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
+	if obj.EnableControllerAttachDetach == nil {
+		obj.EnableControllerAttachDetach = utilpointer.BoolPtr(true)
+	}
 	if obj.MakeIPTablesUtilChains == nil {
-		obj.MakeIPTablesUtilChains = boolVar(true)
+		obj.MakeIPTablesUtilChains = utilpointer.BoolPtr(true)
 	}
 	if obj.IPTablesMasqueradeBit == nil {
-		temp := int32(DefaultIPTablesMasqueradeBit)
-		obj.IPTablesMasqueradeBit = &temp
+		obj.IPTablesMasqueradeBit = utilpointer.Int32Ptr(DefaultIPTablesMasqueradeBit)
 	}
 	if obj.IPTablesDropBit == nil {
-		temp := int32(DefaultIPTablesDropBit)
-		obj.IPTablesDropBit = &temp
+		obj.IPTablesDropBit = utilpointer.Int32Ptr(DefaultIPTablesDropBit)
 	}
 	if obj.FailSwapOn == nil {
 		obj.FailSwapOn = utilpointer.BoolPtr(true)
-	}
-	if obj.CgroupsPerQOS == nil {
-		temp := true
-		obj.CgroupsPerQOS = &temp
-	}
-	if obj.CgroupDriver == "" {
-		obj.CgroupDriver = "cgroupfs"
 	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}
 }
-
-func boolVar(b bool) *bool {
-	return &b
-}
-
-var (
-	defaultCfg = KubeletConfiguration{}
-)

@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
@@ -186,7 +186,7 @@ func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
 // SetDefaults_KubeletConfiguration assigns default values to kubelet
 func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	if obj.KubeletConfiguration.BaseConfig == nil {
-		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1alpha1.KubeletConfiguration{}
+		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 	}
 	if obj.KubeletConfiguration.BaseConfig.PodManifestPath == "" {
 		obj.KubeletConfiguration.BaseConfig.PodManifestPath = DefaultManifestsDir
@@ -203,7 +203,7 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 		obj.KubeletConfiguration.BaseConfig.ClusterDomain = DefaultServiceDNSDomain
 	}
 	if obj.KubeletConfiguration.BaseConfig.Authorization.Mode == "" {
-		obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1alpha1.KubeletAuthorizationModeWebhook
+		obj.KubeletConfiguration.BaseConfig.Authorization.Mode = kubeletconfigv1beta1.KubeletAuthorizationModeWebhook
 	}
 	if obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile == "" {
 		obj.KubeletConfiguration.BaseConfig.Authentication.X509.ClientCAFile = DefaultCACertPath

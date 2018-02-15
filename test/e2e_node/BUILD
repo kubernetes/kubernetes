@@ -33,7 +33,7 @@ go_library(
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm/devicemanager:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",

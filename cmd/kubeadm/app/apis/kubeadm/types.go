@@ -19,7 +19,7 @@ package kubeadm
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
@@ -239,7 +239,7 @@ type NodeConfiguration struct {
 
 // KubeletConfiguration contains elements describing initial remote configuration of kubelet.
 type KubeletConfiguration struct {
-	BaseConfig *kubeletconfigv1alpha1.KubeletConfiguration
+	BaseConfig *kubeletconfigv1beta1.KubeletConfiguration
 }
 
 // GetControlPlaneImageRepository returns name of image repository
