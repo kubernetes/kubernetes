@@ -1,5 +1,4 @@
 cluster/images/etcd-version-monitor
-cmd/gke-certificates-controller/app
 cmd/hyperkube
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
