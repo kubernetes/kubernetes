@@ -105,8 +105,11 @@ func NewCloudNodeController(
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: cnc.AddCloudNode,
+	// Use shared informer to listen to add/update of nodes. Note that any nodes
+	// that exist before node controller starts will show up in the update method
+	cnc.nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    cnc.AddCloudNode,
+		UpdateFunc: cnc.UpdateCloudNode,
 	})
 
 	return cnc
@@ -307,6 +310,14 @@ func (cnc *CloudNodeController) MonitorNode() {
 			}
 		}
 	}
+}
+
+func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
+	if _, ok := newObj.(*v1.Node); !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		return
+	}
+	cnc.AddCloudNode(newObj)
 }
 
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
