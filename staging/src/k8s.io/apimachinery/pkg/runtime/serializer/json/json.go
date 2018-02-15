@@ -194,6 +194,22 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
+		if s.yaml || s.pretty {
+			// FIXME: Those are not supported. Call with Object
+			return s.Encode(sso.Serialized.Object.DeepCopyObject(), w)
+		}
+		if sso.Serialized.Scheme.MediaType == runtime.ContentTypeJSON {
+			sso.Serialized.Serialize(s)
+			if sso.Serialized.Err != nil {
+				return sso.Serialized.Err
+			}
+			_, err := w.Write(sso.Serialized.Raw)
+			return err
+		}
+		return s.Encode(sso.Serialized.Object.DeepCopyObject(), w)
+	}
+
 	if s.yaml {
 		json, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(obj)
 		if err != nil {

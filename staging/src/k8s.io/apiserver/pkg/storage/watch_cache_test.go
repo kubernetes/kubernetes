@@ -53,7 +53,7 @@ func newTestWatchCache(capacity int) *watchCache {
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 		return nil, nil, false, nil
 	}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
+	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, nil)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }

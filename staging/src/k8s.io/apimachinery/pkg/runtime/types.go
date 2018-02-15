@@ -16,6 +16,16 @@ limitations under the License.
 
 package runtime
 
+import (
+	"bytes"
+	"sync"
+	"sync/atomic"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+//	"github.com/golang/glog"
+)
+
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
@@ -134,4 +144,74 @@ type VersionedObjects struct {
 	// other objects may be present. The right most object is the same as would be returned
 	// by a normal Decode call.
 	Objects []Object
+}
+
+// FIXME: This isn't really first-class citized. Consider putting it somewhere else.
+// FIXME: Comment.
+type SerializedObject struct {
+	// Set once at the beginning - then only read.
+	Scheme *SerializationScheme
+
+	lock sync.Mutex
+	done uint32
+	Object Object
+	Raw    []byte
+	Err    error
+}
+
+func (s *SerializedObject) SetObject(f func() (Object, error)) {
+	if atomic.LoadUint32(&s.done) >= 1 {
+		return
+	}
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.done == 0 {
+		defer atomic.StoreUint32(&s.done, 1)
+		s.Object, s.Err = f()
+	}
+}
+
+// FIXME: Comment.
+func (s *SerializedObject) Serialize(serializer Serializer) {
+	if atomic.LoadUint32(&s.done) >= 2 {
+		return
+	}
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if s.done == 1 {
+		defer atomic.StoreUint32(&s.done, 2)
+		if s.Err != nil {
+			return
+		}
+		buffer := bytes.NewBuffer(nil)
+		s.Err = serializer.Encode(s.Object.DeepCopyObject(), buffer)
+		s.Raw = buffer.Bytes()
+		//glog.Errorf("BBB: smart serialization: %v", s.Err)
+	}
+}
+
+// FIXME: Comment.
+func NewSerializedObject(scheme *SerializationScheme) *SerializedObject {
+	return &SerializedObject{
+		Scheme: scheme,
+	}
+}
+
+// FIXME: Comment.
+type SmartlySerializedObject struct {
+	// TODO: Comment.
+	Object Object
+	// TODO: Comment
+	Serialized *SerializedObject
+}
+
+// FIXME: Move somewhere else.
+func (s *SmartlySerializedObject) GetObjectKind() schema.ObjectKind {
+	return s.Object.GetObjectKind()
+}
+
+func (s *SmartlySerializedObject) DeepCopyObject() Object {
+	// FIXME:
+	panic("should never happen - programmer error")
+	return s
 }

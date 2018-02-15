@@ -169,6 +169,20 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
 	case *runtime.Unknown, runtime.Unstructured:
 		return c.encoder.Encode(obj, w)
+	case *runtime.SmartlySerializedObject:
+		// FIXME: This isn't safe. We need to check for unversioned object.
+
+		sso := obj.(*runtime.SmartlySerializedObject)
+		// FIXME: Do we want to support more schemes?
+		if sso.Serialized.Scheme.GV != c.encodeVersion {
+			return c.Encode(sso.Object.DeepCopyObject(), w)
+		}
+
+		sso.Serialized.SetObject(func () (runtime.Object, error) {
+			obj := sso.Object.DeepCopyObject()
+			return c.convertor.ConvertToVersion(obj, c.encodeVersion)
+		})
+		return c.encoder.Encode(sso, w)
 	}
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)

@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/util/framer"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -169,6 +171,20 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
+		if sso.Serialized.Scheme.MediaType == s.contentType {
+			sso.Serialized.Serialize(s)
+			if sso.Serialized.Err != nil {
+				glog.Errorf("XXX: Bad serialization: %v", sso.Serialized.Err)
+				return sso.Serialized.Err
+			}
+			//glog.Errorf("AAA: using smartly serialized")
+			_, err := w.Write(sso.Serialized.Raw)
+			return err
+		}
+		return s.Encode(sso.Serialized.Object.DeepCopyObject(), w)
+	}
+
 	prefixSize := uint64(len(s.prefix))
 
 	var unk runtime.Unknown
@@ -405,6 +421,12 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 
 // Encode serializes the provided object to the given writer. Overrides is ignored.
 func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
+	if sso, ok := obj.(*runtime.SmartlySerializedObject); ok {
+		// FIXME: This should never happen.
+		glog.Errorf("CCC: PANIC")
+		obj = sso.Serialized.Object.DeepCopyObject()
+	}
+
 	switch t := obj.(type) {
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement

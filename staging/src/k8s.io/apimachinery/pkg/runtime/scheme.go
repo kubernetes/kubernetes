@@ -70,6 +70,13 @@ type Scheme struct {
 	converter *conversion.Converter
 }
 
+// FIXME: Comment.
+// TODO: Does this belong here?
+type SerializationScheme struct {
+	GV        schema.GroupVersion
+	MediaType string
+}
+
 // Function to convert a field selector to internal representation.
 type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
 
