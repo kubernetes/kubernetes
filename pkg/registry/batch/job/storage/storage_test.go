@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func newStorage(t *testing.T) (*JobStorage, *etcdtesting.EtcdTestServer) {
@@ -57,7 +58,7 @@ func validNewJob() *batch.Job {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
-			ManualSelector: newBool(true),
+			ManualSelector: utilpointer.BoolPtr(true),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
@@ -177,12 +178,6 @@ func TestWatch(t *testing.T) {
 }
 
 // TODO: test update /status
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
-}
 
 func TestCategories(t *testing.T) {
 	storage, server := newStorage(t)

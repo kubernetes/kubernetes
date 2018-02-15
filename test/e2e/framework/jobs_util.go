@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -56,7 +57,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Parallelism:           &parallelism,
 			Completions:           &completions,
 			BackoffLimit:          &backoffLimit,
-			ManualSelector:        newBool(false),
+			ManualSelector:        utilpointer.BoolPtr(false),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{JobSelectorKey: name},
@@ -226,12 +227,6 @@ func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parall
 		}
 	}
 	return count == parallelism, nil
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }
 
 type updateJobFunc func(*batch.Job)

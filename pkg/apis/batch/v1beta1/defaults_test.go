@@ -40,7 +40,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.AllowConcurrent,
-					Suspend:                    newBool(false),
+					Suspend:                    utilpointer.BoolPtr(false),
 					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(3),
 					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(1),
 				},
@@ -50,7 +50,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 			original: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
-					Suspend:                    newBool(true),
+					Suspend:                    utilpointer.BoolPtr(true),
 					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
 					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
 				},
@@ -58,7 +58,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
-					Suspend:                    newBool(true),
+					Suspend:                    utilpointer.BoolPtr(true),
 					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
 					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
 				},
@@ -108,10 +108,4 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }

@@ -4688,16 +4688,14 @@ func TestValidateDisabledSubpath(t *testing.T) {
 }
 
 func TestValidateMountPropagation(t *testing.T) {
-	bTrue := true
-	bFalse := false
 	privilegedContainer := &core.Container{
 		SecurityContext: &core.SecurityContext{
-			Privileged: &bTrue,
+			Privileged: utilpointer.BoolPtr(true),
 		},
 	}
 	nonPrivilegedContainer := &core.Container{
 		SecurityContext: &core.SecurityContext{
-			Privileged: &bFalse,
+			Privileged: utilpointer.BoolPtr(false),
 		},
 	}
 	defaultContainer := &core.Container{}
@@ -11919,7 +11917,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
-			Privileged: boolPtr(false),
+			Privileged: utilpointer.BoolPtr(false),
 			Capabilities: &core.Capabilities{
 				Add:  []core.Capability{"foo"},
 				Drop: []core.Capability{"bar"},
@@ -11964,19 +11962,19 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 
 	privRequestWithGlobalDeny := fullValidSC()
-	privRequestWithGlobalDeny.Privileged = boolPtr(true)
+	privRequestWithGlobalDeny.Privileged = utilpointer.BoolPtr(true)
 
 	negativeRunAsUser := fullValidSC()
 	negativeUser := int64(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
 	privWithoutEscalation := fullValidSC()
-	privWithoutEscalation.Privileged = boolPtr(true)
-	privWithoutEscalation.AllowPrivilegeEscalation = boolPtr(false)
+	privWithoutEscalation.Privileged = utilpointer.BoolPtr(true)
+	privWithoutEscalation.AllowPrivilegeEscalation = utilpointer.BoolPtr(false)
 
 	capSysAdminWithoutEscalation := fullValidSC()
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
-	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = boolPtr(false)
+	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = utilpointer.BoolPtr(false)
 
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
@@ -12486,8 +12484,4 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 			t.Errorf("case: %v, expected failures: %v", name, errs)
 		}
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

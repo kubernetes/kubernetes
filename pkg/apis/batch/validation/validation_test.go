@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func getValidManualSelector() *metav1.LabelSelector {
@@ -79,7 +80,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: utilpointer.BoolPtr(true),
 				Template:       validPodTemplateSpecForManual,
 			},
 		},
@@ -157,7 +158,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: utilpointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"y": "z"},
@@ -178,7 +179,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: utilpointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"controller-uid": "4d5e6f"},
@@ -199,7 +200,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			Spec: batch.JobSpec{
 				Selector:       validManualSelector,
-				ManualSelector: newBool(true),
+				ManualSelector: utilpointer.BoolPtr(true),
 				Template: api.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validManualSelector.MatchLabels,
@@ -555,7 +556,7 @@ func TestValidateCronJob(t *testing.T) {
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						ManualSelector: newBool(true),
+						ManualSelector: utilpointer.BoolPtr(true),
 						Template:       validPodTemplateSpec,
 					},
 				},
@@ -615,10 +616,4 @@ func TestValidateCronJob(t *testing.T) {
 			}
 		}
 	}
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }

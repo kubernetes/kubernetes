@@ -26,9 +26,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
-
-func boolptr(b bool) *bool { return &b }
 
 func TestGetJobFromTemplate(t *testing.T) {
 	// getJobFromTemplate() needs to take the job template and copy the labels and annotations
@@ -132,7 +131,7 @@ func TestGetParentUIDFromJob(t *testing.T) {
 			{
 				Kind:       "CronJob",
 				UID:        types.UID("5ef034e0-1890-11e6-8935-42010af0003e"),
-				Controller: boolptr(true),
+				Controller: utilpointer.BoolPtr(true),
 			},
 		})
 
@@ -156,19 +155,19 @@ func TestGroupJobsByParent(t *testing.T) {
 	ownerReference1 := metav1.OwnerReference{
 		Kind:       "CronJob",
 		UID:        uid1,
-		Controller: boolptr(true),
+		Controller: utilpointer.BoolPtr(true),
 	}
 
 	ownerReference2 := metav1.OwnerReference{
 		Kind:       "CronJob",
 		UID:        uid2,
-		Controller: boolptr(true),
+		Controller: utilpointer.BoolPtr(true),
 	}
 
 	ownerReference3 := metav1.OwnerReference{
 		Kind:       "CronJob",
 		UID:        uid3,
-		Controller: boolptr(true),
+		Controller: utilpointer.BoolPtr(true),
 	}
 
 	{

@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func init() {
@@ -3041,7 +3042,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							Controller: boolP(true),
+							Controller: utilpointer.BoolPtr(true),
 							APIVersion: "apps/v1",
 							Kind:       "DaemonSet",
 							Name:       "foo",
@@ -3059,7 +3060,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							Controller: boolP(false),
+							Controller: utilpointer.BoolPtr(false),
 							Kind:       "ABC",
 							Name:       "foo",
 						},
@@ -3107,10 +3108,6 @@ func TestPrintControllerRevision(t *testing.T) {
 		}
 		buf.Reset()
 	}
-}
-
-func boolP(b bool) *bool {
-	return &b
 }
 
 func TestPrintReplicaSet(t *testing.T) {

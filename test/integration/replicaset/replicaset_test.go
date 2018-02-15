@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
@@ -398,7 +399,7 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 }
 
 func TestAdoption(t *testing.T) {
-	boolPtr := func(b bool) *bool { return &b }
+	boolPtr := utilpointer.BoolPtr
 	testCases := []struct {
 		name                    string
 		existingOwnerReferences func(rs *apps.ReplicaSet) []metav1.OwnerReference

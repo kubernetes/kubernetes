@@ -28,13 +28,8 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
-
-func newBool(a bool) *bool {
-	r := new(bool)
-	*r = a
-	return r
-}
 
 func TestJobStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
@@ -66,7 +61,7 @@ func TestJobStrategy(t *testing.T) {
 		Spec: batch.JobSpec{
 			Selector:       validSelector,
 			Template:       validPodTemplateSpec,
-			ManualSelector: newBool(true),
+			ManualSelector: utilpointer.BoolPtr(true),
 		},
 		Status: batch.JobStatus{
 			Active: 11,

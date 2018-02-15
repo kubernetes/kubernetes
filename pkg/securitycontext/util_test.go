@@ -19,6 +19,8 @@ package securitycontext
 import (
 	"testing"
 
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+
 	"k8s.io/api/core/v1"
 )
 
@@ -85,9 +87,6 @@ func compareContexts(name string, ex, ac *v1.SELinuxOptions, t *testing.T) {
 }
 
 func TestAddNoNewPrivileges(t *testing.T) {
-	pfalse := false
-	ptrue := true
-
 	tests := map[string]struct {
 		sc     *v1.SecurityContext
 		expect bool
@@ -104,13 +103,13 @@ func TestAddNoNewPrivileges(t *testing.T) {
 		},
 		"allowPrivilegeEscalation false": {
 			sc: &v1.SecurityContext{
-				AllowPrivilegeEscalation: &pfalse,
+				AllowPrivilegeEscalation: utilpointer.BoolPtr(false),
 			},
 			expect: true,
 		},
 		"allowPrivilegeEscalation true": {
 			sc: &v1.SecurityContext{
-				AllowPrivilegeEscalation: &ptrue,
+				AllowPrivilegeEscalation: utilpointer.BoolPtr(true),
 			},
 			expect: false,
 		},

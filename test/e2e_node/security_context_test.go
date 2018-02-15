@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -506,16 +507,14 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		It("should not allow privilege escalation when false", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
-			apeFalse := false
-			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
+			if err := createAndMatchOutput(podName, "Effective uid: 1000", utilpointer.BoolPtr(false), 1000); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
 		It("should allow privilege escalation when true", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
-			apeTrue := true
-			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
+			if err := createAndMatchOutput(podName, "Effective uid: 0", utilpointer.BoolPtr(true), 1000); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})

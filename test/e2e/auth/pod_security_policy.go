@@ -165,7 +165,7 @@ func expectForbidden(err error) {
 func testPrivilegedPods(f *framework.Framework, tester func(pod *v1.Pod)) {
 	By("Running a privileged pod", func() {
 		privileged := restrictedPod(f, "privileged")
-		privileged.Spec.Containers[0].SecurityContext.Privileged = boolPtr(true)
+		privileged.Spec.Containers[0].SecurityContext.Privileged = utilpointer.BoolPtr(true)
 		privileged.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(privileged)
 	})
@@ -324,7 +324,7 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 				Name:  "pause",
 				Image: framework.GetPauseImageName(f.ClientSet),
 				SecurityContext: &v1.SecurityContext{
-					AllowPrivilegeEscalation: boolPtr(false),
+					AllowPrivilegeEscalation: utilpointer.BoolPtr(false),
 					RunAsUser:                utilpointer.Int64Ptr(65534),
 				},
 			}},
@@ -475,8 +475,4 @@ func restrictedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 			ReadOnlyRootFilesystem: false,
 		},
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }
