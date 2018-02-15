@@ -28,7 +28,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -171,6 +173,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		secretsPerPod    int
 		configMapsPerPod int
 		daemonsPerNode   int
+		quotas           bool
 	}
 
 	loadTests := []Load{
@@ -188,11 +191,18 @@ var _ = SIGDescribe("Load capacity", func() {
 		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
 		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
+		// Test with quotas
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind, quotas: true},
+	}
+
+	isCanonical := func(test *Load) bool {
+		return test.podsPerNode == 30 && test.kind == api.Kind("ReplicationController") && test.daemonsPerNode == 0 && test.secretsPerPod == 0 && test.configMapsPerPod == 0 && !test.quotas
 	}
 
 	for _, testArg := range loadTests {
 		feature := "ManualPerformance"
-		if testArg.podsPerNode == 30 && testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 && testArg.configMapsPerPod == 0 {
+		if isCanonical(&testArg) {
 			feature = "Performance"
 		}
 		name := fmt.Sprintf("[Feature:%s] should be able to handle %v pods per node %v with %v secrets, %v configmaps and %v daemons",
@@ -203,6 +213,9 @@ var _ = SIGDescribe("Load capacity", func() {
 			testArg.configMapsPerPod,
 			testArg.daemonsPerNode,
 		)
+		if testArg.quotas {
+			name += " with quotas"
+		}
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
@@ -214,6 +227,11 @@ var _ = SIGDescribe("Load capacity", func() {
 
 			totalPods := (itArg.podsPerNode - itArg.daemonsPerNode) * nodeCount
 			configs, secretConfigs, configMapConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod, itArg.configMapsPerPod)
+
+			if itArg.quotas {
+				err := CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation"))
+				framework.ExpectNoError(err)
+			}
 
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
@@ -702,4 +720,29 @@ func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix str
 		namespaces = append(namespaces, namespace)
 	}
 	return namespaces, nil
+}
+
+func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount int, testPhase *timer.Phase) error {
+	defer testPhase.End()
+	quotaTemplate := &v1.ResourceQuota{
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{"pods": *resource.NewQuantity(int64(podCount), resource.DecimalSI)},
+		},
+	}
+
+	for _, ns := range namespaces {
+		if err := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
+			quotaTemplate.Name = ns.Name + "-quota"
+			_, err := f.ClientSet.CoreV1().ResourceQuotas(ns.Name).Create(quotaTemplate)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				framework.Logf("Unexpected error while creating resource quota: %v", err)
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
+			return fmt.Errorf("Failed to create quota: %v", err)
+		}
+	}
+
+	return nil
 }
