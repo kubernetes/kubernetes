@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
-	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageprotection"
+	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageobjectinuseprotection"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -62,38 +62,38 @@ import (
 
 // AllOrderedPlugins is the list of all the plugins in order.
 var AllOrderedPlugins = []string{
-	admit.PluginName,                      // AlwaysAdmit
-	autoprovision.PluginName,              // NamespaceAutoProvision
-	lifecycle.PluginName,                  // NamespaceLifecycle
-	exists.PluginName,                     // NamespaceExists
-	scdeny.PluginName,                     // SecurityContextDeny
-	antiaffinity.PluginName,               // LimitPodHardAntiAffinityTopology
-	initialresources.PluginName,           // InitialResources
-	podpreset.PluginName,                  // PodPreset
-	limitranger.PluginName,                // LimitRanger
-	serviceaccount.PluginName,             // ServiceAccount
-	noderestriction.PluginName,            // NodeRestriction
-	alwayspullimages.PluginName,           // AlwaysPullImages
-	imagepolicy.PluginName,                // ImagePolicyWebhook
-	podsecuritypolicy.PluginName,          // PodSecurityPolicy
-	podnodeselector.PluginName,            // PodNodeSelector
-	podpriority.PluginName,                // Priority
-	defaulttolerationseconds.PluginName,   // DefaultTolerationSeconds
-	podtolerationrestriction.PluginName,   // PodTolerationRestriction
-	exec.DenyEscalatingExec,               // DenyEscalatingExec
-	exec.DenyExecOnPrivileged,             // DenyExecOnPrivileged
-	eventratelimit.PluginName,             // EventRateLimit
-	extendedresourcetoleration.PluginName, // ExtendedResourceToleration
-	label.PluginName,                      // PersistentVolumeLabel
-	setdefault.PluginName,                 // DefaultStorageClass
-	storageprotection.PluginName,          // StorageProtection
-	gc.PluginName,                         // OwnerReferencesPermissionEnforcement
-	resize.PluginName,                     // PersistentVolumeClaimResize
-	mutatingwebhook.PluginName,            // MutatingAdmissionWebhook
-	initialization.PluginName,             // Initializers
-	validatingwebhook.PluginName,          // ValidatingAdmissionWebhook
-	resourcequota.PluginName,              // ResourceQuota
-	deny.PluginName,                       // AlwaysDeny
+	admit.PluginName,                        // AlwaysAdmit
+	autoprovision.PluginName,                // NamespaceAutoProvision
+	lifecycle.PluginName,                    // NamespaceLifecycle
+	exists.PluginName,                       // NamespaceExists
+	scdeny.PluginName,                       // SecurityContextDeny
+	antiaffinity.PluginName,                 // LimitPodHardAntiAffinityTopology
+	initialresources.PluginName,             // InitialResources
+	podpreset.PluginName,                    // PodPreset
+	limitranger.PluginName,                  // LimitRanger
+	serviceaccount.PluginName,               // ServiceAccount
+	noderestriction.PluginName,              // NodeRestriction
+	alwayspullimages.PluginName,             // AlwaysPullImages
+	imagepolicy.PluginName,                  // ImagePolicyWebhook
+	podsecuritypolicy.PluginName,            // PodSecurityPolicy
+	podnodeselector.PluginName,              // PodNodeSelector
+	podpriority.PluginName,                  // Priority
+	defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
+	podtolerationrestriction.PluginName,     // PodTolerationRestriction
+	exec.DenyEscalatingExec,                 // DenyEscalatingExec
+	exec.DenyExecOnPrivileged,               // DenyExecOnPrivileged
+	eventratelimit.PluginName,               // EventRateLimit
+	extendedresourcetoleration.PluginName,   // ExtendedResourceToleration
+	label.PluginName,                        // PersistentVolumeLabel
+	setdefault.PluginName,                   // DefaultStorageClass
+	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
+	resize.PluginName,                       // PersistentVolumeClaimResize
+	mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
+	initialization.PluginName,               // Initializers
+	validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
+	resourcequota.PluginName,                // ResourceQuota
+	deny.PluginName,                         // AlwaysDeny
 }
 
 // RegisterAllAdmissionPlugins registers all admission plugins and
@@ -125,7 +125,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	resize.Register(plugins)
-	storageprotection.Register(plugins)
+	storageobjectinuseprotection.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
