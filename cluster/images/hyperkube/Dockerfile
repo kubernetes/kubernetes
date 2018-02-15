@@ -26,7 +26,7 @@ RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /kubelet \
  && ln -s /hyperkube /proxy \
  && ln -s /hyperkube /scheduler \
-  && ln -s /hyperkube /aggerator \
+ && ln -s /hyperkube /aggregator \
  && ln -s /hyperkube /usr/local/bin/kube-apiserver \
  && ln -s /hyperkube /usr/local/bin/kube-controller-manager \
  && ln -s /hyperkube /usr/local/bin/kubectl \
