@@ -154,8 +154,3 @@ type KubeProxyConfiguration struct {
 // the system's kernel or iptables versions are insufficient, this always falls back to the
 // userspace proxy.
 type ProxyMode string
-
-const (
-	ProxyModeUserspace ProxyMode = "userspace"
-	ProxyModeIPTables  ProxyMode = "iptables"
-)
