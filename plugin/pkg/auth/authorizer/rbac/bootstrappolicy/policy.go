@@ -403,6 +403,18 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 		{
+			// a role to use for both out-of-tree or in-tree cloud-controller-manager
+			ObjectMeta: metav1.ObjectMeta{Name: "system:cloud-controller-manager"},
+			Rules: []rbac.PolicyRule{
+				eventsRule(),
+				rbac.NewRule("*").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbac.NewRule("list", "watch", "patch", "update").Groups(legacyGroup).Resources("services").RuleOrDie(),
+				rbac.NewRule("create", "patch", "update").Groups(legacyGroup).Resources("events").RuleOrDie(),
+				rbac.NewRule("create", "get", "list", "watch", "update").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+				rbac.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
+			},
+		},
+		{
 			// a role to use for the kube-scheduler
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
 			Rules: []rbac.PolicyRule{
