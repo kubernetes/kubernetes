@@ -117,11 +117,12 @@ func (Binding) SwaggerDoc() map[string]string {
 }
 
 var map_CSIPersistentVolumeSource = map[string]string{
-	"":             "Represents storage that is managed by an external CSI volume driver (Beta feature)",
-	"driver":       "Driver is the name of the driver to use for this volume. Required.",
-	"volumeHandle": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
-	"readOnly":     "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
-	"fsType":       "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"":                 "Represents storage that is managed by an external CSI volume driver (Beta feature)",
+	"driver":           "Driver is the name of the driver to use for this volume. Required.",
+	"volumeHandle":     "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
+	"readOnly":         "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"volumeAttributes": "Attributes of the volume to publish.",
 }
 
 func (CSIPersistentVolumeSource) SwaggerDoc() map[string]string {
