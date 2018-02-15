@@ -175,6 +175,8 @@ CONTROLLER_MANAGER_TEST_LOG_LEVEL="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-$TEST_CL
 SCHEDULER_TEST_LOG_LEVEL="${SCHEDULER_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_LOG_LEVEL="${KUBEPROXY_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 
+VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec}"
+
 # TODO: change this and flex e2e test when default flex volume install path is changed for GCI
 # Set flex dir to one that's readable from controller-manager container and writable by the flex e2e test.
 if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
