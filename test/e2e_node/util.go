@@ -219,11 +219,11 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 	return nil
 }
 
-// getConfigOK returns the first NodeCondition in `cs` with Type == apiv1.NodeConfigOK,
+// getKubeletConfigOkCondition returns the first NodeCondition in `cs` with Type == apiv1.NodeKubeletConfigOk,
 // or if no such condition exists, returns nil.
-func getConfigOKCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
+func getKubeletConfigOkCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
 	for i := range cs {
-		if cs[i].Type == apiv1.NodeConfigOK {
+		if cs[i].Type == apiv1.NodeKubeletConfigOk {
 			return &cs[i]
 		}
 	}
