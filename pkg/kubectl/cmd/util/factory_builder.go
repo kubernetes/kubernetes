@@ -48,15 +48,12 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 }
 
 func (f *ring2Factory) PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	var mapper meta.RESTMapper
-	var typer runtime.ObjectTyper
-
-	mapper, typer = f.objectMappingFactory.Object()
+	_, typer := f.objectMappingFactory.Object()
 
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return printerForOptions(mapper, typer, encoder, decoders, options)
+	return printerForOptions(typer, encoder, decoders, options)
 }
 
 func (f *ring2Factory) PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {

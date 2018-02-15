@@ -116,8 +116,8 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+	_, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer}
 	opts := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		out:   buf,
@@ -130,7 +130,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
 	}

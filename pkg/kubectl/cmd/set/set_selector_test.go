@@ -335,11 +335,11 @@ func TestSelectorTest(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
 
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+	_, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer}
 	cmd.Run(cmd, []string{"environment=qa"})
 
-	if !strings.Contains(buf.String(), "services/cassandra") {
+	if !strings.Contains(buf.String(), "service/cassandra") {
 		t.Errorf("did not set selector: %s", buf.String())
 	}
 }

@@ -19,8 +19,10 @@ package printers
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
@@ -29,7 +31,6 @@ import (
 type NamePrinter struct {
 	Decoders []runtime.Decoder
 	Typer    runtime.ObjectTyper
-	Mapper   meta.RESTMapper
 }
 
 func (p *NamePrinter) AfterPrint(w io.Writer, res string) error {
@@ -64,22 +65,45 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind()
 	if len(groupVersionKind.Kind) > 0 {
-		if mappings, err := p.Mapper.RESTMappings(groupVersionKind.GroupKind(), groupVersionKind.Version); err == nil && len(mappings) > 0 {
-			fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
-			return nil
-		}
+		kind := groupVersionKind.Kind
+		group := groupVersionKind.Group
+		return printObj(w, name, group, kind)
 	}
 
 	if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
 		for _, gvk := range gvks {
-			if mappings, err := p.Mapper.RESTMappings(gvk.GroupKind(), gvk.Version); err == nil && len(mappings) > 0 {
-				fmt.Fprintf(w, "%s/%s\n", mappings[0].Resource, name)
-				return nil
+			if len(gvk.Kind) == 0 {
+				continue
 			}
+
+			return printObj(w, name, gvk.Group, gvk.Kind)
+		}
+	}
+
+	if uns, ok := obj.(*unstructured.Unstructured); ok {
+		group := uns.GroupVersionKind().Group
+		kind := uns.GroupVersionKind().Kind
+
+		if len(kind) > 0 {
+			return printObj(w, name, group, kind)
 		}
 	}
 
 	fmt.Fprintf(w, "<unknown>/%s\n", name)
+	return nil
+}
+
+func printObj(w io.Writer, name, group, kind string) error {
+	if len(kind) == 0 {
+		return fmt.Errorf("missing kind for resource with name %v", name)
+	}
+
+	if len(group) == 0 {
+		fmt.Fprintf(w, "%s/%s\n", strings.ToLower(kind), name)
+		return nil
+	}
+
+	fmt.Fprintf(w, "%s.%s/%s\n", strings.ToLower(kind), group, name)
 	return nil
 }
 

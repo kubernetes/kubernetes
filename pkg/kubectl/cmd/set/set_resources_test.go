@@ -63,8 +63,8 @@ func TestResourcesLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+	_, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer}
 
 	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
@@ -84,7 +84,7 @@ func TestResourcesLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "replicationcontrollers/cassandra") {
+	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set resources: %s", buf.String())
 	}
 }
@@ -107,8 +107,8 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+	_, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer}
 
 	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
@@ -128,7 +128,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
 	}
@@ -448,8 +448,8 @@ func TestSetResourcesRemote(t *testing.T) {
 			testapi.Default = testapi.Groups[input.testAPIGroup]
 			f, tf, _, ns := cmdtesting.NewAPIFactory()
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			mapper, typer := f.Object()
-			tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{testapi.Default.Codec()}, Typer: typer, Mapper: mapper}
+			_, typer := f.Object()
+			tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{testapi.Default.Codec()}, Typer: typer}
 			tf.Namespace = "test"
 			tf.CategoryExpander = categories.LegacyCategoryExpander
 			tf.Client = &fake.RESTClient{

@@ -1472,7 +1472,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" 'valid-pod' # pod details
   output_message=$(kubectl get pods/valid-pod -o name -w --request-timeout=1 "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" 'STATUS' # no headers
-  kube::test::if_has_string     "${output_message}" 'pods/valid-pod' # resource name
+  kube::test::if_has_string     "${output_message}" 'pod/valid-pod' # resource name
   output_message=$(kubectl get pods/valid-pod -o yaml -w --request-timeout=1 "${kube_flags[@]}")
   kube::test::if_has_not_string "${output_message}" 'STATUS'          # no headers
   kube::test::if_has_string     "${output_message}" 'name: valid-pod' # yaml
@@ -1586,6 +1586,33 @@ __EOF__
   # Post-Condition: assertion object exist
   kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'bars.company.com:foos.company.com:'
 
+  # This test ensures that the name printer is able to output a resource
+  # in the proper "kind.group/resource_name" format, and that the
+  # resource builder is able to resolve a GVK when a kind.group pair is given.
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "resources.mygroup.example.com"
+  },
+  "spec": {
+    "group": "mygroup.example.com",
+    "version": "v1alpha1",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "resources",
+      "singular": "resource",
+      "kind": "Kind",
+      "listKind": "KindList"
+    }
+  }
+}
+__EOF__
+
+  # Post-Condition: assertion crd with non-matching kind and resource exists
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
+
   run_non_native_resource_tests
 
   # teardown
@@ -1633,6 +1660,28 @@ run_non_native_resource_tests() {
   # Test that we can list this new CustomResource (bars)
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  # Test that we can list this new CustomResource (resources)
+  kube::test::get_object_assert resources "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # Test that we can create a new resource of type Kind
+  kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/resource.yaml "${kube_flags[@]}"
+
+  # Test that -o name returns kind.group/resourcename
+  output_message=$(kubectl "${kube_flags[@]}" get resource/myobj -o name)
+  kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
+
+  output_message=$(kubectl "${kube_flags[@]}" get resources/myobj -o name)
+  kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
+
+  output_message=$(kubectl "${kube_flags[@]}" get kind.mygroup.example.com/myobj -o name)
+  kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
+
+  # Delete the resource with cascade.
+  kubectl "${kube_flags[@]}" delete resources myobj --cascade=true
+
+  # Make sure it's gone
+  kube::test::get_object_assert resources "{{range.items}}{{$id_field}}:{{end}}" ''
+
   # Test that we can create a new resource of type Foo
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}"
 
@@ -1661,7 +1710,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
   kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
   output_message=$(kubectl "${kube_flags[@]}" get foos/test -o name)
-  kube::test::if_has_string "${output_message}" 'foos/test'
+  kube::test::if_has_string "${output_message}" 'foo.company.com/test'
 
   # Test patching
   kube::log::status "Testing CustomResource patching"
@@ -1744,7 +1793,7 @@ run_non_native_resource_tests() {
   # Stop the watcher and the patch loop.
   kill -9 ${watch_pid}
   kill -9 ${patch_pid}
-  kube::test::if_has_string "${watch_output}" 'bars/test'
+  kube::test::if_has_string "${watch_output}" 'bar.company.com/test'
 
   # Delete the resource without cascade.
   kubectl "${kube_flags[@]}" delete bars test --cascade=false

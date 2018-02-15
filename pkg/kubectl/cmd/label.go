@@ -287,7 +287,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			return nil
 		}
 
-		if o.outputFormat != "" {
+		if len(o.outputFormat) > 0 {
 			return f.PrintObject(cmd, o.local, r.Mapper().RESTMapper, outputObj, o.out)
 		}
 		f.PrintSuccess(false, o.out, info.Mapping.Resource, info.Name, o.dryrun, dataChangeMsg)

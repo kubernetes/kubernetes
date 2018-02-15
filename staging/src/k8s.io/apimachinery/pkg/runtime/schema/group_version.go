@@ -36,6 +36,21 @@ func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 	return gvr, ParseGroupResource(arg)
 }
 
+// ParseKindArg takes the common style of string which may be either `Kind.group.com` or `Kind.version.group.com`
+// and parses it out into both possibilities. This code takes no responsibility for knowing which representation was intended
+// but with a knowledge of all GroupKinds, calling code can take a very good guess. If there are only two segments, then
+// `*GroupVersionResource` is nil.
+// `Kind.group.com` -> `group=com, version=group, kind=Kind` and `group=group.com, kind=Kind`
+func ParseKindArg(arg string) (*GroupVersionKind, GroupKind) {
+	var gvk *GroupVersionKind
+	if strings.Count(arg, ".") >= 2 {
+		s := strings.SplitN(arg, ".", 3)
+		gvk = &GroupVersionKind{Group: s[2], Version: s[1], Kind: s[0]}
+	}
+
+	return gvk, ParseGroupKind(arg)
+}
+
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
 type GroupResource struct {
@@ -56,6 +71,15 @@ func (gr *GroupResource) String() string {
 		return gr.Resource
 	}
 	return gr.Resource + "." + gr.Group
+}
+
+func ParseGroupKind(gk string) GroupKind {
+	i := strings.Index(gk, ".")
+	if i == -1 {
+		return GroupKind{Kind: gk}
+	}
+
+	return GroupKind{Group: gk[i+1:], Kind: gk[:i]}
 }
 
 // ParseGroupResource turns "resource.group" string into a GroupResource struct.  Empty strings are allowed
