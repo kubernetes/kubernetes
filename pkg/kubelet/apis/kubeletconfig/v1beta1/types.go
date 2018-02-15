@@ -390,6 +390,14 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
+	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
+	// Default: "10Mi"
+	// +optional
+	ContainerLogMaxSize string `json:"containerLogMaxSize,omitempty"`
+	// Maximum number of container log files that can be present for a container.
+	// Default: 5
+	// +optional
+	ContainerLogMaxFiles *int32 `json:"containerLogMaxFiles,omitempty"`
 
 	/* following flags are meant for Node Allocatable */
 

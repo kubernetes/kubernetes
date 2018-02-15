@@ -66,7 +66,9 @@ service RuntimeService {
     rpc UpdateContainerResources(UpdateContainerResourcesRequest) returns (UpdateContainerResourcesResponse) {}
     // ReopenContainerLog asks runtime to reopen the stdout/stderr log file
     // for the container. This is often called after the log file has been
-    // rotated.
+    // rotated. If the container is not running, container runtime can choose
+    // to either create a new log file and return nil, or return an error.
+    // Once it returns error, new container log file MUST NOT be created.
     rpc ReopenContainerLog(ReopenContainerLogRequest) returns (ReopenContainerLogResponse) {}
 
     // ExecSync runs a command in a container synchronously.

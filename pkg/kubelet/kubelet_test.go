@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -262,6 +263,7 @@ func newTestKubeletWithImageList(
 		fakeImageService: fakeRuntime,
 		ImageGCManager:   imageGCManager,
 	}
+	kubelet.containerLogManager = logs.NewStubContainerLogManager()
 	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock

@@ -74,6 +74,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -758,6 +759,21 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.imageManager = imageManager
 
+	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
+		// setup containerLogManager for CRI container runtime
+		containerLogManager, err := logs.NewContainerLogManager(
+			klet.runtimeService,
+			kubeCfg.ContainerLogMaxSize,
+			int(kubeCfg.ContainerLogMaxFiles),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
+		}
+		klet.containerLogManager = containerLogManager
+	} else {
+		klet.containerLogManager = logs.NewStubContainerLogManager()
+	}
+
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
@@ -992,6 +1008,9 @@ type Kubelet struct {
 
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager
+
+	// Manager for container logs.
+	containerLogManager logs.ContainerLogManager
 
 	// Secret manager.
 	secretManager secret.Manager
@@ -1335,6 +1354,9 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		glog.Fatalf("Failed to start ContainerManager %v", err)
 	}
+	// container log manager must start after container runtime is up to retrieve information from container runtime
+	// and inform container to reopen log file after log rotation.
+	kl.containerLogManager.Start()
 }
 
 // Run starts the kubelet reacting to config updates

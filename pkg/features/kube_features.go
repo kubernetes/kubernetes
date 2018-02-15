@@ -250,6 +250,12 @@ const (
 	//
 	// Implement TokenRequest endpoint on service account resources.
 	TokenRequest utilfeature.Feature = "TokenRequest"
+
+	// owner: @Random-Liu
+	// alpha: v1.10
+	//
+	// Enable container log rotation for cri container runtime
+	CRIContainerLogRotation utilfeature.Feature = "CRIContainerLogRotation"
 )
 
 func init() {
@@ -293,6 +299,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
