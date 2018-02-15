@@ -53,8 +53,8 @@ type Controller struct {
 	// pendingConfigSource; write to this channel to indicate that the config source needs to be synced from the API server
 	pendingConfigSource chan bool
 
-	// configOK manages the ConfigOK condition that is reported in Node.Status.Conditions
-	configOK status.ConfigOKCondition
+	// configOk manages the KubeletConfigOk condition that is reported in Node.Status.Conditions
+	configOk status.ConfigOkCondition
 
 	// informer is the informer that watches the Node object
 	informer cache.SharedInformer
@@ -69,7 +69,7 @@ func NewController(defaultConfig *kubeletconfig.KubeletConfiguration, dynamicCon
 		defaultConfig: defaultConfig,
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingConfigSource: make(chan bool, 1),
-		configOK:            status.NewConfigOKCondition(),
+		configOk:            status.NewConfigOkCondition(),
 		checkpointStore:     store.NewFsStore(utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, checkpointsDir)),
 	}
 }
@@ -95,9 +95,9 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	if err == nil {
 		// set the status to indicate we will use the assigned config
 		if curSource != nil {
-			cc.configOK.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
+			cc.configOk.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
 		} else {
-			cc.configOK.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
+			cc.configOk.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
 		}
 
 		// update the last-known-good config if necessary, and start a timer that
@@ -125,9 +125,9 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 
 	// set the status to indicate that we had to roll back to the lkg for the reason reported when we tried to load the assigned config
 	if lkgSource != nil {
-		cc.configOK.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.APIPath()), reason, apiv1.ConditionFalse)
+		cc.configOk.Set(fmt.Sprintf(status.LkgRemoteMessageFmt, lkgSource.APIPath()), reason, apiv1.ConditionFalse)
 	} else {
-		cc.configOK.Set(status.LkgLocalMessage, reason, apiv1.ConditionFalse)
+		cc.configOk.Set(status.LkgLocalMessage, reason, apiv1.ConditionFalse)
 	}
 
 	// return the last-known-good config
@@ -146,11 +146,11 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 		return
 	}
 
-	// start the ConfigOK condition sync loop
+	// start the ConfigOk condition sync loop
 	go utilpanic.HandlePanic(func() {
-		utillog.Infof("starting ConfigOK condition sync loop")
+		utillog.Infof("starting ConfigOk condition sync loop")
 		wait.JitterUntil(func() {
-			cc.configOK.Sync(client, nodeName)
+			cc.configOk.Sync(client, nodeName)
 		}, 10*time.Second, 0.2, true, wait.NeverStop)
 	})()
 
