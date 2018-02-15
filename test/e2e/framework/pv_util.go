@@ -263,6 +263,11 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVol
 	return pv, nil
 }
 
+// create the PV resource. Fails test on error.
+func CreatePV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return createPV(c, pv)
+}
+
 // create the PVC resource. Fails test on error.
 func CreatePVC(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
