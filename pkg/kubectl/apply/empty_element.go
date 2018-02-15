@@ -27,6 +27,11 @@ func (e EmptyElement) Merge(v Strategy) (Result, error) {
 	return v.MergeEmpty(e)
 }
 
+// Compare detect conflicts in merging empty elements of remote and recorded values
+func (e EmptyElement) Compare(v Compare) bool {
+	return v.CompareEmpty(e)
+}
+
 // IsAdd implements Element.IsAdd
 func (e EmptyElement) IsAdd() bool {
 	return false

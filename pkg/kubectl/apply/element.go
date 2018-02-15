@@ -36,6 +36,9 @@ type Element interface {
 	// Returns the Result of the merged elements
 	Merge(Strategy) (Result, error)
 
+	// Compare detects conflicts between recorded and remote values.
+	Compare(Compare) bool
+
 	// HasRecorded returns true if the field was explicitly
 	// present in the recorded source.  This is to differentiate between
 	// undefined and set to null

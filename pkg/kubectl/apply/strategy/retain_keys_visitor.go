@@ -18,12 +18,13 @@ package strategy
 
 import (
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 
 func createRetainKeysStrategy(options Options, strategic *delegatingStrategy) retainKeysStrategy {
 	return retainKeysStrategy{
-		&mergeStrategy{strategic, options},
+		&mergeStrategy{strategic, options, CreateCompareStrategy()},
 		strategic,
 		options,
 	}
