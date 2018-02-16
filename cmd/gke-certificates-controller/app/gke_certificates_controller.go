@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/certificates"
+	"k8s.io/kubernetes/pkg/version/verflag"
 
 	// Install all auth plugins
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -41,11 +42,17 @@ import (
 
 // NewGKECertificatesControllerCommand creates a new *cobra.Command with default parameters.
 func NewGKECertificatesControllerCommand() *cobra.Command {
+	s := NewGKECertificatesController()
 	cmd := &cobra.Command{
 		Use: "gke-certificates-controller",
 		Long: `The Kubernetes GKE certificates controller is a daemon that
 handles auto-approving and signing certificates for GKE clusters.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+			Run(s)
+		},
 	}
+	s.AddFlags(cmd.Flags())
 
 	return cmd
 }
