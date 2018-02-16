@@ -324,15 +324,15 @@ func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
 func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
-	instances, ok := cnc.cloud.Instances()
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
-		return
-	}
-
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
 		glog.V(2).Infof("This node %s is registered without the cloud taint. Will not process.", node.Name)
+		return
+	}
+
+	instances, ok := cnc.cloud.Instances()
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
 		return
 	}
 
