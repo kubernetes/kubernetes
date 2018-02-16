@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -31,6 +30,7 @@ import (
 	"github.com/golang/glog"
 
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -110,7 +110,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		framework.ExpectNoError(err)
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
-		if reflect.DeepEqual(*newCfg, *oldCfg) {
+		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
 			return
 		}
 
@@ -185,7 +185,7 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		if err != nil {
 			return fmt.Errorf("failed trying to get current Kubelet config, will retry, error: %v", err)
 		}
-		if !reflect.DeepEqual(*kubeCfg, *newKubeCfg) {
+		if !apiequality.Semantic.DeepEqual(*kubeCfg, *newKubeCfg) {
 			return fmt.Errorf("still waiting for new configuration to take effect, will continue to watch /configz")
 		}
 		glog.Infof("new configuration has taken effect")
