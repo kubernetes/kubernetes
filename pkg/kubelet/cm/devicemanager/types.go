@@ -18,7 +18,7 @@ package devicemanager
 
 import (
 	"k8s.io/api/core/v1"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -77,7 +77,7 @@ const (
 	errFailedToDialDevicePlugin = "failed to dial device plugin:"
 	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
 	// supported by the Kubelet registry
-	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
+	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported versions are %q"
 	// errDevicePluginAlreadyExists is the error raised when a device plugin with the
 	// same Resource Name tries to register itself
 	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"

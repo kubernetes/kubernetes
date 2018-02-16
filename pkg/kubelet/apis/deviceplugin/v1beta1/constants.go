@@ -33,3 +33,5 @@ const (
 	// Timeout duration in secs for PreStartContainer RPC
 	KubeletPreStartContainerRPCTimeoutInSecs = 30
 )
+
+var SupportedVersions = [...]string{"v1beta1"}
