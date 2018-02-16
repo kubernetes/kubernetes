@@ -185,9 +185,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
 	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels); err != nil {
+		framework.Logf("Error waiting for pods to be running and ready. Retrieving cluster information. Error cause is logged below after :END.")
+		framework.Logf("CLUSTER-INFORMATION:START")
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
+		framework.Logf("CLUSTER-INFORMATION:END")
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 

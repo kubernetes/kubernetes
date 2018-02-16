@@ -2523,7 +2523,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 
 	var notSchedulable []*v1.Node
 	attempt := 0
-	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
 		attempt++
 		notSchedulable = nil
 		opts := metav1.ListOptions{
@@ -2554,7 +2554,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		if len(notSchedulable) > 0 {
 			// In large clusters, log them only every 10th pass.
 			if len(nodes.Items) >= largeClusterThreshold && attempt%10 == 0 {
-				Logf("Unschedulable nodes:")
+				Logf("Found %d unschedulable nodes:", len(notSchedulable))
 				for i := range notSchedulable {
 					Logf("-> %s Ready=%t Network=%t",
 						notSchedulable[i].Name,
@@ -2566,6 +2566,8 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		return len(notSchedulable) <= TestContext.AllowedNotReadyNodes, nil
 	})
+	Logf("All but %d nodes are schedulable.", len(notSchedulable))
+	return err
 }
 
 func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
