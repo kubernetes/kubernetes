@@ -654,6 +654,7 @@ function start_cloud_controller_manager {
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
     fi
 
+    echo "Starting cloud-controller-manager"
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
     ${CONTROLPLANE_SUDO} ${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/hyperkube" cloud-controller-manager} \
       --v=${LOG_LEVEL} \
