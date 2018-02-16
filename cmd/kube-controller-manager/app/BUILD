@@ -85,6 +85,7 @@ go_library(
         "//pkg/quota/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/configz:go_default_library",
+        "//pkg/util/flag:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",

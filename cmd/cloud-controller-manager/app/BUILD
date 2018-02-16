@@ -19,6 +19,7 @@ go_library(
         "//pkg/controller/route:go_default_library",
         "//pkg/controller/service:go_default_library",
         "//pkg/util/configz:go_default_library",
+        "//pkg/util/flag:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
