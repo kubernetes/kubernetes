@@ -281,23 +281,25 @@ func fakeGCECloud() (*GCECloud, error) {
 		return nil, err
 	}
 
-	cloud := cloud.NewMockGCE()
-	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
-	cloud.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
-
-	gce := GCECloud{
+	gce := &GCECloud{
 		region:             gceRegion,
 		service:            service,
 		manager:            fakeManager,
 		managedZones:       []string{zoneName},
 		projectID:          gceProjectId,
+		networkProjectID:   gceProjectId,
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          zonesWithNodes,
 		nodeInformerSynced: func() bool { return true },
-		c:                  cloud,
 	}
 
-	return &gce, nil
+	cloud := cloud.NewMockGCE(&gceProjectRouter{gce})
+	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
+	cloud.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+
+	gce.c = cloud
+
+	return gce, nil
 }
 
 func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error) {
