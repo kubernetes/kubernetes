@@ -533,6 +533,14 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	// allocatable of the node
 	cm.nodeInfo = node
 
+	rootfs, err := cm.cadvisorInterface.RootFsInfo()
+	if err != nil {
+		return fmt.Errorf("failed to get rootfs info: %v", err)
+	}
+	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
+		cm.capacity[rName] = rCap
+	}
+
 	// Ensure that node allocatable configuration is valid.
 	if err := cm.validateNodeAllocatable(); err != nil {
 		return err
@@ -575,36 +583,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}, 5*time.Minute, wait.NeverStop)
 	}
 
-	// Local storage filesystem information from `RootFsInfo` and `ImagesFsInfo` is available at a later time
-	// depending on the time when cadvisor manager updates container stats. Therefore use a go routine to keep
-	// retrieving the information until it is available.
-	stopChan := make(chan struct{})
-	go wait.Until(func() {
-		if err := cm.setFsCapacity(); err != nil {
-			glog.Errorf("[ContainerManager]: %v", err)
-			return
-		}
-		close(stopChan)
-	}, time.Second, stopChan)
-
 	// Starts device manager.
 	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
 		return err
 	}
-	return nil
-}
 
-func (cm *containerManagerImpl) setFsCapacity() error {
-	rootfs, err := cm.cadvisorInterface.RootFsInfo()
-	if err != nil {
-		return fmt.Errorf("Fail to get rootfs information %v", err)
-	}
-
-	cm.Lock()
-	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
-		cm.capacity[rName] = rCap
-	}
-	cm.Unlock()
 	return nil
 }
 
@@ -884,8 +867,6 @@ func getDockerAPIVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 }
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
-	cm.RLock()
-	defer cm.RUnlock()
 	return cm.capacity
 }
 
