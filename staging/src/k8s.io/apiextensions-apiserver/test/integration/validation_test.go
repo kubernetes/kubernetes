@@ -25,6 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/staging/src/k8s.io/apiextensions-apiserver/pkg/features"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
@@ -164,6 +167,10 @@ func newNoxuValidationInstance(namespace, name string) *unstructured.Unstructure
 			"beta":  10,
 			"gamma": "bar",
 			"delta": "hello",
+			"foo": map[string]interface{}{
+				"bar": "baz",
+				"abc": "def",
+			},
 		},
 	}
 }
@@ -420,6 +427,94 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestRemoveUnknownFields(t *testing.T) {
+	// enable alpha feature CustomResourceRemoveUnknownFields
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceRemoveUnknownFields, true)()
+
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := newNoxuValidationCRD(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition.Spec.RemoveUnknownFields = boolPtr(true)
+	noxuDefinition.Spec.Validation.OpenAPIV3Schema = &apiextensionsv1beta1.JSONSchemaProps{
+		Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+			"foo": {
+				Description: "Validation for foo",
+				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+					"bar": {
+						Type: "string",
+					},
+				},
+			},
+		},
+	}
+
+	ns := "not-the-default"
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuResourceClient := NewNamespacedCustomResourceClient(ns, noxuVersionClient, noxuDefinition)
+	createdNoxuInstance, err := instantiateCustomResource(t, newNoxuValidationInstance(ns, "noxu1"), noxuResourceClient, noxuDefinition)
+	if err != nil {
+		t.Fatalf("unable to create noxu instance: %v", err)
+	}
+
+	// .foo.bar should be present
+	_, found, err := unstructured.NestedString(createdNoxuInstance.Object, "foo", "bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatalf(".foo.bar not found, expected value %v", "baz")
+	}
+
+	// .foo.abc should not be present
+	abc, found, err := unstructured.NestedString(createdNoxuInstance.Object, "foo", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found {
+		t.Fatalf(".foo.abc shoud be removed, found value %v", abc)
+	}
+
+	gottenCRD, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get("noxus.mygroup.example.com", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// foo should be removed because it does not have properties constructs under it
+	// TODO: double check if we want this?
+	gottenCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"] = apiextensionsv1beta1.JSONSchemaProps{
+		Description: "Validation for foo",
+	}
+
+	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(gottenCRD); err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		createdNoxuInstance, err = noxuResourceClient.Create(newNoxuValidationInstance(ns, "noxu2"))
+		if _, found, _ := unstructured.NestedStringMap(createdNoxuInstance.Object, "foo"); found {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func float64Ptr(f float64) *float64 {

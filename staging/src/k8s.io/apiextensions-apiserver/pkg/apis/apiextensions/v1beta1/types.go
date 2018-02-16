@@ -31,6 +31,11 @@ type CustomResourceDefinitionSpec struct {
 	// Validation describes the validation methods for CustomResources
 	// +optional
 	Validation *CustomResourceValidation `json:"validation,omitempty" protobuf:"bytes,5,opt,name=validation"`
+	// RemoveUnknownFields indicates whether fields not specified in the Properties construct of the
+	// CustomResourceValidation schema should be removed.
+	// This field is alpha-level and should only be sent to servers that enable the CustomResourceRemoveUnknownFields feature.
+	// +optional
+	RemoveUnknownFields *bool
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
