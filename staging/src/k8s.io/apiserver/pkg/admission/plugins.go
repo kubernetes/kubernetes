@@ -122,8 +122,6 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 	return bytes.NewBuffer(configBytes), bytes.NewBuffer(configBytes), nil
 }
 
-type Decorator func(handler Interface, name string) Interface
-
 // NewFromPlugins returns an admission.Interface that will enforce admission control decisions of all
 // the given plugins.
 func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigProvider, pluginInitializer PluginInitializer, decorator Decorator) (Interface, error) {
@@ -140,7 +138,7 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 		}
 		if plugin != nil {
 			if decorator != nil {
-				handlers = append(handlers, decorator(plugin, pluginName))
+				handlers = append(handlers, decorator.Decorate(plugin, pluginName))
 			} else {
 				handlers = append(handlers, plugin)
 			}
