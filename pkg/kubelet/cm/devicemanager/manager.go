@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -289,8 +289,15 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	glog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)
 	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
-	if r.Version != pluginapi.Version {
-		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.Version)
+	var versionCompatible bool
+	for _, v := range pluginapi.SupportedVersions {
+		if r.Version == v {
+			versionCompatible = true
+			break
+		}
+	}
+	if !versionCompatible {
+		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.SupportedVersions)
 		glog.Infof("Bad registration request from device plugin with resource name %q: %v", r.ResourceName, errorString)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}

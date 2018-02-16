@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 )
 
 // endpoint maps to a single registered device plugin. It is responsible
@@ -66,9 +66,8 @@ func newEndpointImpl(socketPath, resourceName string, devices map[string]plugina
 		client:     client,
 		clientConn: c,
 
-		socketPath:                      socketPath,
-		resourceName:                    resourceName,
-		invokePreStartContainerBoolFlag: false,
+		socketPath:   socketPath,
+		resourceName: resourceName,
 
 		devices: devices,
 		cb:      callback,

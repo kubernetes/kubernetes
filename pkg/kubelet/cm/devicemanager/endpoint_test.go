@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 )
 
 var (
