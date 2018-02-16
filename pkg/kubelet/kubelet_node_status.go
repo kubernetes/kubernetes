@@ -735,17 +735,28 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 	// This is due to an issue with version skewed kubelet and master components.
 	// ref: https://github.com/kubernetes/kubernetes/issues/16961
 	currentTime := metav1.NewTime(kl.clock.Now())
-	var newNodeReadyCondition v1.NodeCondition
+	newNodeReadyCondition := v1.NodeCondition{
+		Type:              v1.NodeReady,
+		Status:            v1.ConditionTrue,
+		Reason:            "KubeletReady",
+		Message:           "kubelet is posting ready status",
+		LastHeartbeatTime: currentTime,
+	}
 	rs := append(kl.runtimeState.runtimeErrors(), kl.runtimeState.networkErrors()...)
-	if len(rs) == 0 {
-		newNodeReadyCondition = v1.NodeCondition{
-			Type:              v1.NodeReady,
-			Status:            v1.ConditionTrue,
-			Reason:            "KubeletReady",
-			Message:           "kubelet is posting ready status",
-			LastHeartbeatTime: currentTime,
+	requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
+	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
+	}
+	missingCapacities := []string{}
+	for _, resource := range requiredCapacities {
+		if _, found := node.Status.Capacity[resource]; !found {
+			missingCapacities = append(missingCapacities, string(resource))
 		}
-	} else {
+	}
+	if len(missingCapacities) > 0 {
+		rs = append(rs, fmt.Sprintf("Missing node capacity for resources: %s", strings.Join(missingCapacities, ", ")))
+	}
+	if len(rs) > 0 {
 		newNodeReadyCondition = v1.NodeCondition{
 			Type:              v1.NodeReady,
 			Status:            v1.ConditionFalse,

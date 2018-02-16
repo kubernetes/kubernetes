@@ -1294,16 +1294,6 @@ func (kl *Kubelet) initializeModules() error {
 		kl.serverCertificateManager.Start()
 	}
 
-	// Start container manager.
-	node, err := kl.getNodeAnyWay()
-	if err != nil {
-		return fmt.Errorf("Kubelet failed to get node info: %v", err)
-	}
-
-	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService); err != nil {
-		return fmt.Errorf("Failed to start ContainerManager %v", err)
-	}
-
 	// Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
@@ -1329,6 +1319,21 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
 	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, kl.containerManager, evictionMonitoringPeriod)
+
+	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
+	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
+	kl.StatsProvider.GetCgroupStats("/", true)
+	// Start container manager.
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		// Fail kubelet and rely on the babysitter to retry starting kubelet.
+		glog.Fatalf("Kubelet failed to get node info: %v", err)
+	}
+	// containerManager must start after cAdvisor because it needs filesystem capacity information
+	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService); err != nil {
+		// Fail kubelet and rely on the babysitter to retry starting kubelet.
+		glog.Fatalf("Failed to start ContainerManager %v", err)
+	}
 }
 
 // Run starts the kubelet reacting to config updates

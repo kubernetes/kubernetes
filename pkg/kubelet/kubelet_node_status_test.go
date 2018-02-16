@@ -249,6 +249,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -441,6 +444,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -645,6 +651,9 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -1122,6 +1131,9 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
