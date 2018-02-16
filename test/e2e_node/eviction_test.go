@@ -71,7 +71,6 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{"nodefs.inodesFree": fmt.Sprintf("%d", inodesFree-inodesConsumed)}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logInodeMetrics, []podEvictSpec{
 			{
@@ -134,7 +133,6 @@ var _ = framework.KubeDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			initialConfig.EvictionHard = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
@@ -168,7 +166,6 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 			initialConfig.EvictionSoftGracePeriod = map[string]string{"nodefs.available": "1m"}
 			// Defer to the pod default grace period
 			initialConfig.EvictionMaxPodGracePeriod = 30
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			// Ensure that pods are not evicted because of the eviction-hard threshold
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
@@ -254,7 +251,6 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 				framework.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{"memory.available": fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		specs := []podEvictSpec{
 			{
@@ -301,7 +297,6 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 				framework.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
 			}
 			initialConfig.EvictionHard = map[string]string{"nodefs.available": fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		specs := []podEvictSpec{
 			{
