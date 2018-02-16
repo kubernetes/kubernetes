@@ -20,6 +20,7 @@ go_library(
         "persistent_volumes-local.go",
         "pv_protection.go",
         "pvc_protection.go",
+        "regional_pd.go",
         "volume_expand.go",
         "volume_io.go",
         "volume_metrics.go",
@@ -29,6 +30,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/storage",
     deps = [
         "//pkg/api/testapi:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",

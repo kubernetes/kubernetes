@@ -125,6 +125,7 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 		node.Name, kubeletapis.LabelZoneFailureDomain)
 }
 
+// TODO (verult) Merge with framework.GetClusterZones()
 // Find the names of all zones in which we have nodes in this cluster.
 func getZoneNames(c clientset.Interface) ([]string, error) {
 	zoneNames := sets.NewString()
