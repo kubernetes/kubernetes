@@ -84392,6 +84392,10 @@
      "scope"
     ],
     "properties": {
+     "RemoveUnknownFields": {
+      "description": "RemoveUnknownFields indicates whether fields not specified in the Properties construct of the CustomResourceValidation schema should be removed. This field is alpha-level and should only be sent to servers that enable the CustomResourceRemoveUnknownFields feature.",
+      "type": "boolean"
+     },
      "group": {
       "description": "Group is the group this resource belongs in",
       "type": "string"

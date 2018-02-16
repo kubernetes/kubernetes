@@ -35,7 +35,7 @@ type CustomResourceDefinitionSpec struct {
 	// CustomResourceValidation schema should be removed.
 	// This field is alpha-level and should only be sent to servers that enable the CustomResourceRemoveUnknownFields feature.
 	// +optional
-	RemoveUnknownFields *bool
+	RemoveUnknownFields *bool `protobuf:"varint,6,opt,name=removeUnknownFields"`
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition

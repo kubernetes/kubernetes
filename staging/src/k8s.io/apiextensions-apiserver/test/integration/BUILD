@@ -17,6 +17,7 @@ go_test(
     importpath = "k8s.io/apiextensions-apiserver/test/integration",
     tags = ["integration"],
     deps = [
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
@@ -31,6 +32,8 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
     ],
 )

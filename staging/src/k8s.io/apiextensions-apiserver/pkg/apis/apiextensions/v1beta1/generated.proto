@@ -107,6 +107,12 @@ message CustomResourceDefinitionSpec {
   // Validation describes the validation methods for CustomResources
   // +optional
   optional CustomResourceValidation validation = 5;
+
+  // RemoveUnknownFields indicates whether fields not specified in the Properties construct of the
+  // CustomResourceValidation schema should be removed.
+  // This field is alpha-level and should only be sent to servers that enable the CustomResourceRemoveUnknownFields feature.
+  // +optional
+  optional bool removeUnknownFields = 6;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition

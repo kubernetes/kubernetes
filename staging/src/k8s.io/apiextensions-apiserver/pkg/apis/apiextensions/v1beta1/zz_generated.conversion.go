@@ -211,6 +211,7 @@ func autoConvert_v1beta1_CustomResourceDefinitionSpec_To_apiextensions_CustomRes
 	} else {
 		out.Validation = nil
 	}
+	out.RemoveUnknownFields = (*bool)(unsafe.Pointer(in.RemoveUnknownFields))
 	return nil
 }
 
@@ -235,6 +236,7 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomRes
 	} else {
 		out.Validation = nil
 	}
+	out.RemoveUnknownFields = (*bool)(unsafe.Pointer(in.RemoveUnknownFields))
 	return nil
 }
 
