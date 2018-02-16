@@ -1142,7 +1142,7 @@ func (j *IngressTestJig) RunCreate(ing *extensions.Ingress) (*extensions.Ingress
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := RunKubemciCmd("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := runKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return ing, err
 }
 
@@ -1157,7 +1157,7 @@ func (j *IngressTestJig) RunUpdate(ing *extensions.Ingress) (*extensions.Ingress
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := RunKubemciCmd("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
+	_, err := runKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
 	return ing, err
 }
 
@@ -1245,14 +1245,14 @@ func (j *IngressTestJig) RunDelete(ing *extensions.Ingress, class string) error 
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return err
 	}
-	_, err := RunKubemciCmd("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := runKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return err
 }
 
 // getIngressAddressFromKubemci returns the IP address of the given multicluster ingress using kubemci.
 // TODO(nikhiljindal): Update this to be able to return hostname as well.
 func getIngressAddressFromKubemci(name string) ([]string, error) {
-	out, err := RunKubemciCmd("get-status", name)
+	out, err := runKubemciCmd("get-status", name)
 	if err != nil {
 		return []string{}, err
 	}
