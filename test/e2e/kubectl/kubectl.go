@@ -1222,6 +1222,7 @@ metadata:
 				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, nginxImage)
 			}
 			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
+			framework.ValidateController(c, nginxImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 
 			By("rolling-update to same image controller")
 
