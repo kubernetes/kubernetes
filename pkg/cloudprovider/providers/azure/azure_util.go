@@ -228,7 +228,7 @@ func (az *Cloud) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailab
 
 func (az *Cloud) mapLoadBalancerNameToAvailabilitySet(lbName string, clusterName string) (availabilitySetName string) {
 	availabilitySetName = strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix)
-	if strings.EqualFold(clusterName, lbName) {
+	if strings.EqualFold(clusterName, availabilitySetName) {
 		availabilitySetName = az.Config.PrimaryAvailabilitySetName
 	}
 
