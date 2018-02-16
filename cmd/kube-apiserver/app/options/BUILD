@@ -35,7 +35,6 @@ go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/options",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",

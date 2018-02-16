@@ -14,7 +14,6 @@ go_test(
         "sio_volume_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/scaleio",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

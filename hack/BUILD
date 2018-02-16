@@ -58,7 +58,6 @@ test_suite(
 go_binary(
     name = "hack",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/hack",
 )
 
 go_test(
@@ -66,7 +65,6 @@ go_test(
     srcs = ["e2e_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/hack",
 )
 
 go_library(

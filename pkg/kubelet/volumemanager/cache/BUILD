@@ -31,7 +31,6 @@ go_test(
         "desired_state_of_world_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/cache",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",

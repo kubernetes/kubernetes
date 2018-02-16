@@ -61,7 +61,6 @@ go_test(
         "marshal_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

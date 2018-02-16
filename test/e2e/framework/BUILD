@@ -179,5 +179,4 @@ go_test(
     name = "go_default_test",
     srcs = ["firewall_util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e/framework",
 )

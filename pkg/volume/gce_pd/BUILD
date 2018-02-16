@@ -41,7 +41,6 @@ go_test(
         "gce_pd_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/gce_pd",
     deps = [
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",

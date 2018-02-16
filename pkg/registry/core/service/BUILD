@@ -52,7 +52,6 @@ go_test(
         "strategy_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/core/service",
     deps = [
         "//pkg/api/service:go_default_library",
         "//pkg/apis/core:go_default_library",

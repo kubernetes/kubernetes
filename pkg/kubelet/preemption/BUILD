@@ -45,7 +45,6 @@ go_test(
     name = "go_default_test",
     srcs = ["preemption_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/preemption",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/types:go_default_library",

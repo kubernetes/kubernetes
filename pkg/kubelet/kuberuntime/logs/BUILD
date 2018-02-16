@@ -20,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["logs_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime/logs",
     deps = [
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

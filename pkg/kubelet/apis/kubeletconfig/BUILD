@@ -46,7 +46,6 @@ go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",

@@ -47,7 +47,6 @@ go_test(
         "services_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/quota/evaluator/core",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/quota:go_default_library",

@@ -12,7 +12,6 @@ go_test(
         "daemonset_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/daemonset",
     tags = ["integration"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",

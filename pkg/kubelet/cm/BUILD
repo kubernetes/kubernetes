@@ -192,7 +192,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cm",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/eviction/api:go_default_library",

@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "defaulter-gen",
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/defaulter-gen",
 )
 
 go_library(

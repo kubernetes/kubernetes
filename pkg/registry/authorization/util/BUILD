@@ -34,7 +34,6 @@ go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/authorization/util",
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",

@@ -12,7 +12,6 @@ go_test(
         "apiserver_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/examples",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",

@@ -13,7 +13,6 @@ go_test(
         "rest_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

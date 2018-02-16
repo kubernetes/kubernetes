@@ -12,7 +12,6 @@ go_test(
         "main_test.go",
         "openshift_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/openshift",
     tags = ["integration"],
     deps = [
         "//pkg/master:go_default_library",

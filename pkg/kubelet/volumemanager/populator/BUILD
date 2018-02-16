@@ -48,7 +48,6 @@ go_test(
     name = "go_default_test",
     srcs = ["desired_state_of_world_populator_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/populator",
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",

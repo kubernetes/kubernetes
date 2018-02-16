@@ -28,7 +28,6 @@ go_test(
     name = "go_default_test",
     srcs = ["config_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/server/options/encryptionconfig",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",

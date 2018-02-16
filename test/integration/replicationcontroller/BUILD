@@ -12,7 +12,6 @@ go_test(
         "main_test.go",
         "replicationcontroller_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/replicationcontroller",
     tags = ["integration"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",

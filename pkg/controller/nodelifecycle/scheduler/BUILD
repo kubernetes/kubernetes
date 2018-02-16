@@ -36,7 +36,6 @@ go_test(
         "timed_workers_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler",
     deps = [
         "//pkg/controller/testutil:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

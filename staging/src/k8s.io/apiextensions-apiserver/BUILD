@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "apiextensions-apiserver",
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiextensions-apiserver",
 )
 
 go_library(

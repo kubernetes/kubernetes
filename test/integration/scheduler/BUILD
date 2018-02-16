@@ -21,7 +21,6 @@ go_test(
         "volume_binding_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/integration/scheduler",
     tags = ["integration"],
     deps = [
         "//cmd/kube-scheduler/app:go_default_library",

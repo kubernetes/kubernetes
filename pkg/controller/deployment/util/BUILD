@@ -46,7 +46,6 @@ go_test(
         "hash_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/deployment/util",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/hash:go_default_library",

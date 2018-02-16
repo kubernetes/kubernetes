@@ -20,7 +20,6 @@ go_library(
 go_binary(
     name = "localrun",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e/network/scale/localrun",
     visibility = ["//visibility:public"],
 )
 

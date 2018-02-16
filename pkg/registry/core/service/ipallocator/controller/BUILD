@@ -31,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = ["repair_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",

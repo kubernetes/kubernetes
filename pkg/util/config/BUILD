@@ -20,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["config_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/config",
 )
 
 filegroup(

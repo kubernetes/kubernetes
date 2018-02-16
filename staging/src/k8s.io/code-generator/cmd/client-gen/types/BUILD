@@ -20,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/client-gen/types",
 )
 
 filegroup(

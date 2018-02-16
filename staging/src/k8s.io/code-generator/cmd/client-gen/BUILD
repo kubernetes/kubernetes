@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "client-gen",
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/client-gen",
 )
 
 go_library(

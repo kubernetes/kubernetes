@@ -33,7 +33,6 @@ go_test(
         "utils_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud",
     deps = [
         "//pkg/cloudprovider/providers/gce/cloud/filter:go_default_library",
         "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",

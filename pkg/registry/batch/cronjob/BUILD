@@ -30,7 +30,6 @@ go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/batch/cronjob",
     deps = [
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",

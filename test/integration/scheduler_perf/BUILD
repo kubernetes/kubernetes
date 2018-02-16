@@ -39,7 +39,6 @@ go_test(
         "scheduler_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     tags = ["integration"],
     deps = [
         "//pkg/kubelet/apis:go_default_library",

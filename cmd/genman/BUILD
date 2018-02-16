@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "genman",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genman",
 )
 
 go_library(

@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["httplog_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/server/httplog",
 )
 
 go_library(

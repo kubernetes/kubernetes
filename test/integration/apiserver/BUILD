@@ -13,7 +13,6 @@ go_test(
         "main_test.go",
         "patch_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/apiserver",
     tags = [
         "etcd",
         "integration",

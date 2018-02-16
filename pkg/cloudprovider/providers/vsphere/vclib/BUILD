@@ -66,7 +66,6 @@ go_test(
         "virtualmachine_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib",
     deps = [
         "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",

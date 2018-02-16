@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/apis/core/v1/helper",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

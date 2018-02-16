@@ -76,7 +76,6 @@ go_test(
         "tags_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
     deps = [
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

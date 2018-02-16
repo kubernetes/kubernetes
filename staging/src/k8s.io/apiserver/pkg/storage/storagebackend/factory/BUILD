@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["tls_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/storage/storagebackend/factory",
     deps = [
         "//vendor/github.com/coreos/etcd/integration:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",

@@ -82,7 +82,6 @@ go_test(
         "security_context_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",

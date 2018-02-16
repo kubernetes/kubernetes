@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["portforward_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/client-go/tools/portforward",
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library"],
 )
 

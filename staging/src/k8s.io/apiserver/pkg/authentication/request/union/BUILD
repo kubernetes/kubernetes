@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["unionauth_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/authentication/request/union",
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 

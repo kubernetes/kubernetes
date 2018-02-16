@@ -42,7 +42,6 @@ go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app/options",
     tags = ["automanaged"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",

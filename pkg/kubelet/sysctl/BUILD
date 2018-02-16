@@ -31,7 +31,6 @@ go_test(
         "whitelist_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/sysctl",
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 

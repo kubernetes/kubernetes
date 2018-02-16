@@ -17,7 +17,6 @@ go_test(
     name = "go_default_test",
     srcs = ["chaosmonkey_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e/chaosmonkey",
     tags = ["e2e"],
 )
 

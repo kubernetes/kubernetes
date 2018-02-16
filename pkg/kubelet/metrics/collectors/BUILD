@@ -22,7 +22,6 @@ go_test(
         "volume_stats_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/metrics/collectors",
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/server/stats/testing:go_default_library",
