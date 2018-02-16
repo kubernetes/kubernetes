@@ -67,6 +67,10 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}
+	rlimit, err := sp.provider.RlimitStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
+	}
 
 	nodeStats := statsapi.NodeStats{
 		NodeName:  node.Name,
@@ -76,6 +80,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		StartTime: rootStats.StartTime,
 		Fs:        rootFsStats,
 		Runtime:   &statsapi.RuntimeStats{ImageFs: imageFsStats},
+		Rlimit:    rlimit,
 	}
 
 	systemContainers := map[string]string{

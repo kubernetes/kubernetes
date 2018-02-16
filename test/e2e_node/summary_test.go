@@ -277,6 +277,11 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"InodesUsed": bounded(0, 1E8),
 						}),
 					}),
+					"Rlimit": ptrMatchAllFields(gstruct.Fields{
+						"Time":                  recent(maxStatsAge),
+						"MaxPID":                bounded(0, 1E8),
+						"NumOfRunningProcesses": bounded(0, 1E8),
+					}),
 				}),
 				// Ignore extra pods since the tests run in parallel.
 				"Pods": gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{

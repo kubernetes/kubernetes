@@ -101,7 +101,8 @@ func NewManager(
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler) {
+	clock clock.Clock,
+) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:           clock,
 		killPodFunc:     killPodFunc,
@@ -174,6 +175,13 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	m.RLock()
 	defer m.RUnlock()
 	return hasNodeCondition(m.nodeConditions, v1.NodeDiskPressure)
+}
+
+// IsUnderPIDPressure returns true if the node is under PID pressure.
+func (m *managerImpl) IsUnderPIDPressure() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
 func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observations signalObservations, hard bool, handler thresholdNotifierHandlerFunc) error {

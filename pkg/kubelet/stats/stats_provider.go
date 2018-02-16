@@ -77,6 +77,7 @@ type StatsProvider struct {
 	podManager   kubepod.Manager
 	runtimeCache kubecontainer.RuntimeCache
 	containerStatsProvider
+	rlimitStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
@@ -85,6 +86,10 @@ type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
 	ImageFsDevice() (string, error)
+}
+
+type rlimitStatsProvider interface {
+	RlimitStats() (*statsapi.RlimitStats, error)
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
