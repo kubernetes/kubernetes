@@ -1066,7 +1066,7 @@ func (m *PodSandboxStatus) GetAnnotations() map[string]string {
 type PodSandboxStatusResponse struct {
 	// Status of the PodSandbox.
 	Status *PodSandboxStatus `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
-	// Info is extra information of the PodSandbox. The key could be abitrary string, and
+	// Info is extra information of the PodSandbox. The key could be arbitrary string, and
 	// value should be in json format. The information could include anything useful for
 	// debug, e.g. network namespace for linux container based container runtime.
 	// It should only be returned non-empty when Verbose is true.
@@ -2401,7 +2401,7 @@ func (m *ContainerStatus) GetLogPath() string {
 type ContainerStatusResponse struct {
 	// Status of the container.
 	Status *ContainerStatus `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
-	// Info is extra information of the Container. The key could be abitrary string, and
+	// Info is extra information of the Container. The key could be arbitrary string, and
 	// value should be in json format. The information could include anything useful for
 	// debug, e.g. pid for linux container based container runtime.
 	// It should only be returned non-empty when Verbose is true.
@@ -2870,7 +2870,7 @@ func (m *ImageStatusRequest) GetVerbose() bool {
 type ImageStatusResponse struct {
 	// Status of the image.
 	Image *Image `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
-	// Info is extra information of the Image. The key could be abitrary string, and
+	// Info is extra information of the Image. The key could be arbitrary string, and
 	// value should be in json format. The information could include anything useful
 	// for debug, e.g. image config for oci image based container runtime.
 	// It should only be returned non-empty when Verbose is true.
@@ -3173,7 +3173,7 @@ func (m *StatusRequest) GetVerbose() bool {
 type StatusResponse struct {
 	// Status of the Runtime.
 	Status *RuntimeStatus `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
-	// Info is extra information of the Runtime. The key could be abitrary string, and
+	// Info is extra information of the Runtime. The key could be arbitrary string, and
 	// value should be in json format. The information could include anything useful for
 	// debug, e.g. plugins used by the container runtime.
 	// It should only be returned non-empty when Verbose is true.
