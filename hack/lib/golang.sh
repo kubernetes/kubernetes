@@ -186,15 +186,11 @@ readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 # Setting to 40 to provide some headroom
 readonly KUBE_PARALLEL_BUILD_MEMORY=40
 
-# TODO(pipejakob) gke-certificates-controller is included here to exercise its
-# compilation, but it doesn't need to be distributed in any of our tars. Its
-# code is only living in this repo temporarily until it finds a new home.
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
   "${KUBE_CLIENT_TARGETS[@]}"
   "${KUBE_TEST_TARGETS[@]}"
   "${KUBE_TEST_SERVER_TARGETS[@]}"
-  cmd/gke-certificates-controller
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
