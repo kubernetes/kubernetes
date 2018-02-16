@@ -125,6 +125,20 @@ func (_m *StatsProvider) GetNodeConfig() cm.NodeConfig {
 	return r0
 }
 
+// GetPodCgroupRoot provides a mock function with given fields:
+func (_m *StatsProvider) GetPodCgroupRoot() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // GetPodByName provides a mock function with given fields: namespace, name
 func (_m *StatsProvider) GetPodByName(namespace string, name string) (*corev1.Pod, bool) {
 	ret := _m.Called(namespace, name)

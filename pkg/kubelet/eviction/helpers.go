@@ -100,9 +100,6 @@ func validSignal(signal evictionapi.Signal) bool {
 // ParseThresholdConfig parses the flags for thresholds.
 func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
-	allocatableThresholds := getAllocatableThreshold(allocatableConfig)
-	results = append(results, allocatableThresholds...)
-
 	hardThresholds, err := parseThresholdStatements(evictionHard)
 	if err != nil {
 		return nil, err
@@ -137,7 +134,29 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 			}
 		}
 	}
+	for _, key := range allocatableConfig {
+		if key == kubetypes.NodeAllocatableEnforcementKey {
+			results = addAllocatableThresholds(results)
+			break
+		}
+	}
 	return results, nil
+}
+
+func addAllocatableThresholds(thresholds []evictionapi.Threshold) []evictionapi.Threshold {
+	additionalThresholds := []evictionapi.Threshold{}
+	for _, threshold := range thresholds {
+		if threshold.Signal == evictionapi.SignalMemoryAvailable && isHardEvictionThreshold(threshold) {
+			// Copy the SignalMemoryAvailable to SignalAllocatableMemoryAvailable
+			additionalThresholds = append(additionalThresholds, evictionapi.Threshold{
+				Signal:     evictionapi.SignalAllocatableMemoryAvailable,
+				Operator:   threshold.Operator,
+				Value:      threshold.Value,
+				MinReclaim: threshold.MinReclaim,
+			})
+		}
+	}
+	return append(thresholds, additionalThresholds...)
 }
 
 // parseThresholdStatements parses the input statements into a list of Threshold objects.
@@ -202,27 +221,6 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionap
 			Quantity: &quantity,
 		},
 	}, nil
-}
-
-// getAllocatableThreshold returns the thresholds applicable for the allocatable configuration
-func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold {
-	for _, key := range allocatableConfig {
-		if key == kubetypes.NodeAllocatableEnforcementKey {
-			return []evictionapi.Threshold{
-				{
-					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
-					Operator: evictionapi.OpLessThan,
-					Value: evictionapi.ThresholdValue{
-						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
-					},
-					MinReclaim: &evictionapi.ThresholdValue{
-						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
-					},
-				},
-			}
-		}
-	}
-	return []evictionapi.Threshold{}
 }
 
 // parsePercentage parses a string representing a percentage value
@@ -724,7 +722,7 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summary *statsapi.Summary, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc) {
+func makeSignalObservations(summary *statsapi.Summary) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
@@ -735,6 +733,17 @@ func makeSignalObservations(summary *statsapi.Summary, capacityProvider Capacity
 			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
 			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
 			time:      memory.Time,
+		}
+	}
+	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
+		glog.Errorf("eviction manager: failed to construct signal: %q error: %v", evictionapi.SignalAllocatableMemoryAvailable, err)
+	} else {
+		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
+			result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+				time:      memory.Time,
+			}
 		}
 	}
 	if nodeFs := summary.Node.Fs; nodeFs != nil {
@@ -771,7 +780,6 @@ func makeSignalObservations(summary *statsapi.Summary, capacityProvider Capacity
 			}
 		}
 	}
-
 	if rlimit := summary.Node.Rlimit; rlimit != nil {
 		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
 			available := int64(*rlimit.MaxPID) - int64(*rlimit.NumOfRunningProcesses)
@@ -782,27 +790,16 @@ func makeSignalObservations(summary *statsapi.Summary, capacityProvider Capacity
 			}
 		}
 	}
-
-	if memoryAllocatableCapacity, ok := capacityProvider.GetCapacity()[v1.ResourceMemory]; ok {
-		memoryAllocatableAvailable := memoryAllocatableCapacity.Copy()
-		if reserved, exists := capacityProvider.GetNodeAllocatableReservation()[v1.ResourceMemory]; exists {
-			memoryAllocatableAvailable.Sub(reserved)
-		}
-		for _, pod := range summary.Pods {
-			mu, err := podMemoryUsage(pod)
-			if err == nil {
-				memoryAllocatableAvailable.Sub(mu[v1.ResourceMemory])
-			}
-		}
-		result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
-			available: memoryAllocatableAvailable,
-			capacity:  &memoryAllocatableCapacity,
-		}
-	} else {
-		glog.Errorf("Could not find capacity information for resource %v", v1.ResourceMemory)
-	}
-
 	return result, statsFunc
+}
+
+func getSysContainer(sysContainers []statsapi.ContainerStats, name string) (*statsapi.ContainerStats, error) {
+	for _, cont := range sysContainers {
+		if cont.Name == name {
+			return &cont, nil
+		}
+	}
+	return nil, fmt.Errorf("system container %q not found in metrics", name)
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period

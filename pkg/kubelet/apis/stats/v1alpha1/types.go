@@ -87,6 +87,8 @@ const (
 	SystemContainerRuntime = "runtime"
 	// SystemContainerMisc is the container name for the system container tracking non-kubernetes processes.
 	SystemContainerMisc = "misc"
+	// SystemContainerPods is the container name for the system container tracking user pods.
+	SystemContainerPods = "pods"
 )
 
 // PodStats holds pod-level unprocessed sample stats.

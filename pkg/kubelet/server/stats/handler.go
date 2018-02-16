@@ -81,6 +81,9 @@ type StatsProvider interface {
 
 	// RlimitStats returns the rlimit stats of system.
 	RlimitStats() (*statsapi.RlimitStats, error)
+
+	// GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods
+	GetPodCgroupRoot() string
 }
 
 type handler struct {

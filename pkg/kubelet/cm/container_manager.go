@@ -91,6 +91,9 @@ type ContainerManager interface {
 	UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
 	InternalContainerLifecycle() InternalContainerLifecycle
+
+	// GetPodCgroupRoot returns the cgroup which contains all pods.
+	GetPodCgroupRoot() string
 }
 
 type NodeConfig struct {
