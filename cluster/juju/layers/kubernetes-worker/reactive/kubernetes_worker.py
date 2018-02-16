@@ -945,15 +945,6 @@ def notify_master_gpu_not_enabled(kube_control):
 
 
 @when('kube-control.connected')
-@when('config.changed.kubelet-extra-args')
-def maybe_request_new_credentials(kube_control):
-    kubelet_extra_args = parse_extra_args('kubelet-extra-args')
-    cloud_provider = kubelet_extra_args.get('cloud-provider', '')
-    if data_changed('cloud_provider', cloud_provider):
-        request_kubelet_and_proxy_credentials(kube_control)
-
-
-@when('kube-control.connected')
 def request_kubelet_and_proxy_credentials(kube_control):
     """ Request kubelet node authorization with a well formed kubelet user.
     This also implies that we are requesting kube-proxy auth. """
