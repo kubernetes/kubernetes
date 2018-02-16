@@ -50,7 +50,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source)
+		pod := testPodWithHostVol(volumePath, source, false)
 
 		pod.Spec.Containers[0].Args = []string{
 			fmt.Sprintf("--fs_type=%v", volumePath),
@@ -68,7 +68,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source)
+		pod := testPodWithHostVol(volumePath, source, true)
 
 		pod.Spec.Containers[0].Args = []string{
 			fmt.Sprintf("--new_file_0644=%v", filePath),
@@ -97,7 +97,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source)
+		pod := testPodWithHostVol(volumePath, source, true)
 
 		// Write the file in the subPath from container 0
 		container := &pod.Spec.Containers[0]
@@ -131,7 +131,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source)
+		pod := testPodWithHostVol(volumePath, source, true)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		pod.Spec.NodeName = nodeList.Items[0].Name
 
@@ -175,7 +175,7 @@ var _ = Describe("[sig-storage] HostPath", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}
-		pod := testPodWithHostVol(volumePath, source)
+		pod := testPodWithHostVol(volumePath, source, true)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		pod.Spec.NodeName = nodeList.Items[0].Name
 
@@ -221,9 +221,8 @@ func mount(source *v1.HostPathVolumeSource) []v1.Volume {
 }
 
 //TODO: To merge this with the emptyDir tests, we can make source a lambda.
-func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
+func testPodWithHostVol(path string, source *v1.HostPathVolumeSource, privileged bool) *v1.Pod {
 	podName := "pod-host-path-test"
-	privileged := true
 
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
