@@ -403,6 +403,13 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
 
+	case *api.Service:
+		namespace = t.Namespace
+		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
+			return nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
+		}
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+
 	case *api.Pod:
 		return t, nil
 
