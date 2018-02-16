@@ -187,10 +187,10 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 		},
 	}
 
-	spaceFreed, err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages()
 	assert := assert.New(t)
+	assert.Len(fakeRuntime.ImageList, 1)
 	require.NoError(t, err)
-	assert.EqualValues(0, spaceFreed)
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
@@ -291,10 +291,9 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 		}},
 	}
 
-	spaceFreed, err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages()
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.EqualValues(3072, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 

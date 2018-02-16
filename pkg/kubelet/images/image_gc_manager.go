@@ -56,8 +56,8 @@ type ImageGCManager interface {
 
 	GetImageList() ([]container.Image, error)
 
-	// Delete all unused images and returns the number of bytes freed. The number of bytes freed is always returned.
-	DeleteUnusedImages() (int64, error)
+	// Delete all unused images.
+	DeleteUnusedImages() error
 }
 
 // A policy for garbage collecting images. Policy defines an allowed band in
@@ -308,8 +308,10 @@ func (im *realImageGCManager) GarbageCollect() error {
 	return nil
 }
 
-func (im *realImageGCManager) DeleteUnusedImages() (int64, error) {
-	return im.freeSpace(math.MaxInt64, time.Now())
+func (im *realImageGCManager) DeleteUnusedImages() error {
+	glog.Infof("attempting to delete unused images")
+	_, err := im.freeSpace(math.MaxInt64, time.Now())
+	return err
 }
 
 // Tries to free bytesToFree worth of images on the disk.

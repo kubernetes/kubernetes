@@ -78,15 +78,13 @@ type CapacityProvider interface {
 
 // ImageGC is responsible for performing garbage collection of unused images.
 type ImageGC interface {
-	// DeleteUnusedImages deletes unused images and returns the number of bytes freed, and an error.
-	// This returns the bytes freed even if an error is returned.
-	DeleteUnusedImages() (int64, error)
+	// DeleteUnusedImages deletes unused images.
+	DeleteUnusedImages() error
 }
 
 // ContainerGC is responsible for performing garbage collection of unused containers.
 type ContainerGC interface {
 	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
-	// It returns an error if it is unsuccessful.
 	DeleteAllUnusedContainers() error
 }
 
@@ -131,9 +129,7 @@ type thresholdsObservedAt map[evictionapi.Threshold]time.Time
 type nodeConditionsObservedAt map[v1.NodeConditionType]time.Time
 
 // nodeReclaimFunc is a function that knows how to reclaim a resource from the node without impacting pods.
-// Returns the quantity of resources reclaimed and an error, if applicable.
-// nodeReclaimFunc return the resources reclaimed even if an error occurs.
-type nodeReclaimFunc func() (*resource.Quantity, error)
+type nodeReclaimFunc func() error
 
 // nodeReclaimFuncs is an ordered list of nodeReclaimFunc
 type nodeReclaimFuncs []nodeReclaimFunc
