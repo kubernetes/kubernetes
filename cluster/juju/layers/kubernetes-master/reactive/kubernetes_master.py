@@ -485,8 +485,43 @@ def etcd_data_change(etcd):
             leader_set(auto_storage_backend='etcd2')
 
 
-@when('kube-control.connected')
-@when('cdk-addons.configured')
+@when('kube-control.connected',
+      'kubernetes-master.components.started')
+@when_not('cdk-addons.dns.initialised')
+def init_cluster_dns_detail(kube_control):
+    ''' Initialised cluster DNS info '''
+    enableKubeDNS = hookenv.config('enable-kube-dns')
+    if enableKubeDNS:
+        args = [
+            'arch=' + arch(),
+            'dns-ip=' + get_deprecated_dns_ip(),
+            'dns-domain=' + hookenv.config('dns_domain'),
+            'enable-dashboard=false',
+            'enable-kube-dns=' + str(enableKubeDNS).lower()
+        ]
+        check_call(['snap', 'set', 'cdk-addons'] + args)
+        if not addons_ready():
+            hookenv.status_set('waiting', 'Waiting to retry dns addon deployment')
+            return
+        attempts = 3
+        while attempts > 0:
+            try:
+                get_dns_ip()
+                break
+            except CalledProcessError:
+                hookenv.log("kubedns not ready yet")
+                attempts -= 1
+        if attempts == 0:
+            hookenv.status_set('waiting', 'Waiting to retry dns add-on deployment')
+            return
+
+    send_cluster_dns_detail(kube_control)
+    set_state('cdk-addons.dns.initialised')
+
+
+@when('kube-control.connected',
+      'cdk-addons.configured',
+      'cdk-addons.dns.initialised')
 def send_cluster_dns_detail(kube_control):
     ''' Send cluster DNS info '''
     enableKubeDNS = hookenv.config('enable-kube-dns')
@@ -634,7 +669,9 @@ def kick_api_server(tls):
     tls_client.reset_certificate_write_flag('server')
 
 
-@when('kubernetes-master.components.started')
+@when('kubernetes-master.components.started',
+      'cdk-addons.dns.initialised',
+      )
 def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')

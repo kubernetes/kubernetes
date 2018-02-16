@@ -346,9 +346,12 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
+    if dns['enable-kube-dns'] == None:
+        hookenv.log('Waiting for dns info.')
+        return
+
     ingress_ip = get_ingress_address(kube_control)
     cluster_cidr = cni.get_config()['cidr']
-
     if cluster_cidr is None:
         hookenv.log('Waiting for cluster cidr.')
         return
