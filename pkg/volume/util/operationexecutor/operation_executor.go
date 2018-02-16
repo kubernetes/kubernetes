@@ -844,7 +844,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	// Filesystem Volume case
 	if volumeMode == v1.PersistentVolumeFilesystem {
 		// Create volumeSpec from mount path
-		glog.V(12).Infof("Starting operationExecutor.ReconstructVolumepodName")
+		glog.V(5).Infof("Starting operationExecutor.ReconstructVolumepodName")
 		volumeSpec, err := plugin.ConstructVolumeSpec(volumeSpecName, mountPath)
 		if err != nil {
 			return nil, err
@@ -854,7 +854,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 
 	// Block Volume case
 	// Create volumeSpec from mount path
-	glog.V(12).Infof("Starting operationExecutor.ReconstructVolume")
+	glog.V(5).Infof("Starting operationExecutor.ReconstructVolume")
 	if mapperPlugin == nil {
 		return nil, fmt.Errorf("Could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)",
 			pluginName,
