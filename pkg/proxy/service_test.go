@@ -17,9 +17,7 @@ limitations under the License.
 package proxy
 
 import (
-	"fmt"
 	"net"
-	"reflect"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -27,59 +25,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 const testHostname = "test-hostname"
 
-// fake implementation for service info.
-type fakeServiceInfo struct {
-	clusterIP           net.IP
-	port                int
-	protocol            api.Protocol
-	healthCheckNodePort int
-}
-
-func (f *fakeServiceInfo) String() string {
-	return fmt.Sprintf("%s:%d/%s", f.clusterIP, f.port, f.protocol)
-}
-
-func (f *fakeServiceInfo) ClusterIP() string {
-	return f.clusterIP.String()
-}
-
-func (f *fakeServiceInfo) Protocol() api.Protocol {
-	return f.protocol
-}
-
-func (f *fakeServiceInfo) HealthCheckNodePort() int {
-	return f.healthCheckNodePort
-}
-
-func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int) *fakeServiceInfo {
-	info := &fakeServiceInfo{
-		clusterIP: net.ParseIP(clusterIP),
-		port:      port,
-		protocol:  api.Protocol(protocol),
+func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int) *ServiceInfoCommon {
+	info := &ServiceInfoCommon{
+		ClusterIP: net.ParseIP(clusterIP),
+		Port:      port,
+		Protocol:  api.Protocol(protocol),
 	}
 	if healthcheckNodePort != 0 {
-		info.healthCheckNodePort = healthcheckNodePort
-	}
-	return info
-}
-
-func newFakeServiceInfo(servicePort *api.ServicePort, service *api.Service) ServicePort {
-	info := &fakeServiceInfo{
-		clusterIP: net.ParseIP(service.Spec.ClusterIP),
-		port:      int(servicePort.Port),
-		protocol:  servicePort.Protocol,
-	}
-	if apiservice.NeedsHealthCheck(service) {
-		p := service.Spec.HealthCheckNodePort
-		if p != 0 {
-			info.healthCheckNodePort = int(p)
-		}
+		info.HealthCheckNodePort = healthcheckNodePort
 	}
 	return info
 }
@@ -120,15 +78,17 @@ func makeServicePortName(ns, name, port string) ServicePortName {
 	}
 }
 
-func Test_serviceToServiceMap(t *testing.T) {
+func TestServiceToServiceMap(t *testing.T) {
+	svcTracker := NewServiceChangeTracker(nil, nil, nil)
+
 	testCases := []struct {
 		service  *api.Service
-		expected map[ServicePortName]*fakeServiceInfo
+		expected map[ServicePortName]*ServiceInfoCommon
 	}{
 		{
 			// Case[0]: nothing
 			service:  nil,
-			expected: map[ServicePortName]*fakeServiceInfo{},
+			expected: map[ServicePortName]*ServiceInfoCommon{},
 		},
 		{
 			// Case[1]: headless service
@@ -137,7 +97,7 @@ func Test_serviceToServiceMap(t *testing.T) {
 				svc.Spec.ClusterIP = api.ClusterIPNone
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "rpc", "UDP", 1234, 0, 0)
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{},
+			expected: map[ServicePortName]*ServiceInfoCommon{},
 		},
 		{
 			// Case[2]: headless service without port
@@ -145,7 +105,7 @@ func Test_serviceToServiceMap(t *testing.T) {
 				svc.Spec.Type = api.ServiceTypeClusterIP
 				svc.Spec.ClusterIP = api.ClusterIPNone
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{},
+			expected: map[ServicePortName]*ServiceInfoCommon{},
 		},
 		{
 			// Case[3]: cluster ip service
@@ -155,7 +115,7 @@ func Test_serviceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p2", "UDP", 1235, 5321, 0)
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{
+			expected: map[ServicePortName]*ServiceInfoCommon{
 				makeServicePortName("ns2", "cluster-ip", "p1"): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0),
 				makeServicePortName("ns2", "cluster-ip", "p2"): makeTestServiceInfo("172.16.55.4", 1235, "UDP", 0),
 			},
@@ -168,7 +128,7 @@ func Test_serviceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port1", "UDP", 345, 678, 0)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port2", "TCP", 344, 677, 0)
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{
+			expected: map[ServicePortName]*ServiceInfoCommon{
 				makeServicePortName("ns2", "node-port", "port1"): makeTestServiceInfo("172.16.55.10", 345, "UDP", 0),
 				makeServicePortName("ns2", "node-port", "port2"): makeTestServiceInfo("172.16.55.10", 344, "TCP", 0),
 			},
@@ -187,7 +147,7 @@ func Test_serviceToServiceMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{
+			expected: map[ServicePortName]*ServiceInfoCommon{
 				makeServicePortName("ns1", "load-balancer", "port3"): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0),
 				makeServicePortName("ns1", "load-balancer", "port4"): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0),
 			},
@@ -208,7 +168,7 @@ func Test_serviceToServiceMap(t *testing.T) {
 				svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
 				svc.Spec.HealthCheckNodePort = 345
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{
+			expected: map[ServicePortName]*ServiceInfoCommon{
 				makeServicePortName("ns1", "only-local-load-balancer", "portx"): makeTestServiceInfo("172.16.55.12", 8677, "UDP", 345),
 				makeServicePortName("ns1", "only-local-load-balancer", "porty"): makeTestServiceInfo("172.16.55.12", 8678, "UDP", 345),
 			},
@@ -221,21 +181,24 @@ func Test_serviceToServiceMap(t *testing.T) {
 				svc.Spec.ExternalName = "foo2.bar.com"
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "portz", "UDP", 1235, 5321, 0)
 			}),
-			expected: map[ServicePortName]*fakeServiceInfo{},
+			expected: map[ServicePortName]*ServiceInfoCommon{},
 		},
 	}
 
 	for tci, tc := range testCases {
 		// outputs
-		newServices := serviceToServiceMap(tc.service, newFakeServiceInfo)
+		newServices := svcTracker.serviceToServiceMap(tc.service)
 
 		if len(newServices) != len(tc.expected) {
 			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expected), len(newServices), spew.Sdump(newServices))
 		}
 		for x := range tc.expected {
-			svc := newServices[x].(*fakeServiceInfo)
-			if !reflect.DeepEqual(svc, tc.expected[x]) {
-				t.Errorf("[%d] expected new[%v]to be %v, got %v", tci, x, tc.expected[x], *svc)
+			svcInfo := newServices[x].(*ServiceInfoCommon)
+			if !svcInfo.ClusterIP.Equal(tc.expected[x].ClusterIP) ||
+				svcInfo.Port != tc.expected[x].Port ||
+				svcInfo.Protocol != tc.expected[x].Protocol ||
+				svcInfo.HealthCheckNodePort != tc.expected[x].HealthCheckNodePort {
+				t.Errorf("[%d] expected new[%v]to be %v, got %v", tci, x, tc.expected[x], *svcInfo)
 			}
 		}
 	}
@@ -252,9 +215,9 @@ type FakeProxier struct {
 func newFakeProxier() *FakeProxier {
 	return &FakeProxier{
 		serviceMap:       make(ServiceMap),
-		serviceChanges:   NewServiceChangeTracker(),
+		serviceChanges:   NewServiceChangeTracker(nil, nil, nil),
 		endpointsMap:     make(EndpointsMap),
-		endpointsChanges: NewEndpointChangeTracker(testHostname),
+		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, nil, nil),
 	}
 }
 
@@ -265,30 +228,15 @@ func makeServiceMap(fake *FakeProxier, allServices ...*api.Service) {
 }
 
 func (fake *FakeProxier) addService(service *api.Service) {
-	fake.serviceChanges.Update(nil, service, makeServicePort)
+	fake.serviceChanges.Update(nil, service)
 }
 
 func (fake *FakeProxier) updateService(oldService *api.Service, service *api.Service) {
-	fake.serviceChanges.Update(oldService, service, makeServicePort)
+	fake.serviceChanges.Update(oldService, service)
 }
 
 func (fake *FakeProxier) deleteService(service *api.Service) {
-	fake.serviceChanges.Update(service, nil, makeServicePort)
-}
-
-func makeServicePort(port *api.ServicePort, service *api.Service) ServicePort {
-	info := &fakeServiceInfo{
-		clusterIP: net.ParseIP(service.Spec.ClusterIP),
-		port:      int(port.Port),
-		protocol:  port.Protocol,
-	}
-	if apiservice.NeedsHealthCheck(service) {
-		p := service.Spec.HealthCheckNodePort
-		if p != 0 {
-			info.healthCheckNodePort = int(p)
-		}
-	}
-	return info
+	fake.serviceChanges.Update(service, nil)
 }
 
 func TestUpdateServiceMapHeadless(t *testing.T) {

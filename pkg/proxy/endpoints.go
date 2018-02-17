@@ -17,15 +17,62 @@ limitations under the License.
 package proxy
 
 import (
+	"net"
 	"reflect"
+	"strconv"
 	"sync"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 )
+
+// EndpointInfoCommon contains common endpoint information.
+type EndpointInfoCommon struct {
+	Endpoint string // TODO: should be an endpointString type
+	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
+	IsLocal bool
+}
+
+var _ Endpoint = &EndpointInfoCommon{}
+
+// String is part of proxy.Endpoint interface.
+func (info *EndpointInfoCommon) String() string {
+	return info.Endpoint
+}
+
+// IsLocal is part of proxy.Endpoint interface.
+func (info *EndpointInfoCommon) GetIsLocal() bool {
+	return info.IsLocal
+}
+
+// IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
+func (info *EndpointInfoCommon) IP() string {
+	return utilproxy.IPPart(info.Endpoint)
+}
+
+// Port returns just the Port part of the endpoint.
+func (info *EndpointInfoCommon) Port() (int, error) {
+	return utilproxy.PortPart(info.Endpoint)
+}
+
+// Equal is part of proxy.Endpoint interface.
+func (info *EndpointInfoCommon) Equal(other Endpoint) bool {
+	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
+}
+
+func newEndpointInfoCommon(IP string, port int, isLocal bool) *EndpointInfoCommon {
+	return &EndpointInfoCommon{
+		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
+		IsLocal:  isLocal,
+	}
+}
+
+type customizeEndpointInfoFunc func(IP string, port int, isLocal bool, info *EndpointInfoCommon) Endpoint
 
 // EndpointChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
@@ -36,13 +83,21 @@ type EndpointChangeTracker struct {
 	hostname string
 	// items maps a service to is endpointsChange.
 	items map[types.NamespacedName]*endpointsChange
+	// customizeEndpointInfo allows proxier to inject customized infomation when processing endpoint.
+	customizeEndpointInfo customizeEndpointInfoFunc
+	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
+	isIPv6Mode *bool
+	recorder   record.EventRecorder
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string) *EndpointChangeTracker {
+func NewEndpointChangeTracker(hostname string, customizeEndpointInfo customizeEndpointInfoFunc, isIPv6Mode *bool, recorder record.EventRecorder) *EndpointChangeTracker {
 	return &EndpointChangeTracker{
 		hostname: hostname,
 		items:    make(map[types.NamespacedName]*endpointsChange),
+		customizeEndpointInfo: customizeEndpointInfo,
+		isIPv6Mode:            isIPv6Mode,
+		recorder:              recorder,
 	}
 }
 
@@ -54,7 +109,7 @@ func NewEndpointChangeTracker(hostname string) *EndpointChangeTracker {
 //   - pass <oldEndpoints, endpoints> as the <previous, current> pair.
 // Delete item
 //   - pass <endpoints, nil> as the <previous, current> pair.
-func (ect *EndpointChangeTracker) Update(previous, current *api.Endpoints, makeEndpoints func(IP string, port int, isLocal bool) Endpoint) bool {
+func (ect *EndpointChangeTracker) Update(previous, current *api.Endpoints) bool {
 	endpoints := current
 	if endpoints == nil {
 		endpoints = previous
@@ -71,10 +126,10 @@ func (ect *EndpointChangeTracker) Update(previous, current *api.Endpoints, makeE
 	change, exists := ect.items[namespacedName]
 	if !exists {
 		change = &endpointsChange{}
-		change.previous = endpointsToEndpointsMap(previous, ect.hostname, makeEndpoints)
+		change.previous = ect.endpointsToEndpointsMap(previous)
 		ect.items[namespacedName] = change
 	}
-	change.current = endpointsToEndpointsMap(current, ect.hostname, makeEndpoints)
+	change.current = ect.endpointsToEndpointsMap(current)
 	// if change.previous equal to change.current, it means no change
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(ect.items, namespacedName)
@@ -118,14 +173,14 @@ func UpdateEndpointsMap(endpointsMap EndpointsMap, changes *EndpointChangeTracke
 	return result
 }
 
-// EndpointsMap maps a service to one of its endpoint.
+// EndpointsMap maps a service to one of its Endpoint.
 type EndpointsMap map[ServicePortName][]Endpoint
 
 // endpointsToEndpointsMap translates single Endpoints object to EndpointsMap.
 // This function is used for incremental updated of endpointsMap.
 //
 // NOTE: endpoints object should NOT be modified.
-func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string, makeEndpoints func(IP string, port int, isLocal bool) Endpoint) EndpointsMap {
+func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoints) EndpointsMap {
 	if endpoints == nil {
 		return nil
 	}
@@ -151,9 +206,13 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string, makeEndp
 					glog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
-				isLocal := addr.NodeName != nil && *addr.NodeName == hostname
-				epInfo := makeEndpoints(addr.IP, int(port.Port), isLocal)
-				endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfo)
+				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
+				epInfoCommon := newEndpointInfoCommon(addr.IP, int(port.Port), isLocal)
+				if ect.customizeEndpointInfo != nil {
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.customizeEndpointInfo(addr.IP, int(port.Port), isLocal, epInfoCommon))
+				} else {
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfoCommon)
+				}
 			}
 			if glog.V(3) {
 				newEPList := []string{}
@@ -203,7 +262,7 @@ func GetLocalEndpointIPs(endpointsMap EndpointsMap) map[types.NamespacedName]set
 	localIPs := make(map[types.NamespacedName]sets.String)
 	for svcPortName, epList := range endpointsMap {
 		for _, ep := range epList {
-			if ep.IsLocal() {
+			if ep.GetIsLocal() {
 				nsn := svcPortName.NamespacedName
 				if localIPs[nsn] == nil {
 					localIPs[nsn] = sets.NewString()
