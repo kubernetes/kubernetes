@@ -30,3 +30,32 @@ func IsIPv6String(ip string) bool {
 	netIP := net.ParseIP(ip)
 	return IsIPv6(netIP)
 }
+
+// IsIPv6CIDR returns if cidr is IPv6.
+// This assumes cidr is a valid CIDR.
+func IsIPv6CIDR(cidr string) bool {
+	ip, _, _ := net.ParseCIDR(cidr)
+	return IsIPv6(ip)
+}
+
+// FilterIncorrectIPVersion filters out the incorrect IP version case from a slice of IP strings.
+func FilterIncorrectIPVersion(ipStrings []string, isIPv6Mode bool) ([]string, []string) {
+	return filterWithCondition(ipStrings, isIPv6Mode, IsIPv6String)
+}
+
+// FilterIncorrectCIDRVersion filters out the incorrect IP version case from a slice of CIDR strings.
+func FilterIncorrectCIDRVersion(ipStrings []string, isIPv6Mode bool) ([]string, []string) {
+	return filterWithCondition(ipStrings, isIPv6Mode, IsIPv6CIDR)
+}
+
+func filterWithCondition(strs []string, expectedCondition bool, conditionFunc func(string) bool) ([]string, []string) {
+	var corrects, incorrects []string
+	for _, str := range strs {
+		if conditionFunc(str) != expectedCondition {
+			incorrects = append(incorrects, str)
+		} else {
+			corrects = append(corrects, str)
+		}
+	}
+	return corrects, incorrects
+}

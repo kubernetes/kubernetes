@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"net"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -128,4 +130,19 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 		}
 	}
 	return uniqueAddressList, nil
+}
+
+// LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
+func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
+	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
+	glog.Errorf("%s (service %s/%s).", errMsg, svcNamespace, svcName)
+	if recorder != nil {
+		recorder.Eventf(
+			&v1.ObjectReference{
+				Kind:      "Service",
+				Name:      svcName,
+				Namespace: svcNamespace,
+				UID:       svcUID,
+			}, v1.EventTypeWarning, "KubeProxyIncorrectIPVersion", errMsg)
+	}
 }

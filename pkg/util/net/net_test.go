@@ -18,6 +18,7 @@ package net
 
 import (
 	"net"
+	"reflect"
 	"testing"
 )
 
@@ -113,6 +114,173 @@ func TestIsIPv6(t *testing.T) {
 		isIPv6 := IsIPv6(testCases[i].ip)
 		if isIPv6 != testCases[i].expectIPv6 {
 			t.Errorf("[%d] Expect ipv6 %v, got %v", i+1, testCases[i].expectIPv6, isIPv6)
+		}
+	}
+}
+
+func TestIsIPv6CIDR(t *testing.T) {
+	testCases := []struct {
+		desc         string
+		cidr         string
+		expectResult bool
+	}{
+		{
+			desc:         "ipv4 CIDR 1",
+			cidr:         "10.0.0.0/8",
+			expectResult: false,
+		},
+		{
+			desc:         "ipv4 CIDR 2",
+			cidr:         "192.168.0.0/16",
+			expectResult: false,
+		},
+		{
+			desc:         "ipv6 CIDR 1",
+			cidr:         "::/1",
+			expectResult: true,
+		},
+		{
+			desc:         "ipv6 CIDR 2",
+			cidr:         "2000::/10",
+			expectResult: true,
+		},
+		{
+			desc:         "ipv6 CIDR 3",
+			cidr:         "2001:db8::/32",
+			expectResult: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		res := IsIPv6CIDR(tc.cidr)
+		if res != tc.expectResult {
+			t.Errorf("%v: want IsIPv6CIDR=%v, got %v", tc.desc, tc.expectResult, res)
+		}
+	}
+}
+
+func TestFilterIncorrectIPVersion(t *testing.T) {
+	testCases := []struct {
+		desc             string
+		isIPv6           bool
+		ipStrings        []string
+		expectCorrects   []string
+		expectIncorrects []string
+	}{
+		{
+			desc:             "all ipv4 strings in ipv4 mode",
+			isIPv6:           false,
+			ipStrings:        []string{"10.0.0.1", "192.168.0.1", "127.0.0.1"},
+			expectCorrects:   []string{"10.0.0.1", "192.168.0.1", "127.0.0.1"},
+			expectIncorrects: nil,
+		},
+		{
+			desc:             "all ipv6 strings in ipv4 mode",
+			isIPv6:           false,
+			ipStrings:        []string{"::1", "fd00::600d:f00d", "2001:db8::5"},
+			expectCorrects:   nil,
+			expectIncorrects: []string{"::1", "fd00::600d:f00d", "2001:db8::5"},
+		},
+		{
+			desc:             "mixed versions in ipv4 mode",
+			isIPv6:           false,
+			ipStrings:        []string{"10.0.0.1", "192.168.0.1", "127.0.0.1", "::1", "fd00::600d:f00d", "2001:db8::5"},
+			expectCorrects:   []string{"10.0.0.1", "192.168.0.1", "127.0.0.1"},
+			expectIncorrects: []string{"::1", "fd00::600d:f00d", "2001:db8::5"},
+		},
+		{
+			desc:             "all ipv4 strings in ipv6 mode",
+			isIPv6:           true,
+			ipStrings:        []string{"10.0.0.1", "192.168.0.1", "127.0.0.1"},
+			expectCorrects:   nil,
+			expectIncorrects: []string{"10.0.0.1", "192.168.0.1", "127.0.0.1"},
+		},
+		{
+			desc:             "all ipv6 strings in ipv6 mode",
+			isIPv6:           true,
+			ipStrings:        []string{"::1", "fd00::600d:f00d", "2001:db8::5"},
+			expectCorrects:   []string{"::1", "fd00::600d:f00d", "2001:db8::5"},
+			expectIncorrects: nil,
+		},
+		{
+			desc:             "mixed versions in ipv6 mode",
+			isIPv6:           true,
+			ipStrings:        []string{"10.0.0.1", "192.168.0.1", "127.0.0.1", "::1", "fd00::600d:f00d", "2001:db8::5"},
+			expectCorrects:   []string{"::1", "fd00::600d:f00d", "2001:db8::5"},
+			expectIncorrects: []string{"10.0.0.1", "192.168.0.1", "127.0.0.1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		corrects, incorrects := FilterIncorrectIPVersion(tc.ipStrings, tc.isIPv6)
+		if !reflect.DeepEqual(tc.expectCorrects, corrects) {
+			t.Errorf("%v: want corrects=%v, got %v", tc.desc, tc.expectCorrects, corrects)
+		}
+		if !reflect.DeepEqual(tc.expectIncorrects, incorrects) {
+			t.Errorf("%v: want incorrects=%v, got %v", tc.desc, tc.expectIncorrects, incorrects)
+		}
+	}
+}
+
+func TestFilterIncorrectCIDRVersion(t *testing.T) {
+	testCases := []struct {
+		desc             string
+		isIPv6           bool
+		cidrStrings      []string
+		expectCorrects   []string
+		expectIncorrects []string
+	}{
+		{
+			desc:             "all ipv4 strings in ipv4 mode",
+			isIPv6:           false,
+			cidrStrings:      []string{"0.0.0.0/1", "1.0.0.0/1"},
+			expectCorrects:   []string{"0.0.0.0/1", "1.0.0.0/1"},
+			expectIncorrects: nil,
+		},
+		{
+			desc:             "all ipv6 strings in ipv4 mode",
+			isIPv6:           false,
+			cidrStrings:      []string{"2001:db8::/32", "2001:0db8:0123:4567::/64"},
+			expectCorrects:   nil,
+			expectIncorrects: []string{"2001:db8::/32", "2001:0db8:0123:4567::/64"},
+		},
+		{
+			desc:             "mixed versions in ipv4 mode",
+			isIPv6:           false,
+			cidrStrings:      []string{"0.0.0.0/1", "1.0.0.0/1", "2001:db8::/32", "2001:0db8:0123:4567::/64"},
+			expectCorrects:   []string{"0.0.0.0/1", "1.0.0.0/1"},
+			expectIncorrects: []string{"2001:db8::/32", "2001:0db8:0123:4567::/64"},
+		},
+		{
+			desc:             "all ipv4 strings in ipv6 mode",
+			isIPv6:           true,
+			cidrStrings:      []string{"0.0.0.0/1", "1.0.0.0/1"},
+			expectCorrects:   nil,
+			expectIncorrects: []string{"0.0.0.0/1", "1.0.0.0/1"},
+		},
+		{
+			desc:             "all ipv6 strings in ipv6 mode",
+			isIPv6:           true,
+			cidrStrings:      []string{"2001:db8::/32", "2001:0db8:0123:4567::/64"},
+			expectCorrects:   []string{"2001:db8::/32", "2001:0db8:0123:4567::/64"},
+			expectIncorrects: nil,
+		},
+		{
+			desc:             "mixed versions in ipv6 mode",
+			isIPv6:           true,
+			cidrStrings:      []string{"0.0.0.0/1", "1.0.0.0/1", "2001:db8::/32", "2001:0db8:0123:4567::/64"},
+			expectCorrects:   []string{"2001:db8::/32", "2001:0db8:0123:4567::/64"},
+			expectIncorrects: []string{"0.0.0.0/1", "1.0.0.0/1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		corrects, incorrects := FilterIncorrectCIDRVersion(tc.cidrStrings, tc.isIPv6)
+		if !reflect.DeepEqual(tc.expectCorrects, corrects) {
+			t.Errorf("%v: want corrects=%v, got %v", tc.desc, tc.expectCorrects, corrects)
+		}
+		if !reflect.DeepEqual(tc.expectIncorrects, incorrects) {
+			t.Errorf("%v: want incorrects=%v, got %v", tc.desc, tc.expectIncorrects, incorrects)
 		}
 	}
 }
