@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	csiExternalAttacherImage    string = "docker.io/k8scsi/csi-attacher:0.1"
-	csiExternalProvisionerImage string = "docker.io/k8scsi/csi-provisioner:0.1"
-	csiDriverRegistrarImage     string = "docker.io/k8scsi/driver-registrar"
+	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
+	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.0"
+	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
 )
 
 func externalAttacherServiceAccount(

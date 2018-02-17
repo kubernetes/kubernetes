@@ -122,11 +122,11 @@ func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.
 	// also the minor number. If our supported version is >= 1.X.X
 	// then check only the major number.
 	for _, v := range vers {
-		if ver.GetMajor() == uint32(0) &&
+		if ver.GetMajor() == int32(0) &&
 			(ver.GetMajor() == v.GetMajor() && ver.GetMinor() == v.GetMinor()) {
 			supported = true
 			break
-		} else if ver.GetMajor() != uint32(0) && ver.GetMajor() == v.GetMajor() {
+		} else if ver.GetMajor() != int32(0) && ver.GetMajor() == v.GetMajor() {
 			supported = true
 			break
 		}
@@ -176,12 +176,12 @@ func (c *csiDriverClient) NodePublishVolume(
 	}
 
 	req := &csipb.NodePublishVolumeRequest{
-		Version:           csiVersion,
-		VolumeId:          volID,
-		TargetPath:        targetPath,
-		Readonly:          readOnly,
-		PublishVolumeInfo: volumeInfo,
-		VolumeAttributes:  volumeAttribs,
+		Version:          csiVersion,
+		VolumeId:         volID,
+		TargetPath:       targetPath,
+		Readonly:         readOnly,
+		PublishInfo:      volumeInfo,
+		VolumeAttributes: volumeAttribs,
 
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
