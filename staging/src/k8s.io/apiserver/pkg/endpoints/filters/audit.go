@@ -241,7 +241,7 @@ func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, er
 
 	// This will be ignored if WriteHeader() function has already been called.
 	// It's not guaranteed Audit-ID http header is sent for all requests.
-	// For example, when user run "kubectl exec", apiserver uses a proxy handler
+	// For example, when a user runs "kubectl exec", apiserver uses a proxy handler
 	// to deal with the request, users can only get http headers returned by kubelet node.
 	f.setHttpHeader()
 
