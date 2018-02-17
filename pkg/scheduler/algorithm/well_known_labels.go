@@ -56,6 +56,11 @@ const (
 	// and removed when network becomes ready.
 	TaintNodeNetworkUnavailable = "node.kubernetes.io/network-unavailable"
 
+	// TaintNodePIDPressure will be added when node has pid pressure
+	// and feature-gate for TaintNodesByCondition flag is enabled,
+	// and removed when node has enough disk.
+	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
+
 	// TaintExternalCloudProvider sets this taint on a node to mark it as unusable,
 	// when kubelet is started with the "external" cloud provider, until a controller
 	// from the cloud-controller-manager intitializes this node, and then removes
