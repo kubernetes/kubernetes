@@ -1128,12 +1128,12 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		j.Ingress.Annotations[k] = v
 	}
 	j.Logger.Infof(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
-	j.Ingress, err = j.RunCreate(j.Ingress)
+	j.Ingress, err = j.runCreate(j.Ingress)
 	ExpectNoError(err)
 }
 
-// RunCreate runs the required command to create the given ingress.
-func (j *IngressTestJig) RunCreate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+// runCreate runs the required command to create the given ingress.
+func (j *IngressTestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
 		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(ing)
 	}
@@ -1146,8 +1146,8 @@ func (j *IngressTestJig) RunCreate(ing *extensions.Ingress) (*extensions.Ingress
 	return ing, err
 }
 
-// RunUpdate runs the required command to update the given ingress.
-func (j *IngressTestJig) RunUpdate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+// runUpdate runs the required command to update the given ingress.
+func (j *IngressTestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
 		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Update(ing)
 	}
@@ -1171,7 +1171,7 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 			Failf("failed to get ingress %q: %v", name, err)
 		}
 		update(j.Ingress)
-		j.Ingress, err = j.RunUpdate(j.Ingress)
+		j.Ingress, err = j.runUpdate(j.Ingress)
 		if err == nil {
 			DescribeIng(j.Ingress.Namespace)
 			return
@@ -1223,7 +1223,7 @@ func (j *IngressTestJig) TryDeleteIngress() {
 }
 
 func (j *IngressTestJig) TryDeleteGivenIngress(ing *extensions.Ingress) {
-	if err := j.RunDelete(ing, j.Class); err != nil {
+	if err := j.runDelete(ing, j.Class); err != nil {
 		j.Logger.Infof("Error while deleting the ingress %v/%v with class %s: %v", ing.Namespace, ing.Name, j.Class, err)
 	}
 }
@@ -1235,8 +1235,8 @@ func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
 	}
 }
 
-// RunDelete runs the required command to delete the given ingress.
-func (j *IngressTestJig) RunDelete(ing *extensions.Ingress, class string) error {
+// runDelete runs the required command to delete the given ingress.
+func (j *IngressTestJig) runDelete(ing *extensions.Ingress, class string) error {
 	if j.Class != MulticlusterIngressClassValue {
 		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
 	}

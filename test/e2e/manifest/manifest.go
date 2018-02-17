@@ -92,7 +92,7 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 }
 
 // IngressToManifest generates a yaml file in the given path with the given ingress.
-// Returns the file name and error, if there was any.
+// Assumes that a directory exists at the given path.
 func IngressToManifest(ing *extensions.Ingress, path string) error {
 	serialized, err := util.MarshalToYaml(ing, extensions.SchemeGroupVersion)
 	if err != nil {
