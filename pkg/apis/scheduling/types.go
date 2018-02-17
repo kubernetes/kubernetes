@@ -44,8 +44,11 @@ type PriorityClass struct {
 	// receive when they have the name of this class in their pod spec.
 	Value int32
 
-	// GlobalDefault specifies whether this PriorityClass should be considered as
+	// globalDefault specifies whether this PriorityClass should be considered as
 	// the default priority for pods that do not have any priority class.
+	// Only one PriorityClass with can be marked as `globalDefault`. Due to race conditions, more than
+	// one PriorityClasses might be created with their `globalDefault` field set to true. In that case,
+	// the smallest value of such global default PriorityClasses will be used as the default priority.
 	// +optional
 	GlobalDefault bool
 
