@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -293,6 +294,13 @@ func NewConfigFactory(
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
 		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer)
+
+		storageClassInformer.Informer().AddEventHandler(
+			cache.ResourceEventHandlerFuncs{
+				AddFunc:    c.onStorageClassAdd,
+				DeleteFunc: c.onStorageClassDelete,
+			},
+		)
 	}
 
 	return c
@@ -519,11 +527,11 @@ func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim
 	// The bound volume type may change
 	invalidPredicates := sets.NewString(maxPDVolumeCountPredicateKeys...)
 
-	// The bound volume's label may change
+	// On delete, predicate should fail
 	invalidPredicates.Insert("NoVolumeZoneConflict")
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Add/delete impacts the available PVs to choose from
+		// On delete, predicate should fail
 		invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 	}
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
@@ -539,6 +547,54 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 		}
 		// The bound volume type may change
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
+	}
+
+	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+}
+
+func (c *configFactory) onStorageClassAdd(obj interface{}) {
+	sc, ok := obj.(*storagev1.StorageClass)
+	if !ok {
+		glog.Errorf("cannot convert to *storagev1.StorageClass: %v", obj)
+		return
+	}
+
+	// Creating a StorageClass with late binding can cause previously errored volume predicates to pass
+	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+		c.podQueue.MoveAllToActiveQueue()
+	}
+}
+
+func (c *configFactory) onStorageClassDelete(obj interface{}) {
+	if c.enableEquivalenceClassCache {
+		var sc *storagev1.StorageClass
+		switch t := obj.(type) {
+		case *storagev1.StorageClass:
+			sc = t
+		case cache.DeletedFinalStateUnknown:
+			var ok bool
+			sc, ok = t.Obj.(*storagev1.StorageClass)
+			if !ok {
+				glog.Errorf("cannot convert to *storagev1.StorageClass: %v", t.Obj)
+				return
+			}
+		default:
+			glog.Errorf("cannot convert to *storagev1.StorageClass: %v", t)
+			return
+		}
+		c.invalidatePredicatesForStorageClass(sc)
+	}
+}
+
+func (c *configFactory) invalidatePredicatesForStorageClass(sc *storagev1.StorageClass) {
+	invalidPredicates := sets.NewString()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+			// Delete can cause predicates to fail
+			invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
+			invalidPredicates.Insert("NoVolumeZoneConflict")
+		}
 	}
 
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
