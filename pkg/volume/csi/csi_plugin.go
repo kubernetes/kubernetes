@@ -46,7 +46,7 @@ const (
 
 var (
 	// csiVersion supported csi version
-	csiVersion = &csipb.Version{Major: 0, Minor: 1, Patch: 0}
+	csiVersion = &csipb.Version{Major: 0, Minor: 2, Patch: 0}
 )
 
 type csiPlugin struct {

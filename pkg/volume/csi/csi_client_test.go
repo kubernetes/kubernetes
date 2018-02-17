@@ -49,6 +49,7 @@ func TestClientAssertSupportedVersion(t *testing.T) {
 		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 0, Patch: 0}},
 		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 1, Patch: 0}},
 		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 1, Patch: 10}},
+		{testName: "supported version", ver: &csipb.Version{Major: 0, Minor: 2, Patch: 0}},
 		{testName: "supported version", ver: &csipb.Version{Major: 1, Minor: 1, Patch: 0}},
 		{testName: "supported version", ver: &csipb.Version{Major: 1, Minor: 0, Patch: 10}},
 		{testName: "unsupported version", ver: &csipb.Version{Major: 10, Minor: 0, Patch: 0}, mustFail: true},
