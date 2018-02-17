@@ -103,11 +103,6 @@ func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
 	return (metadataName == nodeName), err
 }
 
-// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
-func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
-}
-
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {

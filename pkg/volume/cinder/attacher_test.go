@@ -732,10 +732,6 @@ func (instances *instances) InstanceExistsByProviderID(ctx context.Context, prov
 	return false, errors.New("unimplemented")
 }
 
-func (instances *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, errors.New("unimplemented")
-}
-
 func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
