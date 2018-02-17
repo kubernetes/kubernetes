@@ -1071,38 +1071,15 @@ func buildResourceToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, w
 		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{}
 		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{}
 		// with an imagefs, imagefs pressure should delete unused images
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
 		// since imagefs and nodefs share a common device, they share common reclaim functions
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 	}
 	return resourceToReclaimFunc
-}
-
-// deleteTerminatedContainers will delete terminated containers to free up disk pressure.
-func deleteTerminatedContainers(containerGC ContainerGC) nodeReclaimFunc {
-	return func() (*resource.Quantity, error) {
-		glog.Infof("eviction manager: attempting to delete unused containers")
-		err := containerGC.DeleteAllUnusedContainers()
-		// Calculating bytes freed is not yet supported.
-		return resource.NewQuantity(int64(0), resource.BinarySI), err
-	}
-}
-
-// deleteImages will delete unused images to free up disk pressure.
-func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
-	return func() (*resource.Quantity, error) {
-		glog.Infof("eviction manager: attempting to delete unused images")
-		bytesFreed, err := imageGC.DeleteUnusedImages()
-		reclaimed := int64(0)
-		if reportBytesFreed {
-			reclaimed = bytesFreed
-		}
-		return resource.NewQuantity(reclaimed, resource.BinarySI), err
-	}
 }

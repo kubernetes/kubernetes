@@ -349,7 +349,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
-	if m.reclaimNodeLevelResources(resourceToReclaim, observations) {
+	if m.reclaimNodeLevelResources(resourceToReclaim, capacityProvider, activePods) {
 		glog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
 		return nil
 	}
@@ -437,26 +437,31 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceName, observations signalObservations) bool {
+func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceName, capacityProvider CapacityProvider, pods []*v1.Pod) bool {
 	nodeReclaimFuncs := m.resourceToNodeReclaimFuncs[resourceToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
-		reclaimed, err := nodeReclaimFunc()
-		if err != nil {
+		if err := nodeReclaimFunc(); err != nil {
 			glog.Warningf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
 		}
-		// update our local observations based on the amount reported to have been reclaimed.
-		// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
-		for _, signal := range resourceClaimToSignal[resourceToReclaim] {
-			value, ok := observations[signal]
-			if !ok {
-				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
-				continue
-			}
-			value.available.Add(*reclaimed)
+
+	}
+	if len(nodeReclaimFuncs) > 0 {
+		summary, err := m.summaryProvider.Get(true)
+		if err != nil {
+			glog.Errorf("eviction manager: failed to get get summary stats after resource reclaim: %v", err)
+			return false
 		}
-		// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
-		if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
+
+		// make observations and get a function to derive pod usage stats relative to those observations.
+		observations, _ := makeSignalObservations(summary, capacityProvider, pods)
+		debugLogObservations("observations after resource reclaim", observations)
+
+		// determine the set of thresholds met independent of grace period
+		thresholds := thresholdsMet(m.config.Thresholds, observations, false)
+		debugLogThresholdsWithObservation("thresholds after resource reclaim - ignoring grace period", thresholds, observations)
+
+		if len(thresholds) == 0 {
 			return true
 		}
 	}
