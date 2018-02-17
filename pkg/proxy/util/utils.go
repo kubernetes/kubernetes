@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/util/conntrack"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/golang/glog"
 )
@@ -117,10 +117,10 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 					return nil, fmt.Errorf("error parsing CIDR for interface %s, error: %v", itf.Name, err)
 				}
 				if ipNet.Contains(ip) {
-					if conntrack.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
+					if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
 						uniqueAddressList.Insert(ip.String())
 					}
-					if !conntrack.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
+					if !utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
 						uniqueAddressList.Insert(ip.String())
 					}
 				}

@@ -31,6 +31,7 @@ import (
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
 )
 
@@ -165,7 +166,7 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		// clean up opened host port if encounter any error
 		return utilerrors.NewAggregate([]error{err, hm.closeHostports(hostportMappings)})
 	}
-	isIpv6 := conntrack.IsIPv6(podPortMapping.IP)
+	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
 
 	// Remove conntrack entries just after adding the new iptables rules. If the conntrack entry is removed along with
 	// the IP tables rule, it can be the case that the packets received by the node after iptables rule removal will

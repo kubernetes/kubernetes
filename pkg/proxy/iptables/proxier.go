@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	utilexec "k8s.io/utils/exec"
@@ -758,7 +759,7 @@ func (proxier *Proxier) syncProxyRules() {
 			glog.Errorf("Failed to cast serviceInfo %q", svcName.String())
 			continue
 		}
-		isIPv6 := conntrack.IsIPv6(svcInfo.ClusterIP)
+		isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP)
 		protocol := strings.ToLower(string(svcInfo.Protocol))
 		svcNameString := svcInfo.serviceNameString
 		hasEndpoints := len(proxier.endpointsMap[svcName]) > 0
@@ -1223,7 +1224,7 @@ func (proxier *Proxier) syncProxyRules() {
 				break
 			}
 			// Ignore IP addresses with incorrect version
-			if isIPv6 && !conntrack.IsIPv6String(address) || !isIPv6 && conntrack.IsIPv6String(address) {
+			if isIPv6 && !utilnet.IsIPv6String(address) || !isIPv6 && utilnet.IsIPv6String(address) {
 				glog.Errorf("IP address %s has incorrect IP version", address)
 				continue
 			}

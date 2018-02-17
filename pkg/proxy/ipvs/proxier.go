@@ -47,6 +47,7 @@ import (
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 )
@@ -289,7 +290,7 @@ func NewProxier(ipt utiliptables.Interface,
 		nodeIP = net.ParseIP("127.0.0.1")
 	}
 
-	isIPv6 := conntrack.IsIPv6(nodeIP)
+	isIPv6 := utilnet.IsIPv6(nodeIP)
 
 	glog.V(2).Infof("nodeIP: %v, isIPv6: %v", nodeIP, isIPv6)
 
@@ -1006,7 +1007,7 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if lp.Protocol == "udp" {
-					isIPv6 := conntrack.IsIPv6(svcInfo.ClusterIP)
+					isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP)
 					conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, clientv1.ProtocolUDP)
 				}
 				replacementPortsMap[lp] = socket
