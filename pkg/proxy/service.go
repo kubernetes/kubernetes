@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -31,6 +32,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // ServiceInfoCommon contains common service information.
@@ -92,10 +94,23 @@ func (sct *ServiceChangeTracker) newServiceInfoCommon(port *api.ServicePort, ser
 		OnlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
 	}
 
-	info.ExternalIPs = make([]string, len(service.Spec.ExternalIPs))
-	info.LoadBalancerSourceRanges = make([]string, len(service.Spec.LoadBalancerSourceRanges))
-	copy(info.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
-	copy(info.ExternalIPs, service.Spec.ExternalIPs)
+	if sct.isIPv6Mode == nil {
+		info.ExternalIPs = make([]string, len(service.Spec.ExternalIPs))
+		info.LoadBalancerSourceRanges = make([]string, len(service.Spec.LoadBalancerSourceRanges))
+		copy(info.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
+		copy(info.ExternalIPs, service.Spec.ExternalIPs)
+	} else {
+		// Filter out the incorrect IP version case.
+		var incorrectIPs []string
+		info.ExternalIPs, incorrectIPs = utilnet.FilterIncorrectIPVersion(service.Spec.ExternalIPs, *sct.isIPv6Mode)
+		if len(incorrectIPs) > 0 {
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
+		}
+		info.LoadBalancerSourceRanges, incorrectIPs = utilnet.FilterIncorrectCIDRVersion(service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode)
+		if len(incorrectIPs) > 0 {
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "loadBalancerSourceRanges", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
+		}
+	}
 
 	if apiservice.NeedsHealthCheck(service) {
 		p := service.Spec.HealthCheckNodePort
@@ -219,6 +234,14 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *api.Service) Servi
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if utilproxy.ShouldSkipService(svcName, service) {
 		return nil
+	}
+
+	if len(service.Spec.ClusterIP) != 0 {
+		// Filter out the incorrect IP version case.
+		if sct.isIPv6Mode != nil && utilnet.IsIPv6String(service.Spec.ClusterIP) != *sct.isIPv6Mode {
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "clusterIP", service.Spec.ClusterIP, service.Namespace, service.Name, service.UID)
+			return nil
+		}
 	}
 
 	serviceMap := make(ServiceMap)

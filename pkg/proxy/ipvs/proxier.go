@@ -296,6 +296,8 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(clusterCIDR) == 0 {
 		glog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
+	} else if utilnet.IsIPv6CIDR(clusterCIDR) != isIPv6 {
+		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
 	}
 
 	if len(scheduler) == 0 {

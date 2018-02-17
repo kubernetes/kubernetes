@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // EndpointInfoCommon contains common endpoint information.
@@ -204,6 +205,13 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoin
 				addr := &ss.Addresses[i]
 				if addr.IP == "" {
 					glog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
+					continue
+				}
+				// Filter out the incorrect IP version case.
+				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
+					// Emit event on the corresponding service which had a different
+					// IP version than the endpoint.
+					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Name, endpoints.Namespace, "")
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
