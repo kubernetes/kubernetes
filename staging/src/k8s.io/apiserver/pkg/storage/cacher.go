@@ -73,6 +73,10 @@ type CacherConfig struct {
 	NewListFunc func() runtime.Object
 
 	Codec runtime.Codec
+
+	// SerializationSchemesToCache defines list of serialization schemas, for
+	// which serialization result should be cached together with the object.
+	SerializationSchemesToCache []*runtime.SerializationScheme
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -191,7 +195,9 @@ type Cacher struct {
 // its internal cache and updating its cache in the background based on the
 // given configuration.
 func NewCacherFromConfig(config CacherConfig) *Cacher {
-	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc)
+	watchCache := newWatchCache(
+		config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc,
+		config.SerializationSchemesToCache)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -565,7 +571,7 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 		return nil, false
 	}
 	result := make([]string, 0, 2)
-	matchValues := c.triggerFunc(event.Object)
+	matchValues := c.triggerFunc(event.BaseObject())
 	if len(matchValues) > 0 {
 		result = append(result, matchValues[0].Value)
 	}
@@ -872,16 +878,27 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
+		watchEvent.Type = watch.Added
+		if _, ok := event.Object.(*runtime.CachingObject); ok {
+			watchEvent.Object = event.Object
+		} else {
+			watchEvent.Object = event.Object.DeepCopyObject()
+		}
 	case curObjPasses && oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
+		watchEvent.Type = watch.Modified
+		if _, ok := event.Object.(*runtime.CachingObject); ok {
+			watchEvent.Object = event.Object
+		} else {
+			watchEvent.Object = event.Object.DeepCopyObject()
+		}
 	case !curObjPasses && oldObjPasses:
+		watchEvent.Type = watch.Deleted
 		// return a delete event with the previous object content, but with the event's resource version
 		oldObj := event.PrevObject.DeepCopyObject()
 		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
 		}
-		watchEvent = watch.Event{Type: watch.Deleted, Object: oldObj}
+		watchEvent.Object = oldObj
 	}
 
 	// We need to ensure that if we put event X to the c.result, all
