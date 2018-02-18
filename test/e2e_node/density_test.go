@@ -198,7 +198,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				// Here we set API QPS limit from default 5 to 60 in order to test real Kubelet performance.
 				// Note that it will cause higher resource usage.
 				tempSetCurrentKubeletConfig(f, func(cfg *kubeletconfig.KubeletConfiguration) {
-					framework.Logf("Old QPS limit is: %d\n", cfg.KubeAPIQPS)
+					framework.Logf("Old QPS limit is: %d", cfg.KubeAPIQPS)
 					// Set new API QPS limit
 					cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
 				})
