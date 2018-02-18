@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,7 +76,7 @@ func newTestWatchCache(capacity int) *watchCache {
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	versioner := etcd.APIObjectVersioner{}
-	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, versioner)
+	wc := newWatchCache(capacity, keyFunc, getAttrsFunc, versioner, nil)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }

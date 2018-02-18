@@ -58,6 +58,13 @@ type watchCacheEvent struct {
 	ResourceVersion uint64
 }
 
+func (e *watchCacheEvent) BaseObject() runtime.Object {
+	if co, ok := e.Object.(*runtime.CachingObject); ok {
+		return co.Object
+	}
+	return e.Object
+}
+
 // Computing a key of an object is generally non-trivial (it performs
 // e.g. validation underneath). Similarly computing object fields and
 // labels. To avoid computing them multiple times (to serve the event
@@ -68,6 +75,16 @@ type storeElement struct {
 	Object runtime.Object
 	Labels labels.Set
 	Fields fields.Set
+	// Wrapped is an object that caches serialized object on
+	// requested serialization schemas.
+	Wrapped runtime.Object
+}
+
+func (s *storeElement) WrappedObject() runtime.Object {
+	if s.Wrapped != nil {
+		return s.Wrapped
+	}
+	return s.Object
 }
 
 func storeElementKey(obj interface{}) (string, error) {
@@ -92,6 +109,10 @@ type watchCache struct {
 
 	// Maximum size of history window.
 	capacity int
+
+	// serializationSchemes defines serialization schemas, for
+	// which serialization result should be cached together with the object.
+	serializationSchemes []*runtime.SerializationScheme
 
 	// keyFunc is used to get a key in the underlying storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
@@ -138,19 +159,21 @@ func newWatchCache(
 	capacity int,
 	keyFunc func(runtime.Object) (string, error),
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
-	versioner storage.Versioner) *watchCache {
+	versioner storage.Versioner,
+	serializationSchemesToCache []*runtime.SerializationScheme) *watchCache {
 	wc := &watchCache{
-		capacity:            capacity,
-		keyFunc:             keyFunc,
-		getAttrsFunc:        getAttrsFunc,
-		cache:               make([]*watchCacheEvent, capacity),
-		startIndex:          0,
-		endIndex:            0,
-		store:               cache.NewStore(storeElementKey),
-		resourceVersion:     0,
-		listResourceVersion: 0,
-		clock:               clock.RealClock{},
-		versioner:           versioner,
+		capacity:             capacity,
+		keyFunc:              keyFunc,
+		getAttrsFunc:         getAttrsFunc,
+		cache:                make([]*watchCacheEvent, capacity),
+		startIndex:           0,
+		endIndex:             0,
+		store:                cache.NewStore(storeElementKey),
+		resourceVersion:      0,
+		listResourceVersion:  0,
+		clock:                clock.RealClock{},
+		versioner:            versioner,
+		serializationSchemes: serializationSchemesToCache,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
@@ -214,10 +237,16 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if err != nil {
 		return err
 	}
+	if len(w.serializationSchemes) > 0 {
+		elem.Wrapped = &runtime.CachingObject{
+			Object:    event.Object,
+			Versioned: runtime.NewCachingVersionedObjects(w.serializationSchemes),
+		}
+	}
 
 	watchCacheEvent := &watchCacheEvent{
 		Type:            event.Type,
-		Object:          elem.Object,
+		Object:          elem.WrappedObject(),
 		ObjLabels:       elem.Labels,
 		ObjFields:       elem.Fields,
 		Key:             key,
