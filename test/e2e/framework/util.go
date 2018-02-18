@@ -2206,9 +2206,6 @@ func runKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
 	b := new(kubectlBuilder)
-	if TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
-	}
 	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
 
 	b.cmd = exec.Command(kubemci, args...)
