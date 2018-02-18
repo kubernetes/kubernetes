@@ -5,12 +5,17 @@ go_library(
     srcs = [
         "cmdutil.go",
         "documentation.go",
+        "join.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/util/pubkeypin:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 
