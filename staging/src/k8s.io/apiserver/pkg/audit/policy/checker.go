@@ -76,14 +76,18 @@ func (p *policyChecker) LevelAndStages(attrs authorizer.Attributes) (audit.Level
 
 // Check whether the rule matches the request attrs.
 func ruleMatches(r *audit.PolicyRule, attrs authorizer.Attributes) bool {
-	if len(r.Users) > 0 && attrs.GetUser() != nil {
-		if !hasString(r.Users, attrs.GetUser().GetName()) {
+	user := attrs.GetUser()
+	if len(r.Users) > 0 {
+		if user == nil || !hasString(r.Users, user.GetName()) {
 			return false
 		}
 	}
-	if len(r.UserGroups) > 0 && attrs.GetUser() != nil {
+	if len(r.UserGroups) > 0 {
+		if user == nil {
+			return false
+		}
 		matched := false
-		for _, group := range attrs.GetUser().GetGroups() {
+		for _, group := range user.GetGroups() {
 			if hasString(r.UserGroups, group) {
 				matched = true
 				break
