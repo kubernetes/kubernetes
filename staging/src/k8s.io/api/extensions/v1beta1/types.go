@@ -943,6 +943,9 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "Volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
+	// The max integer value of priority one pod can set. PodPriority feature is required, otherwise this field is ignored.
+	// +optional
+	MaxPriorityClassValue *int32 `json:"maxPriorityClassValue" protobuf:"bytes,19,opt,name=maxPriorityClassValue"`
 }
 
 // defines the host volume conditions that will be enabled by a policy

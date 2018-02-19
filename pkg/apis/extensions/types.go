@@ -865,6 +865,9 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "Volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume
+	// The max integer value of priority one pod can set. PodPriority feature is required, otherwise this field is ignored.
+	// +optional
+	MaxPriorityClassValue *int32
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy

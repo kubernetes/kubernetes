@@ -81796,6 +81796,11 @@
        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.HostPortRange"
       }
      },
+     "maxPriorityClassValue": {
+      "description": "The max integer value of priority one pod can set. PodPriority feature is required, otherwise this field is ignored.",
+      "type": "integer",
+      "format": "int32"
+     },
      "privileged": {
       "description": "privileged determines if a pod can request to be run as privileged.",
       "type": "boolean"

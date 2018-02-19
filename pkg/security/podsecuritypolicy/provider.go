@@ -207,6 +207,15 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod, fldPath *field.Path) field.Er
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostIPC"), sc.HostIPC(), "Host IPC is not allowed to be used"))
 	}
 
+	if pod.Spec.Priority != nil && s.psp.Spec.MaxPriorityClassValue != nil && *s.psp.Spec.MaxPriorityClassValue < *pod.Spec.Priority {
+		priorityClassInfo := ""
+		if len(pod.Spec.PriorityClassName) > 0 {
+			priorityClassInfo = " The corresponding PriorityClass is  " + pod.Spec.PriorityClassName + "."
+		}
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "priority"),
+			fmt.Sprintf("spec.priority=%d which is larger than the max allowed value %d.%s", *pod.Spec.Priority, *s.psp.Spec.MaxPriorityClassValue, priorityClassInfo)))
+	}
+
 	allErrs = append(allErrs, s.strategies.SysctlsStrategy.Validate(pod)...)
 
 	if len(pod.Spec.Volumes) > 0 {
