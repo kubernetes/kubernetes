@@ -274,10 +274,9 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		mapper, _ := o.f.Object()
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
-			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
+			return o.f.PrintObject(o.cmd, outputObj, o.out)
 		}
 
 		o.f.PrintSuccess(false, o.out, info.Mapping.Resource, info.Name, false, operation)

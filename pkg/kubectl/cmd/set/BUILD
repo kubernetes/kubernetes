@@ -59,6 +59,7 @@ go_test(
     embed = [":go_default_library"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl/categories:go_default_library",

@@ -239,9 +239,9 @@ type BuilderFactory interface {
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
 	// Returns a printer, true if the printer is generic (is not internal), or
 	// an error if a printer could not be found.
-	PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
+	PrinterForMapping(options *printers.PrintOptions) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error
 	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
 	// attempts to print an info object based on the specified output format. If the
 	// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.

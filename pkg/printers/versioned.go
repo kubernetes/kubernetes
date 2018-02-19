@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -29,14 +30,16 @@ import (
 type VersionedPrinter struct {
 	printer   ResourcePrinter
 	converter runtime.ObjectConvertor
+	typer     runtime.ObjectTyper
 	versions  []schema.GroupVersion
 }
 
 // NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, versions ...schema.GroupVersion) ResourcePrinter {
+func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, typer runtime.ObjectTyper, versions ...schema.GroupVersion) ResourcePrinter {
 	return &VersionedPrinter{
 		printer:   printer,
 		converter: converter,
+		typer:     typer,
 		versions:  versions,
 	}
 }
@@ -47,6 +50,33 @@ func (p *VersionedPrinter) AfterPrint(w io.Writer, res string) error {
 
 // PrintObj implements ResourcePrinter
 func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	gvks, _, err := p.typer.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+	needsConversion := false
+	for _, gvk := range gvks {
+		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+			needsConversion = true
+		}
+	}
+
+	// if we're unstructured, no conversion necessary
+	if _, ok := obj.(*unstructured.Unstructured); ok {
+		return p.printer.PrintObj(obj, w)
+	}
+	// if we aren't a generic printer, we don't convert.  This means the printer must be aware of what it is getting.
+	// The default printers fall into this category.
+	// TODO eventually, all printers must be generic
+	if !p.IsGeneric() {
+		return p.printer.PrintObj(obj, w)
+	}
+
+	// if we're already external, no conversion necessary
+	if !needsConversion {
+		return p.printer.PrintObj(obj, w)
+	}
+
 	if len(p.versions) == 0 {
 		return fmt.Errorf("no version specified, object cannot be converted")
 	}

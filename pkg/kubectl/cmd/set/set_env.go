@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -116,7 +115,6 @@ type EnvOptions struct {
 	From              string
 	Prefix            string
 
-	Mapper  meta.RESTMapper
 	Builder *resource.Builder
 	Infos   []*resource.Info
 	Encoder runtime.Encoder
@@ -124,7 +122,7 @@ type EnvOptions struct {
 	Cmd *cobra.Command
 
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject            func(cmd *cobra.Command, obj runtime.Object, out io.Writer) error
 }
 
 // NewCmdEnv implements the OpenShift cli env command
@@ -189,7 +187,6 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return cmdutil.UsageErrorf(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 
-	o.Mapper, _ = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
 	o.ContainerSelector = cmdutil.GetFlagString(cmd, "containers")
@@ -417,7 +414,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -437,7 +434,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if len(o.Output) > 0 {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue

@@ -25,11 +25,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	kubectlscheme "k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -48,34 +49,17 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 }
 
 func (f *ring2Factory) PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	_, typer := f.objectMappingFactory.Object()
-
-	// TODO: used by the custom column implementation and the name implementation, break this dependency
-	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
-	encoder := f.clientAccessFactory.JSONEncoder()
-	return printerForOptions(typer, encoder, decoders, options)
+	return printerForOptions(options)
 }
 
-func (f *ring2Factory) PrinterForMapping(options *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForMapping(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
 	printer, err := f.PrinterForOptions(options)
 	if err != nil {
 		return nil, err
 	}
 
-	// Make sure we output versioned data for generic printers
-	if printer.IsGeneric() {
-		if mapping == nil {
-			return nil, fmt.Errorf("no serialization format found")
-		}
-		version := mapping.GroupVersionKind.GroupVersion()
-		if version.Empty() {
-			return nil, fmt.Errorf("no serialization format found")
-		}
-
-		printer = printers.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
-
-	}
-
+	// wrap the printer in a versioning printer that understands when to convert and when not to convert
+	printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, kubectlscheme.Versions...)
 	return printer, nil
 }
 
@@ -101,26 +85,8 @@ func (f *ring2Factory) PrintSuccess(shortOutput bool, out io.Writer, resource, n
 	}
 }
 
-func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	// try to get a typed object
-	_, typer := f.objectMappingFactory.Object()
-	gvks, _, err := typer.ObjectKinds(obj)
-
-	if err != nil {
-		return err
-	}
-	// Prefer the existing external version if specified
-	var preferredVersion []string
-	if gvks[0].Version != "" && gvks[0].Version != runtime.APIVersionInternal {
-		preferredVersion = []string{gvks[0].Version}
-	}
-
-	mapping, err := mapper.RESTMapping(gvks[0].GroupKind(), preferredVersion...)
-	if err != nil {
-		return err
-	}
-
-	printer, err := f.PrinterForMapping(ExtractCmdPrintOptions(cmd, false), mapping)
+func (f *ring2Factory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
+	printer, err := f.PrinterForMapping(ExtractCmdPrintOptions(cmd, false))
 	if err != nil {
 		return err
 	}
@@ -134,7 +100,7 @@ func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *res
 		return err
 	}
 	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(printOpts, nil)
+		printer, err = f.PrinterForMapping(printOpts)
 		if err != nil {
 			return err
 		}

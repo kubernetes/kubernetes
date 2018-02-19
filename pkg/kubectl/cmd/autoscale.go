@@ -156,7 +156,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			object = hpa.Object
 		}
 		if cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return f.PrintObject(cmd, object, out)
 		}
 
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
@@ -170,7 +170,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 		count++
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return f.PrintObject(cmd, object, out)
 		}
 
 		f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")

@@ -23,10 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	kubectlscheme "k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
@@ -83,8 +85,12 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 // printerForOptions returns the printer for the outputOptions (if given) or
 // returns the default printer for the command. Requires that printer flags have
 // been added to cmd (see AddPrinterFlags).
-func printerForOptions(typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	printer, err := printers.GetStandardPrinter(typer, encoder, decoders, *options)
+func printerForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
+	// TODO: used by the custom column implementation and the name implementation, break this dependency
+	decoders := []runtime.Decoder{kubectlscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}
+	encoder := kubectlscheme.Codecs.LegacyCodec(kubectlscheme.Registry.EnabledVersions()...)
+
+	printer, err := printers.GetStandardPrinter(kubectlscheme.Scheme, encoder, decoders, *options)
 	if err != nil {
 		return nil, err
 	}

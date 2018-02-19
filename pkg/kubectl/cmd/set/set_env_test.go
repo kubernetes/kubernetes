@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -435,7 +436,7 @@ func TestSetEnvRemote(t *testing.T) {
 		testapi.Default = testapi.Groups[input.testAPIGroup]
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
+		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, legacyscheme.Scheme, legacyscheme.Scheme, scheme.Versions...)
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{

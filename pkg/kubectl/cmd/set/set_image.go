@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -37,7 +36,6 @@ import (
 type ImageOptions struct {
 	resource.FilenameOptions
 
-	Mapper       meta.RESTMapper
 	Infos        []*resource.Info
 	Encoder      runtime.Encoder
 	Decoder      runtime.Decoder
@@ -55,7 +53,7 @@ type ImageOptions struct {
 	ResolveImage func(in string) (string, error)
 
 	PrintSuccess           func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject            func(cmd *cobra.Command, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 	ContainerImages        map[string]string
@@ -117,7 +115,6 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, _ = f.Object()
 	o.PrintSuccess = f.PrintSuccess
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
@@ -249,7 +246,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -275,7 +272,7 @@ func (o *ImageOptions) Run() error {
 		info.Refresh(obj, true)
 
 		if len(o.Output) > 0 {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue

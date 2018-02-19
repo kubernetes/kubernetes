@@ -152,7 +152,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, o.local, mapper, obj, o.out)
+		return f.PrintObject(cmd, obj, o.out)
 	}
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
