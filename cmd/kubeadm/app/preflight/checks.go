@@ -546,7 +546,7 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 	return warnings, nil
 }
 
-// SystemVerificationCheck defines struct used for for running the system verification node check in test/e2e_node/system
+// SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
 type SystemVerificationCheck struct {
 	CRISocket string
 }
