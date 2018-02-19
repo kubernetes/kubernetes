@@ -180,6 +180,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if cvo, ok := obj.(*runtime.CachingVersionedObject); ok {
+		return cvo.Serialize(s.contentType, s, w)
+	}
+
 	prefixSize := uint64(len(s.prefix))
 
 	var unk runtime.Unknown

@@ -280,6 +280,14 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 
 // Encode serializes the provided object to the given writer.
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
+	if cvo, ok := obj.(*runtime.CachingVersionedObject); ok {
+		if s.yaml || s.pretty {
+			// Yaml and pretty modes are not supported.
+			return s.Encode(cvo.Object.DeepCopyObject(), w)
+		}
+		return cvo.Serialize(runtime.ContentTypeJSON, s, w)
+	}
+
 	if s.Yaml {
 		json, err := caseSensitiveJsonIterator.Marshal(obj)
 		if err != nil {

@@ -174,6 +174,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
+
 	case runtime.Unstructured:
 		// An unstructured list can contain objects of multiple group version kinds. don't short-circuit just
 		// because the top-level type matches our desired destination type. actually send the object to the converter
@@ -192,6 +193,36 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 				return c.encoder.Encode(obj, w)
 			}
 		}
+	case *runtime.CachingObject:
+		co := obj.(*runtime.CachingObject)
+		_, isUnversioned, err := c.typer.ObjectKinds(co.Object)
+		if err != nil {
+			return err
+		}
+		if c.encodeVersion == nil || isUnversioned {
+			// TODO: Figure out if we can support those modes.
+			return c.Encode(co.Object.DeepCopyObject(), w)
+		}
+
+		cvo := co.GetCachingVersionedObject(c.encodeVersion)
+		if cvo == nil {
+			// A given group version is not supposed to be cached.
+			return c.Encode(co.Object.DeepCopyObject(), w)
+		}
+
+		cvo.SetObject(func() (runtime.Object, error) {
+			out, err := c.convertor.ConvertToVersion(co.Object.DeepCopyObject(), c.encodeVersion)
+			if err != nil {
+				return nil, err
+			}
+			if e, ok := out.(runtime.NestedObjectEncoder); ok {
+				if err := e.EncodeNestedObjects(DirectEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
+					return nil, err
+				}
+			}
+			return out, nil
+		})
+		return c.encoder.Encode(cvo, w)
 	}
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
