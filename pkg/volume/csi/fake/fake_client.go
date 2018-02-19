@@ -53,6 +53,7 @@ func (f *IdentityClient) GetSupportedVersions(ctx grpctx.Context, req *csipb.Get
 		SupportedVersions: []*csipb.Version{
 			{Major: 0, Minor: 0, Patch: 1},
 			{Major: 0, Minor: 1, Patch: 0},
+			{Major: 0, Minor: 2, Patch: 0},
 			{Major: 1, Minor: 0, Patch: 0},
 			{Major: 1, Minor: 0, Patch: 1},
 			{Major: 1, Minor: 1, Patch: 1},
