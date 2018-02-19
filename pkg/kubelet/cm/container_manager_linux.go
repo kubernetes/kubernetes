@@ -500,6 +500,11 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 	return cm.NodeConfig
 }
 
+// GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods.
+func (cm *containerManagerImpl) GetPodCgroupRoot() string {
+	return cm.cgroupManager.Name(CgroupName(cm.cgroupRoot))
+}
+
 func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
 	return cm.subsystems
 }

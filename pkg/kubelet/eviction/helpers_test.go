@@ -72,7 +72,7 @@ func TestParseThresholdConfig(t *testing.T) {
 					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
 					Operator: evictionapi.OpLessThan,
 					Value: evictionapi.ThresholdValue{
-						Quantity: quantityMustParse("0"),
+						Quantity: quantityMustParse("150Mi"),
 					},
 					MinReclaim: &evictionapi.ThresholdValue{
 						Quantity: quantityMustParse("0"),
@@ -1004,6 +1004,15 @@ func TestMakeSignalObservations(t *testing.T) {
 				InodesFree:     &nodeFsInodesFree,
 				Inodes:         &nodeFsInodes,
 			},
+			SystemContainers: []statsapi.ContainerStats{
+				{
+					Name: statsapi.SystemContainerPods,
+					Memory: &statsapi.MemoryStats{
+						AvailableBytes:  &nodeAvailableBytes,
+						WorkingSetBytes: &nodeWorkingSetBytes,
+					},
+				},
+			},
 		},
 		Pods: []statsapi.PodStats{},
 	}
@@ -1017,20 +1026,19 @@ func TestMakeSignalObservations(t *testing.T) {
 		fakeStats.Pods = append(fakeStats.Pods, newPodStats(pod, containerWorkingSetBytes))
 	}
 	res := quantityMustParse("5Gi")
-	capacityProvider := newMockCapacityProvider(v1.ResourceList{v1.ResourceMemory: *quantityMustParse("5Gi")}, v1.ResourceList{v1.ResourceMemory: *quantityMustParse("0Gi")})
 	// Allocatable thresholds are always 100%.  Verify that Threshold == Capacity.
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc := makeSignalObservations(fakeStats, capacityProvider, pods)
+	actualObservations, statsFunc := makeSignalObservations(fakeStats)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
 		t.Errorf("Expected allocatable memory observation, but didnt find one")
 	}
-	if allocatableMemQuantity.available.Value() != 2*containerWorkingSetBytes {
-		t.Errorf("Expected %v, actual: %v", containerWorkingSetBytes, allocatableMemQuantity.available.Value())
+	if expectedBytes := int64(nodeAvailableBytes); allocatableMemQuantity.available.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, allocatableMemQuantity.available.Value())
 	}
-	if expectedBytes := int64(allocatableMemoryCapacity); allocatableMemQuantity.capacity.Value() != expectedBytes {
+	if expectedBytes := int64(nodeWorkingSetBytes + nodeAvailableBytes); allocatableMemQuantity.capacity.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, allocatableMemQuantity.capacity.Value())
 	}
 	memQuantity, found := actualObservations[evictionapi.SignalMemoryAvailable]
