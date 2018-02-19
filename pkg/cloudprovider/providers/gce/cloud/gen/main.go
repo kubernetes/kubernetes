@@ -175,14 +175,14 @@ func (gce *GCE) {{.WrapType}}() {{.WrapType}} {
 {{- end}}
 
 // NewMockGCE returns a new mock for GCE.
-func NewMockGCE() *MockGCE {
+func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 	{{- range .Groups}}
 	mock{{.Service}}Objs := map[meta.Key]*Mock{{.Service}}Obj{}
 	{{- end}}
 
 	mock := &MockGCE{
 	{{- range .All}}
-		{{.MockField}}: New{{.MockWrapType}}(mock{{.Service}}Objs),
+		{{.MockField}}: New{{.MockWrapType}}(projectRouter, mock{{.Service}}Objs),
 	{{- end}}
 	}
 	return mock
@@ -306,8 +306,10 @@ type {{.WrapType}} interface {
 }
 
 // New{{.MockWrapType}} returns a new mock for {{.Service}}.
-func New{{.MockWrapType}}(objs map[meta.Key]*Mock{{.Service}}Obj) *{{.MockWrapType}} {
+func New{{.MockWrapType}}(pr ProjectRouter, objs map[meta.Key]*Mock{{.Service}}Obj) *{{.MockWrapType}} {
 	mock := &{{.MockWrapType}}{
+		ProjectRouter: pr,
+
 		Objects: objs,
 		{{- if .GenerateGet}}
 		GetError:    map[meta.Key]error{},
@@ -325,6 +327,8 @@ func New{{.MockWrapType}}(objs map[meta.Key]*Mock{{.Service}}Obj) *{{.MockWrapTy
 // {{.MockWrapType}} is the mock for {{.Service}}.
 type {{.MockWrapType}} struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*Mock{{.Service}}Obj
@@ -534,9 +538,8 @@ func (m *{{.MockWrapType}}) Insert(ctx context.Context, key *meta.Key, obj *{{.F
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.Version{{.VersionTitle}}, "mock-project", "{{.Resource}}", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "{{.Version}}", "{{.Resource}}")
+	obj.SelfLink = SelfLink(meta.Version{{.VersionTitle}}, projectID, "{{.Resource}}", key)
 
 	m.Objects[*key] = &Mock{{.Service}}Obj{obj}
 	glog.V(5).Infof("{{.MockWrapType}}.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -1036,7 +1039,8 @@ func Test{{.Service}}Group(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	mock := NewMockGCE()
+	pr := &SingleProjectRouter{"mock-project"}
+	mock := NewMockGCE(pr)
 
 	var key *meta.Key
 {{- if .HasAlpha}}

@@ -319,7 +319,7 @@ func (gce *GCE) Zones() Zones {
 }
 
 // NewMockGCE returns a new mock for GCE.
-func NewMockGCE() *MockGCE {
+func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 	mockAddressesObjs := map[meta.Key]*MockAddressesObj{}
 	mockBackendServicesObjs := map[meta.Key]*MockBackendServicesObj{}
 	mockDisksObjs := map[meta.Key]*MockDisksObj{}
@@ -346,39 +346,39 @@ func NewMockGCE() *MockGCE {
 	mockZonesObjs := map[meta.Key]*MockZonesObj{}
 
 	mock := &MockGCE{
-		MockAddresses:                  NewMockAddresses(mockAddressesObjs),
-		MockAlphaAddresses:             NewMockAlphaAddresses(mockAddressesObjs),
-		MockBetaAddresses:              NewMockBetaAddresses(mockAddressesObjs),
-		MockGlobalAddresses:            NewMockGlobalAddresses(mockGlobalAddressesObjs),
-		MockBackendServices:            NewMockBackendServices(mockBackendServicesObjs),
-		MockAlphaBackendServices:       NewMockAlphaBackendServices(mockBackendServicesObjs),
-		MockRegionBackendServices:      NewMockRegionBackendServices(mockRegionBackendServicesObjs),
-		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(mockRegionBackendServicesObjs),
-		MockDisks:                      NewMockDisks(mockDisksObjs),
-		MockAlphaDisks:                 NewMockAlphaDisks(mockDisksObjs),
-		MockAlphaRegionDisks:           NewMockAlphaRegionDisks(mockRegionDisksObjs),
-		MockFirewalls:                  NewMockFirewalls(mockFirewallsObjs),
-		MockForwardingRules:            NewMockForwardingRules(mockForwardingRulesObjs),
-		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(mockForwardingRulesObjs),
-		MockGlobalForwardingRules:      NewMockGlobalForwardingRules(mockGlobalForwardingRulesObjs),
-		MockHealthChecks:               NewMockHealthChecks(mockHealthChecksObjs),
-		MockAlphaHealthChecks:          NewMockAlphaHealthChecks(mockHealthChecksObjs),
-		MockHttpHealthChecks:           NewMockHttpHealthChecks(mockHttpHealthChecksObjs),
-		MockHttpsHealthChecks:          NewMockHttpsHealthChecks(mockHttpsHealthChecksObjs),
-		MockInstanceGroups:             NewMockInstanceGroups(mockInstanceGroupsObjs),
-		MockInstances:                  NewMockInstances(mockInstancesObjs),
-		MockBetaInstances:              NewMockBetaInstances(mockInstancesObjs),
-		MockAlphaInstances:             NewMockAlphaInstances(mockInstancesObjs),
-		MockAlphaNetworkEndpointGroups: NewMockAlphaNetworkEndpointGroups(mockNetworkEndpointGroupsObjs),
-		MockProjects:                   NewMockProjects(mockProjectsObjs),
-		MockRegions:                    NewMockRegions(mockRegionsObjs),
-		MockRoutes:                     NewMockRoutes(mockRoutesObjs),
-		MockSslCertificates:            NewMockSslCertificates(mockSslCertificatesObjs),
-		MockTargetHttpProxies:          NewMockTargetHttpProxies(mockTargetHttpProxiesObjs),
-		MockTargetHttpsProxies:         NewMockTargetHttpsProxies(mockTargetHttpsProxiesObjs),
-		MockTargetPools:                NewMockTargetPools(mockTargetPoolsObjs),
-		MockUrlMaps:                    NewMockUrlMaps(mockUrlMapsObjs),
-		MockZones:                      NewMockZones(mockZonesObjs),
+		MockAddresses:                  NewMockAddresses(projectRouter, mockAddressesObjs),
+		MockAlphaAddresses:             NewMockAlphaAddresses(projectRouter, mockAddressesObjs),
+		MockBetaAddresses:              NewMockBetaAddresses(projectRouter, mockAddressesObjs),
+		MockGlobalAddresses:            NewMockGlobalAddresses(projectRouter, mockGlobalAddressesObjs),
+		MockBackendServices:            NewMockBackendServices(projectRouter, mockBackendServicesObjs),
+		MockAlphaBackendServices:       NewMockAlphaBackendServices(projectRouter, mockBackendServicesObjs),
+		MockRegionBackendServices:      NewMockRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
+		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
+		MockDisks:                      NewMockDisks(projectRouter, mockDisksObjs),
+		MockAlphaDisks:                 NewMockAlphaDisks(projectRouter, mockDisksObjs),
+		MockAlphaRegionDisks:           NewMockAlphaRegionDisks(projectRouter, mockRegionDisksObjs),
+		MockFirewalls:                  NewMockFirewalls(projectRouter, mockFirewallsObjs),
+		MockForwardingRules:            NewMockForwardingRules(projectRouter, mockForwardingRulesObjs),
+		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(projectRouter, mockForwardingRulesObjs),
+		MockGlobalForwardingRules:      NewMockGlobalForwardingRules(projectRouter, mockGlobalForwardingRulesObjs),
+		MockHealthChecks:               NewMockHealthChecks(projectRouter, mockHealthChecksObjs),
+		MockAlphaHealthChecks:          NewMockAlphaHealthChecks(projectRouter, mockHealthChecksObjs),
+		MockHttpHealthChecks:           NewMockHttpHealthChecks(projectRouter, mockHttpHealthChecksObjs),
+		MockHttpsHealthChecks:          NewMockHttpsHealthChecks(projectRouter, mockHttpsHealthChecksObjs),
+		MockInstanceGroups:             NewMockInstanceGroups(projectRouter, mockInstanceGroupsObjs),
+		MockInstances:                  NewMockInstances(projectRouter, mockInstancesObjs),
+		MockBetaInstances:              NewMockBetaInstances(projectRouter, mockInstancesObjs),
+		MockAlphaInstances:             NewMockAlphaInstances(projectRouter, mockInstancesObjs),
+		MockAlphaNetworkEndpointGroups: NewMockAlphaNetworkEndpointGroups(projectRouter, mockNetworkEndpointGroupsObjs),
+		MockProjects:                   NewMockProjects(projectRouter, mockProjectsObjs),
+		MockRegions:                    NewMockRegions(projectRouter, mockRegionsObjs),
+		MockRoutes:                     NewMockRoutes(projectRouter, mockRoutesObjs),
+		MockSslCertificates:            NewMockSslCertificates(projectRouter, mockSslCertificatesObjs),
+		MockTargetHttpProxies:          NewMockTargetHttpProxies(projectRouter, mockTargetHttpProxiesObjs),
+		MockTargetHttpsProxies:         NewMockTargetHttpsProxies(projectRouter, mockTargetHttpsProxiesObjs),
+		MockTargetPools:                NewMockTargetPools(projectRouter, mockTargetPoolsObjs),
+		MockUrlMaps:                    NewMockUrlMaps(projectRouter, mockUrlMapsObjs),
+		MockZones:                      NewMockZones(projectRouter, mockZonesObjs),
 	}
 	return mock
 }
@@ -1194,8 +1194,10 @@ type Addresses interface {
 }
 
 // NewMockAddresses returns a new mock for Addresses.
-func NewMockAddresses(objs map[meta.Key]*MockAddressesObj) *MockAddresses {
+func NewMockAddresses(pr ProjectRouter, objs map[meta.Key]*MockAddressesObj) *MockAddresses {
 	mock := &MockAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -1207,6 +1209,8 @@ func NewMockAddresses(objs map[meta.Key]*MockAddressesObj) *MockAddresses {
 // MockAddresses is the mock for Addresses.
 type MockAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockAddressesObj
@@ -1328,9 +1332,8 @@ func (m *MockAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addre
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockAddressesObj{obj}
 	glog.V(5).Infof("MockAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -1525,8 +1528,10 @@ type AlphaAddresses interface {
 }
 
 // NewMockAlphaAddresses returns a new mock for Addresses.
-func NewMockAlphaAddresses(objs map[meta.Key]*MockAddressesObj) *MockAlphaAddresses {
+func NewMockAlphaAddresses(pr ProjectRouter, objs map[meta.Key]*MockAddressesObj) *MockAlphaAddresses {
 	mock := &MockAlphaAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -1538,6 +1543,8 @@ func NewMockAlphaAddresses(objs map[meta.Key]*MockAddressesObj) *MockAlphaAddres
 // MockAlphaAddresses is the mock for Addresses.
 type MockAlphaAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockAddressesObj
@@ -1659,9 +1666,8 @@ func (m *MockAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alp
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockAddressesObj{obj}
 	glog.V(5).Infof("MockAlphaAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -1856,8 +1862,10 @@ type BetaAddresses interface {
 }
 
 // NewMockBetaAddresses returns a new mock for Addresses.
-func NewMockBetaAddresses(objs map[meta.Key]*MockAddressesObj) *MockBetaAddresses {
+func NewMockBetaAddresses(pr ProjectRouter, objs map[meta.Key]*MockAddressesObj) *MockBetaAddresses {
 	mock := &MockBetaAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -1869,6 +1877,8 @@ func NewMockBetaAddresses(objs map[meta.Key]*MockAddressesObj) *MockBetaAddresse
 // MockBetaAddresses is the mock for Addresses.
 type MockBetaAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockAddressesObj
@@ -1990,9 +2000,8 @@ func (m *MockBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionBeta, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockAddressesObj{obj}
 	glog.V(5).Infof("MockBetaAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -2187,8 +2196,10 @@ type GlobalAddresses interface {
 }
 
 // NewMockGlobalAddresses returns a new mock for GlobalAddresses.
-func NewMockGlobalAddresses(objs map[meta.Key]*MockGlobalAddressesObj) *MockGlobalAddresses {
+func NewMockGlobalAddresses(pr ProjectRouter, objs map[meta.Key]*MockGlobalAddressesObj) *MockGlobalAddresses {
 	mock := &MockGlobalAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -2200,6 +2211,8 @@ func NewMockGlobalAddresses(objs map[meta.Key]*MockGlobalAddressesObj) *MockGlob
 // MockGlobalAddresses is the mock for GlobalAddresses.
 type MockGlobalAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockGlobalAddressesObj
@@ -2318,9 +2331,8 @@ func (m *MockGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockGlobalAddressesObj{obj}
 	glog.V(5).Infof("MockGlobalAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -2518,8 +2530,10 @@ type BackendServices interface {
 }
 
 // NewMockBackendServices returns a new mock for BackendServices.
-func NewMockBackendServices(objs map[meta.Key]*MockBackendServicesObj) *MockBackendServices {
+func NewMockBackendServices(pr ProjectRouter, objs map[meta.Key]*MockBackendServicesObj) *MockBackendServices {
 	mock := &MockBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -2531,6 +2545,8 @@ func NewMockBackendServices(objs map[meta.Key]*MockBackendServicesObj) *MockBack
 // MockBackendServices is the mock for BackendServices.
 type MockBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockBackendServicesObj
@@ -2651,9 +2667,8 @@ func (m *MockBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockBackendServicesObj{obj}
 	glog.V(5).Infof("MockBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -2927,8 +2942,10 @@ type AlphaBackendServices interface {
 }
 
 // NewMockAlphaBackendServices returns a new mock for BackendServices.
-func NewMockAlphaBackendServices(objs map[meta.Key]*MockBackendServicesObj) *MockAlphaBackendServices {
+func NewMockAlphaBackendServices(pr ProjectRouter, objs map[meta.Key]*MockBackendServicesObj) *MockAlphaBackendServices {
 	mock := &MockAlphaBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -2940,6 +2957,8 @@ func NewMockAlphaBackendServices(objs map[meta.Key]*MockBackendServicesObj) *Moc
 // MockAlphaBackendServices is the mock for BackendServices.
 type MockAlphaBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockBackendServicesObj
@@ -3059,9 +3078,8 @@ func (m *MockAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockBackendServicesObj{obj}
 	glog.V(5).Infof("MockAlphaBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -3300,8 +3318,10 @@ type RegionBackendServices interface {
 }
 
 // NewMockRegionBackendServices returns a new mock for RegionBackendServices.
-func NewMockRegionBackendServices(objs map[meta.Key]*MockRegionBackendServicesObj) *MockRegionBackendServices {
+func NewMockRegionBackendServices(pr ProjectRouter, objs map[meta.Key]*MockRegionBackendServicesObj) *MockRegionBackendServices {
 	mock := &MockRegionBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -3313,6 +3333,8 @@ func NewMockRegionBackendServices(objs map[meta.Key]*MockRegionBackendServicesOb
 // MockRegionBackendServices is the mock for RegionBackendServices.
 type MockRegionBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionBackendServicesObj
@@ -3436,9 +3458,8 @@ func (m *MockRegionBackendServices) Insert(ctx context.Context, key *meta.Key, o
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockRegionBackendServicesObj{obj}
 	glog.V(5).Infof("MockRegionBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -3712,8 +3733,10 @@ type AlphaRegionBackendServices interface {
 }
 
 // NewMockAlphaRegionBackendServices returns a new mock for RegionBackendServices.
-func NewMockAlphaRegionBackendServices(objs map[meta.Key]*MockRegionBackendServicesObj) *MockAlphaRegionBackendServices {
+func NewMockAlphaRegionBackendServices(pr ProjectRouter, objs map[meta.Key]*MockRegionBackendServicesObj) *MockAlphaRegionBackendServices {
 	mock := &MockAlphaRegionBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -3725,6 +3748,8 @@ func NewMockAlphaRegionBackendServices(objs map[meta.Key]*MockRegionBackendServi
 // MockAlphaRegionBackendServices is the mock for RegionBackendServices.
 type MockAlphaRegionBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionBackendServicesObj
@@ -3848,9 +3873,8 @@ func (m *MockAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.K
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockRegionBackendServicesObj{obj}
 	glog.V(5).Infof("MockAlphaRegionBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -4122,8 +4146,10 @@ type Disks interface {
 }
 
 // NewMockDisks returns a new mock for Disks.
-func NewMockDisks(objs map[meta.Key]*MockDisksObj) *MockDisks {
+func NewMockDisks(pr ProjectRouter, objs map[meta.Key]*MockDisksObj) *MockDisks {
 	mock := &MockDisks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -4135,6 +4161,8 @@ func NewMockDisks(objs map[meta.Key]*MockDisksObj) *MockDisks {
 // MockDisks is the mock for Disks.
 type MockDisks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockDisksObj
@@ -4256,9 +4284,8 @@ func (m *MockDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) err
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "disks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "disks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "disks", key)
 
 	m.Objects[*key] = &MockDisksObj{obj}
 	glog.V(5).Infof("MockDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -4453,8 +4480,10 @@ type AlphaDisks interface {
 }
 
 // NewMockAlphaDisks returns a new mock for Disks.
-func NewMockAlphaDisks(objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
+func NewMockAlphaDisks(pr ProjectRouter, objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
 	mock := &MockAlphaDisks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -4466,6 +4495,8 @@ func NewMockAlphaDisks(objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
 // MockAlphaDisks is the mock for Disks.
 type MockAlphaDisks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockDisksObj
@@ -4587,9 +4618,8 @@ func (m *MockAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.D
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "disks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "disks")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "disks", key)
 
 	m.Objects[*key] = &MockDisksObj{obj}
 	glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -4784,8 +4814,10 @@ type AlphaRegionDisks interface {
 }
 
 // NewMockAlphaRegionDisks returns a new mock for RegionDisks.
-func NewMockAlphaRegionDisks(objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRegionDisks {
+func NewMockAlphaRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRegionDisks {
 	mock := &MockAlphaRegionDisks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -4797,6 +4829,8 @@ func NewMockAlphaRegionDisks(objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRe
 // MockAlphaRegionDisks is the mock for RegionDisks.
 type MockAlphaRegionDisks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionDisksObj
@@ -4918,9 +4952,8 @@ func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *a
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "disks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "disks")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "disks", key)
 
 	m.Objects[*key] = &MockRegionDisksObj{obj}
 	glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -5116,8 +5149,10 @@ type Firewalls interface {
 }
 
 // NewMockFirewalls returns a new mock for Firewalls.
-func NewMockFirewalls(objs map[meta.Key]*MockFirewallsObj) *MockFirewalls {
+func NewMockFirewalls(pr ProjectRouter, objs map[meta.Key]*MockFirewallsObj) *MockFirewalls {
 	mock := &MockFirewalls{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -5129,6 +5164,8 @@ func NewMockFirewalls(objs map[meta.Key]*MockFirewallsObj) *MockFirewalls {
 // MockFirewalls is the mock for Firewalls.
 type MockFirewalls struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockFirewallsObj
@@ -5248,9 +5285,8 @@ func (m *MockFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firew
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "firewalls", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "firewalls")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "firewalls", key)
 
 	m.Objects[*key] = &MockFirewallsObj{obj}
 	glog.V(5).Infof("MockFirewalls.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -5487,8 +5523,10 @@ type ForwardingRules interface {
 }
 
 // NewMockForwardingRules returns a new mock for ForwardingRules.
-func NewMockForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *MockForwardingRules {
+func NewMockForwardingRules(pr ProjectRouter, objs map[meta.Key]*MockForwardingRulesObj) *MockForwardingRules {
 	mock := &MockForwardingRules{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -5500,6 +5538,8 @@ func NewMockForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *MockForw
 // MockForwardingRules is the mock for ForwardingRules.
 type MockForwardingRules struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockForwardingRulesObj
@@ -5621,9 +5661,8 @@ func (m *MockForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "forwardingRules", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "forwardingRules")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "forwardingRules", key)
 
 	m.Objects[*key] = &MockForwardingRulesObj{obj}
 	glog.V(5).Infof("MockForwardingRules.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -5818,8 +5857,10 @@ type AlphaForwardingRules interface {
 }
 
 // NewMockAlphaForwardingRules returns a new mock for ForwardingRules.
-func NewMockAlphaForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *MockAlphaForwardingRules {
+func NewMockAlphaForwardingRules(pr ProjectRouter, objs map[meta.Key]*MockForwardingRulesObj) *MockAlphaForwardingRules {
 	mock := &MockAlphaForwardingRules{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -5831,6 +5872,8 @@ func NewMockAlphaForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *Moc
 // MockAlphaForwardingRules is the mock for ForwardingRules.
 type MockAlphaForwardingRules struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockForwardingRulesObj
@@ -5952,9 +5995,8 @@ func (m *MockAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "forwardingRules", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "forwardingRules")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "forwardingRules", key)
 
 	m.Objects[*key] = &MockForwardingRulesObj{obj}
 	glog.V(5).Infof("MockAlphaForwardingRules.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -6150,8 +6192,10 @@ type GlobalForwardingRules interface {
 }
 
 // NewMockGlobalForwardingRules returns a new mock for GlobalForwardingRules.
-func NewMockGlobalForwardingRules(objs map[meta.Key]*MockGlobalForwardingRulesObj) *MockGlobalForwardingRules {
+func NewMockGlobalForwardingRules(pr ProjectRouter, objs map[meta.Key]*MockGlobalForwardingRulesObj) *MockGlobalForwardingRules {
 	mock := &MockGlobalForwardingRules{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -6163,6 +6207,8 @@ func NewMockGlobalForwardingRules(objs map[meta.Key]*MockGlobalForwardingRulesOb
 // MockGlobalForwardingRules is the mock for GlobalForwardingRules.
 type MockGlobalForwardingRules struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockGlobalForwardingRulesObj
@@ -6282,9 +6328,8 @@ func (m *MockGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, o
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "forwardingRules", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "forwardingRules")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "forwardingRules", key)
 
 	m.Objects[*key] = &MockGlobalForwardingRulesObj{obj}
 	glog.V(5).Infof("MockGlobalForwardingRules.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -6522,8 +6567,10 @@ type HealthChecks interface {
 }
 
 // NewMockHealthChecks returns a new mock for HealthChecks.
-func NewMockHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockHealthChecks {
+func NewMockHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHealthChecksObj) *MockHealthChecks {
 	mock := &MockHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -6535,6 +6582,8 @@ func NewMockHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockHealthChec
 // MockHealthChecks is the mock for HealthChecks.
 type MockHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHealthChecksObj
@@ -6654,9 +6703,8 @@ func (m *MockHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.He
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "healthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "healthChecks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "healthChecks", key)
 
 	m.Objects[*key] = &MockHealthChecksObj{obj}
 	glog.V(5).Infof("MockHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -6894,8 +6942,10 @@ type AlphaHealthChecks interface {
 }
 
 // NewMockAlphaHealthChecks returns a new mock for HealthChecks.
-func NewMockAlphaHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockAlphaHealthChecks {
+func NewMockAlphaHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHealthChecksObj) *MockAlphaHealthChecks {
 	mock := &MockAlphaHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -6907,6 +6957,8 @@ func NewMockAlphaHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockAlpha
 // MockAlphaHealthChecks is the mock for HealthChecks.
 type MockAlphaHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHealthChecksObj
@@ -7026,9 +7078,8 @@ func (m *MockAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "healthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "healthChecks")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "healthChecks", key)
 
 	m.Objects[*key] = &MockHealthChecksObj{obj}
 	glog.V(5).Infof("MockAlphaHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -7266,8 +7317,10 @@ type HttpHealthChecks interface {
 }
 
 // NewMockHttpHealthChecks returns a new mock for HttpHealthChecks.
-func NewMockHttpHealthChecks(objs map[meta.Key]*MockHttpHealthChecksObj) *MockHttpHealthChecks {
+func NewMockHttpHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHttpHealthChecksObj) *MockHttpHealthChecks {
 	mock := &MockHttpHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -7279,6 +7332,8 @@ func NewMockHttpHealthChecks(objs map[meta.Key]*MockHttpHealthChecksObj) *MockHt
 // MockHttpHealthChecks is the mock for HttpHealthChecks.
 type MockHttpHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHttpHealthChecksObj
@@ -7398,9 +7453,8 @@ func (m *MockHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "httpHealthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "httpHealthChecks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "httpHealthChecks", key)
 
 	m.Objects[*key] = &MockHttpHealthChecksObj{obj}
 	glog.V(5).Infof("MockHttpHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -7638,8 +7692,10 @@ type HttpsHealthChecks interface {
 }
 
 // NewMockHttpsHealthChecks returns a new mock for HttpsHealthChecks.
-func NewMockHttpsHealthChecks(objs map[meta.Key]*MockHttpsHealthChecksObj) *MockHttpsHealthChecks {
+func NewMockHttpsHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHttpsHealthChecksObj) *MockHttpsHealthChecks {
 	mock := &MockHttpsHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -7651,6 +7707,8 @@ func NewMockHttpsHealthChecks(objs map[meta.Key]*MockHttpsHealthChecksObj) *Mock
 // MockHttpsHealthChecks is the mock for HttpsHealthChecks.
 type MockHttpsHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHttpsHealthChecksObj
@@ -7770,9 +7828,8 @@ func (m *MockHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "httpsHealthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "httpsHealthChecks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "httpsHealthChecks", key)
 
 	m.Objects[*key] = &MockHttpsHealthChecksObj{obj}
 	glog.V(5).Infof("MockHttpsHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -8013,8 +8070,10 @@ type InstanceGroups interface {
 }
 
 // NewMockInstanceGroups returns a new mock for InstanceGroups.
-func NewMockInstanceGroups(objs map[meta.Key]*MockInstanceGroupsObj) *MockInstanceGroups {
+func NewMockInstanceGroups(pr ProjectRouter, objs map[meta.Key]*MockInstanceGroupsObj) *MockInstanceGroups {
 	mock := &MockInstanceGroups{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -8026,6 +8085,8 @@ func NewMockInstanceGroups(objs map[meta.Key]*MockInstanceGroupsObj) *MockInstan
 // MockInstanceGroups is the mock for InstanceGroups.
 type MockInstanceGroups struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstanceGroupsObj
@@ -8151,9 +8212,8 @@ func (m *MockInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "instanceGroups", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "instanceGroups")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "instanceGroups", key)
 
 	m.Objects[*key] = &MockInstanceGroupsObj{obj}
 	glog.V(5).Infof("MockInstanceGroups.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -8525,8 +8585,10 @@ type Instances interface {
 }
 
 // NewMockInstances returns a new mock for Instances.
-func NewMockInstances(objs map[meta.Key]*MockInstancesObj) *MockInstances {
+func NewMockInstances(pr ProjectRouter, objs map[meta.Key]*MockInstancesObj) *MockInstances {
 	mock := &MockInstances{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -8538,6 +8600,8 @@ func NewMockInstances(objs map[meta.Key]*MockInstancesObj) *MockInstances {
 // MockInstances is the mock for Instances.
 type MockInstances struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstancesObj
@@ -8661,9 +8725,8 @@ func (m *MockInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Insta
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "instances", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "instances")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "instances", key)
 
 	m.Objects[*key] = &MockInstancesObj{obj}
 	glog.V(5).Infof("MockInstances.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -8943,8 +9006,10 @@ type BetaInstances interface {
 }
 
 // NewMockBetaInstances returns a new mock for Instances.
-func NewMockBetaInstances(objs map[meta.Key]*MockInstancesObj) *MockBetaInstances {
+func NewMockBetaInstances(pr ProjectRouter, objs map[meta.Key]*MockInstancesObj) *MockBetaInstances {
 	mock := &MockBetaInstances{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -8956,6 +9021,8 @@ func NewMockBetaInstances(objs map[meta.Key]*MockInstancesObj) *MockBetaInstance
 // MockBetaInstances is the mock for Instances.
 type MockBetaInstances struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstancesObj
@@ -9080,9 +9147,8 @@ func (m *MockBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionBeta, "mock-project", "instances", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "instances")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "instances", key)
 
 	m.Objects[*key] = &MockInstancesObj{obj}
 	glog.V(5).Infof("MockBetaInstances.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -9403,8 +9469,10 @@ type AlphaInstances interface {
 }
 
 // NewMockAlphaInstances returns a new mock for Instances.
-func NewMockAlphaInstances(objs map[meta.Key]*MockInstancesObj) *MockAlphaInstances {
+func NewMockAlphaInstances(pr ProjectRouter, objs map[meta.Key]*MockInstancesObj) *MockAlphaInstances {
 	mock := &MockAlphaInstances{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -9416,6 +9484,8 @@ func NewMockAlphaInstances(objs map[meta.Key]*MockInstancesObj) *MockAlphaInstan
 // MockAlphaInstances is the mock for Instances.
 type MockAlphaInstances struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstancesObj
@@ -9540,9 +9610,8 @@ func (m *MockAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alp
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "instances", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "instances")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "instances", key)
 
 	m.Objects[*key] = &MockInstancesObj{obj}
 	glog.V(5).Infof("MockAlphaInstances.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -9864,8 +9933,10 @@ type AlphaNetworkEndpointGroups interface {
 }
 
 // NewMockAlphaNetworkEndpointGroups returns a new mock for NetworkEndpointGroups.
-func NewMockAlphaNetworkEndpointGroups(objs map[meta.Key]*MockNetworkEndpointGroupsObj) *MockAlphaNetworkEndpointGroups {
+func NewMockAlphaNetworkEndpointGroups(pr ProjectRouter, objs map[meta.Key]*MockNetworkEndpointGroupsObj) *MockAlphaNetworkEndpointGroups {
 	mock := &MockAlphaNetworkEndpointGroups{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -9877,6 +9948,8 @@ func NewMockAlphaNetworkEndpointGroups(objs map[meta.Key]*MockNetworkEndpointGro
 // MockAlphaNetworkEndpointGroups is the mock for NetworkEndpointGroups.
 type MockAlphaNetworkEndpointGroups struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockNetworkEndpointGroupsObj
@@ -10003,9 +10076,8 @@ func (m *MockAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.K
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "networkEndpointGroups", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "networkEndpointGroups")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "networkEndpointGroups", key)
 
 	m.Objects[*key] = &MockNetworkEndpointGroupsObj{obj}
 	glog.V(5).Infof("MockAlphaNetworkEndpointGroups.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -10416,8 +10488,10 @@ type Projects interface {
 }
 
 // NewMockProjects returns a new mock for Projects.
-func NewMockProjects(objs map[meta.Key]*MockProjectsObj) *MockProjects {
+func NewMockProjects(pr ProjectRouter, objs map[meta.Key]*MockProjectsObj) *MockProjects {
 	mock := &MockProjects{
+		ProjectRouter: pr,
+
 		Objects: objs,
 	}
 	return mock
@@ -10426,6 +10500,8 @@ func NewMockProjects(objs map[meta.Key]*MockProjectsObj) *MockProjects {
 // MockProjects is the mock for Projects.
 type MockProjects struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockProjectsObj
@@ -10460,8 +10536,10 @@ type Regions interface {
 }
 
 // NewMockRegions returns a new mock for Regions.
-func NewMockRegions(objs map[meta.Key]*MockRegionsObj) *MockRegions {
+func NewMockRegions(pr ProjectRouter, objs map[meta.Key]*MockRegionsObj) *MockRegions {
 	mock := &MockRegions{
+		ProjectRouter: pr,
+
 		Objects:  objs,
 		GetError: map[meta.Key]error{},
 	}
@@ -10471,6 +10549,8 @@ func NewMockRegions(objs map[meta.Key]*MockRegionsObj) *MockRegions {
 // MockRegions is the mock for Regions.
 type MockRegions struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionsObj
@@ -10644,8 +10724,10 @@ type Routes interface {
 }
 
 // NewMockRoutes returns a new mock for Routes.
-func NewMockRoutes(objs map[meta.Key]*MockRoutesObj) *MockRoutes {
+func NewMockRoutes(pr ProjectRouter, objs map[meta.Key]*MockRoutesObj) *MockRoutes {
 	mock := &MockRoutes{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -10657,6 +10739,8 @@ func NewMockRoutes(objs map[meta.Key]*MockRoutesObj) *MockRoutes {
 // MockRoutes is the mock for Routes.
 type MockRoutes struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRoutesObj
@@ -10775,9 +10859,8 @@ func (m *MockRoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) e
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "routes", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "routes")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "routes", key)
 
 	m.Objects[*key] = &MockRoutesObj{obj}
 	glog.V(5).Infof("MockRoutes.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -10973,8 +11056,10 @@ type SslCertificates interface {
 }
 
 // NewMockSslCertificates returns a new mock for SslCertificates.
-func NewMockSslCertificates(objs map[meta.Key]*MockSslCertificatesObj) *MockSslCertificates {
+func NewMockSslCertificates(pr ProjectRouter, objs map[meta.Key]*MockSslCertificatesObj) *MockSslCertificates {
 	mock := &MockSslCertificates{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -10986,6 +11071,8 @@ func NewMockSslCertificates(objs map[meta.Key]*MockSslCertificatesObj) *MockSslC
 // MockSslCertificates is the mock for SslCertificates.
 type MockSslCertificates struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockSslCertificatesObj
@@ -11104,9 +11191,8 @@ func (m *MockSslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "sslCertificates", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "sslCertificates")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "sslCertificates", key)
 
 	m.Objects[*key] = &MockSslCertificatesObj{obj}
 	glog.V(5).Infof("MockSslCertificates.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -11303,8 +11389,10 @@ type TargetHttpProxies interface {
 }
 
 // NewMockTargetHttpProxies returns a new mock for TargetHttpProxies.
-func NewMockTargetHttpProxies(objs map[meta.Key]*MockTargetHttpProxiesObj) *MockTargetHttpProxies {
+func NewMockTargetHttpProxies(pr ProjectRouter, objs map[meta.Key]*MockTargetHttpProxiesObj) *MockTargetHttpProxies {
 	mock := &MockTargetHttpProxies{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -11316,6 +11404,8 @@ func NewMockTargetHttpProxies(objs map[meta.Key]*MockTargetHttpProxiesObj) *Mock
 // MockTargetHttpProxies is the mock for TargetHttpProxies.
 type MockTargetHttpProxies struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockTargetHttpProxiesObj
@@ -11435,9 +11525,8 @@ func (m *MockTargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "targetHttpProxies", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "targetHttpProxies")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "targetHttpProxies", key)
 
 	m.Objects[*key] = &MockTargetHttpProxiesObj{obj}
 	glog.V(5).Infof("MockTargetHttpProxies.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -11676,8 +11765,10 @@ type TargetHttpsProxies interface {
 }
 
 // NewMockTargetHttpsProxies returns a new mock for TargetHttpsProxies.
-func NewMockTargetHttpsProxies(objs map[meta.Key]*MockTargetHttpsProxiesObj) *MockTargetHttpsProxies {
+func NewMockTargetHttpsProxies(pr ProjectRouter, objs map[meta.Key]*MockTargetHttpsProxiesObj) *MockTargetHttpsProxies {
 	mock := &MockTargetHttpsProxies{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -11689,6 +11780,8 @@ func NewMockTargetHttpsProxies(objs map[meta.Key]*MockTargetHttpsProxiesObj) *Mo
 // MockTargetHttpsProxies is the mock for TargetHttpsProxies.
 type MockTargetHttpsProxies struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockTargetHttpsProxiesObj
@@ -11809,9 +11902,8 @@ func (m *MockTargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj 
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "targetHttpsProxies", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "targetHttpsProxies")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "targetHttpsProxies", key)
 
 	m.Objects[*key] = &MockTargetHttpsProxiesObj{obj}
 	glog.V(5).Infof("MockTargetHttpsProxies.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -12091,8 +12183,10 @@ type TargetPools interface {
 }
 
 // NewMockTargetPools returns a new mock for TargetPools.
-func NewMockTargetPools(objs map[meta.Key]*MockTargetPoolsObj) *MockTargetPools {
+func NewMockTargetPools(pr ProjectRouter, objs map[meta.Key]*MockTargetPoolsObj) *MockTargetPools {
 	mock := &MockTargetPools{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -12104,6 +12198,8 @@ func NewMockTargetPools(objs map[meta.Key]*MockTargetPoolsObj) *MockTargetPools 
 // MockTargetPools is the mock for TargetPools.
 type MockTargetPools struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockTargetPoolsObj
@@ -12227,9 +12323,8 @@ func (m *MockTargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Tar
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "targetPools", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "targetPools")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "targetPools", key)
 
 	m.Objects[*key] = &MockTargetPoolsObj{obj}
 	glog.V(5).Infof("MockTargetPools.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -12507,8 +12602,10 @@ type UrlMaps interface {
 }
 
 // NewMockUrlMaps returns a new mock for UrlMaps.
-func NewMockUrlMaps(objs map[meta.Key]*MockUrlMapsObj) *MockUrlMaps {
+func NewMockUrlMaps(pr ProjectRouter, objs map[meta.Key]*MockUrlMapsObj) *MockUrlMaps {
 	mock := &MockUrlMaps{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -12520,6 +12617,8 @@ func NewMockUrlMaps(objs map[meta.Key]*MockUrlMapsObj) *MockUrlMaps {
 // MockUrlMaps is the mock for UrlMaps.
 type MockUrlMaps struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockUrlMapsObj
@@ -12639,9 +12738,8 @@ func (m *MockUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap)
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "urlMaps", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "urlMaps")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "urlMaps", key)
 
 	m.Objects[*key] = &MockUrlMapsObj{obj}
 	glog.V(5).Infof("MockUrlMaps.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -12876,8 +12974,10 @@ type Zones interface {
 }
 
 // NewMockZones returns a new mock for Zones.
-func NewMockZones(objs map[meta.Key]*MockZonesObj) *MockZones {
+func NewMockZones(pr ProjectRouter, objs map[meta.Key]*MockZonesObj) *MockZones {
 	mock := &MockZones{
+		ProjectRouter: pr,
+
 		Objects:  objs,
 		GetError: map[meta.Key]error{},
 	}
@@ -12887,6 +12987,8 @@ func NewMockZones(objs map[meta.Key]*MockZonesObj) *MockZones {
 // MockZones is the mock for Zones.
 type MockZones struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockZonesObj
