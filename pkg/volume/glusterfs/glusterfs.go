@@ -332,7 +332,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// with `backup-volfile-servers` mount option in place, it is not required to
 	// iterate over all the servers in the addrlist. A mount attempt with this option
 	// will fetch all the servers mentioned in the backup-volfile-servers list.
-	// Refer backup-volfile-servers @ https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3/html/Administration_Guide/sect-Native_Client.html
+	// Refer to backup-volfile-servers @ http://docs.gluster.org/en/latest/Administrator%20Guide/Setting%20Up%20Clients/
 
 	if (len(addrlist) > 0) && (addrlist[0] != "") {
 		ip := addrlist[0]
