@@ -197,7 +197,7 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 
 func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 
-	// To reconstrcut volume spec we need endpoint where fetching endpoint from mount
+	// To reconstruct volume spec we need endpoint where fetching endpoint from mount
 	// string looks to be impossible, so returning error.
 
 	return nil, fmt.Errorf("impossible to reconstruct glusterfs volume spec from volume mountpath")
