@@ -63,7 +63,6 @@ func ControllerRevisionName(prefix string, hash uint32) string {
 func NewControllerRevision(parent metav1.Object,
 	parentKind schema.GroupVersionKind,
 	podLabels map[string]string,
-	selector labels.Selector,
 	data runtime.RawExtension,
 	revision int64,
 	collisionCount *int32) (*apps.ControllerRevision, error) {
