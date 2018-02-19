@@ -173,6 +173,10 @@ type Store struct {
 	Storage storage.Interface
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
+
+	// List of serialization schemes for which serialization serialization
+	// result should be cached together with the object.
+	SerializationSchemesToCache []*runtime.SerializationScheme
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -1362,6 +1366,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			e.NewListFunc,
 			attrFunc,
 			triggerFunc,
+			e.SerializationSchemesToCache,
 		)
 	}
 
