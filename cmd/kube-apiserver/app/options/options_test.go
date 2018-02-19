@@ -83,6 +83,7 @@ func TestAddFlags(t *testing.T) {
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
+		"--http2-max-streams-per-connection=42",
 		"--kubelet-https=true",
 		"--kubelet-read-only-port=10255",
 		"--kubelet-timeout=5s",
@@ -142,6 +143,7 @@ func TestAddFlags(t *testing.T) {
 				CertDirectory: "/var/run/kubernetes",
 				PairName:      "apiserver",
 			},
+			HTTP2MaxStreamsPerConnection: 42,
 		},
 		InsecureServing: &kubeoptions.InsecureServingOptions{
 			BindAddress: net.ParseIP("127.0.0.1"),
