@@ -485,6 +485,8 @@ var _ = SIGDescribe("Density", func() {
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
+		framework.Skipf("SKIP DENSITY")
+
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
