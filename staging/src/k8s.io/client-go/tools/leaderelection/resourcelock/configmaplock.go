@@ -32,15 +32,15 @@ import (
 // data we will likely move to deprecate the Endpoints lock.
 
 type ConfigMapLock struct {
-	// ConfigMapMeta should contain a Name and a Namespace of an
-	// ConfigMapMeta object that the Leadercmlector will attempt to lead.
+	// ConfigMapMeta should contain a Name and a Namespace of a
+	// ConfigMapMeta object that the LeaderElector will attempt to lead.
 	ConfigMapMeta metav1.ObjectMeta
 	Client        corev1client.ConfigMapsGetter
 	LockConfig    ResourceLockConfig
 	cm            *v1.ConfigMap
 }
 
-// Get returns the cmlection record from a ConfigMap Annotation
+// Get returns the election record from a ConfigMap Annotation
 func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, error) {
 	var record LeaderElectionRecord
 	var err error
@@ -59,7 +59,7 @@ func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, error) {
 	return &record, nil
 }
 
-// Create attempts to create a LeadercmlectionRecord annotation
+// Create attempts to create a LeaderElectionRecord annotation
 func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {
@@ -77,7 +77,7 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 	return err
 }
 
-// Update will update and existing annotation on a given resource.
+// Update will update an existing annotation on a given resource.
 func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 	if cml.cm == nil {
 		return errors.New("endpoint not initialized, call get or create first")
@@ -91,7 +91,7 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 	return err
 }
 
-// RecordEvent in leader cmlection while adding meta-data
+// RecordEvent in leader election while adding meta-data
 func (cml *ConfigMapLock) RecordEvent(s string) {
 	events := fmt.Sprintf("%v %v", cml.LockConfig.Identity, s)
 	cml.LockConfig.EventRecorder.Eventf(&v1.ConfigMap{ObjectMeta: cml.cm.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
