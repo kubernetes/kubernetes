@@ -22,9 +22,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -88,6 +89,13 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		ExportStrategy: node.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+
+		SerializationSchemesToCache: []*runtime.SerializationScheme{
+			{
+				GV:        schema.GroupVersion{Group: "", Version: "v1"},
+				MediaType: []string{"application/vnd.kubernetes.protobuf"},
+			},
+		},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: node.GetAttrs, TriggerFunc: node.NodeNameTriggerFunc}
 	if err := store.CompleteWithOptions(options); err != nil {
