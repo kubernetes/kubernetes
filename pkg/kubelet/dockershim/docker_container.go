@@ -401,6 +401,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 		Labels:      labels,
 		Annotations: annotations,
 		LogPath:     r.Config.Labels[containerLogPathLabelKey],
+		RealPath:    r.LogPath,
 	}
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
 }

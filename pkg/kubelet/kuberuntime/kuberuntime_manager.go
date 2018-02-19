@@ -495,6 +495,16 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 
+		if containerStatus != nil &&
+			(containerStatus.State == kubecontainer.ContainerStateRunning ||
+				containerStatus.State == kubecontainer.ContainerStateExited) {
+
+			if err := m.createContainerLogSymlinksIfNotExist(containerStatus.ID.ID); err != nil {
+				glog.Errorf("error in creating symlink to container log: %v", err)
+			}
+
+		}
+
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.

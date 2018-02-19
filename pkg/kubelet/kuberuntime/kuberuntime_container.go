@@ -857,6 +857,50 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 	return nil
 }
 
+// createContainerLogSymlinksIfNotExist creates symlinks to container logs if they do not exist.
+// It can happen if the kubelet restarted for whatever reason after a container started but before
+// symlinks were created.
+func (m *kubeGenericRuntimeManager) createContainerLogSymlinksIfNotExist(containerID string) error {
+	// Remove the container log.
+	status, err := m.runtimeService.ContainerStatus(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+	}
+
+	realPath := status.RealPath
+	// if the conatiner runtime does not return real log path, just return
+	if len(realPath) == 0 {
+		return nil
+	}
+	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	path := buildFullContainerLogsPath(labeledInfo.PodUID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
+	// if symlink does not exist, create one
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err = m.osInterface.Symlink(realPath, path); err != nil {
+			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
+				path, realPath, containerID, err)
+		}
+	} else if err != nil {
+		// if some other error in Stat, return
+		return err
+	}
+
+	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
+		labeledInfo.PodNamespace)
+	if _, err := os.Stat(legacySymlink); os.IsNotExist(err) {
+		if err := m.osInterface.Symlink(path, legacySymlink); err != nil {
+			return fmt.Errorf("failed to create container %q log legacy symbolic link %q: %v",
+				containerID, legacySymlink, err)
+		}
+	} else if err != nil {
+		// if some other error in Stat, return
+		return err
+	}
+
+	return nil
+}
+
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	return m.removeContainer(containerID.ID)
