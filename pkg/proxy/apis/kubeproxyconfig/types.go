@@ -54,6 +54,9 @@ type KubeProxyIPTablesConfiguration struct {
 	// minSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').
 	MinSyncPeriod metav1.Duration
+	// udpConnectionFlushTimeout is the minimum timeout before dropping connection tracking entries after
+	// an endpoint is removed (e.g. '30s'). If set to 0, connections are flushed immediately.
+	UDPConnectionFlushDelay *metav1.Duration
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration

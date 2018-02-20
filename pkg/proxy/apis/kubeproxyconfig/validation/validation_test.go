@@ -337,6 +337,16 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 			},
 			msg: fmt.Sprintf("must be greater than or equal to %s", newPath.Child("KubeProxyIPTablesConfiguration").Child("MinSyncPeriod").String()),
 		},
+		{
+			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+				MasqueradeBit:           &valid,
+				MasqueradeAll:           true,
+				SyncPeriod:              metav1.Duration{Duration: 5 * time.Second},
+				MinSyncPeriod:           metav1.Duration{Duration: 1 * time.Second},
+				UDPConnectionFlushDelay: &metav1.Duration{Duration: -5 * time.Second},
+			},
+			msg: "must be greater than or equal to 0",
+		},
 	}
 
 	for _, errorCase := range errorCases {

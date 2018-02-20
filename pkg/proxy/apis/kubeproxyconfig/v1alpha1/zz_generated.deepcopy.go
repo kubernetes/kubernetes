@@ -168,6 +168,15 @@ func (in *KubeProxyIPTablesConfiguration) DeepCopyInto(out *KubeProxyIPTablesCon
 	}
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	if in.UDPConnectionFlushDelay != nil {
+		in, out := &in.UDPConnectionFlushDelay, &out.UDPConnectionFlushDelay
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
+	}
 	return
 }
 

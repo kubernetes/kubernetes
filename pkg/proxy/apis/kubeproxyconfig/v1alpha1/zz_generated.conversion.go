@@ -181,6 +181,7 @@ func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_kubeproxyconfig_Kube
 	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	out.UDPConnectionFlushDelay = (*v1.Duration)(unsafe.Pointer(in.UDPConnectionFlushDelay))
 	return nil
 }
 
@@ -194,6 +195,7 @@ func autoConvert_kubeproxyconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_Kube
 	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	out.UDPConnectionFlushDelay = (*v1.Duration)(unsafe.Pointer(in.UDPConnectionFlushDelay))
 	return nil
 }
 

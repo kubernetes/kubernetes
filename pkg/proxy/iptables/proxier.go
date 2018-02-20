@@ -224,17 +224,18 @@ type Proxier struct {
 	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 
 	// These are effectively const and do not need the mutex to be held.
-	iptables       utiliptables.Interface
-	masqueradeAll  bool
-	masqueradeMark string
-	exec           utilexec.Interface
-	clusterCIDR    string
-	hostname       string
-	nodeIP         net.IP
-	portMapper     utilproxy.PortOpener
-	recorder       record.EventRecorder
-	healthChecker  healthcheck.Server
-	healthzServer  healthcheck.HealthzUpdater
+	iptables                utiliptables.Interface
+	masqueradeAll           bool
+	masqueradeMark          string
+	udpConnectionFlushDelay time.Duration
+	exec                    utilexec.Interface
+	clusterCIDR             string
+	hostname                string
+	nodeIP                  net.IP
+	portMapper              utilproxy.PortOpener
+	recorder                record.EventRecorder
+	healthChecker           healthcheck.Server
+	healthzServer           healthcheck.HealthzUpdater
 
 	// Since converting probabilities (floats) to strings is expensive
 	// and we are using only probabilities in the format of 1/n, we are
@@ -279,6 +280,7 @@ func NewProxier(ipt utiliptables.Interface,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
+	udpConnectionFlushDelay time.Duration,
 	clusterCIDR string,
 	hostname string,
 	nodeIP net.IP,
@@ -317,14 +319,15 @@ func NewProxier(ipt utiliptables.Interface,
 
 	isIPv6 := ipt.IsIpv6()
 	proxier := &Proxier{
-		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		serviceMap:               make(proxy.ServiceMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
-		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder),
-		iptables:                 ipt,
-		masqueradeAll:            masqueradeAll,
-		masqueradeMark:           masqueradeMark,
+		portsMap:                make(map[utilproxy.LocalPort]utilproxy.Closeable),
+		serviceMap:              make(proxy.ServiceMap),
+		serviceChanges:          proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
+		endpointsMap:            make(proxy.EndpointsMap),
+		endpointsChanges:        proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder),
+		iptables:                ipt,
+		masqueradeAll:           masqueradeAll,
+		masqueradeMark:          masqueradeMark,
+		udpConnectionFlushDelay: udpConnectionFlushDelay,
 		exec:                     exec,
 		clusterCIDR:              clusterCIDR,
 		hostname:                 hostname,
@@ -597,13 +600,37 @@ func servicePortEndpointChainName(servicePortName string, protocol string, endpo
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.GetProtocol() == api.ProtocolUDP {
-			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIPString(), endpointIP, v1.ProtocolUDP)
-			if err != nil {
-				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
+			if proxier.udpConnectionFlushDelay == 0 {
+				proxier.deleteEndpointPair(svcInfo, epSvcPair)
+			} else {
+				// Delay UDP flush so in-flight requests are not immediately dropped before they have a chance to complete.
+				go proxier.asyncDeleteEndpointPair(svcInfo, epSvcPair)
 			}
 		}
 	}
+}
+
+func (proxier *Proxier) deleteEndpointPair(svcInfo proxy.ServicePort, epSvcPair proxy.ServiceEndpoint) {
+	endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
+	err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIPString(), endpointIP, v1.ProtocolUDP)
+	if err != nil {
+		glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
+	}
+}
+
+func (proxier *Proxier) asyncDeleteEndpointPair(svcInfo proxy.ServicePort, epSvcPair proxy.ServiceEndpoint) {
+	time.Sleep(proxier.udpConnectionFlushDelay)
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	if endpoints, ok := proxier.endpointsMap[epSvcPair.ServicePortName]; ok {
+		for _, ep := range endpoints {
+			if ep.String() == epSvcPair.Endpoint {
+				// endpoint has come back, don't drop connections
+				return
+			}
+		}
+	}
+	proxier.deleteEndpointPair(svcInfo, epSvcPair)
 }
 
 // This is where all of the iptables-save/restore calls happen.

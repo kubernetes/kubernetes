@@ -97,6 +97,10 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
 	}
 
+	if config.UDPConnectionFlushDelay != nil && config.UDPConnectionFlushDelay.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("UDPConnectionFlushDelay"), config.UDPConnectionFlushDelay, fmt.Sprintf("must be greater than or equal to 0")))
+	}
+
 	return allErrs
 }
 

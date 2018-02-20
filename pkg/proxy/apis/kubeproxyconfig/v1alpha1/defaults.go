@@ -56,6 +56,9 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.IPTables.SyncPeriod.Duration == 0 {
 		obj.IPTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
+	if obj.IPTables.UDPConnectionFlushDelay == nil {
+		obj.IPTables.UDPConnectionFlushDelay = &metav1.Duration{Duration: 30 * time.Second}
+	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}

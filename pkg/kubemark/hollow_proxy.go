@@ -87,6 +87,7 @@ func NewHollowProxyOrDie(
 			5*time.Second,
 			false,
 			0,
+			0,
 			"10.0.0.0/8",
 			nodeName,
 			getNodeIP(client, nodeName),
