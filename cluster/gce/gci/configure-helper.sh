@@ -2238,6 +2238,13 @@ EOF
     local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
     update-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
+  if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
+    if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+      setup-addon-manifests "addons" "istio/auth"
+    else
+      setup-addon-manifests "addons" "istio/noauth"
+    fi
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
