@@ -148,6 +148,8 @@ type Instances interface {
 	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
+	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
+	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
 }
 
 // Route is a representation of an advanced routing rule.

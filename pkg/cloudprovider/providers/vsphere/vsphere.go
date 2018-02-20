@@ -610,6 +610,11 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 	return false, err
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (vs *VSphere) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
 

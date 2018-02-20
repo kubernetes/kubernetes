@@ -120,6 +120,11 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 	return true, nil
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
 	nodeName := mapNodeNameToVMName(name)
 	metadataName, err := az.metadata.Text("instance/compute/name")

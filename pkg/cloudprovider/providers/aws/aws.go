@@ -1368,6 +1368,11 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	return true, nil
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
 func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:

@@ -158,3 +158,8 @@ func (cs *CSCloud) InstanceExistsByProviderID(ctx context.Context, providerID st
 
 	return true, nil
 }
+
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (cs *CSCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
