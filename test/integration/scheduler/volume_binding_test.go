@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 type testConfig struct {
@@ -252,6 +251,21 @@ func makePV(t *testing.T, name, scName, pvcName, ns string) *v1.PersistentVolume
 					Path: "/test-path",
 				},
 			},
+			NodeAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      labelKey,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{labelValue},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -259,25 +273,6 @@ func makePV(t *testing.T, name, scName, pvcName, ns string) *v1.PersistentVolume
 		pv.Spec.ClaimRef = &v1.ObjectReference{Name: pvcName, Namespace: ns}
 	}
 
-	testNodeAffinity := &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      labelKey,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{labelValue},
-						},
-					},
-				},
-			},
-		},
-	}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, testNodeAffinity)
-	if err != nil {
-		t.Fatalf("Setting storage node affinity failed: %v", err)
-	}
 	return pv
 }
 

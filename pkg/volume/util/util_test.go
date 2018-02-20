@@ -37,7 +37,7 @@ var nodeLabels map[string]string = map[string]string{
 	"test-key2": "test-value2",
 }
 
-func TestCheckNodeAffinity(t *testing.T) {
+func TestCheckAlphaNodeAffinity(t *testing.T) {
 	type affinityTest struct {
 		name          string
 		expectSuccess bool
@@ -48,12 +48,12 @@ func TestCheckNodeAffinity(t *testing.T) {
 		{
 			name:          "valid-no-constraints",
 			expectSuccess: true,
-			pv:            testVolumeWithNodeAffinity(t, &v1.NodeAffinity{}),
+			pv:            testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{}),
 		},
 		{
 			name:          "valid-constraints",
 			expectSuccess: true,
-			pv: testVolumeWithNodeAffinity(t, &v1.NodeAffinity{
+			pv: testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
@@ -77,7 +77,7 @@ func TestCheckNodeAffinity(t *testing.T) {
 		{
 			name:          "invalid-key",
 			expectSuccess: false,
-			pv: testVolumeWithNodeAffinity(t, &v1.NodeAffinity{
+			pv: testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
@@ -101,7 +101,7 @@ func TestCheckNodeAffinity(t *testing.T) {
 		{
 			name:          "invalid-values",
 			expectSuccess: false,
-			pv: testVolumeWithNodeAffinity(t, &v1.NodeAffinity{
+			pv: testVolumeWithAlphaNodeAffinity(t, &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
@@ -136,7 +136,111 @@ func TestCheckNodeAffinity(t *testing.T) {
 	}
 }
 
-func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.NodeAffinity) *v1.PersistentVolume {
+func TestCheckVolumeNodeAffinity(t *testing.T) {
+	type affinityTest struct {
+		name          string
+		expectSuccess bool
+		pv            *v1.PersistentVolume
+	}
+
+	cases := []affinityTest{
+		{
+			name:          "valid-nil",
+			expectSuccess: true,
+			pv:            testVolumeWithNodeAffinity(t, nil),
+		},
+		{
+			name:          "valid-no-constraints",
+			expectSuccess: true,
+			pv:            testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{}),
+		},
+		{
+			name:          "valid-constraints",
+			expectSuccess: true,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key1",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value1", "test-value3"},
+								},
+								{
+									Key:      "test-key2",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value2"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "invalid-key",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key1",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value1", "test-value3"},
+								},
+								{
+									Key:      "test-key3",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value2"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:          "invalid-values",
+			expectSuccess: false,
+			pv: testVolumeWithNodeAffinity(t, &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "test-key1",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value3", "test-value4"},
+								},
+								{
+									Key:      "test-key2",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test-value0", "test-value2"},
+								},
+							},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	for _, c := range cases {
+		err := CheckNodeAffinity(c.pv, nodeLabels)
+
+		if err != nil && c.expectSuccess {
+			t.Errorf("CheckTopology %v returned error: %v", c.name, err)
+		}
+		if err == nil && !c.expectSuccess {
+			t.Errorf("CheckTopology %v returned success, expected error", c.name)
+		}
+	}
+}
+
+func testVolumeWithAlphaNodeAffinity(t *testing.T, affinity *v1.NodeAffinity) *v1.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: "test-constraints"}
 	objMeta.Annotations = map[string]string{}
 	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
@@ -146,6 +250,16 @@ func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.NodeAffinity) *v1.Per
 
 	return &v1.PersistentVolume{
 		ObjectMeta: objMeta,
+	}
+}
+
+func testVolumeWithNodeAffinity(t *testing.T, affinity *v1.VolumeNodeAffinity) *v1.PersistentVolume {
+	objMeta := metav1.ObjectMeta{Name: "test-constraints"}
+	return &v1.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec: v1.PersistentVolumeSpec{
+			NodeAffinity: affinity,
+		},
 	}
 }
 

@@ -27,8 +27,9 @@ import (
 )
 
 var (
-	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
-	Read      = []string{"get", "list", "watch"}
+	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
+	Read       = []string{"get", "list", "watch"}
+	ReadUpdate = []string{"get", "list", "watch", "update", "patch"}
 
 	Label      = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
 	Annotation = map[string]string{rbac.AutoUpdateAnnotationKey: "true"}
@@ -483,15 +484,13 @@ func ClusterRoles() []rbac.ClusterRole {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		// Find the scheduler role
-		for i, role := range roles {
-			if role.Name == "system:kube-scheduler" {
-				pvRule := rbac.NewRule("update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie()
-				scRule := rbac.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie()
-				roles[i].Rules = append(role.Rules, pvRule, scRule)
-				break
-			}
-		}
+		roles = append(roles, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+			},
+		})
 	}
 
 	addClusterRoleLabel(roles)
@@ -518,6 +517,10 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 			ObjectMeta: metav1.ObjectMeta{Name: systemNodeRoleName},
 			RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: systemNodeRoleName},
 		},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		rolebindings = append(rolebindings, rbac.NewClusterBinding("system:volume-scheduler").Users(user.KubeScheduler).BindingOrDie())
 	}
 
 	addClusterRoleBindingLabel(rolebindings)
