@@ -106,7 +106,7 @@ function record_command() {
     juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
     if [[ $? -ne 0 ]]; then
       echo "Error when running ${name}"
-      foundError="True"
+      foundError="${foundError}""${name}"", "
     fi
 
     set -o nounset
@@ -357,7 +357,7 @@ run_pod_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert pods true
   ### Validate Export ###
-  kube::test::get_object_assert 'pods/valid-pod' "{{.metadata.namespace}} {{.metadata.name}}" '<no value> valid-pod' "--export=true"
+  kube::test::get_object_assert 'pods/valid-pod' "{{.metadata.namespace}} {{.metadata.name}}" '<no value> va-pod' "--export=true"
 
   ### Dump current valid-pod POD
   output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1 "${kube_flags[@]}")
@@ -4609,7 +4609,7 @@ run_impersonation_tests() {
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
-  foundError="False"
+  foundError=""
 
   if [ -z "${SUPPORTED_RESOURCES:-}" ]; then
     echo "Need to set SUPPORTED_RESOURCES env var. It is a list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
@@ -5108,8 +5108,8 @@ runTests() {
 
   kube::test::clear_all
 
-  if [ "$foundError" == "True" ]; then
-    echo "TEST FAILED"
+  if [ ! -z "${foundError}" ]; then
+    echo "FAILED TESTS: ""${foundError}"
     exit 1
   fi
 }
