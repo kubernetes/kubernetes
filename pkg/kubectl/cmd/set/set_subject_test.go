@@ -28,7 +28,7 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	_, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
@@ -107,7 +107,6 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.options.Mapper, _ = f.Object()
 		err := test.options.Validate()
 		if test.expectErr && err != nil {
 			continue

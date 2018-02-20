@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -101,26 +102,25 @@ func (f *ring2Factory) PrintSuccess(shortOutput bool, out io.Writer, resource, n
 	}
 }
 
-func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	// try to get a typed object
-	_, typer := f.objectMappingFactory.Object()
-	gvks, _, err := typer.ObjectKinds(obj)
+func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, obj runtime.Object, out io.Writer) error {
+	// gate internal objects from being printed through this method
+	_, isUnstructured := obj.(*unstructured.Unstructured)
 
-	if err != nil {
-		return err
-	}
-	// Prefer the existing external version if specified
-	var preferredVersion []string
-	if gvks[0].Version != "" && gvks[0].Version != runtime.APIVersionInternal {
-		preferredVersion = []string{gvks[0].Version}
-	}
-
-	mapping, err := mapper.RESTMapping(gvks[0].GroupKind(), preferredVersion...)
-	if err != nil {
+	typer := legacyscheme.Scheme
+	gvks, unversioned, err := typer.ObjectKinds(obj)
+	if err != nil && !isUnstructured {
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(ExtractCmdPrintOptions(cmd, false), mapping)
+	if !isUnstructured {
+		for _, gvk := range gvks {
+			if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal || unversioned {
+				return fmt.Errorf("sent an internal object %v to print", gvk)
+			}
+		}
+	}
+
+	printer, err := f.PrinterForOptions(ExtractCmdPrintOptions(cmd, false))
 	if err != nil {
 		return err
 	}
