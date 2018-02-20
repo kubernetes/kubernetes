@@ -41,10 +41,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
-	"github.com/vmware/govmomi/find"
-	vimtypes "github.com/vmware/govmomi/vim25/types"
 	"regexp"
 	"strings"
+
+	"github.com/vmware/govmomi/find"
+	vimtypes "github.com/vmware/govmomi/vim25/types"
 )
 
 const (
@@ -657,7 +658,7 @@ func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.Reso
 	framework.Logf("Registering node VM %s with vmx file path %s", nodeName, vmxFilePath)
 
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
-	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, true)
+	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, false)
 
 	vmFolder, err := finder.FolderOrDefault(ctx, workingDir)
 	Expect(err).NotTo(HaveOccurred())
