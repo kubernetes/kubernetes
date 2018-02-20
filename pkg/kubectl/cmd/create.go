@@ -213,9 +213,6 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if len(output) > 0 && !shortOutput {
 			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
-		if !shortOutput {
-			f.PrintObjectSpecificMessage(info.Object, o.Out)
-		}
 
 		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "created")
 		return nil

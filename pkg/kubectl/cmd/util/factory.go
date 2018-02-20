@@ -18,7 +18,6 @@ package util
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -172,9 +171,6 @@ type ClientAccessFactory interface {
 	// can range over in order to determine if the user has specified an editor
 	// of their choice.
 	EditorEnvs() []string
-
-	// PrintObjectSpecificMessage prints object-specific messages on the provided writer
-	PrintObjectSpecificMessage(obj runtime.Object, out io.Writer)
 }
 
 // ObjectMappingFactory holds the second level of factory methods. These functions depend upon ClientAccessFactory methods.
