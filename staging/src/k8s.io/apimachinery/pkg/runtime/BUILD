@@ -16,6 +16,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "caching_object.go",
         "codec.go",
         "codec_check.go",
         "conversion.go",
