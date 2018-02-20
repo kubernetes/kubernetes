@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 // Internal Load Balancer
@@ -33,7 +34,7 @@ func makeInstanceGroupName(clusterID string) string {
 	return fmt.Sprintf("k8s-ig--%s", clusterID)
 }
 
-func makeBackendServiceName(loadBalancerName, clusterID string, shared bool, scheme lbScheme, protocol v1.Protocol, svcAffinity v1.ServiceAffinity) string {
+func makeBackendServiceName(loadBalancerName, clusterID string, shared bool, scheme cloud.LbScheme, protocol v1.Protocol, svcAffinity v1.ServiceAffinity) string {
 	if shared {
 		hash := sha1.New()
 

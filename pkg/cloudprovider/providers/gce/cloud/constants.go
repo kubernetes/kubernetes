@@ -21,11 +21,15 @@ import (
 )
 
 type NetworkTier string
+type LbScheme string
 
 const (
 	NetworkTierStandard NetworkTier = "Standard"
 	NetworkTierPremium  NetworkTier = "Premium"
 	NetworkTierDefault  NetworkTier = NetworkTierPremium
+
+	SchemeExternal LbScheme = "EXTERNAL"
+	SchemeInternal LbScheme = "INTERNAL"
 )
 
 // ToGCEValue converts NetworkTier to a string that we can populate the
