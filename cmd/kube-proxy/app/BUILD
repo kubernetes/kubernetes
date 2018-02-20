@@ -185,7 +185,6 @@ go_test(
     name = "go_default_test",
     srcs = ["server_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",

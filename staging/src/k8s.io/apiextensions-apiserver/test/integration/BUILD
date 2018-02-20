@@ -14,7 +14,6 @@ go_test(
         "validation_test.go",
         "yaml_test.go",
     ],
-    importpath = "k8s.io/apiextensions-apiserver/test/integration",
     tags = ["integration"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",

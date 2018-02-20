@@ -36,7 +36,6 @@ go_test(
     name = "go_default_test",
     srcs = ["handlers_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",

@@ -99,7 +99,6 @@ go_test(
         "//api/swagger-spec",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     visibility = [
         "//build/visible_to:COMMON_testing",
     ],

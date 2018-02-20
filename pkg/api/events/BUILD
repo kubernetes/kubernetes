@@ -17,7 +17,6 @@ go_test(
     name = "go_default_test",
     srcs = ["sorted_event_list_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/api/events",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

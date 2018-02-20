@@ -1,15 +1,15 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "af4281751a0e3b5d87fb6a52c83d358871b4f83d7acbe6e65a901fba6612a03e",
-    strip_prefix = "rules_go-bdf2df58c0d352ffa262ae4b36c7a1a2d6e3f0c9",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/bdf2df58c0d352ffa262ae4b36c7a1a2d6e3f0c9.tar.gz"],
+    sha256 = "66282d078c1847c2d876c02c5dabd4fd57cc75eb41a9668a2374352fa73b4587",
+    strip_prefix = "rules_go-ff7e3364d9383cf14155f8c2efc87218d07eb03b",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/ff7e3364d9383cf14155f8c2efc87218d07eb03b.tar.gz"],
 )
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "f4946917d95c54aaa98d1092757256e491f8f48fd550179134f00f902bc0b4ce",
-    strip_prefix = "repo-infra-c75960142a50de16ac6225b0843b1ff3476ab0b4",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/c75960142a50de16ac6225b0843b1ff3476ab0b4.tar.gz"],
+    sha256 = "007774f06536059f3f782d1a092bddc625d88c17f20bbe731cea844a52485b11",
+    strip_prefix = "repo-infra-97099dccc8807e9159dc28f374a8f0602cab07e1",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/97099dccc8807e9159dc28f374a8f0602cab07e1.tar.gz"],
 )
 
 http_archive(

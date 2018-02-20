@@ -38,7 +38,6 @@ go_test(
         "manager_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",

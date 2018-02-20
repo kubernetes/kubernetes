@@ -38,7 +38,6 @@ go_test(
         "iscsi_util_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/iscsi",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

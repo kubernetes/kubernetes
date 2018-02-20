@@ -14,7 +14,6 @@ go_test(
         "upgrade_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/httpstream/spdy",
     deps = [
         "//vendor/github.com/elazarl/goproxy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",

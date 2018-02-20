@@ -8,7 +8,6 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kubectl",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubectl",
     pure = "on",
     visibility = ["//visibility:public"],
     x_defs = version_x_defs(),

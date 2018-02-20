@@ -30,7 +30,6 @@ go_test(
         "grpc_service_unix_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope",
     deps = [
         "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",

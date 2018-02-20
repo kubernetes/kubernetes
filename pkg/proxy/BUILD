@@ -56,7 +56,6 @@ go_test(
         "service_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/proxy",
     deps = [
         "//pkg/api/service:go_default_library",
         "//pkg/apis/core:go_default_library",

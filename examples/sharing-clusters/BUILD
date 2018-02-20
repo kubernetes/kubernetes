@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "sharing-clusters",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/examples/sharing-clusters",
 )
 
 go_library(

@@ -75,7 +75,6 @@ go_test(
         "package_validator_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e_node/system",
     tags = ["e2e"],
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",

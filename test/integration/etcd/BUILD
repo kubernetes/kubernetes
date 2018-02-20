@@ -12,7 +12,6 @@ go_test(
         "etcd_storage_path_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/etcd",
     tags = [
         "etcd",
         "integration",

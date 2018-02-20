@@ -37,7 +37,6 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating",
     deps = [
         "//vendor/k8s.io/api/admission/v1beta1:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1beta1:go_default_library",

@@ -51,7 +51,6 @@ go_test(
     name = "go_default_test",
     srcs = ["cani_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/auth",
     deps = [
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

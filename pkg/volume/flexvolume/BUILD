@@ -55,7 +55,6 @@ go_test(
         "unmounter_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/flexvolume",
     deps = [
         "//pkg/util/filesystem:go_default_library",
         "//pkg/util/mount:go_default_library",

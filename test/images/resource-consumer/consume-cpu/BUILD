@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "consume-cpu",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/resource-consumer/consume-cpu",
 )
 
 go_library(

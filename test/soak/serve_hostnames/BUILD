@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "serve_hostnames",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/soak/serve_hostnames",
 )
 
 go_library(

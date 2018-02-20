@@ -20,7 +20,6 @@ go_test(
     name = "go_default_test",
     srcs = ["hairpin_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hairpin",
     deps = [
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",

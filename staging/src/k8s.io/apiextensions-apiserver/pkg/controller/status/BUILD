@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["naming_controller_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiextensions-apiserver/pkg/controller/status",
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",

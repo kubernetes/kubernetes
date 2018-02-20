@@ -23,7 +23,6 @@ go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/apis/autoscaling/validation",
     deps = [
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",

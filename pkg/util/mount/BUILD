@@ -102,7 +102,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/mount",
     deps = [
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],

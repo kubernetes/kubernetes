@@ -40,7 +40,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["customcolumn_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/printers_test",
     deps = [
         ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
@@ -72,7 +71,6 @@ go_test(
     name = "go_default_test",
     srcs = ["humanreadable_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -54,7 +54,6 @@ go_test(
     name = "go_default_test",
     srcs = ["taints_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e/scheduling",
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",

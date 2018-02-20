@@ -38,7 +38,6 @@ go_test(
         "csi_plugin_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/csi",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi/fake:go_default_library",

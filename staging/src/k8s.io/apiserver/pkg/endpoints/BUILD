@@ -16,7 +16,6 @@ go_test(
         "watch_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/endpoints",
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",

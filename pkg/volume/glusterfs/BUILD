@@ -44,7 +44,6 @@ go_test(
         "glusterfs_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/glusterfs",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

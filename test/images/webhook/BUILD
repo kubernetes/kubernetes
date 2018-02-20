@@ -25,7 +25,6 @@ go_library(
 go_binary(
     name = "webhook",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/webhook",
     visibility = ["//visibility:public"],
 )
 
@@ -47,7 +46,6 @@ go_test(
     name = "go_default_test",
     srcs = ["patch_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/webhook",
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

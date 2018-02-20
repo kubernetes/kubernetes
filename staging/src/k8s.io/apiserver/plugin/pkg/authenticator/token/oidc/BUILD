@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["oidc_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/oidc",
     deps = [
         "//vendor/github.com/coreos/go-oidc/jose:go_default_library",
         "//vendor/github.com/coreos/go-oidc/oidc:go_default_library",

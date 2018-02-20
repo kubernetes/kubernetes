@@ -37,7 +37,6 @@ go_test(
         "photon_pd_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/photon_pd",
     deps = [
         "//pkg/cloudprovider/providers/photon:go_default_library",
         "//pkg/util/mount:go_default_library",

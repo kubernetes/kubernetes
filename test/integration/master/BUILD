@@ -15,7 +15,6 @@ go_test(
         "secrets_enveloping_test.go",
         "synthetic_master_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/master",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",

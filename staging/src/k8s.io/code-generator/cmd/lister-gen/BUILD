@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "lister-gen",
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/lister-gen",
 )
 
 go_library(

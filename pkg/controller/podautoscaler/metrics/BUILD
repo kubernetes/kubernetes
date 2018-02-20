@@ -40,7 +40,6 @@ go_test(
         "utilization_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",

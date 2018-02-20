@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["pki_helpers_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil",
     deps = ["//vendor/k8s.io/client-go/util/cert:go_default_library"],
 )
 

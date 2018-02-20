@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["allow_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/password/allow",
 )
 
 go_library(

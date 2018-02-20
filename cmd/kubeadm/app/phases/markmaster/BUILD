@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["markmaster_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster",
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/kubelet/apis:go_default_library",

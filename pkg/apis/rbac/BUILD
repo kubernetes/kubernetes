@@ -48,7 +48,6 @@ filegroup(
 go_test(
     name = "go_default_xtest",
     srcs = ["helpers_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/rbac_test",
     deps = [
         ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",

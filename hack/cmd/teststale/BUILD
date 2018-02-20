@@ -10,14 +10,12 @@ load(
 go_binary(
     name = "teststale",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/hack/cmd/teststale",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["teststale_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/hack/cmd/teststale",
 )
 
 go_library(

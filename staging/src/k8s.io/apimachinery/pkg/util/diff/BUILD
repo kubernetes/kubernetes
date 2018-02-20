@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["diff_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/diff",
 )
 
 go_library(

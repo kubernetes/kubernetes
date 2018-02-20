@@ -34,7 +34,6 @@ go_test(
         "hostport_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hostport",
     deps = [
         "//pkg/util/iptables:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

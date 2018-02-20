@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "etcd-version-monitor",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cluster/images/etcd-version-monitor",
 )
 
 go_library(

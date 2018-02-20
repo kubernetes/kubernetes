@@ -10,7 +10,6 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "cloud-controller-manager",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager",
     pure = "on",
     x_defs = version_x_defs(),
 )

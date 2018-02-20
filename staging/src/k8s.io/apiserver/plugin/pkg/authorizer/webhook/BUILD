@@ -13,7 +13,6 @@ go_test(
         "webhook_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authorizer/webhook",
     deps = [
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
