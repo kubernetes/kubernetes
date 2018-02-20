@@ -233,7 +233,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 }
 
 // selectLoadBalancer selects load balancer for the service in the cluster.
-// The selection algorithm selects the the load balancer with currently has
+// The selection algorithm selects the load balancer which currently has
 // the minimum lb rules. If there are multiple LBs with same number of rules,
 // then selects the first one (sorted based on name).
 func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, existingLBs *[]network.LoadBalancer, nodes []*v1.Node) (selectedLB *network.LoadBalancer, existsLb bool, err error) {

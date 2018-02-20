@@ -325,7 +325,7 @@ func (ss *scaleSet) listScaleSetVMs(scaleSetName string) ([]computepreview.Virtu
 	return allVMs, nil
 }
 
-// getAgentPoolScaleSets lists the virtual machines for for the resource group and then builds
+// getAgentPoolScaleSets lists the virtual machines for the resource group and then builds
 // a list of scale sets that match the nodes available to k8s.
 func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
 	agentPoolScaleSets := &[]string{}
