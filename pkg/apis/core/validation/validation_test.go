@@ -586,6 +586,29 @@ func TestValidateLocalVolumes(t *testing.T) {
 				},
 				testLocalVolume("/foo", nil)),
 		},
+		"alpha and beta local volume": {
+			isExpectedFailure: true,
+			volume: testVolumeWithAlphaNodeAffinity(
+				t,
+				"invalid-alpha-beta-local-volume",
+				"",
+				&core.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{
+							{
+								MatchExpressions: []core.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: core.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				testLocalVolume("/foo", simpleVolumeNodeAffinity("foo", "bar"))),
+		},
 		"valid local volume": {
 			isExpectedFailure: false,
 			volume: testVolume("valid-local-volume", "",
@@ -741,7 +764,7 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar2")),
 		},
 		"nil-to-obj": {
-			isExpectedFailure: true,
+			isExpectedFailure: false,
 			oldPV:             testVolumeWithNodeAffinity(nil),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
 		},

@@ -1501,8 +1501,13 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	allErrs = append(allErrs, errs...)
 
 	volumeNodeAffinitySpecified, errs := validateVolumeNodeAffinity(pv.Spec.NodeAffinity, specPath.Child("nodeAffinity"))
-	nodeAffinitySpecified = nodeAffinitySpecified || volumeNodeAffinitySpecified
 	allErrs = append(allErrs, errs...)
+
+	if nodeAffinitySpecified && volumeNodeAffinitySpecified {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("nodeAffinity"), "may not specify both alpha nodeAffinity annotation and nodeAffinity field"))
+	}
+
+	nodeAffinitySpecified = nodeAffinitySpecified || volumeNodeAffinitySpecified
 
 	numVolumes := 0
 	if pv.Spec.HostPath != nil {
@@ -1733,7 +1738,10 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+		// Allow setting NodeAffinity if oldPv NodeAffinity was not set
+		if oldPv.Spec.NodeAffinity != nil {
+			allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+		}
 	}
 
 	return allErrs
@@ -4964,6 +4972,9 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 }
 
 // validateVolumeNodeAffinity tests that the PersistentVolume.NodeAffinity has valid data
+// returns:
+// - true if volumeNodeAffinity is set
+// - errorList if there are validation errors
 func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) (bool, field.ErrorList) {
 	allErrs := field.ErrorList{}
 
