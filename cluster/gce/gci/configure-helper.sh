@@ -2041,6 +2041,15 @@ function update-container-runtime {
   sed -i -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" "${configmap_yaml}"
 }
 
+# Remove configuration in yaml file if COS audit logging is not enabled.
+function update-cos-audit-logging {
+  local -r configmap_yaml="$1"
+  if [[ "${ENABLE_COS_AUDIT_LOGGING:-}" != "true" ]]; then
+    # Removes all lines between two patterns (throws away cos-audit-logging)
+    sed -i -e "/# BEGIN_COS_AUDIT_LOGGING/,/# END_COS_AUDIT_LOGGING/d" "${configmap_yaml}"
+  fi
+}
+
 # Updates parameters in yaml file for prometheus-to-sd configuration, or
 # removes component if it is disabled.
 function update-prometheus-to-sd-parameters {
@@ -2206,6 +2215,7 @@ EOF
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
     start-fluentd-resource-update ${fluentd_gcp_yaml}
     update-container-runtime ${fluentd_gcp_configmap_yaml}
+    update-cos-audit-logging ${fluentd_gcp_configmap_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"

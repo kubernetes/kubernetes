@@ -273,6 +273,23 @@ data:
       read_from_head true
       tag node-problem-detector
     </source>
+
+    # BEGIN_COS_AUDIT_LOGGING
+    <source>
+      @type systemd
+      pos_file /var/log/gcp-journald.pos
+      read_from_head true
+      tag gke-node-journal
+    </source>
+
+    <filter gke-node-journal>
+      @type grep
+      <exclude>
+        key _SYSTEMD_UNIT
+        pattern ^(docker|{{ container_runtime }}|kubelet|node-problem-detector)\.service$
+      </exclude>
+    </filter>
+    # END_COS_AUDIT_LOGGING
   monitoring.conf: |-
     # Prometheus monitoring
     <source>
