@@ -133,183 +133,259 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 func TestEndpointsToEndpointsMap(t *testing.T) {
 	epTracker := NewEndpointChangeTracker("test-hostname", nil, nil, nil)
 
+	trueVal := true
+	falseVal := false
+
 	testCases := []struct {
+		desc         string
 		newEndpoints *api.Endpoints
 		expected     map[ServicePortName][]*EndpointInfoCommon
-	}{{
-		// Case[0]: nothing
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-		expected:     map[ServicePortName][]*EndpointInfoCommon{},
-	}, {
-		// Case[1]: no changes, unnamed port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}},
-					Ports: []api.EndpointPort{{
-						Name: "",
-						Port: 11,
-					}},
+		isIPv6Mode   *bool
+	}{
+		{
+			desc:         "nothing",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
+			expected:     map[ServicePortName][]*EndpointInfoCommon{},
+		},
+		{
+			desc: "no changes, unnamed port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "",
+							Port: 11,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", ""): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", ""): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-	}, {
-		// Case[2]: no changes, named port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}},
-					Ports: []api.EndpointPort{{
-						Name: "port",
-						Port: 11,
-					}},
+		{
+			desc: "no changes, named port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "port",
+							Port: 11,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "port"): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", "port"): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-	}, {
-		// Case[3]: new port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}},
-					Ports: []api.EndpointPort{{
-						Port: 11,
-					}},
+		{
+			desc: "new port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}},
+						Ports: []api.EndpointPort{{
+							Port: 11,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", ""): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", ""): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-	}, {
-		// Case[4]: remove port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-		expected:     map[ServicePortName][]*EndpointInfoCommon{},
-	}, {
-		// Case[5]: new IP and port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}, {
-						IP: "2.2.2.2",
-					}},
-					Ports: []api.EndpointPort{{
-						Name: "p1",
-						Port: 11,
-					}, {
-						Name: "p2",
-						Port: 22,
-					}},
+		{
+			desc:         "remove port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
+			expected:     map[ServicePortName][]*EndpointInfoCommon{},
+		},
+		{
+			desc: "new IP and port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}, {
+							IP: "2.2.2.2",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "p1",
+							Port: 11,
+						}, {
+							Name: "p2",
+							Port: 22,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "p1"): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
+					{Endpoint: "2.2.2.2:11", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
-				{Endpoint: "2.2.2.2:11", IsLocal: false},
-			},
-			makeServicePortName("ns1", "ep1", "p2"): {
-				{Endpoint: "1.1.1.1:22", IsLocal: false},
-				{Endpoint: "2.2.2.2:22", IsLocal: false},
+				makeServicePortName("ns1", "ep1", "p2"): {
+					{Endpoint: "1.1.1.1:22", IsLocal: false},
+					{Endpoint: "2.2.2.2:22", IsLocal: false},
+				},
 			},
 		},
-	}, {
-		// Case[6]: remove IP and port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}},
-					Ports: []api.EndpointPort{{
-						Name: "p1",
-						Port: 11,
-					}},
+		{
+			desc: "remove IP and port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "p1",
+							Port: 11,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "p1"): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-	}, {
-		// Case[7]: rename port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}},
-					Ports: []api.EndpointPort{{
-						Name: "p2",
-						Port: 11,
-					}},
+		{
+			desc: "rename port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "p2",
+							Port: 11,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "p2"): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", "p2"): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-	}, {
-		// Case[8]: renumber port
-		newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
-			ept.Subsets = []api.EndpointSubset{
-				{
-					Addresses: []api.EndpointAddress{{
-						IP: "1.1.1.1",
-					}},
-					Ports: []api.EndpointPort{{
-						Name: "p1",
-						Port: 22,
-					}},
+		{
+			desc: "renumber port",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "p1",
+							Port: 22,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "p1"): {
+					{Endpoint: "1.1.1.1:22", IsLocal: false},
 				},
-			}
-		}),
-		expected: map[ServicePortName][]*EndpointInfoCommon{
-			makeServicePortName("ns1", "ep1", "p1"): {
-				{Endpoint: "1.1.1.1:22", IsLocal: false},
 			},
 		},
-	}}
+		{
+			desc: "should omit IPv6 address in IPv4 mode",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}, {
+							IP: "2001:db8:85a3:0:0:8a2e:370:7334",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "p1",
+							Port: 11,
+						}, {
+							Name: "p2",
+							Port: 22,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "p1"): {
+					{Endpoint: "1.1.1.1:11", IsLocal: false},
+				},
+				makeServicePortName("ns1", "ep1", "p2"): {
+					{Endpoint: "1.1.1.1:22", IsLocal: false},
+				},
+			},
+			isIPv6Mode: &falseVal,
+		},
+		{
+			desc: "should omit IPv4 address in IPv6 mode",
+			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {
+				ept.Subsets = []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{
+							IP: "1.1.1.1",
+						}, {
+							IP: "2001:db8:85a3:0:0:8a2e:370:7334",
+						}},
+						Ports: []api.EndpointPort{{
+							Name: "p1",
+							Port: 11,
+						}, {
+							Name: "p2",
+							Port: 22,
+						}},
+					},
+				}
+			}),
+			expected: map[ServicePortName][]*EndpointInfoCommon{
+				makeServicePortName("ns1", "ep1", "p1"): {
+					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:11", IsLocal: false},
+				},
+				makeServicePortName("ns1", "ep1", "p2"): {
+					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:22", IsLocal: false},
+				},
+			},
+			isIPv6Mode: &trueVal,
+		},
+	}
 
-	for tci, tc := range testCases {
+	for _, tc := range testCases {
+		epTracker.isIPv6Mode = tc.isIPv6Mode
 		// outputs
 		newEndpoints := epTracker.endpointsToEndpointsMap(tc.newEndpoints)
 
 		if len(newEndpoints) != len(tc.expected) {
-			t.Errorf("[%d] expected %d new, got %d: %v", tci, len(tc.expected), len(newEndpoints), spew.Sdump(newEndpoints))
+			t.Errorf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newEndpoints), spew.Sdump(newEndpoints))
 		}
 		for x := range tc.expected {
 			if len(newEndpoints[x]) != len(tc.expected[x]) {
-				t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(tc.expected[x]), x, len(newEndpoints[x]))
+				t.Errorf("[%s] expected %d endpoints for %v, got %d", tc.desc, len(tc.expected[x]), x, len(newEndpoints[x]))
 			} else {
 				for i := range newEndpoints[x] {
 					ep := newEndpoints[x][i].(*EndpointInfoCommon)
 					if *ep != *(tc.expected[x][i]) {
-						t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, tc.expected[x][i], *ep)
+						t.Errorf("[%s] expected new[%v][%d] to be %v, got %v", tc.desc, x, i, tc.expected[x][i], *ep)
 					}
 				}
 			}
