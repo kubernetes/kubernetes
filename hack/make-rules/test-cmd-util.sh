@@ -106,7 +106,7 @@ function record_command() {
     juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
     if [[ $? -ne 0 ]]; then
       echo "Error when running ${name}"
-      foundError="True"
+      foundError="${foundError}""${name}"", "
     fi
 
     set -o nounset
@@ -4609,7 +4609,7 @@ run_impersonation_tests() {
 # Requires an env var SUPPORTED_RESOURCES which is a comma separated list of
 # resources for which tests should be run.
 runTests() {
-  foundError="False"
+  foundError=""
 
   if [ -z "${SUPPORTED_RESOURCES:-}" ]; then
     echo "Need to set SUPPORTED_RESOURCES env var. It is a list of resources that are supported and hence should be tested. Set it to (*) to test all resources"
@@ -5108,8 +5108,8 @@ runTests() {
 
   kube::test::clear_all
 
-  if [ "$foundError" == "True" ]; then
-    echo "TEST FAILED"
+  if [ ! -z "${foundError}" ]; then
+    echo "FAILED TESTS: ""${foundError}"
     exit 1
   fi
 }
