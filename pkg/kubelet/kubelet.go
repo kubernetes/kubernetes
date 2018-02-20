@@ -1245,6 +1245,14 @@ func (kl *Kubelet) StartGarbageCollection() {
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	// when the high threshold is set to 100, stub the image GC manager
+	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 {
+		glog.V(2).Infof("ImageGCHighThresholdPercent is set 100, Disable image GC")
+		go func() { stopChan <- struct{}{} }()
+	}
+
 	prevImageGCFailed := false
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
@@ -1265,7 +1273,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 			glog.V(vLevel).Infof("Image garbage collection succeeded")
 		}
-	}, ImageGCPeriod, wait.NeverStop)
+	}, ImageGCPeriod, stopChan)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
