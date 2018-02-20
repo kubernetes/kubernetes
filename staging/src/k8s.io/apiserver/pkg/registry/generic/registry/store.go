@@ -587,8 +587,15 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 }
 
 // Get retrieves the item from storage.
+
 func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	obj := e.NewFunc()
+	var obj runtime.Object
+	// FIXME: This isn't completely safe.
+	if len(e.SerializationSchemesToCache) > 0 && options.ResourceVersion != "" {
+		obj = &runtime.CachingObject{}
+	} else {
+		obj = e.NewFunc()
+	}
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err

@@ -537,7 +537,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		objVal.Set(reflect.ValueOf(elem.Object).Elem())
+		objVal.Set(reflect.ValueOf(elem.WrappedObject()).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 		if !ignoreNotFound {
