@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -299,7 +300,7 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 				Image: framework.GetPauseImageName(f.ClientSet),
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
-					RunAsUser:                intPtr(65534),
+					RunAsUser:                utilpointer.Int64Ptr(65534),
 				},
 			}},
 		},
@@ -308,8 +309,4 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-func intPtr(i int64) *int64 {
-	return &i
 }

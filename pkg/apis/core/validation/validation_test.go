@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -1595,7 +1596,7 @@ func TestValidateKeyToPath(t *testing.T) {
 			ok: true,
 		},
 		{
-			kp: core.KeyToPath{Key: "k", Path: "p", Mode: newInt32(0644)},
+			kp: core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(0644)},
 			ok: true,
 		},
 		{
@@ -1629,12 +1630,12 @@ func TestValidateKeyToPath(t *testing.T) {
 			errtype: field.ErrorTypeInvalid,
 		},
 		{
-			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: newInt32(01000)},
+			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(01000)},
 			ok:      false,
 			errtype: field.ErrorTypeInvalid,
 		},
 		{
-			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: newInt32(-1)},
+			kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32Ptr(-1)},
 			ok:      false,
 			errtype: field.ErrorTypeInvalid,
 		},
@@ -1871,14 +1872,6 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 		t.Errorf("Failed to disable feature gate for CSIPersistentVolumes: %v", err)
 		return
 	}
-
-}
-
-// helper
-func newInt32(val int) *int32 {
-	p := new(int32)
-	*p = int32(val)
-	return p
 }
 
 // This test is a little too top-to-bottom.  Ideally we would test each volume
@@ -2365,7 +2358,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "my-secret",
-						DefaultMode: newInt32(0644),
+						DefaultMode: utilpointer.Int32Ptr(0644),
 					},
 				},
 			},
@@ -2380,7 +2373,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: newInt32(0644),
+							Mode: utilpointer.Int32Ptr(0644),
 						}},
 					},
 				},
@@ -2450,7 +2443,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: newInt32(01000),
+						DefaultMode: utilpointer.Int32Ptr(01000),
 					},
 				},
 			},
@@ -2464,7 +2457,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: newInt32(-1),
+						DefaultMode: utilpointer.Int32Ptr(-1),
 					},
 				},
 			},
@@ -2494,7 +2487,7 @@ func TestValidateVolumes(t *testing.T) {
 						LocalObjectReference: core.LocalObjectReference{
 							Name: "my-cfgmap",
 						},
-						DefaultMode: newInt32(0644),
+						DefaultMode: utilpointer.Int32Ptr(0644),
 					},
 				},
 			},
@@ -2510,7 +2503,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: newInt32(0644),
+							Mode: utilpointer.Int32Ptr(0644),
 						}},
 					},
 				},
@@ -2581,7 +2574,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          newInt32(01000),
+						DefaultMode:          utilpointer.Int32Ptr(01000),
 					},
 				},
 			},
@@ -2595,7 +2588,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          newInt32(-1),
+						DefaultMode:          utilpointer.Int32Ptr(-1),
 					},
 				},
 			},
@@ -2924,7 +2917,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: newInt32(0644),
+						DefaultMode: utilpointer.Int32Ptr(0644),
 					},
 				},
 			},
@@ -2936,7 +2929,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: newInt32(0644),
+							Mode: utilpointer.Int32Ptr(0644),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -2954,7 +2947,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: newInt32(01000),
+							Mode: utilpointer.Int32Ptr(01000),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -2974,7 +2967,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: newInt32(-1),
+							Mode: utilpointer.Int32Ptr(-1),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -3115,7 +3108,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: newInt32(01000),
+						DefaultMode: utilpointer.Int32Ptr(01000),
 					},
 				},
 			},
@@ -3128,7 +3121,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: newInt32(-1),
+						DefaultMode: utilpointer.Int32Ptr(-1),
 					},
 				},
 			},
@@ -3143,7 +3136,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        newInt32(1),
+						Lun:        utilpointer.Int32Ptr(1),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -3170,7 +3163,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{},
-						Lun:        newInt32(1),
+						Lun:        utilpointer.Int32Ptr(1),
 						WWIDs:      []string{},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -3188,7 +3181,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        newInt32(1),
+						Lun:        utilpointer.Int32Ptr(1),
 						WWIDs:      []string{"some_wwid"},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -3223,7 +3216,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"wwn"},
-						Lun:        newInt32(256),
+						Lun:        utilpointer.Int32Ptr(256),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -8641,7 +8634,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.SessionAffinity = core.ServiceAffinityClientIP
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: newInt32(-1),
+						TimeoutSeconds: utilpointer.Int32Ptr(-1),
 					},
 				}
 			},
@@ -8654,7 +8647,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.SessionAffinity = core.ServiceAffinityNone
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: newInt32(90),
+						TimeoutSeconds: utilpointer.Int32Ptr(90),
 					},
 				}
 			},
@@ -10149,7 +10142,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.SessionAffinity = "ClientIP"
 				newSvc.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: newInt32(90),
+						TimeoutSeconds: utilpointer.Int32Ptr(90),
 					},
 				}
 			},
@@ -12443,17 +12436,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 	successCases := map[string]*core.SessionAffinityConfig{
 		"non-empty config, valid timeout: 1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(1),
+				TimeoutSeconds: utilpointer.Int32Ptr(1),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds-1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(int(core.MaxClientIPServiceAffinitySeconds - 1)),
+				TimeoutSeconds: utilpointer.Int32Ptr(core.MaxClientIPServiceAffinitySeconds - 1),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(int(core.MaxClientIPServiceAffinitySeconds)),
+				TimeoutSeconds: utilpointer.Int32Ptr(core.MaxClientIPServiceAffinitySeconds),
 			},
 		},
 	}
@@ -12476,17 +12469,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 		},
 		"non-empty config, invalid timeout: core.MaxClientIPServiceAffinitySeconds+1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(int(core.MaxClientIPServiceAffinitySeconds + 1)),
+				TimeoutSeconds: utilpointer.Int32Ptr(core.MaxClientIPServiceAffinitySeconds + 1),
 			},
 		},
 		"non-empty config, invalid timeout: -1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(-1),
+				TimeoutSeconds: utilpointer.Int32Ptr(-1),
 			},
 		},
 		"non-empty config, invalid timeout: 0": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: newInt32(0),
+				TimeoutSeconds: utilpointer.Int32Ptr(0),
 			},
 		},
 	}

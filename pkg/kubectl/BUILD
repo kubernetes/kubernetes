@@ -53,6 +53,7 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/kubectl/util:go_default_library",
         "//pkg/printers:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
