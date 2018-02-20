@@ -53,6 +53,7 @@ type CreateOpts struct {
 	FloatingIP        string `json:"floating_ip_address,omitempty"`
 	PortID            string `json:"port_id,omitempty"`
 	FixedIP           string `json:"fixed_ip_address,omitempty"`
+	SubnetID          string `json:"subnet_id,omitempty"`
 	TenantID          string `json:"tenant_id,omitempty"`
 }
 
