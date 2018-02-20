@@ -107,7 +107,7 @@ function create_resource_from_string() {
   local -r config_name=$4;
   local -r namespace=$5;
   while [ ${tries} -gt 0 ]; do
-    echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} apply -f - && \
+    echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} --namespace="${namespace}" apply -f - && \
       log INFO "== Successfully started ${config_name} in namespace ${namespace} at $(date -Is)" && \
       return 0;
     let tries=tries-1;
