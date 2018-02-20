@@ -197,7 +197,7 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 
 func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 
-	// To reconstrcut volume spec we need endpoint where fetching endpoint from mount
+	// To reconstruct volume spec we need endpoint where fetching endpoint from mount
 	// string looks to be impossible, so returning error.
 
 	return nil, fmt.Errorf("impossible to reconstruct glusterfs volume spec from volume mountpath")
@@ -332,7 +332,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// with `backup-volfile-servers` mount option in place, it is not required to
 	// iterate over all the servers in the addrlist. A mount attempt with this option
 	// will fetch all the servers mentioned in the backup-volfile-servers list.
-	// Refer backup-volfile-servers @ https://access.redhat.com/documentation/en-US/Red_Hat_Storage/3/html/Administration_Guide/sect-Native_Client.html
+	// Refer to backup-volfile-servers @ http://docs.gluster.org/en/latest/Administrator%20Guide/Setting%20Up%20Clients/
 
 	if (len(addrlist) > 0) && (addrlist[0] != "") {
 		ip := addrlist[0]
@@ -741,7 +741,6 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	var clusterIDs []string
 	customVolumeName := ""
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	// Glusterfs creates volumes in units of GiB, but heketi documentation incorrectly reports GBs
 	sz := int(volume.RoundUpToGiB(capacity))
 	glog.V(2).Infof("create volume of size: %d GiB", sz)
 	if p.url == "" {
