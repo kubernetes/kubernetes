@@ -151,6 +151,7 @@ function prepare-upgrade() {
   detect-project
   detect-subnetworks
   detect-node-names # sets INSTANCE_GROUPS
+  write-cluster-location
   write-cluster-name
   tars_from_version
 }
