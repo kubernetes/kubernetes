@@ -38,9 +38,17 @@ type RecommendedOptions struct {
 }
 
 func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *RecommendedOptions {
+	sso := NewSecureServingOptions()
+
+	// We are composing recommended options for an aggregated api-server,
+	// whose client is typically a proxy multiplexing many operations ---
+	// notably including long-running ones --- into one HTTP/2 connection
+	// into this server.  So allow many concurrent operations.
+	sso.HTTP2MaxStreamsPerConnection = 1000
+
 	return &RecommendedOptions{
 		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, copier, codec)),
-		SecureServing:  NewSecureServingOptions(),
+		SecureServing:  sso,
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),
 		Audit:          NewAuditOptions(),
