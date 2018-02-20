@@ -87,6 +87,9 @@ func fakeGCECloud() (*GCECloud, error) {
 	cloud := cloud.NewMockGCE(&gceProjectRouter{gce})
 	cloud.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
 	cloud.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+	cloud.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
+	cloud.MockAddresses.InsertHook = mock.InsertAddressHook
+	cloud.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
 
 	gce.c = cloud
 
@@ -94,43 +97,42 @@ func fakeGCECloud() (*GCECloud, error) {
 }
 
 func TestEnsureStaticIP(t *testing.T) {
-	fcas := NewFakeCloudAddressService()
+	gce, err := fakeGCECloud()
+	require.NoError(t, err)
+
 	ipName := "some-static-ip"
-	serviceName := ""
-	region := "us-central1"
 
 	// First ensure call
-	ip, existed, err := ensureStaticIP(fcas, ipName, serviceName, region, "", NetworkTierDefault)
-	if err != nil || existed || ip == "" {
-		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, "") = %v, %v, %v; want valid ip, false, nil`, fcas, ipName, serviceName, region, ip, existed, err)
+	ip, existed, err := ensureStaticIP(gce, ipName, serviceName, region, "", cloud.NetworkTierDefault)
+	if err != nil || existed {
+		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, "") = %v, %v, %v; want valid ip, false, nil`, gce, ipName, serviceName, region, ip, existed, err)
 	}
 
 	// Second ensure call
 	var ipPrime string
-	ipPrime, existed, err = ensureStaticIP(fcas, ipName, serviceName, region, ip, NetworkTierDefault)
+	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, region, ip, cloud.NetworkTierDefault)
 	if err != nil || !existed || ip != ipPrime {
-		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, fcas, ipName, serviceName, region, ip, ipPrime, existed, err, ip)
+		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, region, ip, ipPrime, existed, err, ip)
 	}
 }
 
 func TestEnsureStaticIPWithTier(t *testing.T) {
-	s := NewFakeCloudAddressService()
-	serviceName := ""
-	region := "us-east1"
+	s, err := fakeGCECloud()
+	require.NoError(t, err)
 
 	for desc, tc := range map[string]struct {
 		name     string
-		netTier  NetworkTier
+		netTier  cloud.NetworkTier
 		expected string
 	}{
 		"Premium (default)": {
 			name:     "foo-1",
-			netTier:  NetworkTierPremium,
+			netTier:  cloud.NetworkTierPremium,
 			expected: "PREMIUM",
 		},
 		"Standard": {
 			name:     "foo-2",
-			netTier:  NetworkTierStandard,
+			netTier:  cloud.NetworkTierStandard,
 			expected: "STANDARD",
 		},
 	} {
@@ -138,7 +140,7 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 			ip, existed, err := ensureStaticIP(s, tc.name, serviceName, region, "", tc.netTier)
 			assert.NoError(t, err)
 			assert.False(t, existed)
-			assert.NotEqual(t, "", ip)
+			assert.NotEqual(t, ip, "")
 			// Get the Address from the fake address service and verify that the tier
 			// is set correctly.
 			alphaAddr, err := s.GetAlphaRegionAddress(tc.name, region)
@@ -149,21 +151,19 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 }
 
 func TestVerifyRequestedIP(t *testing.T) {
-	region := "test-region"
 	lbRef := "test-lb"
-	s := NewFakeCloudAddressService()
 
 	for desc, tc := range map[string]struct {
 		requestedIP     string
 		fwdRuleIP       string
-		netTier         NetworkTier
+		netTier         cloud.NetworkTier
 		addrList        []*computealpha.Address
 		expectErr       bool
 		expectUserOwned bool
 	}{
 		"requested IP exists": {
 			requestedIP:     "1.1.1.1",
-			netTier:         NetworkTierPremium,
+			netTier:         cloud.NetworkTierPremium,
 			addrList:        []*computealpha.Address{{Name: "foo", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
 			expectErr:       false,
 			expectUserOwned: true,
@@ -171,28 +171,33 @@ func TestVerifyRequestedIP(t *testing.T) {
 		"requested IP is not static, but is in use by the fwd rule": {
 			requestedIP: "1.1.1.1",
 			fwdRuleIP:   "1.1.1.1",
-			netTier:     NetworkTierPremium,
+			netTier:     cloud.NetworkTierPremium,
 			expectErr:   false,
 		},
 		"requested IP is not static and is not used by the fwd rule": {
 			requestedIP: "1.1.1.1",
 			fwdRuleIP:   "2.2.2.2",
-			netTier:     NetworkTierPremium,
+			netTier:     cloud.NetworkTierPremium,
 			expectErr:   true,
 		},
 		"no requested IP": {
-			netTier:   NetworkTierPremium,
+			netTier:   cloud.NetworkTierPremium,
 			expectErr: false,
 		},
 		"requested IP exists, but network tier does not match": {
 			requestedIP: "1.1.1.1",
-			netTier:     NetworkTierStandard,
+			netTier:     cloud.NetworkTierStandard,
 			addrList:    []*computealpha.Address{{Name: "foo", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
 			expectErr:   true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			s.SetRegionalAddresses(region, tc.addrList)
+			s, err := fakeGCECloud()
+			require.NoError(t, err)
+
+			for _, addr := range tc.addrList {
+				s.ReserveAlphaRegionAddress(addr, region)
+			}
 			isUserOwnedIP, err := verifyUserRequestedIP(s, region, tc.requestedIP, tc.fwdRuleIP, lbRef, tc.netTier)
 			assert.Equal(t, tc.expectErr, err != nil, fmt.Sprintf("err: %v", err))
 			assert.Equal(t, tc.expectUserOwned, isUserOwnedIP)
@@ -201,19 +206,18 @@ func TestVerifyRequestedIP(t *testing.T) {
 }
 
 func TestCreateForwardingRuleWithTier(t *testing.T) {
-	s := NewFakeCloudForwardingRuleService()
 	// Common variables among the tests.
 	ports := []v1.ServicePort{{Name: "foo", Protocol: v1.ProtocolTCP, Port: int32(123)}}
-	region := "test-region"
 	target := "test-target-pool"
 	svcName := "foo-svc"
+	baseLinkUrl := "https://www.googleapis.com/compute/%v/projects/%v/regions/%v/forwardingRules/%v"
 
 	for desc, tc := range map[string]struct {
-		netTier      NetworkTier
+		netTier      cloud.NetworkTier
 		expectedRule *computealpha.ForwardingRule
 	}{
 		"Premium tier": {
-			netTier: NetworkTierPremium,
+			netTier: cloud.NetworkTierPremium,
 			expectedRule: &computealpha.ForwardingRule{
 				Name:        "lb-1",
 				Description: `{"kubernetes.io/service-name":"foo-svc"}`,
@@ -222,10 +226,11 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "PREMIUM",
+				SelfLink:    fmt.Sprintf(baseLinkUrl, "v1", projectID, region, "lb-1"),
 			},
 		},
 		"Standard tier": {
-			netTier: NetworkTierStandard,
+			netTier: cloud.NetworkTierStandard,
 			expectedRule: &computealpha.ForwardingRule{
 				Name:        "lb-2",
 				Description: `{"kubernetes.io/service-name":"foo-svc"}`,
@@ -234,14 +239,18 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "STANDARD",
+				SelfLink:    fmt.Sprintf(baseLinkUrl, "alpha", projectID, region, "lb-2"),
 			},
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			s, err := fakeGCECloud()
+			require.NoError(t, err)
+
 			lbName := tc.expectedRule.Name
 			ipAddr := tc.expectedRule.IPAddress
 
-			err := createForwardingRule(s, lbName, svcName, region, ipAddr, target, ports, tc.netTier)
+			err = createForwardingRule(s, lbName, svcName, region, ipAddr, target, ports, tc.netTier)
 			assert.NoError(t, err)
 
 			alphaRule, err := s.GetAlphaRegionForwardingRule(lbName, region)
@@ -252,43 +261,50 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 }
 
 func TestDeleteAddressWithWrongTier(t *testing.T) {
-	region := "test-region"
 	lbRef := "test-lb"
-	s := NewFakeCloudAddressService()
+
+	s, err := fakeGCECloud()
+	require.NoError(t, err)
+
+	// Enable the cloud.NetworkTiers feature
+	s.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 
 	for desc, tc := range map[string]struct {
 		addrName     string
-		netTier      NetworkTier
+		netTier      cloud.NetworkTier
 		addrList     []*computealpha.Address
 		expectDelete bool
 	}{
 		"Network tiers (premium) match; do nothing": {
 			addrName: "foo1",
-			netTier:  NetworkTierPremium,
+			netTier:  cloud.NetworkTierPremium,
 			addrList: []*computealpha.Address{{Name: "foo1", Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
 		},
 		"Network tiers (standard) match; do nothing": {
 			addrName: "foo2",
-			netTier:  NetworkTierStandard,
+			netTier:  cloud.NetworkTierStandard,
 			addrList: []*computealpha.Address{{Name: "foo2", Address: "1.1.1.2", NetworkTier: "STANDARD"}},
 		},
 		"Wrong network tier (standard); delete address": {
 			addrName:     "foo3",
-			netTier:      NetworkTierPremium,
+			netTier:      cloud.NetworkTierPremium,
 			addrList:     []*computealpha.Address{{Name: "foo3", Address: "1.1.1.3", NetworkTier: "STANDARD"}},
 			expectDelete: true,
 		},
-		"Wrong network tier (preimium); delete address": {
+		"Wrong network tier (premium); delete address": {
 			addrName:     "foo4",
-			netTier:      NetworkTierStandard,
+			netTier:      cloud.NetworkTierStandard,
 			addrList:     []*computealpha.Address{{Name: "foo4", Address: "1.1.1.4", NetworkTier: "PREMIUM"}},
 			expectDelete: true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			s.SetRegionalAddresses(region, tc.addrList)
+			for _, addr := range tc.addrList {
+				s.ReserveAlphaRegionAddress(addr, region)
+			}
+
 			// Sanity check to ensure we inject the right address.
-			_, err := s.GetRegionAddress(tc.addrName, region)
+			_, err = s.GetRegionAddress(tc.addrName, region)
 			require.NoError(t, err)
 
 			err = deleteAddressWithWrongTier(s, region, tc.addrName, lbRef, tc.netTier)
@@ -316,7 +332,7 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string) ([]*v1.Node, error)
 
 		if instance == nil {
 			err := gce.InsertInstance(
-				gceProjectId,
+				projectID,
 				zoneName,
 				&compute.Instance{
 					Name: name,
@@ -392,7 +408,7 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	}
 
 	// Check that TargetPool is Created
-	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	pool, err := gce.GetTargetPool(lbName, region)
 	require.NoError(t, err)
 	assert.Equal(t, lbName, pool.Name)
 	assert.NotEmpty(t, pool.HealthChecks)
@@ -404,7 +420,7 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	assert.Equal(t, hcName, healthcheck.Name)
 
 	// Check that ForwardingRule is created
-	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, region)
 	require.NoError(t, err)
 	assert.Equal(t, lbName, fwdRule.Name)
 	assert.Equal(t, "TCP", fwdRule.IPProtocol)
@@ -428,7 +444,7 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
 
-	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	pool, err := gce.GetTargetPool(lbName, region)
 	require.NoError(t, err)
 
 	// TODO: when testify is updated to v1.2.0+, use ElementsMatch instead
@@ -453,7 +469,7 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	err = gce.updateExternalLoadBalancer(clusterName, apiService, newNodes)
 	assert.NoError(t, err)
 
-	pool, err = gce.GetTargetPool(lbName, gceRegion)
+	pool, err = gce.GetTargetPool(lbName, region)
 	require.NoError(t, err)
 
 	assert.Equal(
@@ -489,7 +505,7 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	}
 
 	// Check that TargetPool is deleted
-	pool, err := gce.GetTargetPool(lbName, gceRegion)
+	pool, err := gce.GetTargetPool(lbName, region)
 	require.Error(t, err)
 	assert.Nil(t, pool)
 
@@ -499,7 +515,7 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	assert.Nil(t, healthcheck)
 
 	// Check forwarding rule is deleted
-	fwdRule, err := gce.GetRegionForwardingRule(lbName, gceRegion)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, region)
 	require.Error(t, err)
 	assert.Nil(t, fwdRule)
 }
@@ -508,14 +524,14 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	gce, err := fakeGCECloud()
 	require.NoError(t, err)
 
-	// Enable the NetworkTiers feature
+	// Enable the cloud.NetworkTiers feature
 	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
 	apiService.Annotations = map[string]string{NetworkTierAnnotationKey: "Premium"}
 
-	// NetworkTier defaults to Premium
+	// cloud.NetworkTier defaults to Premium
 	desiredTier, err := gce.getServiceNetworkTier(apiService)
 	require.NoError(t, err)
-	assert.Equal(t, NetworkTierPremium, desiredTier)
+	assert.Equal(t, cloud.NetworkTierPremium, desiredTier)
 
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
@@ -525,32 +541,32 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 		gce,
 		lbName,
 		serviceName.String(),
-		gceRegion,
+		region,
 		"",
 		gce.targetPoolURL(lbName),
 		apiService.Spec.Ports,
-		NetworkTierStandard,
+		cloud.NetworkTierStandard,
 	)
 	require.NoError(t, err)
 
 	addressObj := &computealpha.Address{
 		Name:        lbName,
 		Description: serviceName.String(),
-		NetworkTier: NetworkTierStandard.ToGCEValue(),
+		NetworkTier: cloud.NetworkTierStandard.ToGCEValue(),
 	}
 
-	err = gce.ReserveAlphaRegionAddress(addressObj, gceRegion)
+	err = gce.ReserveAlphaRegionAddress(addressObj, region)
 	require.NoError(t, err)
 
 	_, err = createExternalLoadBalancer(gce)
 	require.NoError(t, err)
 
 	// Expect forwarding rule tier to not be Standard
-	tier, err := gce.getNetworkTierFromForwardingRule(lbName, gceRegion)
+	tier, err := gce.getNetworkTierFromForwardingRule(lbName, region)
 	assert.NoError(t, err)
-	assert.Equal(t, NetworkTierDefault.ToGCEValue(), tier)
+	assert.Equal(t, cloud.NetworkTierDefault.ToGCEValue(), tier)
 
 	// Expect address to be deleted
-	_, err = gce.GetRegionAddress(lbName, gceRegion)
+	_, err = gce.GetRegionAddress(lbName, region)
 	assert.True(t, isNotFound(err))
 }
