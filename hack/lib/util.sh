@@ -713,58 +713,17 @@ function kube::util::join {
 
 # Downloads cfssl/cfssljson into $1 directory if they do not already exist in PATH
 #
-# Assumed vars:
-#   $1 (cfssl directory) (optional)
-#
 # Sets:
 #  CFSSL_BIN: The path of the installed cfssl binary
 #  CFSSLJSON_BIN: The path of the installed cfssljson binary
 #
 function kube::util::ensure-cfssl {
-  if command -v cfssl &>/dev/null && command -v cfssljson &>/dev/null; then
-    CFSSL_BIN=$(command -v cfssl)
-    CFSSLJSON_BIN=$(command -v cfssljson)
-    return 0
+  if ! command -v cfssl &>/dev/null || ! command -v cfssljson &>/dev/null; then
+    echo "Failed to find 'cfssl'. Downloading and installing..."
+    go get -u github.com/cloudflare/cfssl/cmd/...
   fi
-
-  # Create a temp dir for cfssl if no directory was given
-  local cfssldir=${1:-}
-  if [[ -z "${cfssldir}" ]]; then
-    kube::util::ensure-temp-dir
-    cfssldir="${KUBE_TEMP}/cfssl"
-  fi
-
-  mkdir -p "${cfssldir}"
-  pushd "${cfssldir}" > /dev/null
-
-    echo "Unable to successfully run 'cfssl' from $PATH; downloading instead..."
-    kernel=$(uname -s)
-    case "${kernel}" in
-      Linux)
-        curl --retry 10 -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
-        curl --retry 10 -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
-        ;;
-      Darwin)
-        curl --retry 10 -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_darwin-amd64
-        curl --retry 10 -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_darwin-amd64
-        ;;
-      *)
-        echo "Unknown, unsupported platform: ${kernel}." >&2
-        echo "Supported platforms: Linux, Darwin." >&2
-        exit 2
-    esac
-
-    chmod +x cfssl || true
-    chmod +x cfssljson || true
-
-    CFSSL_BIN="${cfssldir}/cfssl"
-    CFSSLJSON_BIN="${cfssldir}/cfssljson"
-    if [[ ! -x ${CFSSL_BIN} || ! -x ${CFSSLJSON_BIN} ]]; then
-      echo "Failed to download 'cfssl'. Please install cfssl and cfssljson and verify they are in \$PATH."
-      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
-      exit 1
-    fi
-  popd > /dev/null
+  CFSSL_BIN=$(command -v cfssl)
+  CFSSLJSON_BIN=$(command -v cfssljson)
 }
 
 # kube::util::ensure_dockerized
