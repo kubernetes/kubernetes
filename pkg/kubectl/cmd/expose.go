@@ -255,7 +255,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
 			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return f.PrintObject(cmd, false, mapper, object, out)
+				return f.PrintObject(cmd, object, out)
 			}
 			f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, true, "exposed")
 			return nil
@@ -271,7 +271,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return f.PrintObject(cmd, object, out)
 		}
 
 		f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, false, "exposed")

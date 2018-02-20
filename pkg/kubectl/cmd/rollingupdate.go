@@ -191,8 +191,6 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	var keepOldName bool
 	var replicasDefaulted bool
 
-	mapper, _ := f.Object()
-
 	if len(filename) != 0 {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
@@ -322,10 +320,10 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			oldRcData.WriteString(oldRc.Name)
 			newRcData.WriteString(newRc.Name)
 		} else {
-			if err := f.PrintObject(cmd, false, mapper, oldRc, oldRcData); err != nil {
+			if err := f.PrintObject(cmd, oldRc, oldRcData); err != nil {
 				return err
 			}
-			if err := f.PrintObject(cmd, false, mapper, newRc, newRcData); err != nil {
+			if err := f.PrintObject(cmd, newRc, newRcData); err != nil {
 				return err
 			}
 		}
@@ -370,7 +368,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		return err
 	}
 	if outputFormat != "" {
-		return f.PrintObject(cmd, false, mapper, newRc, out)
+		return f.PrintObject(cmd, newRc, out)
 	}
 	f.PrintSuccess(false, out, "replicationcontrollers", oldName, dryrun, message)
 	return nil

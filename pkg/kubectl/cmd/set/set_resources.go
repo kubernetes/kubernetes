@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,7 +61,6 @@ var (
 type ResourcesOptions struct {
 	resource.FilenameOptions
 
-	Mapper            meta.RESTMapper
 	Infos             []*resource.Info
 	Encoder           runtime.Encoder
 	Out               io.Writer
@@ -81,7 +79,7 @@ type ResourcesOptions struct {
 	ResourceRequirements v1.ResourceRequirements
 
 	PrintSuccess           func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject            func(cmd *cobra.Command, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 }
@@ -128,7 +126,6 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 }
 
 func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, _ = f.Object()
 	o.PrintSuccess = f.PrintSuccess
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
@@ -241,7 +238,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -266,7 +263,7 @@ func (o *ResourcesOptions) Run() error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue

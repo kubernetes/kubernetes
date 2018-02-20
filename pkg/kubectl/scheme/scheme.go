@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
@@ -41,3 +42,8 @@ var Codecs = serializer.NewCodecFactory(Scheme)
 
 // ParameterCodec handles versioning of objects that are converted to query parameters.
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
+
+// Versions is a list of group versions in order of preferred serialization.  This used to be discovered dynamically,
+// from the server for use in the client, but that gives conflicting lists of non-existent versions.  This only needs to
+// live until we stop attempting to perform any conversion client-side and is only valid for items existent in our scheme.
+var Versions = []schema.GroupVersion{}
