@@ -68,12 +68,13 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 	)
 
 	for _, authorizationMode := range config.AuthorizationModes {
-		// Keep cases in sync with constant list above.
+		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch authorizationMode {
 		case modes.ModeNode:
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
 				graph,
+				config.InformerFactory.Core().InternalVersion().Nodes(),
 				config.InformerFactory.Core().InternalVersion().Pods(),
 				config.InformerFactory.Core().InternalVersion().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1beta1().VolumeAttachments(),

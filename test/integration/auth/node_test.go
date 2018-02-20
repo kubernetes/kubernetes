@@ -81,6 +81,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Enabled CSIPersistentVolume feature at startup so volumeattachments get watched
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 
+	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
+
 	// Set up Node+RBAC authorizer
 	authorizerConfig := &authorizer.AuthorizationConfig{
 		AuthorizationModes:       []string{"Node", "RBAC"},
@@ -135,6 +138,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	if _, err := superuserClient.Core().ConfigMaps("ns").Create(&api.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := superuserClient.Core().ConfigMaps("ns").Create(&api.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmapconfigsource"}}); err != nil {
+		t.Fatal(err)
+	}
 	pvName := "mypv"
 	if _, err := superuserClientExternal.StorageV1beta1().VolumeAttachments().Create(&storagev1beta1.VolumeAttachment{
 		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
@@ -183,6 +189,12 @@ func TestNodeAuthorizer(t *testing.T) {
 	getConfigMap := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.Core().ConfigMaps("ns").Get("myconfigmap", metav1.GetOptions{})
+			return err
+		}
+	}
+	getConfigMapConfigSource := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.Core().ConfigMaps("ns").Get("myconfigmapconfigsource", metav1.GetOptions{})
 			return err
 		}
 	}
@@ -264,6 +276,36 @@ func TestNodeAuthorizer(t *testing.T) {
 	createNode2 := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.Core().Nodes().Create(&api.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}})
+			return err
+		}
+	}
+	setNode2ConfigSource := func(client clientset.Interface) func() error {
+		return func() error {
+			node2, err := client.Core().Nodes().Get("node2", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			node2.Spec.ConfigSource = &api.NodeConfigSource{
+				ConfigMapRef: &api.ObjectReference{
+					Namespace: "ns",
+					Name:      "myconfigmapconfigsource",
+					// validation just requires UID to be non-empty and it isn't necessary for GET,
+					// so we just use a bogus one for the test
+					UID: "uid",
+				},
+			}
+			_, err = client.Core().Nodes().Update(node2)
+			return err
+		}
+	}
+	unsetNode2ConfigSource := func(client clientset.Interface) func() error {
+		return func() error {
+			node2, err := client.Core().Nodes().Get("node2", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			node2.Spec.ConfigSource = nil
+			_, err = client.Core().Nodes().Update(node2)
 			return err
 		}
 	}
@@ -420,6 +462,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, deleteNode2NormalPod(node2Client))
 	expectAllowed(t, createNode2MirrorPod(node2Client))
 	expectAllowed(t, deleteNode2MirrorPod(node2Client))
+
 	// recreate as an admin to test eviction
 	expectAllowed(t, createNode2NormalPod(superuserClient))
 	expectAllowed(t, createNode2MirrorPod(superuserClient))
@@ -448,6 +491,25 @@ func TestNodeAuthorizer(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
 	expectAllowed(t, getVolumeAttachment(node2ClientExternal))
+
+	// create node2 again
+	expectAllowed(t, createNode2(node2Client))
+	// node2 can not set its own config source
+	expectForbidden(t, setNode2ConfigSource(node2Client))
+	// node2 can not access the configmap config source yet
+	expectForbidden(t, getConfigMapConfigSource(node2Client))
+	// superuser can access the configmap config source
+	expectAllowed(t, getConfigMapConfigSource(superuserClient))
+	// superuser can set node2's config source
+	expectAllowed(t, setNode2ConfigSource(superuserClient))
+	// node2 can now get the configmap assigned as its config source
+	expectAllowed(t, getConfigMapConfigSource(node2Client))
+	// superuser can unset node2's config source
+	expectAllowed(t, unsetNode2ConfigSource(superuserClient))
+	// node2 can no longer get the configmap after it is unassigned as its config source
+	expectForbidden(t, getConfigMapConfigSource(node2Client))
+	// clean up node2
+	expectAllowed(t, deleteNode2(node2Client))
 
 	//TODO(mikedanese): integration test node restriction of TokenRequest
 }

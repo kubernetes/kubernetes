@@ -4098,6 +4098,9 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	// Allow updates to Node.Spec.ConfigSource if DynamicKubeletConfig feature gate is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		if node.Spec.ConfigSource != nil {
+			allErrs = append(allErrs, validateNodeConfigSource(node.Spec.ConfigSource, field.NewPath("spec", "configSource"))...)
+		}
 		oldNode.Spec.ConfigSource = node.Spec.ConfigSource
 	}
 
@@ -4108,6 +4111,25 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 
+	return allErrs
+}
+
+func validateNodeConfigSource(source *core.NodeConfigSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	count := int(0)
+	if ref := source.ConfigMapRef; ref != nil {
+		count++
+		// name, namespace, and UID must all be non-empty for ConfigMapRef
+		if ref.Name == "" || ref.Namespace == "" || string(ref.UID) == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("configMapRef"), ref, "name, namespace, and UID must all be non-empty"))
+		}
+	}
+	// add more subfields here in the future as they are added to NodeConfigSource
+
+	// exactly one reference subfield must be non-nil
+	if count != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, source, "exactly one reference subfield must be non-nil"))
+	}
 	return allErrs
 }
 
