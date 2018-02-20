@@ -38,6 +38,30 @@ func (CrossVersionObjectReference) SwaggerDoc() map[string]string {
 	return map_CrossVersionObjectReference
 }
 
+var map_ExternalMetricSource = map[string]string{
+	"":                   "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster). Exactly one \"target\" type should be set.",
+	"metricName":         "metricName is the name of the metric in question.",
+	"metricSelector":     "metricSelector is used to identify a specific time series within a given metric.",
+	"targetValue":        "targetValue is the target value of the metric (as a quantity). Mutually exclusive with TargetAverageValue.",
+	"targetAverageValue": "targetAverageValue is the target per-pod value of global metric (as a quantity). Mutually exclusive with TargetValue.",
+}
+
+func (ExternalMetricSource) SwaggerDoc() map[string]string {
+	return map_ExternalMetricSource
+}
+
+var map_ExternalMetricStatus = map[string]string{
+	"":                    "ExternalMetricStatus indicates the current value of a global metric not associated with any Kubernetes object.",
+	"metricName":          "metricName is the name of a metric used for autoscaling in metric system.",
+	"metricSelector":      "metricSelector is used to identify a specific time series within a given metric.",
+	"currentValue":        "currentValue is the current value of the metric (as a quantity)",
+	"currentAverageValue": "currentAverageValue is the current value of metric averaged over autoscaled pods.",
+}
+
+func (ExternalMetricStatus) SwaggerDoc() map[string]string {
+	return map_ExternalMetricStatus
+}
+
 var map_HorizontalPodAutoscaler = map[string]string{
 	"":         "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
 	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
@@ -104,6 +128,7 @@ var map_MetricSpec = map[string]string{
 	"object":   "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
 	"pods":     "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
 	"resource": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+	"external": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
 }
 
 func (MetricSpec) SwaggerDoc() map[string]string {
@@ -116,6 +141,7 @@ var map_MetricStatus = map[string]string{
 	"object":   "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
 	"pods":     "pods refers to a metric describing each pod in the current scale target (for example, transactions-processed-per-second).  The values will be averaged together before being compared to the target value.",
 	"resource": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+	"external": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
 }
 
 func (MetricStatus) SwaggerDoc() map[string]string {
