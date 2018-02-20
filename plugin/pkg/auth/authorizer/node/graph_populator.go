@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -34,12 +35,21 @@ type graphPopulator struct {
 
 func AddGraphEventHandlers(
 	graph *Graph,
+	nodes coreinformers.NodeInformer,
 	pods coreinformers.PodInformer,
 	pvs coreinformers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
+		nodes.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addNode,
+			UpdateFunc: g.updateNode,
+			DeleteFunc: g.deleteNode,
+		})
 	}
 
 	pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -61,6 +71,51 @@ func AddGraphEventHandlers(
 			DeleteFunc: g.deleteVolumeAttachment,
 		})
 	}
+}
+
+func (g *graphPopulator) addNode(obj interface{}) {
+	g.updateNode(nil, obj)
+}
+
+func (g *graphPopulator) updateNode(oldObj, obj interface{}) {
+	node := obj.(*api.Node)
+	var oldNode *api.Node
+	if oldObj != nil {
+		oldNode = obj.(*api.Node)
+	}
+
+	// we only set up rules for ConfigMapRef today, because that is the only reference type
+
+	var name, namespace string
+	if source := node.Spec.ConfigSource; source != nil && source.ConfigMapRef != nil {
+		name = source.ConfigMapRef.Name
+		namespace = source.ConfigMapRef.Namespace
+	}
+
+	var oldName, oldNamespace string
+	if oldNode != nil {
+		if source := oldNode.Spec.ConfigSource; source != nil && source.ConfigMapRef != nil {
+			name = source.ConfigMapRef.Name
+			namespace = source.ConfigMapRef.Namespace
+		}
+	}
+
+	// if Node.Spec.ConfigSource wasn't updated, nothing for us to do
+	if name == oldName && namespace == oldNamespace {
+		return
+	}
+
+	path := "nil"
+	if node.Spec.ConfigSource != nil {
+		path = fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", namespace, name)
+	}
+	glog.V(4).Infof("updateNode configSource reference to %s for node %s", path, node.Name)
+	g.graph.SetNodeConfigMap(node.Name, name, namespace)
+}
+
+func (g *graphPopulator) deleteNode(obj interface{}) {
+	node := obj.(*api.Node)
+	g.graph.DeleteNode(node.Name)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {

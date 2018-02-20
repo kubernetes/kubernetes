@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -40,6 +41,8 @@ type configState struct {
 	configSource   *apiv1.NodeConfigSource
 	expectConfigOk *apiv1.NodeCondition
 	expectConfig   *kubeletconfig.KubeletConfiguration
+	// whether to expect this substring in an error returned from the API server when updating the config source
+	apierr string
 	// whether the state would cause a config change event as a result of the update to Node.Spec.ConfigSource,
 	// assuming that the current source would have also caused a config change event.
 	// for example, some malformed references may result in a download failure, in which case the Kubelet
@@ -132,25 +135,16 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKube
 
 					// Node.Spec.ConfigSource has all nil subfields
 					{desc: "Node.Spec.ConfigSource has all nil subfields",
-						configSource: &apiv1.NodeConfigSource{ConfigMapRef: nil},
-						expectConfigOk: &apiv1.NodeCondition{Type: apiv1.NodeKubeletConfigOk, Status: apiv1.ConditionFalse,
-							Message: "",
-							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, status.FailSyncReasonAllNilSubfields)},
-						expectConfig: nil,
-						event:        false,
+						configSource: &apiv1.NodeConfigSource{},
+						apierr:       "exactly one reference subfield must be non-nil",
 					},
 
 					// Node.Spec.ConfigSource.ConfigMapRef is partial
 					{desc: "Node.Spec.ConfigSource.ConfigMapRef is partial",
-						// TODO(mtaufen): check the other 7 partials in a unit test
 						configSource: &apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{
 							UID:  "foo",
 							Name: "bar"}}, // missing Namespace
-						expectConfigOk: &apiv1.NodeCondition{Type: apiv1.NodeKubeletConfigOk, Status: apiv1.ConditionFalse,
-							Message: "",
-							Reason:  fmt.Sprintf(status.FailSyncReasonFmt, status.FailSyncReasonPartialObjectReference)},
-						expectConfig: nil,
-						event:        false,
+						apierr: "name, namespace, and UID must all be non-empty",
 					},
 
 					// Node.Spec.ConfigSource's UID does not align with namespace/name
@@ -348,10 +342,20 @@ func setAndTestKubeletConfigState(f *framework.Framework, state *configState, ex
 	// set the desired state, retry a few times in case we are competing with other editors
 	Eventually(func() error {
 		if err := setNodeConfigSource(f, state.configSource); err != nil {
-			return fmt.Errorf("case %s: error setting Node.Spec.ConfigSource", err)
+			if len(state.apierr) == 0 {
+				return fmt.Errorf("case %s: expect nil error but got %q", state.desc, err.Error())
+			} else if !strings.Contains(err.Error(), state.apierr) {
+				return fmt.Errorf("case %s: expect error to contain %q but got %q", state.desc, state.apierr, err.Error())
+			}
+		} else if len(state.apierr) > 0 {
+			return fmt.Errorf("case %s: expect error to contain %q but got nil error", state.desc, state.apierr)
 		}
 		return nil
 	}, time.Minute, time.Second).Should(BeNil())
+	// skip further checks if we expected an API error
+	if len(state.apierr) > 0 {
+		return
+	}
 	// check that config source actually got set to what we expect
 	checkNodeConfigSource(f, state.desc, state.configSource)
 	// check condition
@@ -391,7 +395,6 @@ func checkConfigOkCondition(f *framework.Framework, desc string, expect *apiv1.N
 		timeout  = time.Minute
 		interval = time.Second
 	)
-
 	Eventually(func() error {
 		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 		if err != nil {

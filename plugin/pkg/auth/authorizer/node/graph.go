@@ -196,6 +196,47 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 	}
 }
 
+// must be called under write lock
+// deletes edges from a given vertex type to a given vertex type
+// will also delete the "from" nodes if they are orphaned, but will not delete the "to" node
+func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toName string) {
+	// get the "to" side
+	toVert, exists := g.getVertex_rlocked(toType, toNamespace, toName)
+	if !exists {
+		return
+	}
+
+	// get potential "from" verts that match fromType
+	namespaces, exists := g.vertices[fromType]
+	if !exists {
+		return
+	}
+
+	// delete all edges between vertices of fromType and toVert
+	removeVerts := []*namedVertex{}
+	for _, vertexMapping := range namespaces {
+		for _, fromVert := range vertexMapping {
+			if g.graph.HasEdgeBetween(fromVert, toVert) {
+				// remove the edge (no-op if edge doesn't exist)
+				g.graph.RemoveEdge(newDestinationEdge(fromVert, toVert, nil))
+				// remember to clean up the fromVert if we orphaned it
+				if g.graph.Degree(fromVert) == 0 {
+					removeVerts = append(removeVerts, fromVert)
+				}
+			}
+		}
+	}
+
+	// clean up orphaned verts
+	for _, v := range removeVerts {
+		g.graph.RemoveNode(v)
+		delete(g.vertices[v.vertexType][v.namespace], v.name)
+		if len(g.vertices[v.vertexType][v.namespace]) == 0 {
+			delete(g.vertices[v.vertexType], v.namespace)
+		}
+	}
+}
+
 // AddPod should only be called once spec.NodeName is populated.
 // It sets up edges for the following relationships (which are immutable for a pod once bound to a node):
 //
@@ -287,4 +328,42 @@ func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(vaVertexType, "", name)
+}
+
+// SetNodeConfigMap sets up edges for the Node.Spec.ConfigSource.ConfigMapRef relationship:
+//
+// configmap -> node
+func (g *Graph) SetNodeConfigMap(nodeName, configMapName, configMapNamespace string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// nothing to do if we don't have a node
+	if len(nodeName) > 0 {
+		// clear edges configmaps -> node where the destination is the current node *only*
+		// at present, a node can only have one *direct* configmap reference at a time
+		g.deleteEdges_locked(configMapVertexType, nodeVertexType, "", nodeName)
+
+		// establish new edges if we have a real ConfigMap to reference
+		if len(configMapName) > 0 {
+			configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, configMapNamespace, configMapName)
+			nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+			g.graph.SetEdge(newDestinationEdge(configmapVertex, nodeVertex, nodeVertex))
+		}
+	}
+}
+
+// DeleteNode handles node deletion
+// It currently just unlinks ConfigMaps from deleted nodes.
+func (g *Graph) DeleteNode(nodeName string) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	if len(nodeName) > 0 {
+		// clear edges configmaps -> node where the destination is the current node *only*
+		// at present, a node can only have one *direct* configmap reference at a time
+		g.deleteEdges_locked(configMapVertexType, nodeVertexType, "", nodeName)
+
+		// NOTE: We don't remove the node, because if the node is re-created not all pod -> node
+		// links are re-established (we don't get relevant events because the no mutations need
+		// to happen in the API; the state is already there).
+	}
 }
