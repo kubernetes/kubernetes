@@ -18,6 +18,7 @@ package storage
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -40,6 +41,13 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: secret.Strategy,
 		DeleteStrategy: secret.Strategy,
 		ExportStrategy: secret.Strategy,
+
+		SerializationSchemesToCache: []*runtime.SerializationScheme{
+			{
+				GV:        schema.GroupVersion{Group: "", Version: "v1"},
+				MediaType: []string{"application/vnd.kubernetes.protobuf"},
+			},
+		},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: secret.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
