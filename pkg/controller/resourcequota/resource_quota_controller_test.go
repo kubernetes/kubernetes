@@ -338,6 +338,26 @@ func TestAddQuota(t *testing.T) {
 			},
 		},
 		{
+			name:             "status, no usage(to validate it works for extended resources)",
+			expectedPriority: true,
+			quota: &v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						"requests.example/foobars.example.com": resource.MustParse("4"),
+					},
+				},
+				Status: v1.ResourceQuotaStatus{
+					Hard: v1.ResourceList{
+						"requests.example/foobars.example.com": resource.MustParse("4"),
+					},
+				},
+			},
+		},
+		{
 			name:             "status, mismatch",
 			expectedPriority: true,
 			quota: &v1.ResourceQuota{
@@ -370,12 +390,12 @@ func TestAddQuota(t *testing.T) {
 				},
 				Spec: v1.ResourceQuotaSpec{
 					Hard: v1.ResourceList{
-						"count/foobars.example.com": resource.MustParse("4"),
+						"foobars.example.com": resource.MustParse("4"),
 					},
 				},
 				Status: v1.ResourceQuotaStatus{
 					Hard: v1.ResourceList{
-						"count/foobars.example.com": resource.MustParse("4"),
+						"foobars.example.com": resource.MustParse("4"),
 					},
 				},
 			},
