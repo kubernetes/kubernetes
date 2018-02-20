@@ -44,6 +44,7 @@ import (
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const defaultContainerName = "test-c"
@@ -1223,39 +1224,39 @@ func TestAdmitRunAsUser(t *testing.T) {
 			expectedPSP:         runAsAny.Name,
 		},
 		"runAsAny pod request": {
-			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
+			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), nil),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
-			expectedPodSC:       podSC(userIDPtr(1)),
+			expectedPodSC:       podSC(utilpointer.Int64Ptr(1)),
 			expectedContainerSC: nil,
 			expectedPSP:         runAsAny.Name,
 		},
 		"runAsAny container request": {
-			pod:                 createPodWithSecurityContexts(nil, containerSC(userIDPtr(1))),
+			pod:                 createPodWithSecurityContexts(nil, containerSC(utilpointer.Int64Ptr(1))),
 			psps:                []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
-			expectedContainerSC: containerSC(userIDPtr(1)),
+			expectedContainerSC: containerSC(utilpointer.Int64Ptr(1)),
 			expectedPSP:         runAsAny.Name,
 		},
 
 		"mustRunAs pod request out of range": {
-			pod:                createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
+			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), nil),
 			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"mustRunAs container request out of range": {
-			pod:                createPodWithSecurityContexts(podSC(userIDPtr(999)), containerSC(userIDPtr(1))),
+			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(999)), containerSC(utilpointer.Int64Ptr(1))),
 			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 
 		"mustRunAs pod request in range": {
-			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(999)), nil),
+			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(999)), nil),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
@@ -1264,7 +1265,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 			expectedPSP:         mustRunAs.Name,
 		},
 		"mustRunAs container request in range": {
-			pod:                 createPodWithSecurityContexts(nil, containerSC(userIDPtr(999))),
+			pod:                 createPodWithSecurityContexts(nil, containerSC(utilpointer.Int64Ptr(999))),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
@@ -1273,12 +1274,12 @@ func TestAdmitRunAsUser(t *testing.T) {
 			expectedPSP:         mustRunAs.Name,
 		},
 		"mustRunAs pod and container request in range": {
-			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(999)), containerSC(userIDPtr(1000))),
+			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(999)), containerSC(utilpointer.Int64Ptr(1000))),
 			psps:                []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
-			expectedPodSC:       podSC(userIDPtr(999)),
-			expectedContainerSC: containerSC(userIDPtr(1000)),
+			expectedPodSC:       podSC(utilpointer.Int64Ptr(999)),
+			expectedContainerSC: containerSC(utilpointer.Int64Ptr(1000)),
 			expectedPSP:         mustRunAs.Name,
 		},
 		"mustRunAs no request": {
@@ -1301,32 +1302,32 @@ func TestAdmitRunAsUser(t *testing.T) {
 			expectedPSP:         runAsNonRoot.Name,
 		},
 		"runAsNonRoot pod request root": {
-			pod:                createPodWithSecurityContexts(podSC(userIDPtr(0)), nil),
+			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(0)), nil),
 			psps:               []*extensions.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"runAsNonRoot pod request non-root": {
-			pod:                createPodWithSecurityContexts(podSC(userIDPtr(1)), nil),
+			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), nil),
 			psps:               []*extensions.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedPodSC:      podSC(userIDPtr(1)),
+			expectedPodSC:      podSC(utilpointer.Int64Ptr(1)),
 			expectedPSP:        runAsNonRoot.Name,
 		},
 		"runAsNonRoot container request root": {
-			pod:                createPodWithSecurityContexts(podSC(userIDPtr(1)), containerSC(userIDPtr(0))),
+			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), containerSC(utilpointer.Int64Ptr(0))),
 			psps:               []*extensions.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"runAsNonRoot container request non-root": {
-			pod:                 createPodWithSecurityContexts(podSC(userIDPtr(1)), containerSC(userIDPtr(2))),
+			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), containerSC(utilpointer.Int64Ptr(2))),
 			psps:                []*extensions.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
-			expectedPodSC:       podSC(userIDPtr(1)),
-			expectedContainerSC: containerSC(userIDPtr(2)),
+			expectedPodSC:       podSC(utilpointer.Int64Ptr(1)),
+			expectedContainerSC: containerSC(utilpointer.Int64Ptr(2)),
 			expectedPSP:         runAsNonRoot.Name,
 		},
 	}
@@ -1435,12 +1436,12 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 }
 
 func TestAdmitFSGroup(t *testing.T) {
-	createPodWithFSGroup := func(group int) *kapi.Pod {
+	createPodWithFSGroup := func(group int64) *kapi.Pod {
 		pod := goodPod()
 		// doesn't matter if we set it here or on the container, the
 		// admission controller uses DetermineEffectiveSC to get the defaulting
 		// behavior so it can validate what will be applied at runtime
-		pod.Spec.SecurityContext.FSGroup = groupIDPtr(group)
+		pod.Spec.SecurityContext.FSGroup = utilpointer.Int64Ptr(group)
 		return pod
 	}
 
@@ -1472,7 +1473,7 @@ func TestAdmitFSGroup(t *testing.T) {
 			psps:               []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedFSGroup:    groupIDPtr(1),
+			expectedFSGroup:    utilpointer.Int64Ptr(1),
 			expectedPSP:        runAsAny.Name,
 		},
 		"mustRunAs no pod request": {
@@ -1494,7 +1495,7 @@ func TestAdmitFSGroup(t *testing.T) {
 			psps:               []*extensions.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
-			expectedFSGroup:    groupIDPtr(999),
+			expectedFSGroup:    utilpointer.Int64Ptr(999),
 			expectedPSP:        mustRunAs.Name,
 		},
 	}
@@ -2431,14 +2432,4 @@ func goodPod() *kapi.Pod {
 			},
 		},
 	}
-}
-
-func userIDPtr(i int) *int64 {
-	userID := int64(i)
-	return &userID
-}
-
-func groupIDPtr(i int) *int64 {
-	groupID := int64(i)
-	return &groupID
 }
