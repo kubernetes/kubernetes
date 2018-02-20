@@ -132,7 +132,7 @@ func (az *Cloud) getLoadBalancerName(clusterName string, vmSetName string, isInt
 	return lbNamePrefix
 }
 
-// isMasterNode returns returns true is the node has a master role label.
+// isMasterNode returns true if the node has a master role label.
 // The master role is determined by looking for:
 // * a kubernetes.io/role="master" label
 func isMasterNode(node *v1.Node) bool {
@@ -441,7 +441,7 @@ func (as *availabilitySet) GetIPByNodeName(name, vmSetName string) (string, erro
 	return targetIP, nil
 }
 
-// getAgentPoolAvailabiliySets lists the virtual machines for for the resource group and then builds
+// getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
 func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
 	vms, err := as.VirtualMachineClientListWithRetry()
