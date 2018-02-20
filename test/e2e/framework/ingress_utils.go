@@ -1252,12 +1252,16 @@ func (j *IngressTestJig) runDelete(ing *extensions.Ingress, class string) error 
 // getIngressAddressFromKubemci returns the IP address of the given multicluster ingress using kubemci.
 // TODO(nikhiljindal): Update this to be able to return hostname as well.
 func getIngressAddressFromKubemci(name string) ([]string, error) {
+	var addresses []string
 	out, err := runKubemciCmd("get-status", name)
 	if err != nil {
-		return []string{}, err
+		return addresses, err
 	}
 	ip := findIPv4(out)
-	return []string{ip}, err
+	if ip != "" {
+		addresses = append(addresses, ip)
+	}
+	return addresses, err
 }
 
 // findIPv4 returns the first IPv4 address found in the given string.
@@ -1278,7 +1282,7 @@ func getIngressAddress(client clientset.Interface, ns, name, class string) ([]st
 	if err != nil {
 		return nil, err
 	}
-	addresses := []string{}
+	var addresses []string
 	for _, a := range ing.Status.LoadBalancer.Ingress {
 		if a.IP != "" {
 			addresses = append(addresses, a.IP)
