@@ -202,10 +202,6 @@ func validateSyncReplicaSet(t *testing.T, fakePodControl *controller.FakePodCont
 	}
 }
 
-func replicaSetResourceName() string {
-	return "replicasets"
-}
-
 func TestSyncReplicaSetDoesNothing(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
 	fakePodControl := controller.FakePodControl{}
