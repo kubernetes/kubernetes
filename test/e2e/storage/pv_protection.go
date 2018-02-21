@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("PV Protection [Feature:StorageProtection]", func() {
+var _ = utils.SIGDescribe("PV Protection [Feature:StorageObjectInUseProtection]", func() {
 	var (
 		client    clientset.Interface
 		nameSpace string

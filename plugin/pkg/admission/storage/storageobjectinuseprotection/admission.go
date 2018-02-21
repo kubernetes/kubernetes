@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package storageprotection
+package storageobjectinuseprotection
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ import (
 
 const (
 	// PluginName is the name of this admission controller plugin
-	PluginName = "StorageProtection"
+	PluginName = "StorageObjectInUseProtection"
 )
 
 // Register registers a plugin
@@ -95,7 +95,7 @@ var (
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
 func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
-	if !feature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		return nil
 	}
 
