@@ -185,7 +185,11 @@ var ValidVersionGV = schema.GroupVersion{Group: "apitest", Version: ValidVersion
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
+	mapper, codec := AddToScheme(scheme)
+	return scheme, mapper, codec
+}
 
+func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	scheme.AddKnownTypeWithName(InternalGV.WithKind("Type"), &InternalType{})
 	scheme.AddKnownTypeWithName(UnlikelyGV.WithKind("Type"), &ExternalType{})
 	//This tests that kubectl will not confuse the external scheme with the internal scheme, even when they accidentally have versions of the same name.
@@ -213,7 +217,7 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 		}
 	}
 
-	return scheme, mapper, codec
+	return mapper, codec
 }
 
 type fakeCachedDiscoveryClient struct {
@@ -237,7 +241,6 @@ type TestFactory struct {
 	Client             kubectl.RESTClient
 	UnstructuredClient kubectl.RESTClient
 	Describer          printers.Describer
-	Printer            printers.ResourcePrinter
 	Validator          validation.Schema
 	Namespace          string
 	ClientConfig       *restclient.Config
@@ -358,50 +361,6 @@ func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
 }
 
-func (f *FakeFactory) PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
-func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForOptions(&printers.PrintOptions{})
-	if err != nil {
-		return err
-	}
-	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(&printers.PrintOptions{})
-		if err != nil {
-			return err
-		}
-	}
-	return printer.PrintObj(info.Object, out)
-}
-
-func (f *FakeFactory) PrintSuccess(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
-	dryRunMsg := ""
-	if dryRun {
-		dryRunMsg = " (dry run)"
-	}
-	if shortOutput {
-		// -o name: prints resource/name
-		if len(resource) > 0 {
-			fmt.Fprintf(out, "%s/%s\n", resource, name)
-		} else {
-			fmt.Fprintf(out, "%s\n", name)
-		}
-	} else {
-		// understandable output by default
-		if len(resource) > 0 {
-			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
-		} else {
-			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
-		}
-	}
-}
-
-func (f *FakeFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
 func (f *FakeFactory) Scaler(*meta.RESTMapping) (kubectl.Scaler, error) {
 	return nil, nil
 }
@@ -512,14 +471,6 @@ func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (f *FakeFactory) BindExternalFlags(flags *pflag.FlagSet) {
-}
-
-func (f *FakeFactory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
-	return nil
-}
-
-func (f *FakeFactory) PrinterForMapping(printOpts *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
 }
 
 func (f *FakeFactory) NewBuilder() *resource.Builder {
@@ -753,52 +704,8 @@ func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (reso
 	return f.tf.UnstructuredClient, f.tf.Err
 }
 
-func (f *fakeAPIFactory) PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
-}
-
-func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForOptions(&printers.PrintOptions{})
-	if err != nil {
-		return err
-	}
-	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(&printers.PrintOptions{})
-		if err != nil {
-			return err
-		}
-	}
-	return printer.PrintObj(info.Object, out)
-}
-
-func (f *fakeAPIFactory) PrintSuccess(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string) {
-	dryRunMsg := ""
-	if dryRun {
-		dryRunMsg = " (dry run)"
-	}
-	if shortOutput {
-		// -o name: prints resource/name
-		if len(resource) > 0 {
-			fmt.Fprintf(out, "%s/%s\n", resource, name)
-		} else {
-			fmt.Fprintf(out, "%s\n", name)
-		}
-	} else {
-		// understandable output by default
-		if len(resource) > 0 {
-			fmt.Fprintf(out, "%s \"%s\" %s%s\n", resource, name, operation, dryRunMsg)
-		} else {
-			fmt.Fprintf(out, "\"%s\" %s%s\n", name, operation, dryRunMsg)
-		}
-	}
-}
-
 func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
 	return f.tf.Describer, f.tf.Err
-}
-
-func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
 }
 
 func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
@@ -846,18 +753,6 @@ func (f *fakeAPIFactory) Command(*cobra.Command, bool) string {
 
 func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator {
 	return cmdutil.DefaultGenerators(cmdName)
-}
-
-func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
-	printer, err := f.PrinterForMapping(&printers.PrintOptions{})
-	if err != nil {
-		return err
-	}
-	return printer.PrintObj(obj, out)
-}
-
-func (f *fakeAPIFactory) PrinterForMapping(outputOpts *printers.PrintOptions) (printers.ResourcePrinter, error) {
-	return f.tf.Printer, f.tf.Err
 }
 
 func (f *fakeAPIFactory) NewBuilder() *resource.Builder {

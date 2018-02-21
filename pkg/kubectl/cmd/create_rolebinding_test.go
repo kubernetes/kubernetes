@@ -75,7 +75,6 @@ func TestCreateRoleBinding(t *testing.T) {
 	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
 
 	tf.Namespace = "test"
-	tf.Printer = &testPrinter{}
 	tf.Client = &RoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
 			NegotiatedSerializer: ns,

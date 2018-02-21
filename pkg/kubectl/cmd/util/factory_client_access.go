@@ -62,8 +62,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/transport"
-	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring0Factory struct {
@@ -444,12 +442,6 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 		{Resource: "job"},
 		{Resource: "replicaset"},
 	}
-}
-
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
-	printersinternal.AddHandlers(p)
-	return p, nil
 }
 
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {

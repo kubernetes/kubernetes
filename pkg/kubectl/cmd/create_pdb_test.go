@@ -42,7 +42,6 @@ func TestCreatePdb(t *testing.T) {
 		}),
 	}
 	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -52,7 +51,7 @@ func TestCreatePdb(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
 	CreatePodDisruptionBudget(f, buf, cmd, []string{pdbName})
-	expectedOutput := "poddisruptionbudgets/" + pdbName + "\n"
+	expectedOutput := "poddisruptionbudget.policy/" + pdbName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

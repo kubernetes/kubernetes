@@ -33,7 +33,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -316,7 +315,7 @@ func TestGetResourcesAndSelector(t *testing.T) {
 }
 
 func TestSelectorTest(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -335,8 +334,6 @@ func TestSelectorTest(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
 
-	_, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer}
 	cmd.Run(cmd, []string{"environment=qa"})
 
 	if !strings.Contains(buf.String(), "service/cassandra") {

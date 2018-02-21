@@ -73,7 +73,6 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
 
 	tf.Namespace = "test"
-	tf.Printer = &testPrinter{}
 	tf.Client = &ClusterRoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -107,7 +106,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 		},
 	}
 
-	expectedOutput := "clusterrolebindings/" + expectBinding.Name + "\n"
+	expectedOutput := "clusterrolebinding.rbac.authorization.k8s.io/" + expectBinding.Name + "\n"
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateClusterRoleBinding(f, buf)
 	cmd.Flags().Set("clusterrole", "fake-clusterrole")

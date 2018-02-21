@@ -191,7 +191,7 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 			return err
 		}
 		found++
-		f.PrintSuccess(options.outputStyle == "name", out, info.Mapping.Resource, info.Name, false, verb)
+		cmdutil.PrintSuccess(options.outputStyle == "name", out, info.Object, false, verb)
 		return nil
 	})
 	if found == 0 {

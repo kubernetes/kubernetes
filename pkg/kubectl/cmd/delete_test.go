@@ -55,7 +55,6 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -84,7 +83,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"replicationcontrollers/redis-master-controller"})
-	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
+	if buf.String() != "replicationcontroller/redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
@@ -94,7 +93,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets/mysecret"})
-	if buf.String() != "secrets/mysecret\n" {
+	if buf.String() != "secret/mysecret\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -118,7 +117,6 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	var expectedOrphanDependents *bool
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -143,7 +141,7 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets/mysecret"})
-	if buf.String() != "secrets/mysecret\n" {
+	if buf.String() != "secret/mysecret\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
@@ -156,7 +154,7 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets/mysecret"})
-	if buf.String() != "secrets/mysecret\n" {
+	if buf.String() != "secret/mysecret\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -167,7 +165,6 @@ func TestDeleteNamedObject(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -196,7 +193,7 @@ func TestDeleteNamedObject(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"replicationcontrollers", "redis-master-controller"})
-	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
+	if buf.String() != "replicationcontroller/redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
@@ -207,7 +204,7 @@ func TestDeleteNamedObject(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets", "mysecret"})
-	if buf.String() != "secrets/mysecret\n" {
+	if buf.String() != "secret/mysecret\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -217,7 +214,6 @@ func TestDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -240,7 +236,7 @@ func TestDeleteObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationcontrollers/redis-master\n" {
+	if buf.String() != "replicationcontroller/redis-master\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -275,7 +271,6 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 	objectDeletionWaitInterval = time.Millisecond
 	count := 0
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -307,10 +302,10 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 	cmd := NewCmdDelete(fake, buf, errBuf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("grace-period", "0")
-	cmd.Run(cmd, []string{"pod/nginx"})
+	cmd.Run(cmd, []string{"pods/nginx"})
 
 	// uses the name from the file, not the response
-	if buf.String() != "pods/nginx\n" {
+	if buf.String() != "pod/nginx\n" {
 		t.Errorf("unexpected output: %s\n---\n%s", buf.String(), errBuf.String())
 	}
 	if reaper.deleteOptions == nil || reaper.deleteOptions.GracePeriodSeconds == nil || *reaper.deleteOptions.GracePeriodSeconds != 1 {
@@ -324,7 +319,6 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 func TestDeleteObjectNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -361,7 +355,6 @@ func TestDeleteObjectNotFound(t *testing.T) {
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -398,7 +391,6 @@ func TestDeleteAllNotFound(t *testing.T) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -447,7 +439,6 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -473,7 +464,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"services"})
 
-	if buf.String() != "services/baz\n" {
+	if buf.String() != "service/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -483,7 +474,6 @@ func TestDeleteMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -508,7 +498,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/redis-master\nservices/frontend\n" {
+	if buf.String() != "replicationcontroller/redis-master\nservice/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -518,7 +508,6 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	_, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -553,7 +542,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
 
-	if buf.String() != "services/frontend\n" {
+	if buf.String() != "service/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -562,7 +551,6 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -590,7 +578,7 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"replicationcontrollers,services", "baz", "foo"})
-	if buf.String() != "replicationcontrollers/baz\nreplicationcontrollers/foo\nservices/baz\nservices/foo\n" {
+	if buf.String() != "replicationcontroller/baz\nreplicationcontroller/foo\nservice/baz\nservice/foo\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -600,7 +588,6 @@ func TestDeleteDirectory(t *testing.T) {
 	_, _, rc := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -622,7 +609,7 @@ func TestDeleteDirectory(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/frontend\nreplicationcontrollers/redis-master\nreplicationcontrollers/redis-slave\n" {
+	if buf.String() != "replicationcontroller/frontend\nreplicationcontroller/redis-master\nreplicationcontroller/redis-slave\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -632,7 +619,6 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -666,7 +652,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	if buf.String() != "pods/foo\npods/bar\nservices/baz\n" {
+	if buf.String() != "pod/foo\npod/bar\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -697,7 +683,6 @@ func TestResourceErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
 		tf.ClientConfig = defaultClientConfig()
 
@@ -715,9 +700,6 @@ func TestResourceErrors(t *testing.T) {
 			continue
 		}
 
-		if tf.Printer.(*testPrinter).Objects != nil {
-			t.Errorf("unexpected print to default printer")
-		}
 		if buf.Len() > 0 {
 			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
 		}

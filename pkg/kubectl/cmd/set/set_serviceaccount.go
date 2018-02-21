@@ -66,9 +66,7 @@ type serviceAccountConfig struct {
 	output                 string
 	changeCause            string
 	local                  bool
-	PrintObject            func(cmd *cobra.Command, obj runtime.Object, out io.Writer) error
 	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
-	printSuccess           func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	infos                  []*resource.Info
 	serviceAccountName     string
 }
@@ -113,10 +111,8 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.dryRun = cmdutil.GetDryRunFlag(cmd)
 	saConfig.output = cmdutil.GetFlagString(cmd, "output")
 	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
-	saConfig.PrintObject = f.PrintObject
 	saConfig.cmd = cmd
 
-	saConfig.printSuccess = f.PrintSuccess
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -165,7 +161,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			continue
 		}
 		if saConfig.local || saConfig.dryRun {
-			if err := saConfig.PrintObject(saConfig.cmd, patch.Info.AsVersioned(), saConfig.out); err != nil {
+			if err := cmdutil.PrintObject(saConfig.cmd, patch.Info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue
@@ -184,12 +180,12 @@ func (saConfig *serviceAccountConfig) Run() error {
 			}
 		}
 		if len(saConfig.output) > 0 {
-			if err := saConfig.PrintObject(saConfig.cmd, info.AsVersioned(), saConfig.out); err != nil {
+			if err := cmdutil.PrintObject(saConfig.cmd, info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue
 		}
-		saConfig.printSuccess(saConfig.shortOutput, saConfig.out, info.Mapping.Resource, info.Name, saConfig.dryRun, "serviceaccount updated")
+		cmdutil.PrintSuccess(saConfig.shortOutput, saConfig.out, info.Object, saConfig.dryRun, "serviceaccount updated")
 	}
 	return utilerrors.NewAggregate(patchErrs)
 }
