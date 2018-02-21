@@ -45,6 +45,7 @@ import (
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
+	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
 
 	"github.com/stretchr/testify/assert"
 
@@ -145,7 +146,7 @@ func init() {
 	scaleUpLimitFactor = 8
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *scalefake.FakeScaleClient) {
+func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
@@ -523,7 +524,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		return true, metrics, nil
 	})
 
-	return fakeClient, fakeMetricsClient, fakeCMClient, fakeScaleClient
+	fakeEMClient := &emfake.FakeExternalMetricsClient{}
+
+	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient
 }
 
 func (tc *testCase) verifyResults(t *testing.T) {
@@ -538,7 +541,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
-	testClient, testMetricsClient, testCMClient, testScaleClient := tc.prepareTestClient(t)
+	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient := tc.prepareTestClient(t)
 	if tc.testClient != nil {
 		testClient = tc.testClient
 	}
@@ -554,6 +557,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	metricsClient := metrics.NewRESTMetricsClient(
 		testMetricsClient.MetricsV1beta1(),
 		testCMClient,
+		testEMClient,
 	)
 
 	eventClient := &fake.Clientset{}
@@ -1268,7 +1272,7 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 		},
 	}
 
-	_, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _,testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -1313,7 +1317,7 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 		},
 	}
 
-	_, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -1374,7 +1378,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 			useMetricsAPI:       true,
 		}
-		_, testMetricsClient, testCMClient, _ := tc.prepareTestClient(t)
+		_, testMetricsClient, testCMClient, _,  _ := tc.prepareTestClient(t)
 		tc.testMetricsClient = testMetricsClient
 		tc.testCMClient = testCMClient
 
@@ -1447,7 +1451,7 @@ func TestConditionFailedGetScale(t *testing.T) {
 		},
 	}
 
-	_, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -1474,7 +1478,7 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 		}),
 	}
 
-	_, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -1660,7 +1664,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		useMetricsAPI:        true,
 	}
-	testClient, _, _, _ := tc.prepareTestClient(t)
+	testClient, _, _, _, _ := tc.prepareTestClient(t)
 	tc.testClient = testClient
 	var savedHPA *autoscalingv1.HorizontalPodAutoscaler
 	testClient.PrependReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {

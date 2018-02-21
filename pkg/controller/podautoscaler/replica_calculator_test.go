@@ -36,6 +36,7 @@ import (
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
+	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,7 +82,7 @@ const (
 	numContainersPerPod = 2
 )
 
-func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient) {
+func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient) {
 
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -236,12 +237,14 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 		return true, metrics, nil
 	})
 
-	return fakeClient, fakeMetricsClient, fakeCMClient
+	fakeEMClient := &emfake.FakeExternalMetricsClient{}
+
+	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient
 }
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
-	testClient, testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
+	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
+	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,

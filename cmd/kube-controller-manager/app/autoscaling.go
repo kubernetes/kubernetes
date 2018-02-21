@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
 func startHPAController(ctx ControllerContext) (bool, error) {
@@ -51,6 +52,7 @@ func startHPAControllerWithRESTClient(ctx ControllerContext) (bool, error) {
 	metricsClient := metrics.NewRESTMetricsClient(
 		resourceclient.NewForConfigOrDie(clientConfig),
 		custom_metrics.NewForConfigOrDie(clientConfig),
+		external_metrics.NewForConfigOrDie(clientConfig),
 	)
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }
