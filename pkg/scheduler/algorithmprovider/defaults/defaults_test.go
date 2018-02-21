@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
 
@@ -84,4 +86,14 @@ func TestDefaultPredicates(t *testing.T) {
 	if expected := defaultPredicates(); !result.Equal(expected) {
 		t.Errorf("expected %v got %v", expected, result)
 	}
+}
+
+func TestApplyFeatureGates_EnabledResourceLimitsPriorityFunction(t *testing.T) {
+	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.ResourceLimitsPriorityFunction): true})
+	ApplyFeatureGates()
+}
+
+func TestApplyFeatureGates_EnabledTaintNodesByCondition(t *testing.T) {
+	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.TaintNodesByCondition): true})
+	ApplyFeatureGates()
 }
