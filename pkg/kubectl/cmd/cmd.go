@@ -270,7 +270,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
-				NewCmdScale(f, out),
+				NewCmdScale(f, out, err),
 				NewCmdAutoscale(f, out),
 			},
 		},
