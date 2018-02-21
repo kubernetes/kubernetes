@@ -43,15 +43,21 @@ import (
 // connections, forcing the client to re-handshake with the server and use the
 // new certificate.
 //
+// The exitAfter duration, if set, will terminate the current process if a certificate
+// is not available from the store (because it has been deleted on disk or is corrupt)
+// or if the certificate has expired and the server is responsive. This allows the
+// process parent or the bootstrap credentials an opportunity to retrieve a new initial
+// certificate.
+//
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) error {
-	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitIfExpired)
+func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) error {
+	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
-// client cert has changed. Intended for testing.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) error {
+// client cert has changed.
+func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) error {
 	if clientConfig.Transport != nil {
 		return fmt.Errorf("there is already a transport configured")
 	}
@@ -77,16 +83,35 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		conns:  make(map[*closableConn]struct{}),
 	}
 
+	lastCertAvailable := time.Now()
 	lastCert := clientCertificateManager.Current()
 	go wait.Until(func() {
 		curr := clientCertificateManager.Current()
-		if exitIfExpired && curr != nil && time.Now().After(curr.Leaf.NotAfter) {
-			if clientCertificateManager.ServerHealthy() {
-				glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+
+		if exitAfter > 0 {
+			now := time.Now()
+			if curr == nil {
+				// the certificate has been deleted from disk or is otherwise corrupt
+				if now.After(lastCertAvailable.Add(exitAfter)) {
+					if clientCertificateManager.ServerHealthy() {
+						glog.Fatalf("It has been %s since a valid client cert was found and the server is responsive, exiting.", exitAfter)
+					} else {
+						glog.Errorf("It has been %s since a valid client cert was found, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.", exitAfter)
+					}
+				}
 			} else {
-				glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+				// the certificate is expired
+				if now.After(curr.Leaf.NotAfter) {
+					if clientCertificateManager.ServerHealthy() {
+						glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+					} else {
+						glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+					}
+				}
+				lastCertAvailable = now
 			}
 		}
+
 		if curr == nil || lastCert == curr {
 			// Cert hasn't been rotated.
 			return
