@@ -99,7 +99,6 @@ pkg/controller/cloud
 pkg/controller/clusterroleaggregation
 pkg/controller/cronjob
 pkg/controller/daemon
-pkg/controller/daemon/util
 pkg/controller/deployment
 pkg/controller/deployment/util
 pkg/controller/disruption

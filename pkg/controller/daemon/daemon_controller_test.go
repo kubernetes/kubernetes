@@ -84,12 +84,12 @@ var (
 )
 
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
-	if key, err := controller.KeyFunc(ds); err != nil {
+	key, err := controller.KeyFunc(ds)
+
+	if err != nil {
 		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
-		return ""
-	} else {
-		return key
 	}
+	return key
 }
 
 func newDaemonSet(name string) *extensions.DaemonSet {
