@@ -441,12 +441,12 @@ function start_apiserver {
       fi
       RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
     fi
-    
+
 
     # Admission Controllers to invoke prior to persisting objects in cluster
     #
     # The order defined here dose not matter.
-    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PodPreset
+    ENABLE_ADMISSION_PLUGINS=Initializers,LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PodPreset,StorageObjectInUseProtection
 
     audit_arg=""
     APISERVER_BASIC_AUDIT_LOG=""
