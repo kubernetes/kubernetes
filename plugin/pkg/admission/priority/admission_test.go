@@ -190,6 +190,14 @@ func TestDefaultPriority(t *testing.T) {
 			expectedDefaultAfter:  defaultClass1.Value,
 		},
 		{
+			name:                  "multiple default classes resolves to the minimum value among them",
+			classesBefore:         []*scheduling.PriorityClass{defaultClass1, defaultClass2},
+			classesAfter:          []*scheduling.PriorityClass{defaultClass2},
+			attributes:            admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, nil),
+			expectedDefaultBefore: defaultClass1.Value,
+			expectedDefaultAfter:  defaultClass2.Value,
+		},
+		{
 			name:                  "delete default priority class",
 			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
 			classesAfter:          []*scheduling.PriorityClass{},
