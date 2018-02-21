@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 )
@@ -73,8 +74,7 @@ func (sc *stateCheckpoint) restoreState() error {
 
 	checkpoint := NewCPUManagerCheckpoint()
 	if err = sc.checkpointManager.GetCheckpoint(cpuManagerCheckpointName, checkpoint); err != nil {
-		// TODO: change to errors.ErrCheckpointNotFound may be required after issue in checkpointing PR is resolved
-		if err == utilstore.ErrKeyNotFound {
+		if err == errors.ErrCheckpointNotFound {
 			sc.storeState()
 			return nil
 		}
