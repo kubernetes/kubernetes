@@ -23,37 +23,34 @@ import (
 	"github.com/spf13/cobra"
 
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/rand"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
-	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
 	jobLong = templates.LongDesc(i18n.T(`
-		Create a Job to execute immediately from a specified CronJob.`))
+		Create a job with the specified name.`))
 
 	jobExample = templates.Examples(i18n.T(`
-		# Create a Job from a CronJob named "a-cronjob"
-		kubectl create job --from-cronjob=a-cronjob`))
+		# Create a job from a CronJob named "a-cronjob"
+		kubectl create job --from=cronjob/a-cronjob`))
 )
 
 type CreateJobOptions struct {
-	FromCronJob string
+	Name string
+	From string
 
-	OutputFormat  string
-	Namespace     string
-	V1Beta1Client clientbatchv1beta1.BatchV1beta1Interface
-	V1Client      clientbatchv1.BatchV1Interface
-	Mapper        meta.RESTMapper
-	Out           io.Writer
-	PrintObject   func(obj runtime.Object) error
-	PrintSuccess  func(mapper meta.RESTMapper, shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
+	Namespace string
+	Client    clientbatchv1.BatchV1Interface
+	Out       io.Writer
+	DryRun    bool
+	Builder   *resource.Builder
+	Cmd       *cobra.Command
 }
 
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
@@ -62,7 +59,7 @@ func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Out: cmdOut,
 	}
 	cmd := &cobra.Command{
-		Use:     "job --from-cronjob=CRONJOB",
+		Use:     "job NAME [--from-cronjob=CRONJOB]",
 		Short:   jobLong,
 		Long:    jobLong,
 		Example: jobExample,
@@ -74,74 +71,76 @@ func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().String("from-cronjob", "", "Specify the name of the CronJob to create a Job from.")
+	cmd.Flags().String("from", "", "The name of the resource to create a Job from (only cronjob is supported).")
 
 	return cmd
 }
 
 func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) (err error) {
-	c.FromCronJob = cmdutil.GetFlagString(cmd, "from-cronjob")
+	if len(args) == 0 {
+		return cmdutil.UsageErrorf(cmd, "NAME is required")
+	}
+	c.Name = args[0]
 
-	// Complete other options for Run.
-	c.Mapper, _ = f.Object()
-
-	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
-
+	c.From = cmdutil.GetFlagString(cmd, "from")
 	c.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	c.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, obj, c.Out)
-	}
-
-	// need two client sets to deal with the differing versions of CronJobs and Jobs
 	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	if c.V1Client == nil {
-		c.V1Client = clientset.BatchV1()
-	}
-	if c.V1Beta1Client == nil {
-		c.V1Beta1Client = clientset.BatchV1beta1()
-	}
+	c.Client = clientset.BatchV1()
+	c.Builder = f.NewBuilder()
+	c.Cmd = cmd
 
 	return nil
 }
 
-func (c *CreateJobOptions) RunCreateJob() (err error) {
-	cronjob, err := c.V1Beta1Client.CronJobs(c.Namespace).Get(c.FromCronJob, metav1.GetOptions{})
-
+func (c *CreateJobOptions) RunCreateJob() error {
+	infos, err := c.Builder.
+		Unstructured().
+		NamespaceParam(c.Namespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(false, c.From).
+		Flatten().
+		Latest().
+		Do().
+		Infos()
 	if err != nil {
-		return fmt.Errorf("failed to fetch job: %v", err)
+		return err
+	}
+	if len(infos) != 1 {
+		return fmt.Errorf("from must be an existing cronjob")
+	}
+	cronJob, ok := infos[0].AsVersioned().(*batchv1beta1.CronJob)
+	if !ok {
+		return fmt.Errorf("from must be an existing cronjob")
 	}
 
+	return c.createJob(cronJob)
+}
+
+func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
-
-	labels := make(map[string]string)
-	for k, v := range cronjob.Spec.JobTemplate.Labels {
-		labels[k] = v
+	for k, v := range cronJob.Spec.JobTemplate.Annotations {
+		annotations[k] = v
 	}
-
 	jobToCreate := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			// job name cannot exceed DNS1053LabelMaxLength (52 characters)
-			Name:        cronjob.Name + "-manual-" + rand.String(3),
+			Name:        c.Name,
 			Namespace:   c.Namespace,
 			Annotations: annotations,
-			Labels:      labels,
+			Labels:      cronJob.Spec.JobTemplate.Labels,
 		},
-		Spec: cronjob.Spec.JobTemplate.Spec,
+		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
 
-	result, err := c.V1Client.Jobs(c.Namespace).Create(jobToCreate)
-
+	job, err := c.Client.Jobs(c.Namespace).Create(jobToCreate)
 	if err != nil {
 		return fmt.Errorf("failed to create job: %v", err)
 	}
-
-	return c.PrintObject(result)
+	return cmdutil.PrintObject(c.Cmd, job, c.Out)
 }

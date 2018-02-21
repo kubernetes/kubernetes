@@ -18,32 +18,28 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
-	"strings"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	fake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-var submittedJob *batchv1.Job
-
 func TestCreateJobFromCronJob(t *testing.T) {
+	var submittedJob *batchv1.Job
 	testNamespaceName := "test"
 	testCronJobName := "test-cronjob"
+	testJobName := "test-job"
 	testImageName := "fake"
 
 	expectedLabels := make(map[string]string)
 	expectedAnnotations := make(map[string]string)
 	expectedLabels["test-label"] = "test-value"
-	expectedAnnotations["cronjob.kubernetes.io/instantiate"] = "manual"
 
 	expectJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,7 +58,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		},
 	}
 
-	cronJobToCreate := &batchv1beta1.CronJob{
+	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testCronJobName,
 			Namespace: testNamespaceName,
@@ -80,69 +76,47 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	}
 
 	clientset := fake.Clientset{}
-	clientset.PrependReactor("get", "cronjobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		return true, cronJobToCreate, nil
-	})
 	clientset.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 		ca := action.(clienttesting.CreateAction)
 		submittedJob = ca.GetObject().(*batchv1.Job)
 		return true, expectJob, nil
 	})
-
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f, _ := cmdtesting.NewAPIFactory()
 	buf := bytes.NewBuffer([]byte{})
-
-	mapper, _ := f.Object()
 	cmdOptions := &CreateJobOptions{
-		Out:           buf,
-		OutputFormat:  "na",
-		Namespace:     testNamespaceName,
-		FromCronJob:   testCronJobName,
-		V1Client:      clientset.BatchV1(),
-		V1Beta1Client: clientset.BatchV1beta1(),
-		Mapper:        mapper,
-		PrintObject: func(obj runtime.Object) error {
-			return nil
-		},
-	}
-	cmdOptions.RunCreateJob()
-
-	composedJobName := fmt.Sprintf("%s-manual-", testCronJobName)
-	if !strings.HasPrefix(submittedJob.ObjectMeta.Name, composedJobName) {
-		t.Errorf("expected '%s', got '%s'", composedJobName, submittedJob.ObjectMeta.Name)
+		Name:      testJobName,
+		Namespace: testNamespaceName,
+		Client:    clientset.BatchV1(),
+		Out:       buf,
+		Cmd:       NewCmdCreateJob(f, buf),
 	}
 
-	annotationsArrayLength := len(submittedJob.Annotations)
-	if annotationsArrayLength != 1 {
-		t.Errorf("expected length of annotations array to be 1, got %d", annotationsArrayLength)
+	err := cmdOptions.createJob(cronJob)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 
-	if v, ok := submittedJob.Annotations["cronjob.kubernetes.io/instantiate"]; ok {
-		if v != "manual" {
-			t.Errorf("expected annotation cronjob.kubernetes.io/instantiate to be 'manual', got '%s'", v)
-		}
-	} else {
-		t.Errorf("expected annotation cronjob.kubernetes.io/instantiate to exist")
+	if submittedJob.ObjectMeta.Name != testJobName {
+		t.Errorf("expected '%s', got '%s'", testJobName, submittedJob.ObjectMeta.Name)
 	}
 
-	labelsArrayLength := len(submittedJob.Labels)
-	if labelsArrayLength != 1 {
-		t.Errorf("expected length of labels array to be 1, got %d", labelsArrayLength)
+	if l := len(submittedJob.Annotations); l != 1 {
+		t.Errorf("expected length of annotations array to be 1, got %d", l)
+	}
+	if v, ok := submittedJob.Annotations["cronjob.kubernetes.io/instantiate"]; !ok || v != "manual" {
+		t.Errorf("expected annotation cronjob.kubernetes.io/instantiate=manual to exist, got '%s'", v)
 	}
 
-	if v, ok := submittedJob.Labels["test-label"]; ok {
-		if v != "test-value" {
-			t.Errorf("expected label test-label to be 'test-value', got '%s'", v)
-		}
-	} else {
-		t.Errorf("expected label test-label to exist")
+	if l := len(submittedJob.Labels); l != 1 {
+		t.Errorf("expected length of labels array to be 1, got %d", l)
+	}
+	if v, ok := submittedJob.Labels["test-label"]; !ok || v != "test-value" {
+		t.Errorf("expected label test-label=test-value to to exist, got '%s'", v)
 	}
 
-	containerArrayLength := len(submittedJob.Spec.Template.Spec.Containers)
-	if containerArrayLength != 1 {
-		t.Errorf("expected length of container array to be 1, got %d", containerArrayLength)
+	if l := len(submittedJob.Spec.Template.Spec.Containers); l != 1 {
+		t.Errorf("expected length of container array to be 1, got %d", l)
 	}
-
 	if submittedJob.Spec.Template.Spec.Containers[0].Image != testImageName {
 		t.Errorf("expected '%s', got '%s'", testImageName, submittedJob.Spec.Template.Spec.Containers[0].Image)
 	}
