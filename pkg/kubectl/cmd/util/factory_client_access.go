@@ -231,20 +231,6 @@ func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	return restclient.RESTClientFor(clientConfig)
 }
 
-func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
-	var decoder runtime.Decoder
-	if toInternal {
-		decoder = legacyscheme.Codecs.UniversalDecoder()
-	} else {
-		decoder = legacyscheme.Codecs.UniversalDeserializer()
-	}
-	return decoder
-}
-
-func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
-}
-
 func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
 	// TODO: replace with a swagger schema based approach (identify pod template via schema introspection)
 	switch t := obj.(type) {
@@ -451,7 +437,7 @@ func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 			return nil, errors.New("is already paused")
 		}
 		obj.Spec.Paused = true
-		return runtime.Encode(f.JSONEncoder(), info.Object)
+		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
 	default:
 		return nil, fmt.Errorf("pausing is not supported")
 	}
@@ -468,7 +454,7 @@ func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
 			return nil, errors.New("is not paused")
 		}
 		obj.Spec.Paused = false
-		return runtime.Encode(f.JSONEncoder(), info.Object)
+		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
 	default:
 		return nil, fmt.Errorf("resuming is not supported")
 	}
@@ -713,4 +699,13 @@ func computeDiscoverCacheDir(parentDir, host string) string {
 	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
 
 	return filepath.Join(parentDir, safeHost)
+}
+
+// this method exists to help us find the points still relying on internal types.
+func InternalVersionDecoder() runtime.Decoder {
+	return legacyscheme.Codecs.UniversalDecoder()
+}
+
+func InternalVersionJSONEncoder() runtime.Encoder {
+	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 }

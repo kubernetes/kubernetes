@@ -54,7 +54,6 @@ type SelectorOptions struct {
 
 	builder *resource.Builder
 	mapper  meta.RESTMapper
-	encoder runtime.Encoder
 }
 
 var (
@@ -118,7 +117,6 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.changeCause = f.Command(cmd, false)
 	mapper, _ := f.Object()
 	o.mapper = mapper
-	o.encoder = f.JSONEncoder()
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
@@ -178,13 +176,13 @@ func (o *SelectorOptions) RunSelector() error {
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
-		CalculatePatch(patch, o.encoder, func(info *resource.Info) ([]byte, error) {
+		CalculatePatch(patch, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 			versioned := info.AsVersioned()
 			patch.Info.Object = versioned
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 
 			if selectErr == nil {
-				return runtime.Encode(o.encoder, info.Object)
+				return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 			}
 			return nil, selectErr
 		})

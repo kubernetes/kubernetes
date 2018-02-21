@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -119,7 +120,9 @@ func TestRunAccessCheck(t *testing.T) {
 		test.o.Out = ioutil.Discard
 		test.o.Err = ioutil.Discard
 
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 			NegotiatedSerializer: ns,

@@ -117,7 +117,6 @@ type EnvOptions struct {
 
 	Builder *resource.Builder
 	Infos   []*resource.Info
-	Encoder runtime.Encoder
 
 	Cmd *cobra.Command
 
@@ -187,7 +186,6 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.Encoder = f.JSONEncoder()
 	o.ContainerSelector = cmdutil.GetFlagString(cmd, "containers")
 	o.List = cmdutil.GetFlagBool(cmd, "list")
 	o.Resolve = cmdutil.GetFlagBool(cmd, "resolve")
@@ -320,7 +318,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	if err != nil {
 		return err
 	}
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		info.Object = info.AsVersioned()
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
@@ -388,7 +386,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		})
 
 		if err == nil {
-			return runtime.Encode(o.Encoder, info.Object)
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})

@@ -28,7 +28,7 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	_, tf, _, _ := cmdtesting.NewAPIFactory()
+	_, tf := cmdtesting.NewAPIFactory()
 	tf.Namespace = "test"
 
 	tests := map[string]struct {

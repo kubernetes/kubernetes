@@ -57,7 +57,6 @@ type SubjectOptions struct {
 	resource.FilenameOptions
 
 	Infos             []*resource.Info
-	Encoder           runtime.Encoder
 	Out               io.Writer
 	Err               io.Writer
 	Selector          string
@@ -108,7 +107,6 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 }
 
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Encoder = f.JSONEncoder()
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.PrintObject = func(obj runtime.Object, out io.Writer) error {
@@ -179,7 +177,7 @@ func (o *SubjectOptions) Validate() error {
 
 func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 	var err error
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		subjects := []rbac.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbac.Subject{
@@ -218,7 +216,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(o.Encoder, info.AsVersioned())
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.AsVersioned())
 		}
 		return nil, err
 	})

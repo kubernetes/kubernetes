@@ -33,11 +33,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
@@ -54,7 +56,9 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -116,7 +120,9 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	var expectedOrphanDependents *bool
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -164,7 +170,9 @@ func TestDeleteNamedObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -213,7 +221,9 @@ func TestDeleteObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -270,7 +280,9 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 
 	objectDeletionWaitInterval = time.Millisecond
 	count := 0
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -318,7 +330,7 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 
 func TestDeleteObjectNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -354,7 +366,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -389,7 +401,8 @@ func TestDeleteAllNotFound(t *testing.T) {
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -433,7 +446,8 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
@@ -473,7 +487,9 @@ func TestDeleteMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -507,7 +523,9 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, _ := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -550,7 +568,9 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -587,7 +607,9 @@ func TestDeleteDirectory(t *testing.T) {
 	initTestErrorHandler(t)
 	_, _, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -618,7 +640,9 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	initTestErrorHandler(t)
 	pods, svc, _ := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -682,7 +706,7 @@ func TestResourceErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.Namespace = "test"
 		tf.ClientConfig = defaultClientConfig()
 

@@ -24,7 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateSecretGeneric(t *testing.T) {
@@ -35,7 +37,10 @@ func TestCreateSecretGeneric(t *testing.T) {
 		},
 	}
 	secretObject.Name = "my-secret"
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
@@ -65,7 +70,10 @@ func TestCreateSecretGeneric(t *testing.T) {
 func TestCreateSecretDockerRegistry(t *testing.T) {
 	secretObject := &v1.Secret{}
 	secretObject.Name = "my-secret"
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,

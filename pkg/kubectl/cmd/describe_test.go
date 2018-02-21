@@ -24,13 +24,16 @@ import (
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec, _ := cmdtesting.NewTestFactory()
+	f, tf := cmdtesting.NewTestFactory()
+	_, _, codec := cmdtesting.NewExternalScheme()
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -54,7 +57,9 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec, _ := cmdtesting.NewTestFactory()
+	f, tf := cmdtesting.NewTestFactory()
+	_, _, codec := cmdtesting.NewExternalScheme()
+
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -77,7 +82,9 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -110,7 +117,9 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -130,7 +139,9 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -151,7 +162,9 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -171,7 +184,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 }
 
 func TestDescribeHelpMessage(t *testing.T) {
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f, _ := cmdtesting.NewAPIFactory()
 
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})

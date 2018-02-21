@@ -23,13 +23,17 @@ import (
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -67,7 +71,9 @@ func TestPatchObject(t *testing.T) {
 func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -101,7 +107,9 @@ func TestPatchNoop(t *testing.T) {
 	getObject := &svc.Items[0]
 	patchObject := &svc.Items[0]
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -145,7 +153,9 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	}
 	svcCopy.Labels["post-patch"] = "post-patch-value"
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

@@ -37,8 +37,6 @@ type ImageOptions struct {
 	resource.FilenameOptions
 
 	Infos        []*resource.Info
-	Encoder      runtime.Encoder
-	Decoder      runtime.Decoder
 	Selector     string
 	Out          io.Writer
 	Err          io.Writer
@@ -114,8 +112,6 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.Encoder = f.JSONEncoder()
-	o.Decoder = f.Decoder(true)
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
@@ -184,7 +180,7 @@ func (o *ImageOptions) Validate() error {
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false
 		info.Object = info.AsVersioned()
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
@@ -224,7 +220,7 @@ func (o *ImageOptions) Run() error {
 			return nil
 		})
 		if transformed && err == nil {
-			return runtime.Encode(o.Encoder, info.Object)
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})

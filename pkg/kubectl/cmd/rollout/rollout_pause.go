@@ -39,11 +39,10 @@ import (
 type PauseConfig struct {
 	resource.FilenameOptions
 
-	Pauser  func(info *resource.Info) ([]byte, error)
-	Mapper  meta.RESTMapper
-	Typer   runtime.ObjectTyper
-	Encoder runtime.Encoder
-	Infos   []*resource.Info
+	Pauser func(info *resource.Info) ([]byte, error)
+	Mapper meta.RESTMapper
+	Typer  runtime.ObjectTyper
+	Infos  []*resource.Info
 
 	Out io.Writer
 }
@@ -102,7 +101,6 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 	}
 
 	o.Mapper, o.Typer = f.Object()
-	o.Encoder = f.JSONEncoder()
 
 	o.Pauser = f.Pauser
 	o.Out = out
@@ -135,7 +133,7 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 
 func (o PauseConfig) RunPause() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Pauser) {
+	for _, patch := range set.CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), o.Pauser) {
 		info := patch.Info
 		if patch.Err != nil {
 			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", info.Mapping.Resource, info.Name, patch.Err))

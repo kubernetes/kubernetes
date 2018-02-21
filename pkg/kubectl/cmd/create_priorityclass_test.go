@@ -25,12 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreatePriorityClass(t *testing.T) {
 	pcName := "my-pc"
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1alpha1"},
 		NegotiatedSerializer: ns,
