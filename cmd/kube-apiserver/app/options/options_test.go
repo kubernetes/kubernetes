@@ -210,6 +210,7 @@ func TestAddFlags(t *testing.T) {
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
 			OIDC: &kubeoptions.OIDCAuthenticationOptions{
 				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
 			},
 			PasswordFile:  &kubeoptions.PasswordFileAuthenticationOptions{},
 			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
