@@ -35,6 +35,7 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -53,6 +54,8 @@ type criStatsProvider struct {
 	runtimeService internalapi.RuntimeService
 	// imageService is used to get the stats of the image filesystem.
 	imageService internalapi.ImageManagerService
+	// logMetrics provides the metrics for container logs
+	logMetricsService LogMetricsService
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -62,12 +65,14 @@ func newCRIStatsProvider(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
+	logMetricsService LogMetricsService,
 ) containerStatsProvider {
 	return &criStatsProvider{
-		cadvisor:         cadvisor,
-		resourceAnalyzer: resourceAnalyzer,
-		runtimeService:   runtimeService,
-		imageService:     imageService,
+		cadvisor:          cadvisor,
+		resourceAnalyzer:  resourceAnalyzer,
+		runtimeService:    runtimeService,
+		imageService:      imageService,
+		logMetricsService: logMetricsService,
 	}
 }
 
@@ -94,7 +99,6 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	for _, s := range podSandboxes {
 		podSandboxMap[s.Id] = s
 	}
-
 	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
@@ -149,7 +153,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			}
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
-		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo)
+		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
 		caStats, caFound := caInfos[containerID]
@@ -277,6 +281,7 @@ func (p *criStatsProvider) makeContainerStats(
 	container *runtimeapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	uid string,
 ) *statsapi.ContainerStats {
 	result := &statsapi.ContainerStats{
 		Name: stats.Attributes.Metadata.Name,
@@ -291,17 +296,6 @@ func (p *criStatsProvider) makeContainerStats(
 			RSSBytes: proto.Uint64(0),
 		},
 		Rootfs: &statsapi.FsStats{},
-		Logs: &statsapi.FsStats{
-			Time:           metav1.NewTime(rootFsInfo.Timestamp),
-			AvailableBytes: &rootFsInfo.Available,
-			CapacityBytes:  &rootFsInfo.Capacity,
-			InodesFree:     rootFsInfo.InodesFree,
-			Inodes:         rootFsInfo.Inodes,
-			// UsedBytes and InodesUsed are unavailable from CRI stats.
-			//
-			// TODO(yguo0905): Get this information from kubelet and
-			// populate the two fields here.
-		},
 		// UserDefinedMetrics is not supported by CRI.
 	}
 	if stats.Cpu != nil {
@@ -343,7 +337,8 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Rootfs.Inodes = imageFsInfo.Inodes
 		}
 	}
-
+	containerLogPath := kuberuntime.BuildContainerLogsDirectory(types.UID(uid), container.GetMetadata().GetName())
+	result.Logs = p.getContainerLogStats(containerLogPath, rootFsInfo)
 	return result
 }
 
@@ -422,4 +417,26 @@ func getCRICadvisorStats(ca cadvisor.Interface) (map[string]cadvisorapiv2.Contai
 		stats[path.Base(key)] = info
 	}
 	return stats, nil
+}
+
+// TODO Cache the metrics in container log manager
+func (p *criStatsProvider) getContainerLogStats(path string, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	m := p.logMetricsService.createLogMetricsProvider(path)
+	logMetrics, err := m.GetMetrics()
+	if err != nil {
+		glog.Errorf("Unable to fetch container log stats for path %s: %v ", path, err)
+		return nil
+	}
+	result := &statsapi.FsStats{
+		Time:           metav1.NewTime(rootFsInfo.Timestamp),
+		AvailableBytes: &rootFsInfo.Available,
+		CapacityBytes:  &rootFsInfo.Capacity,
+		InodesFree:     rootFsInfo.InodesFree,
+		Inodes:         rootFsInfo.Inodes,
+	}
+	usedbytes := uint64(logMetrics.Used.Value())
+	result.UsedBytes = &usedbytes
+	inodesUsed := uint64(logMetrics.InodesUsed.Value())
+	result.InodesUsed = &inodesUsed
+	return result
 }
