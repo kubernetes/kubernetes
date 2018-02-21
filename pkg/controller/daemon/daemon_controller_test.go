@@ -21,8 +21,10 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -82,15 +84,6 @@ var (
 		TimeAdded: nowPointer(),
 	}}
 )
-
-func getKey(ds *extensions.DaemonSet, t *testing.T) string {
-	if key, err := controller.KeyFunc(ds); err != nil {
-		t.Errorf("Unexpected error getting key for ds %v: %v", ds.Name, err)
-		return ""
-	} else {
-		return key
-	}
-}
 
 func newDaemonSet(name string) *extensions.DaemonSet {
 	two := int32(2)
@@ -2185,33 +2178,49 @@ func TestAddPod(t *testing.T) {
 		ds2.Spec.UpdateStrategy = *strategy
 		manager.dsStore.Add(ds1)
 		manager.dsStore.Add(ds2)
-
 		pod1 := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
-		manager.addPod(pod1)
-		if got, want := manager.queue.Len(), 1; got != want {
-			t.Fatalf("queue.Len() = %v, want %v", got, want)
-		}
-		key, done := manager.queue.Get()
-		if key == nil || done {
-			t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
-		}
-		expectedKey, _ := controller.KeyFunc(ds1)
-		if got, want := key.(string), expectedKey; got != want {
-			t.Errorf("queue.Get() = %v, want %v", got, want)
+
+		// pod which is marked for deletion
+		pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
+		pod2.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
+
+		tests := []struct {
+			pod *v1.Pod
+			ds  *extensions.DaemonSet
+		}{
+			{pod: pod1, ds: ds1},
+			{pod: pod2, ds: ds2},
 		}
 
-		pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
-		manager.addPod(pod2)
-		if got, want := manager.queue.Len(), 1; got != want {
+		for _, test := range tests {
+			manager.addPod(test.pod)
+			if got, want := manager.queue.Len(), 1; got != want {
+				t.Fatalf("queue.Len() = %v, want %v", got, want)
+			}
+			key, done := manager.queue.Get()
+			if key == nil || done {
+				t.Fatalf("failed to enqueue controller for pod %v", test.pod.Name)
+			}
+			expectedKey, _ := controller.KeyFunc(test.ds)
+			if got, want := key.(string), expectedKey; got != want {
+				t.Errorf("queue.Get() = %v, want %v", got, want)
+			}
+		}
+
+		// Create Orphan Pod
+		pod3 := newPod("pod3-", "node-0", nil, nil)
+		manager.addPod(pod3)
+		if got, want := manager.queue.Len(), 0; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
-		key, done = manager.queue.Get()
-		if key == nil || done {
-			t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
-		}
-		expectedKey, _ = controller.KeyFunc(ds2)
-		if got, want := key.(string), expectedKey; got != want {
-			t.Errorf("queue.Get() = %v, want %v", got, want)
+
+		// when pod is has controller but daemonset cannot be resolved
+		ds4 := newDaemonSet("foo4")
+		ds4.Spec.UpdateStrategy = *strategy
+		pod4 := newPod("pod4-", "node-0", simpleDaemonSetLabel, ds4)
+		manager.addPod(pod4)
+		if got, want := manager.queue.Len(), 0; got != want {
+			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
 	}
 }
@@ -2274,21 +2283,51 @@ func TestUpdatePod(t *testing.T) {
 			t.Errorf("queue.Get() = %v, want %v", got, want)
 		}
 
-		pod2 := newPod("pod2-", "node-0", simpleDaemonSetLabel, ds2)
-		prev = *pod2
-		bumpResourceVersion(pod2)
-		manager.updatePod(&prev, pod2)
+		// checking if same pods given
+		manager.updatePod(pod1, pod1)
+		if got, want := manager.queue.Len(), 0; got != want {
+			t.Fatalf("queue.Len() = %v, want %v", got, want)
+		}
+
+		// Create Orphan Pod
+		pod3 := newPod("pod3-", "node-0", nil, nil)
+		prev = *pod3
+		bumpResourceVersion(pod3)
+		manager.updatePod(&prev, pod3)
+		if got, want := manager.queue.Len(), 0; got != want {
+			t.Fatalf("queue.Len() = %v, want %v", got, want)
+		}
+
+		// when pod has controller but daemonset cannot be resolved
+		ds4 := newDaemonSet("foo4")
+		ds4.Spec.UpdateStrategy = *strategy
+		pod4 := newPod("pod4-", "node-0", simpleDaemonSetLabel, ds4)
+		prev = *pod4
+		bumpResourceVersion(pod4)
+		manager.updatePod(&prev, pod4)
+		if got, want := manager.queue.Len(), 0; got != want {
+			t.Fatalf("queue.Len() = %v, want %v", got, want)
+		}
+
+		// when pod has controller but daemonset MinReadySeconds is set
+		ds5 := newDaemonSet("foo5")
+		ds5.Spec.UpdateStrategy = *strategy
+		ds5.Spec.MinReadySeconds = 2
+		manager.dsStore.Add(ds5)
+		pod5 := newPod("pod5-", "node-0", simpleDaemonSetLabel, ds5)
+		prev = *pod5
+		bumpResourceVersion(pod5)
+		pod5.Status = v1.PodStatus{Conditions: []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue},
+		}}
+		prev.Status = v1.PodStatus{Conditions: []v1.PodCondition{
+			{Type: v1.PodReasonUnschedulable, Status: v1.ConditionUnknown},
+		}}
+		manager.updatePod(&prev, pod5)
 		if got, want := manager.queue.Len(), 1; got != want {
 			t.Fatalf("queue.Len() = %v, want %v", got, want)
 		}
-		key, done = manager.queue.Get()
-		if key == nil || done {
-			t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
-		}
-		expectedKey, _ = controller.KeyFunc(ds2)
-		if got, want := key.(string), expectedKey; got != want {
-			t.Errorf("queue.Get() = %v, want %v", got, want)
-		}
+
 	}
 }
 
@@ -2477,4 +2516,97 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func getByCreationTimestamp() byCreationTimestamp {
+	return byCreationTimestamp([]*extensions.DaemonSet{
+		newDaemonSet("foo2"),
+		newDaemonSet("foo1"),
+		newDaemonSet("foo0"),
+	})
+}
+
+func TestByCreationTimestampLen(t *testing.T) {
+	b := getByCreationTimestamp()
+	if b.Len() != 3 {
+		t.Fatalf("length expected to be 3, but got %d", b.Len())
+	}
+}
+
+func TestByCreationTimestampSwap(t *testing.T) {
+	b := getByCreationTimestamp()
+	b.Swap(0, 1)
+	if b[0].Name == "foo1" && b[1].Name == "foo2" {
+	} else {
+		t.Fatalf("expected it to be swapped but it didn't")
+	}
+}
+
+func TestByCreationTimestampLess(t *testing.T) {
+	b := getByCreationTimestamp()
+	if b.Less(0, 1) {
+		t.Fatalf("expected it to be less")
+	}
+
+	// if the names are same test the CreationTimeStamp
+	b[1].CreationTimestamp = metav1.Now()
+	if !b.Less(0, 1) {
+		t.Fatalf("expected it to be less")
+	}
+}
+
+func TestByCreationTimestampSort(t *testing.T) {
+	b := getByCreationTimestamp()
+	sort.Sort(b)
+	if !(b[0].Name == "foo0" && b[1].Name == "foo1" && b[2].Name == "foo2") {
+		t.Fatalf("expected it to be sorted, but got: %#v", b)
+	}
+}
+
+func getPodByCreationTimestamp() podByCreationTimestamp {
+	return podByCreationTimestamp([]*v1.Pod{
+		newPod("pod2", "node-0", nil, nil),
+		newPod("pod1", "node-0", nil, nil),
+		newPod("pod0", "node-0", nil, nil),
+	})
+}
+
+func TestPodByCreationTimestampLen(t *testing.T) {
+	p := getPodByCreationTimestamp()
+	if p.Len() != 3 {
+		t.Fatalf("length expected to be 3, but got %d", p.Len())
+	}
+}
+
+func TestPodByCreationTimestampSwap(t *testing.T) {
+	p := getPodByCreationTimestamp()
+	p.Swap(0, 1)
+	if strings.Contains(p[0].Name, "pod1") && strings.Contains(p[1].Name, "pod2") {
+	} else {
+		t.Fatalf("expected it to be swapped but it didn't")
+	}
+}
+
+func TestPodByCreationTimestampLess(t *testing.T) {
+	p := getPodByCreationTimestamp()
+	if p.Less(0, 1) {
+		t.Fatalf("expected it to be less")
+	}
+
+	// if the names are same test the CreationTimeStamp
+	p[1].CreationTimestamp = metav1.Now()
+	if !p.Less(0, 1) {
+		t.Fatalf("expected it to be less")
+	}
+}
+
+func TestPodByCreationTimestampSort(t *testing.T) {
+	p := getPodByCreationTimestamp()
+	sort.Sort(p)
+
+	if !(strings.Contains(p[0].Name, "pod0") &&
+		strings.Contains(p[1].Name, "pod1") &&
+		strings.Contains(p[2].Name, "pod2")) {
+		t.Fatalf("expected it to be sorted, but got: %#v", p)
+	}
 }
