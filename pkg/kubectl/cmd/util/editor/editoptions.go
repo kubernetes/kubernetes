@@ -405,14 +405,14 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
-			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "skipped")
 			return nil
 		} else {
 			err := o.annotationPatch(info)
 			if err != nil {
 				return err
 			}
-			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "edited")
 			return nil
 		}
 	})
@@ -531,7 +531,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "skipped")
 			return nil
 		}
 
@@ -585,7 +585,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return nil
 		}
 		info.Refresh(patched, true)
-		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "edited")
 		return nil
 	})
 	return err
@@ -596,7 +596,7 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "created")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "created")
 		return nil
 	})
 	return err

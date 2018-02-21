@@ -45,8 +45,7 @@ type PauseConfig struct {
 	Encoder runtime.Encoder
 	Infos   []*resource.Info
 
-	PrintSuccess func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	Out          io.Writer
+	Out io.Writer
 }
 
 var (
@@ -102,7 +101,6 @@ func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out i
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
 
-	o.PrintSuccess = f.PrintSuccess
 	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()
 
@@ -145,7 +143,7 @@ func (o PauseConfig) RunPause() error {
 		}
 
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "already paused")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "already paused")
 			continue
 		}
 
@@ -156,7 +154,7 @@ func (o PauseConfig) RunPause() error {
 		}
 
 		info.Refresh(obj, true)
-		o.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "paused")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "paused")
 	}
 
 	return utilerrors.NewAggregate(allErrs)

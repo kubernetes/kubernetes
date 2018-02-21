@@ -112,7 +112,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.PrintObject = func(obj runtime.Object, out io.Writer) error {
-		return f.PrintObject(cmd, obj, out)
+		return cmdutil.PrintObject(cmd, obj, out)
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -255,7 +255,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		if len(o.Output) > 0 && !shortOutput {
 			return o.PrintObject(info.AsVersioned(), o.Out)
 		}
-		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "subjects updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

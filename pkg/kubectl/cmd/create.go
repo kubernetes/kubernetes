@@ -211,13 +211,13 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 		shortOutput := output == "name"
 		if len(output) > 0 && !shortOutput {
-			return f.PrintResourceInfoForCommand(cmd, info, o.Out)
+			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, o.Out)
 		}
 
-		f.PrintSuccess(shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "created")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -356,9 +356,9 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		f.PrintSuccess(useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
+		cmdutil.PrintSuccess(useShortOutput, out, info.Object, options.DryRun, "created")
 		return nil
 	}
 
-	return f.PrintObject(cmd, obj, out)
+	return cmdutil.PrintObject(cmd, obj, out)
 }

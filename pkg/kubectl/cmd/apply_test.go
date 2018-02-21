@@ -44,7 +44,6 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -331,7 +330,6 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: unstructuredSerializer,
@@ -387,7 +385,6 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -415,7 +412,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	expectRC := "replicationcontrollers/" + nameRC + "\n"
+	expectRC := "replicationcontroller/" + nameRC + "\n"
 	expectWarning := fmt.Sprintf(warningNoLastAppliedConfigAnnotation, "kubectl")
 	if errBuf.String() != expectWarning {
 		t.Fatalf("unexpected non-warning: %s\nexpected: %s", errBuf.String(), expectWarning)
@@ -432,7 +429,6 @@ func TestApplyObject(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -461,7 +457,7 @@ func TestApplyObject(t *testing.T) {
 		cmd.Run(cmd, []string{})
 
 		// uses the name from the file, not the response
-		expectRC := "replicationcontrollers/" + nameRC + "\n"
+		expectRC := "replicationcontroller/" + nameRC + "\n"
 		if buf.String() != expectRC {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 		}
@@ -494,7 +490,6 @@ func TestApplyObjectOutput(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &printers.YAMLPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -522,8 +517,8 @@ func TestApplyObjectOutput(t *testing.T) {
 		cmd.Flags().Set("output", "yaml")
 		cmd.Run(cmd, []string{})
 
-		if !strings.Contains(buf.String(), "name: test-rc") {
-			t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "name: test-rc")
+		if !strings.Contains(buf.String(), "test-rc") {
+			t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "test-rc")
 		}
 		if !strings.Contains(buf.String(), "post-patch: value") {
 			t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "post-patch: value")
@@ -544,7 +539,6 @@ func TestApplyRetry(t *testing.T) {
 		retry := false
 		getCount := 0
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -586,7 +580,7 @@ func TestApplyRetry(t *testing.T) {
 		}
 
 		// uses the name from the file, not the response
-		expectRC := "replicationcontrollers/" + nameRC + "\n"
+		expectRC := "replicationcontroller/" + nameRC + "\n"
 		if buf.String() != expectRC {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 		}
@@ -602,7 +596,6 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathNameRC := pathRC + "/" + nameRC
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -630,7 +623,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	expectRC := "replicationcontrollers/" + nameRC + "\n"
+	expectRC := "replicationcontroller/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Errorf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
@@ -647,7 +640,6 @@ func TestApplyEmptyPatch(t *testing.T) {
 	var body []byte
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -683,7 +675,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	expectRC := "replicationcontrollers/" + nameRC + "\n"
+	expectRC := "replicationcontroller/" + nameRC + "\n"
 	if buf.String() != expectRC {
 		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
 	}
@@ -722,7 +714,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -764,8 +755,8 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		cmd.Run(cmd, []string{})
 
 		// Names should come from the REST response, NOT the files
-		expectRC := "replicationcontrollers/" + nameRC + "\n"
-		expectSVC := "services/" + nameSVC + "\n"
+		expectRC := "replicationcontroller/" + nameRC + "\n"
+		expectSVC := "service/" + nameSVC + "\n"
 		// Test both possible orders since output is non-deterministic.
 		expectOne := expectRC + expectSVC
 		expectTwo := expectSVC + expectRC
@@ -855,7 +846,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 
 		cmd.Run(cmd, []string{})
 
-		expected := "deployments/" + deploymentName + "\n"
+		expected := "deployment.extensions/" + deploymentName + "\n"
 		if buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
@@ -878,7 +869,6 @@ func TestUnstructuredApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -918,7 +908,7 @@ func TestUnstructuredApply(t *testing.T) {
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
 
-		expected := "widgets/" + name + "\n"
+		expected := "widget.unit-test.test.com/" + name + "\n"
 		if buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
@@ -946,7 +936,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -1009,7 +998,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
 
-		expected := "widgets/widget\n"
+		expected := "widget.unit-test.test.com/widget\n"
 		if buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
@@ -1040,7 +1029,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object",
 			filePath:    filenameRC,
 			expectedErr: "",
-			expectedOut: "replicationcontrollers/test-rc\n",
+			expectedOut: "replicationcontroller/test-rc\n",
 			output:      "name",
 		},
 		{
@@ -1061,21 +1050,20 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object output json",
 			filePath:    filenameRCJSON,
 			expectedErr: "",
-			expectedOut: "replicationcontrollers/test-rc\n",
+			expectedOut: "replicationcontroller/test-rc\n",
 			output:      "name",
 		},
 		{
 			name:        "set test for a directory of files",
 			filePath:    dirName,
 			expectedErr: "",
-			expectedOut: "replicationcontrollers/test-rc\nreplicationcontrollers/test-rc\n",
+			expectedOut: "replicationcontroller/test-rc\nreplicationcontroller/test-rc\n",
 			output:      "name",
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			f, tf, codec, _ := cmdtesting.NewAPIFactory()
-			tf.Printer = &testPrinter{}
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
 				NegotiatedSerializer: unstructuredSerializer,
@@ -1166,7 +1154,6 @@ func TestForceApply(t *testing.T) {
 		deleted := false
 		counts := map[string]int{}
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -1243,7 +1230,7 @@ func TestForceApply(t *testing.T) {
 			}
 		}
 
-		if expected := "replicationcontrollers/" + nameRC + "\n"; buf.String() != expected {
+		if expected := "replicationcontroller/" + nameRC + "\n"; buf.String() != expected {
 			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 		}
 		if errBuf.String() != "" {

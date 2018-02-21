@@ -295,7 +295,7 @@ func (o *DrainOptions) RunDrain() error {
 		}
 		if err == nil || o.DryRun {
 			drainedNodes.Insert(info.Name)
-			o.Factory.PrintSuccess(false, o.Out, "node", info.Name, o.DryRun, "drained")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, o.DryRun, "drained")
 		} else {
 			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
 			remainingNodes := []string{}
@@ -616,7 +616,7 @@ func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.D
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				o.Factory.PrintSuccess(false, o.Out, "pod", pod.Name, false, verbStr)
+				cmdutil.PrintSuccess(false, o.Out, &pod, false, verbStr)
 				continue
 			} else if err != nil {
 				return false, err
@@ -697,7 +697,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			}
 			unsched := node.Spec.Unschedulable
 			if unsched == desired {
-				o.Factory.PrintSuccess(false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, already(desired))
+				cmdutil.PrintSuccess(false, o.Out, nodeInfo.Object, o.DryRun, already(desired))
 			} else {
 				if !o.DryRun {
 					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
@@ -718,10 +718,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 						continue
 					}
 				}
-				o.Factory.PrintSuccess(false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, changed(desired))
+				cmdutil.PrintSuccess(false, o.Out, nodeInfo.Object, o.DryRun, changed(desired))
 			}
 		} else {
-			o.Factory.PrintSuccess(false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, "skipped")
+			cmdutil.PrintSuccess(false, o.Out, nodeInfo.Object, o.DryRun, "skipped")
 		}
 	}
 

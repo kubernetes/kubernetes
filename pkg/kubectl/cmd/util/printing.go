@@ -18,8 +18,10 @@ package util
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -29,6 +31,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
@@ -82,10 +85,54 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 	return nil
 }
 
-// printerForOptions returns the printer for the outputOptions (if given) or
-// returns the default printer for the command. Requires that printer flags have
-// been added to cmd (see AddPrinterFlags).
-func printerForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
+// PrintSuccess prints a success message and can do a "-o name" as "shortOutput"
+// TODO this should really just be a printer.  It's got just about the exact same signature.
+func PrintSuccess(shortOutput bool, out io.Writer, obj runtime.Object, dryRun bool, operation string) {
+	dryRunMsg := ""
+	if dryRun {
+		dryRunMsg = " (dry run)"
+	}
+
+	// match name printer format
+	name := "<unknown>"
+	if acc, err := meta.Accessor(obj); err == nil {
+		if n := acc.GetName(); len(n) > 0 {
+			name = n
+		}
+	}
+
+	// legacy scheme to be sure we work ok with internal types.
+	// TODO internal types aren't supposed to exist here
+	groupKind := printers.GetObjectGroupKind(obj, legacyscheme.Scheme)
+	kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
+	if len(groupKind.Group) == 0 {
+		kindString = strings.ToLower(groupKind.Kind)
+	}
+
+	if shortOutput {
+		// -o name: prints resource/name
+		fmt.Fprintf(out, "%s/%s\n", kindString, name)
+		return
+	}
+
+	// understandable output by default
+	fmt.Fprintf(out, "%s \"%s\" %s%s\n", kindString, name, operation, dryRunMsg)
+}
+
+// PrintObject prints a single object based on the default command options
+// TODO this should go away once commands can embed the PrintOptions instead
+func PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
+	printer, err := PrinterForOptions(ExtractCmdPrintOptions(cmd, false))
+	if err != nil {
+		return err
+	}
+	return printer.PrintObj(obj, out)
+}
+
+// PrinterForOptions returns the printer for the outputOptions (if given) or
+// returns the default printer for the command.
+// TODO this should become a function on the PrintOptions struct
+func PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{kubectlscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}
 	encoder := kubectlscheme.Codecs.LegacyCodec(kubectlscheme.Registry.EnabledVersions()...)
@@ -98,11 +145,18 @@ func printerForOptions(options *printers.PrintOptions) (printers.ResourcePrinter
 	// we try to convert to HumanReadablePrinter, if return ok, it must be no generic
 	// we execute AddHandlers() here before maybeWrapSortingPrinter so that we don't
 	// need to convert to delegatePrinter again then invoke AddHandlers()
+	// TODO this looks highly questionable.  human readable printers are baked into code.  This can just live in the definition of the handler itself
+	// TODO or be registered there
 	if humanReadablePrinter, ok := printer.(printers.PrintHandler); ok {
 		printersinternal.AddHandlers(humanReadablePrinter)
 	}
 
-	return maybeWrapSortingPrinter(printer, *options), nil
+	printer = maybeWrapSortingPrinter(printer, *options)
+
+	// wrap the printer in a versioning printer that understands when to convert and when not to convert
+	printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, kubectlscheme.Versions...)
+
+	return printer, nil
 }
 
 // ExtractCmdPrintOptions parses printer specific commandline args and
@@ -230,17 +284,13 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 }
 
 // Retrieve a list of handled resources from printer as valid args
-// TODO: This function implementation should be replaced with a real implementation from the
-//   discovery service.
+// TODO: This function implementation should be replaced with a real implementation from the discovery service.
 func ValidArgList(f ClientAccessFactory) []string {
 	validArgs := []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-	}
+
+	humanReadablePrinter := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
+	printersinternal.AddHandlers(humanReadablePrinter)
+	validArgs = humanReadablePrinter.HandledResources()
 
 	return validArgs
 }

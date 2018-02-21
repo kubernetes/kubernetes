@@ -31,7 +31,6 @@ func TestCreateServiceAccount(t *testing.T) {
 	serviceAccountObject := &v1.ServiceAccount{}
 	serviceAccountObject.Name = "my-service-account"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
@@ -50,7 +49,7 @@ func TestCreateServiceAccount(t *testing.T) {
 	cmd := NewCmdCreateServiceAccount(f, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{serviceAccountObject.Name})
-	expectedOutput := "serviceaccounts/" + serviceAccountObject.Name + "\n"
+	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

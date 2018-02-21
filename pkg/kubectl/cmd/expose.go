@@ -255,9 +255,9 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
 			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return f.PrintObject(cmd, object, out)
+				return cmdutil.PrintObject(cmd, object, out)
 			}
-			f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, true, "exposed")
+			cmdutil.PrintSuccess(false, out, info.Object, true, "exposed")
 			return nil
 		}
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
@@ -271,10 +271,10 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		}
 
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, object, out)
+			return cmdutil.PrintObject(cmd, object, out)
 		}
 
-		f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, false, "exposed")
+		cmdutil.PrintSuccess(false, out, info.Object, false, "exposed")
 		return nil
 	})
 	if err != nil {

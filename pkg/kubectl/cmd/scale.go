@@ -180,7 +180,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 		}
 		counter++
-		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "scaled")
+		cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "scaled")
 		return nil
 	})
 	if err != nil {

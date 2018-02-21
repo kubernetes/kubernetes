@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -50,17 +51,6 @@ func (p *VersionedPrinter) AfterPrint(w io.Writer, res string) error {
 
 // PrintObj implements ResourcePrinter
 func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	gvks, _, err := p.typer.ObjectKinds(obj)
-	if err != nil {
-		return err
-	}
-	needsConversion := false
-	for _, gvk := range gvks {
-		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
-			needsConversion = true
-		}
-	}
-
 	// if we're unstructured, no conversion necessary
 	if _, ok := obj.(*unstructured.Unstructured); ok {
 		return p.printer.PrintObj(obj, w)
@@ -73,6 +63,18 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	// if we're already external, no conversion necessary
+	gvks, _, err := p.typer.ObjectKinds(obj)
+	if err != nil {
+		glog.V(1).Info("error determining type for %T, using passed object: %v", obj, err)
+		return p.printer.PrintObj(obj, w)
+	}
+	needsConversion := false
+	for _, gvk := range gvks {
+		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+			needsConversion = true
+		}
+	}
+
 	if !needsConversion {
 		return p.printer.PrintObj(obj, w)
 	}
