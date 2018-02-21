@@ -3370,8 +3370,8 @@ func describePriorityClass(pc *scheduling.PriorityClass, events *api.EventList) 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
-		w.Write(LEVEL_0, "Value:\t%s\n", pc.Value)
-		w.Write(LEVEL_0, "GlobalDefault:\t%s\n", pc.GlobalDefault)
+		w.Write(LEVEL_0, "Value:\t%v\n", pc.Value)
+		w.Write(LEVEL_0, "GlobalDefault:\t%v\n", pc.GlobalDefault)
 		w.Write(LEVEL_0, "Description:\t%s\n", pc.Description)
 
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(pc.Annotations))
