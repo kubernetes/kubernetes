@@ -845,7 +845,8 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	path := BuildContainerLogsDirectory(labeledInfo.PodUID, labeledInfo.ContainerName)
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	path := buildFullContainerLogsPath(labeledInfo.PodUID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
 	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove container %q log %q: %v", containerID, path, err)
 	}
