@@ -107,10 +107,10 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 			return true, metrics, nil
 		})
 	} else if isExternal {
-		fakeEMClient.AddReactor("get", "externalmetrics", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			getForAction := action.(emfake.GetForAction)
-			assert.Equal(t, tc.metricName, getForAction.GetMetricName(), "the metric requested should have matched the one specified.")
-			assert.Equal(t, tc.metricLabelSelector, getForAction.GetMetricSelector(), "the metric selector should have matched the one specified")
+		fakeEMClient.AddReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			listAction := action.(core.ListAction)
+			assert.Equal(t, tc.metricName, listAction.GetResource().Resource, "the metric requested should have matched the one specified.")
+			assert.Equal(t, tc.metricLabelSelector, listAction.GetListRestrictions().Labels, "the metric selector should have matched the one specified")
 
 			metrics := emapi.ExternalMetricValueList{}
 			for _, metricPoint := range tc.reportedMetricPoints {
@@ -325,7 +325,7 @@ func TestRESTClientQpsEmptyMetrics(t *testing.T) {
 func TestRESTClientExternalEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		metricName:           "external",
-		metricSelector:       &metav1.LabelSelector{},
+		metricSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
 		desiredError:         fmt.Errorf("no metrics returned from external metrics API"),
 		reportedMetricPoints: []metricPoint{},
 	}

@@ -152,7 +152,7 @@ type externalMetricsClient struct {
 // GetExternalMetric gets all the values of a given external metric
 // that match the specified selector.
 func (c *externalMetricsClient) GetExternalMetric(metricName, namespace string, selector labels.Selector) ([]int64, time.Time, error) {
-	metrics, err := c.client.NamespacedMetrics(namespace).Get(metricName, selector)
+	metrics, err := c.client.NamespacedMetrics(namespace).List(metricName, selector)
 	if err != nil {
 		return []int64{}, time.Time{}, fmt.Errorf("unable to fetch metrics from external metrics API: %v", err)
 	}
