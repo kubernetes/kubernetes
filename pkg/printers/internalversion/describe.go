@@ -1134,6 +1134,48 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 	return describePersistentVolume(pv, events)
 }
 
+func printVolumeNodeAffinity(w PrefixWriter, affinity *api.VolumeNodeAffinity) {
+	w.Write(LEVEL_0, "Node Affinity:\t")
+	if affinity == nil || affinity.Required == nil {
+		w.WriteLine("<none>")
+		return
+	}
+	w.WriteLine("")
+
+	if affinity.Required != nil {
+		w.Write(LEVEL_1, "Required Terms:\t")
+		if len(affinity.Required.NodeSelectorTerms) == 0 {
+			w.WriteLine("<none>")
+		} else {
+			w.WriteLine("")
+			for i, term := range affinity.Required.NodeSelectorTerms {
+				printNodeSelectorTermsMultilineWithIndent(w, LEVEL_2, fmt.Sprintf("Term %v", i), "\t", term.MatchExpressions)
+			}
+		}
+	}
+}
+
+// printLabelsMultiline prints multiple labels with a user-defined alignment.
+func printNodeSelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []api.NodeSelectorRequirement) {
+	w.Write(indentLevel, "%s:%s", title, innerIndent)
+
+	if len(reqs) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	for i, req := range reqs {
+		if i != 0 {
+			w.Write(indentLevel, "%s", innerIndent)
+		}
+		exprStr := fmt.Sprintf("%s %s", req.Key, strings.ToLower(string(req.Operator)))
+		if len(req.Values) > 0 {
+			exprStr = fmt.Sprintf("%s [%s]", exprStr, strings.Join(req.Values, ", "))
+		}
+		w.Write(LEVEL_0, "%s\n", exprStr)
+	}
+}
+
 func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
@@ -1159,6 +1201,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		}
 		storage := pv.Spec.Capacity[api.ResourceStorage]
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
+		printVolumeNodeAffinity(w, pv.Spec.NodeAffinity)
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
 		w.Write(LEVEL_0, "Source:\n")
 
