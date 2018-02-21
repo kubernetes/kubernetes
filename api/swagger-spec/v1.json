@@ -20682,6 +20682,10 @@
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
       "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future."
+     },
+     "nodeAffinity": {
+      "$ref": "v1.VolumeNodeAffinity",
+      "description": "NodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
      }
     }
    },
@@ -21328,6 +21332,73 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.VolumeNodeAffinity": {
+    "id": "v1.VolumeNodeAffinity",
+    "description": "VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.",
+    "properties": {
+     "required": {
+      "$ref": "v1.NodeSelector",
+      "description": "Required specifies hard node constraints that must be met."
+     }
+    }
+   },
+   "v1.NodeSelector": {
+    "id": "v1.NodeSelector",
+    "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
+    "required": [
+     "nodeSelectorTerms"
+    ],
+    "properties": {
+     "nodeSelectorTerms": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorTerm"
+      },
+      "description": "Required. A list of node selector terms. The terms are ORed."
+     }
+    }
+   },
+   "v1.NodeSelectorTerm": {
+    "id": "v1.NodeSelectorTerm",
+    "description": "A null or empty node selector term matches no objects.",
+    "required": [
+     "matchExpressions"
+    ],
+    "properties": {
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "Required. A list of node selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.NodeSelectorRequirement": {
+    "id": "v1.NodeSelectorRequirement",
+    "description": "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "The label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch."
      }
     }
    },
@@ -22866,63 +22937,6 @@
        "$ref": "v1.PreferredSchedulingTerm"
       },
       "description": "The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred."
-     }
-    }
-   },
-   "v1.NodeSelector": {
-    "id": "v1.NodeSelector",
-    "description": "A node selector represents the union of the results of one or more label queries over a set of nodes; that is, it represents the OR of the selectors represented by the node selector terms.",
-    "required": [
-     "nodeSelectorTerms"
-    ],
-    "properties": {
-     "nodeSelectorTerms": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.NodeSelectorTerm"
-      },
-      "description": "Required. A list of node selector terms. The terms are ORed."
-     }
-    }
-   },
-   "v1.NodeSelectorTerm": {
-    "id": "v1.NodeSelectorTerm",
-    "description": "A null or empty node selector term matches no objects.",
-    "required": [
-     "matchExpressions"
-    ],
-    "properties": {
-     "matchExpressions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.NodeSelectorRequirement"
-      },
-      "description": "Required. A list of node selector requirements. The requirements are ANDed."
-     }
-    }
-   },
-   "v1.NodeSelectorRequirement": {
-    "id": "v1.NodeSelectorRequirement",
-    "description": "A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-    "required": [
-     "key",
-     "operator"
-    ],
-    "properties": {
-     "key": {
-      "type": "string",
-      "description": "The label key that the selector applies to."
-     },
-     "operator": {
-      "type": "string",
-      "description": "Represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt."
-     },
-     "values": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch."
      }
     }
    },

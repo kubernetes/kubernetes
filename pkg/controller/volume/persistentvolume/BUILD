@@ -78,7 +78,6 @@ go_test(
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

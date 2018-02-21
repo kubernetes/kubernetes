@@ -368,7 +368,7 @@ func (f *FakeFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *reso
 		return err
 	}
 	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(&printers.PrintOptions{}, nil)
+		printer, err = f.PrinterForMapping(&printers.PrintOptions{})
 		if err != nil {
 			return err
 		}
@@ -514,11 +514,11 @@ func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
 func (f *FakeFactory) BindExternalFlags(flags *pflag.FlagSet) {
 }
 
-func (f *FakeFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
+func (f *FakeFactory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
 	return nil
 }
 
-func (f *FakeFactory) PrinterForMapping(printOpts *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *FakeFactory) PrinterForMapping(printOpts *printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 
@@ -763,7 +763,7 @@ func (f *fakeAPIFactory) PrintResourceInfoForCommand(cmd *cobra.Command, info *r
 		return err
 	}
 	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(&printers.PrintOptions{}, nil)
+		printer, err = f.PrinterForMapping(&printers.PrintOptions{})
 		if err != nil {
 			return err
 		}
@@ -848,25 +848,15 @@ func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator
 	return cmdutil.DefaultGenerators(cmdName)
 }
 
-func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-	gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
-	if err != nil {
-		return err
-	}
-
-	mapping, err := mapper.RESTMapping(gvks[0].GroupKind())
-	if err != nil {
-		return err
-	}
-
-	printer, err := f.PrinterForMapping(&printers.PrintOptions{}, mapping)
+func (f *fakeAPIFactory) PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
+	printer, err := f.PrinterForMapping(&printers.PrintOptions{})
 	if err != nil {
 		return err
 	}
 	return printer.PrintObj(obj, out)
 }
 
-func (f *fakeAPIFactory) PrinterForMapping(outputOpts *printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+func (f *fakeAPIFactory) PrinterForMapping(outputOpts *printers.PrintOptions) (printers.ResourcePrinter, error) {
 	return f.tf.Printer, f.tf.Err
 }
 

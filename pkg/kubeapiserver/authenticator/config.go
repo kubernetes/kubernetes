@@ -58,6 +58,7 @@ type AuthenticatorConfig struct {
 	OIDCUsernamePrefix          string
 	OIDCGroupsClaim             string
 	OIDCGroupsPrefix            string
+	OIDCSigningAlgs             []string
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	WebhookTokenAuthnConfigFile string
@@ -143,7 +144,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix)
+		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix, config.OIDCSigningAlgs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -235,7 +236,7 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Token or an error.
-func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string) (authenticator.Token, error) {
+func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string, signingAlgs []string) (authenticator.Token, error) {
 	const noUsernamePrefix = "-"
 
 	if usernamePrefix == "" && usernameClaim != "email" {
@@ -251,14 +252,15 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		usernamePrefix = ""
 	}
 
-	tokenAuthenticator, err := oidc.New(oidc.OIDCOptions{
-		IssuerURL:      issuerURL,
-		ClientID:       clientID,
-		CAFile:         caFile,
-		UsernameClaim:  usernameClaim,
-		UsernamePrefix: usernamePrefix,
-		GroupsClaim:    groupsClaim,
-		GroupsPrefix:   groupsPrefix,
+	tokenAuthenticator, err := oidc.New(oidc.Options{
+		IssuerURL:            issuerURL,
+		ClientID:             clientID,
+		CAFile:               caFile,
+		UsernameClaim:        usernameClaim,
+		UsernamePrefix:       usernamePrefix,
+		GroupsClaim:          groupsClaim,
+		GroupsPrefix:         groupsPrefix,
+		SupportedSigningAlgs: signingAlgs,
 	})
 	if err != nil {
 		return nil, err
@@ -278,7 +280,7 @@ func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccou
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, allPublicKeys, lookup, serviceAccountGetter)
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, allPublicKeys, serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter))
 	return tokenAuthenticator, nil
 }
 

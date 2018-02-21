@@ -237,8 +237,7 @@ func Example_printReplicationControllerWithNamespace() {
 			ReadyReplicas: 1,
 		},
 	}
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -291,8 +290,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 			Replicas: 1,
 		},
 	}
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -344,8 +342,7 @@ func Example_printReplicationController() {
 			Replicas: 1,
 		},
 	}
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, ctrl, os.Stdout)
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -386,8 +383,7 @@ func Example_printPodWithWideFormat() {
 			PodIP: "10.1.1.3",
 		},
 	}
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
+	err := f.PrintObject(cmd, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -431,8 +427,7 @@ func Example_printPodWithShowLabels() {
 			},
 		},
 	}
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
+	err := f.PrintObject(cmd, pod, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -554,8 +549,7 @@ func Example_printPodHideTerminated() {
 		fmt.Printf("Unexpected filter error: %v\n", errs)
 	}
 	for _, pod := range filteredPodList {
-		mapper, _ := f.Object()
-		err := f.PrintObject(cmd, false, mapper, pod, os.Stdout)
+		err := f.PrintObject(cmd, pod, os.Stdout)
 		if err != nil {
 			fmt.Printf("Unexpected error: %v", err)
 		}
@@ -581,8 +575,7 @@ func Example_printPodShowAll() {
 	}
 	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, podList, os.Stdout)
+	err := f.PrintObject(cmd, podList, os.Stdout)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}
@@ -657,8 +650,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 	}
 	ld := strings.NewLineDelimiter(os.Stdout, "|")
 	defer ld.Flush()
-	mapper, _ := f.Object()
-	err := f.PrintObject(cmd, false, mapper, svc, ld)
+	err := f.PrintObject(cmd, svc, ld)
 	if err != nil {
 		fmt.Printf("Unexpected error: %v", err)
 	}

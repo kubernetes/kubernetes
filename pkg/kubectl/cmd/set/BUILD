@@ -58,6 +58,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl/categories:go_default_library",

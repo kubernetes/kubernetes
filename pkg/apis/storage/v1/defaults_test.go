@@ -52,6 +52,10 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 	class := &storagev1.StorageClass{}
 
 	// When feature gate is disabled, field should not be defaulted
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
 	output := roundTrip(t, runtime.Object(class)).(*storagev1.StorageClass)
 	if output.VolumeBindingMode != nil {
 		t.Errorf("Expected VolumeBindingMode to not be defaulted, got: %+v", output.VolumeBindingMode)
@@ -59,12 +63,11 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 
 	class = &storagev1.StorageClass{}
 
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	// When feature gate is enabled, field should be defaulted
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 	if err != nil {
 		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
 	}
-
-	// When feature gate is enabled, field should be defaulted
 	defaultMode := storagev1.VolumeBindingImmediate
 	output = roundTrip(t, runtime.Object(class)).(*storagev1.StorageClass)
 	outMode := output.VolumeBindingMode

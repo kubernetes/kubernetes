@@ -296,6 +296,11 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata": {"name": "pdb1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,
 		expectedEtcdPath: "/registry/poddisruptionbudgets/etcdstoragepathtestnamespace/pdb1",
 	},
+	gvr("policy", "v1beta1", "podsecuritypolicies"): {
+		stub:             `{"metadata": {"name": "psp2"}, "spec": {"fsGroup": {"rule": "RunAsAny"}, "privileged": true, "runAsUser": {"rule": "RunAsAny"}, "seLinux": {"rule": "MustRunAs"}, "supplementalGroups": {"rule": "RunAsAny"}}}`,
+		expectedEtcdPath: "/registry/podsecuritypolicy/psp2",
+		expectedGVK:      gvkP("extensions", "v1beta1", "PodSecurityPolicy"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/storage/v1alpha1

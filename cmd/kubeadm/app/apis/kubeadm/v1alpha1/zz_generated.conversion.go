@@ -233,6 +233,7 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
 	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
+	out.CRISocket = in.CRISocket
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -280,6 +281,7 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
 	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
+	out.CRISocket = in.CRISocket
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -336,6 +338,7 @@ func autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.NodeName = in.NodeName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
+	out.CRISocket = in.CRISocket
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
@@ -355,6 +358,7 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kub
 	out.NodeName = in.NodeName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
+	out.CRISocket = in.CRISocket
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
 	out.DiscoveryTokenUnsafeSkipCAVerification = in.DiscoveryTokenUnsafeSkipCAVerification
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))

@@ -52,7 +52,7 @@ go_library(
         "//plugin/pkg/admission/security/podsecuritypolicy:go_default_library",
         "//plugin/pkg/admission/securitycontext/scdeny:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
-        "//plugin/pkg/admission/storage/storageprotection:go_default_library",
+        "//plugin/pkg/admission/storage/storageobjectinuseprotection:go_default_library",
         "//plugin/pkg/admission/storageclass/setdefault:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",

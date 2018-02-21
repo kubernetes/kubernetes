@@ -67,6 +67,9 @@ type MasterConfiguration struct {
 	// TokenTTL is a ttl for Token. Defaults to 24h.
 	TokenTTL *metav1.Duration `json:"tokenTTL,omitempty"`
 
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string `json:"criSocket,omitempty"`
+
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
 	// TODO: This is temporary and ideally we would like to switch all components to
@@ -209,6 +212,8 @@ type NodeConfiguration struct {
 	TLSBootstrapToken string `json:"tlsBootstrapToken"`
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string `json:"token"`
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string `json:"criSocket,omitempty"`
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery

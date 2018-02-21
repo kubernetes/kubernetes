@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -81,7 +80,7 @@ type PersistentVolumeConfig struct {
 	NamePrefix       string
 	Labels           labels.Set
 	StorageClassName string
-	NodeAffinity     *v1.NodeAffinity
+	NodeAffinity     *v1.VolumeNodeAffinity
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
@@ -603,12 +602,8 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			},
 			ClaimRef:         claimRef,
 			StorageClassName: pvConfig.StorageClassName,
+			NodeAffinity:     pvConfig.NodeAffinity,
 		},
-	}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, pvConfig.NodeAffinity)
-	if err != nil {
-		Logf("Setting storage node affinity failed: %v", err)
-		return nil
 	}
 	return pv
 }

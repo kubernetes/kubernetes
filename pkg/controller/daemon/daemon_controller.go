@@ -63,13 +63,16 @@ import (
 )
 
 const (
-	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
+	// BurstReplicas is a rate limiter for booting pods on a lot of pods.
+	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues.
 	BurstReplicas = 250
 
-	// If sending a status update to API server fails, we retry a finite number of times.
+	// StatusUpdateRetries limits the number of retries if sending a status update to API server fails.
 	StatusUpdateRetries = 1
+)
 
-	// Reasons for DaemonSet events
+// Reasons for DaemonSet events
+const (
 	// SelectingAllReason is added to an event when a DaemonSet selects all Pods.
 	SelectingAllReason = "SelectingAll"
 	// FailedPlacementReason is added to an event when a DaemonSet can't schedule a Pod to a specified node.
@@ -130,6 +133,7 @@ type DaemonSetsController struct {
 	suspendedDaemonPods      map[string]sets.String
 }
 
+// NewDaemonSetsController creates a new DaemonSetsController
 func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -1320,6 +1324,7 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 	return
 }
 
+// NewPod creates a new pod
 func NewPod(ds *extensions.DaemonSet, nodeName string) *v1.Pod {
 	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Namespace = ds.Namespace

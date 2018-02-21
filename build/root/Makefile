@@ -562,7 +562,6 @@ bazel-test-integration:
 	@echo "$$BAZEL_TEST_INTEGRATION_HELP_INFO"
 else
 bazel-test-integration:
-	bazel build --config integration //test/integration/...
 	bazel test --config integration //test/integration/...
 endif
 
