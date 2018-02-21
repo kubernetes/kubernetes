@@ -34,6 +34,7 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     git \
     glusterfs-client \
     iptables \
+    ipset \
     jq \
     kmod \
     openssh-client \
