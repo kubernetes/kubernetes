@@ -484,29 +484,17 @@ var _ = UnschedulablePods(&UnschedulablePodsMap{})
 
 // Add adds a pod to the unschedulable pods.
 func (u *UnschedulablePodsMap) Add(pod *v1.Pod) {
-	podKey := u.keyFunc(pod)
-	if _, exists := u.pods[podKey]; !exists {
-		u.pods[podKey] = pod
-	}
+	u.pods[u.keyFunc(pod)] = pod
 }
 
 // Delete deletes a pod from the unschedulable pods.
 func (u *UnschedulablePodsMap) Delete(pod *v1.Pod) {
-	podKey := u.keyFunc(pod)
-	if _, exists := u.pods[podKey]; exists {
-		delete(u.pods, podKey)
-	}
+	delete(u.pods, u.keyFunc(pod))
 }
 
 // Update updates a pod in the unschedulable pods.
 func (u *UnschedulablePodsMap) Update(pod *v1.Pod) {
-	podKey := u.keyFunc(pod)
-	_, exists := u.pods[podKey]
-	if !exists {
-		u.Add(pod)
-		return
-	}
-	u.pods[podKey] = pod
+	u.Add(pod)
 }
 
 // Get returns the pod if a pod with the same key as the key of the given "pod"
