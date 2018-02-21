@@ -80,7 +80,7 @@ func (f *FileManager) resolve(dc *types.ManagedObjectReference, name string) (st
 		}
 	}
 
-	folder := Map.Get(*dc).(*mo.Datacenter).DatastoreFolder
+	folder := Map.Get(*dc).(*Datacenter).DatastoreFolder
 
 	ds, fault := f.findDatastore(Map.Get(folder), p.Datastore)
 	if fault != nil {
