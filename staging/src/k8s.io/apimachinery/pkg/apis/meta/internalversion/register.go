@@ -47,7 +47,7 @@ var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.
 // ParameterCodec handles versioning of objects that are converted to query parameters.
 var ParameterCodec = runtime.NewParameterCodec(scheme)
 
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
+// Kind takes an unqualified kind and returns a qualified GroupKind
 func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }

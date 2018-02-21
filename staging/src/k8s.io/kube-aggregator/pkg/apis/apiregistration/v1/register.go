@@ -27,7 +27,7 @@ const GroupName = "apiregistration.k8s.io"
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
-// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+// Resource takes an unqualified resource and returns back a qualified GroupResource
 func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }

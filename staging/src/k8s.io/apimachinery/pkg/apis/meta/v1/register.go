@@ -34,7 +34,7 @@ var Unversioned = schema.GroupVersion{Group: "", Version: "v1"}
 // WatchEventKind is name reserved for serializing watch events.
 const WatchEventKind = "WatchEvent"
 
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
+// Kind takes an unqualified kind and returns a qualified GroupKind
 func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
