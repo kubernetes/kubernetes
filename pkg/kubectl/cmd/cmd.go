@@ -96,13 +96,15 @@ __kubectl_parse_config()
     fi
 }
 
+# $1 is the name of resource (required)
+# $2 is template string for kubectl get (optional)
 __kubectl_parse_get()
 {
     local template
-    template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
+    template="${2:-"{{ range .items  }}{{ .metadata.name }} {{ end }}"}"
     local kubectl_out
     if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" "$1" 2>/dev/null); then
-        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+        COMPREPLY+=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -168,6 +170,36 @@ __kubectl_require_pod_and_container()
     return 0
 }
 
+__kubectl_cp()
+{
+    if [[ $(type -t compopt) = "builtin" ]]; then
+        compopt -o nospace
+    fi
+
+    case "$cur" in
+        /*|[.~]*) # looks like a path
+            return
+            ;;
+        *:*) # TODO: complete remote files in the pod
+            return
+            ;;
+        */*) # complete <namespace>/<pod>
+            local template namespace kubectl_out
+            template="{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
+            namespace="${cur%%/*}"
+            if kubectl_out=( $(kubectl get $(__kubectl_override_flags) --namespace "${namespace}" -o template --template="${template}" pods 2>/dev/null) ); then
+                COMPREPLY=( $(compgen -W "${kubectl_out[*]}" -- "${cur}") )
+            fi
+            return
+            ;;
+        *) # complete namespaces, pods, and filedirs
+            __kubectl_parse_get "namespace" "{{ range .items  }}{{ .metadata.name }}/ {{ end }}"
+            __kubectl_parse_get "pod" "{{ range .items  }}{{ .metadata.name }}: {{ end }}"
+            _filedir
+            ;;
+    esac
+}
+
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
@@ -198,6 +230,10 @@ __custom_func() {
             ;;
         kubectl_config_delete-cluster)
             __kubectl_config_get_clusters
+            return
+            ;;
+        kubectl_cp)
+            __kubectl_cp
             return
             ;;
         *)
