@@ -69,7 +69,7 @@ func TestLog(t *testing.T) {
 		tf.ClientConfig = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdLogs(f, buf)
+		cmd := NewCmdLogs(f, buf, buf)
 		cmd.Flags().Set("namespace", "test")
 		cmd.Run(cmd, []string{"foo"})
 
@@ -124,7 +124,8 @@ func TestValidateLogFlags(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		cmd := NewCmdLogs(f, bytes.NewBuffer([]byte{}))
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdLogs(f, buf, buf)
 		out := ""
 		for flag, value := range test.flags {
 			cmd.Flags().Set(flag, value)
@@ -183,7 +184,8 @@ func TestLogComplete(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		cmd := NewCmdLogs(f, bytes.NewBuffer([]byte{}))
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdLogs(f, buf, buf)
 		var err error
 		out := ""
 		for flag, value := range test.flags {
