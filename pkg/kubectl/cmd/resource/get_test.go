@@ -386,16 +386,32 @@ func TestGetObjectsFiltered(t *testing.T) {
 		flags  map[string]string
 		expect string
 	}{
-		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "true"}, resp: first, expect: "pod/foo\n"},
-		{args: []string{"pods", "foo"}, resp: first, expect: "pod/foo\n"},
-		{args: []string{"pods"}, resp: pods, expect: "pod/foo\npod/bar\n"},
-		{args: []string{"pods/foo"}, flags: map[string]string{"show-all": "false"}, resp: first, expect: "pod/foo\n"},
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false", "output": "yaml"}, resp: pods, expect: "pod/bar\n"},
-		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods, expect: "pod/foo\npod/bar\n"},
+		{args: []string{"pods", "foo"}, resp: first, flags: map[string]string{"show-all": "true"},
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
 
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods, expect: "pod/bar\n"},
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "yaml"}, resp: pods, expect: "pod/foo\npod/bar\n"},
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods, expect: "pod/bar\n"},
+		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
+
+		{args: []string{"pods/foo"}, resp: first, flags: map[string]string{"show-all": "false"},
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "false", "output": "name"}, resp: pods,
+			expect: "pod/foo\npod/bar\n"},
+
+		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
+
+		{args: []string{"pods"}, resp: pods, flags: map[string]string{"show-all": "false"},
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "name"}, resp: pods,
+			expect: "pod/foo\npod/bar\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
 	}
 
 	for i, test := range testCases {
@@ -417,7 +433,6 @@ func TestGetObjectsFiltered(t *testing.T) {
 			for k, v := range test.flags {
 				cmd.Flags().Lookup(k).Value.Set(v)
 			}
-			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, test.args)
 
 			if e, a := test.expect, buf.String(); e != a {
