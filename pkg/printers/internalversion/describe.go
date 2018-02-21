@@ -903,8 +903,9 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, w PrefixWriter) {
 		"    RadosUser:\t%v\n"+
 		"    Keyring:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+		"    ReadOnly:\t%v\n"+
+		"    MonitorSRVRecord:\t%v\n",
+		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly, rbd.MonitorSRVRecord)
 }
 
 func printRBDPersistentVolumeSource(rbd *api.RBDPersistentVolumeSource, w PrefixWriter) {
@@ -916,8 +917,9 @@ func printRBDPersistentVolumeSource(rbd *api.RBDPersistentVolumeSource, w Prefix
 		"    RadosUser:\t%v\n"+
 		"    Keyring:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+		"    ReadOnly:\t%v\n"+
+		"    MonitorSRVRecord:\t%v\n",
+		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly, rbd.MonitorSRVRecord)
 }
 
 func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, w PrefixWriter) {
@@ -1012,8 +1014,9 @@ func printCephFSVolumeSource(cephfs *api.CephFSVolumeSource, w PrefixWriter) {
 		"    User:\t%v\n"+
 		"    SecretFile:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
+		"    ReadOnly:\t%v\n"+
+		"    MonitorSRVRecord:\t%v\n",
+		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly, cephfs.MonitorSRVRecord)
 }
 
 func printCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource, w PrefixWriter) {
@@ -1023,8 +1026,9 @@ func printCephFSPersistentVolumeSource(cephfs *api.CephFSPersistentVolumeSource,
 		"    User:\t%v\n"+
 		"    SecretFile:\t%v\n"+
 		"    SecretRef:\t%v\n"+
-		"    ReadOnly:\t%v\n",
-		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly)
+		"    ReadOnly:\t%v\n"+
+		"    MonitorSRVRecord:\t%v\n",
+		cephfs.Monitors, cephfs.Path, cephfs.User, cephfs.SecretFile, cephfs.SecretRef, cephfs.ReadOnly, cephfs.MonitorSRVRecord)
 }
 
 func printStorageOSVolumeSource(storageos *api.StorageOSVolumeSource, w PrefixWriter) {
