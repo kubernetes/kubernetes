@@ -60,12 +60,18 @@ func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts
 // NodeClient returns CSI node client
 type NodeClient struct {
 	nodePublishedVolumes map[string]string
+	nodeStagedVolumes    map[string]string
+	stageUnstageSet      bool
 	nextErr              error
 }
 
 // NewNodeClient returns fake node client
-func NewNodeClient() *NodeClient {
-	return &NodeClient{nodePublishedVolumes: make(map[string]string)}
+func NewNodeClient(stageUnstageSet bool) *NodeClient {
+	return &NodeClient{
+		nodePublishedVolumes: make(map[string]string),
+		nodeStagedVolumes:    make(map[string]string),
+		stageUnstageSet:      stageUnstageSet,
+	}
 }
 
 // SetNextError injects next expected error
@@ -76,6 +82,15 @@ func (f *NodeClient) SetNextError(err error) {
 // GetNodePublishedVolumes returns node published volumes
 func (f *NodeClient) GetNodePublishedVolumes() map[string]string {
 	return f.nodePublishedVolumes
+}
+
+// GetNodeStagedVolumes returns node staged volumes
+func (f *NodeClient) GetNodeStagedVolumes() map[string]string {
+	return f.nodeStagedVolumes
+}
+
+func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string) {
+	f.nodeStagedVolumes[volID] = deviceMountPath
 }
 
 // NodePublishVolume implements CSI NodePublishVolume
@@ -116,6 +131,50 @@ func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnp
 	return &csipb.NodeUnpublishVolumeResponse{}, nil
 }
 
+// NodeStagevolume implements csi method
+func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeStageVolumeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetStagingTargetPath() == "" {
+		return nil, errors.New("missing staging target path")
+	}
+
+	fsType := ""
+	fsTypes := "ext4|xfs|zfs"
+	mounted := req.GetVolumeCapability().GetMount()
+	if mounted != nil {
+		fsType = mounted.GetFsType()
+	}
+	if !strings.Contains(fsTypes, fsType) {
+		return nil, errors.New("invalid fstype")
+	}
+
+	f.nodeStagedVolumes[req.GetVolumeId()] = req.GetStagingTargetPath()
+	return &csipb.NodeStageVolumeResponse{}, nil
+}
+
+// NodeUnstageVolume implements csi method
+func (f *NodeClient) NodeUnstageVolume(ctx context.Context, req *csipb.NodeUnstageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeUnstageVolumeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetStagingTargetPath() == "" {
+		return nil, errors.New("missing staging target path")
+	}
+
+	delete(f.nodeStagedVolumes, req.GetVolumeId())
+	return &csipb.NodeUnstageVolumeResponse{}, nil
+}
+
 // NodeGetId implements method
 func (f *NodeClient) NodeGetId(ctx context.Context, in *csipb.NodeGetIdRequest, opts ...grpc.CallOption) (*csipb.NodeGetIdResponse, error) {
 	return nil, nil
@@ -123,16 +182,20 @@ func (f *NodeClient) NodeGetId(ctx context.Context, in *csipb.NodeGetIdRequest, 
 
 // NodeGetCapabilities implements csi method
 func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetCapabilitiesRequest, opts ...grpc.CallOption) (*csipb.NodeGetCapabilitiesResponse, error) {
-	return nil, nil
-}
-
-// NodeStageVolume implements csi method
-func (f *NodeClient) NodeStageVolume(ctx context.Context, in *csipb.NodeStageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeStageVolumeResponse, error) {
-	return nil, nil
-}
-
-// NodeUnstageVolume implements csi method
-func (f *NodeClient) NodeUnstageVolume(ctx context.Context, in *csipb.NodeUnstageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeUnstageVolumeResponse, error) {
+	resp := &csipb.NodeGetCapabilitiesResponse{
+		Capabilities: []*csipb.NodeServiceCapability{
+			{
+				Type: &csipb.NodeServiceCapability_Rpc{
+					Rpc: &csipb.NodeServiceCapability_RPC{
+						Type: csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+					},
+				},
+			},
+		},
+	}
+	if f.stageUnstageSet {
+		return resp, nil
+	}
 	return nil, nil
 }
 

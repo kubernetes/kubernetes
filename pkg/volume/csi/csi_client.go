@@ -33,6 +33,7 @@ type csiClient interface {
 		ctx grpctx.Context,
 		volumeid string,
 		readOnly bool,
+		stagingTargetPath string,
 		targetPath string,
 		accessMode api.PersistentVolumeAccessMode,
 		volumeInfo map[string]string,
@@ -45,6 +46,17 @@ type csiClient interface {
 		volID string,
 		targetPath string,
 	) error
+	NodeStageVolume(ctx grpctx.Context,
+		volID string,
+		publishVolumeInfo map[string]string,
+		stagingTargetPath string,
+		fsType string,
+		accessMode api.PersistentVolumeAccessMode,
+		nodeStageSecrets map[string]string,
+		volumeAttribs map[string]string,
+	) error
+	NodeUnstageVolume(ctx grpctx.Context, volID, stagingTargetPath string) error
+	NodeGetCapabilities(ctx grpctx.Context) ([]*csipb.NodeServiceCapability, error)
 }
 
 // csiClient encapsulates all csi-plugin methods
@@ -94,6 +106,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	ctx grpctx.Context,
 	volID string,
 	readOnly bool,
+	stagingTargetPath string,
 	targetPath string,
 	accessMode api.PersistentVolumeAccessMode,
 	volumeInfo map[string]string,
@@ -131,6 +144,9 @@ func (c *csiDriverClient) NodePublishVolume(
 			},
 		},
 	}
+	if stagingTargetPath != "" {
+		req.StagingTargetPath = stagingTargetPath
+	}
 
 	_, err := c.nodeClient.NodePublishVolume(ctx, req)
 	return err
@@ -156,6 +172,84 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx grpctx.Context, volID string, 
 
 	_, err := c.nodeClient.NodeUnpublishVolume(ctx, req)
 	return err
+}
+
+func (c *csiDriverClient) NodeStageVolume(ctx grpctx.Context,
+	volID string,
+	publishInfo map[string]string,
+	stagingTargetPath string,
+	fsType string,
+	accessMode api.PersistentVolumeAccessMode,
+	nodeStageSecrets map[string]string,
+	volumeAttribs map[string]string,
+) error {
+	glog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	if volID == "" {
+		return errors.New("missing volume id")
+	}
+	if stagingTargetPath == "" {
+		return errors.New("missing staging target path")
+	}
+	if err := c.assertConnection(); err != nil {
+		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+		return err
+	}
+
+	req := &csipb.NodeStageVolumeRequest{
+		VolumeId:          volID,
+		PublishInfo:       publishInfo,
+		StagingTargetPath: stagingTargetPath,
+		VolumeCapability: &csipb.VolumeCapability{
+			AccessMode: &csipb.VolumeCapability_AccessMode{
+				Mode: asCSIAccessMode(accessMode),
+			},
+			AccessType: &csipb.VolumeCapability_Mount{
+				Mount: &csipb.VolumeCapability_MountVolume{
+					FsType: fsType,
+				},
+			},
+		},
+		NodeStageSecrets: nodeStageSecrets,
+		VolumeAttributes: volumeAttribs,
+	}
+
+	_, err := c.nodeClient.NodeStageVolume(ctx, req)
+	return err
+}
+
+func (c *csiDriverClient) NodeUnstageVolume(ctx grpctx.Context, volID, stagingTargetPath string) error {
+	glog.V(4).Info(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	if volID == "" {
+		return errors.New("missing volume id")
+	}
+	if stagingTargetPath == "" {
+		return errors.New("missing staging target path")
+	}
+	if err := c.assertConnection(); err != nil {
+		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+		return err
+	}
+
+	req := &csipb.NodeUnstageVolumeRequest{
+		VolumeId:          volID,
+		StagingTargetPath: stagingTargetPath,
+	}
+	_, err := c.nodeClient.NodeUnstageVolume(ctx, req)
+	return err
+}
+
+func (c *csiDriverClient) NodeGetCapabilities(ctx grpctx.Context) ([]*csipb.NodeServiceCapability, error) {
+	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
+	if err := c.assertConnection(); err != nil {
+		glog.Errorf("%v: failed to assert a connection: %v", csiPluginName, err)
+		return nil, err
+	}
+	req := &csipb.NodeGetCapabilitiesRequest{}
+	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetCapabilities(), nil
 }
 
 func asCSIAccessMode(am api.PersistentVolumeAccessMode) csipb.VolumeCapability_AccessMode_Mode {
