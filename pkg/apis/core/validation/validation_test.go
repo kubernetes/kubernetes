@@ -2992,8 +2992,8 @@ func TestValidateVolumes(t *testing.T) {
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{
-					RBD: &core.CephFSVolumeSource{
-						CephMonitors: []string{},
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{},
 						MonitorSRVRecord: &core.SRVRecordSource{
 							Name:   "test",
 							Domain: "sample.com",
@@ -3007,7 +3007,7 @@ func TestValidateVolumes(t *testing.T) {
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{
-					RBD: &core.CephFSVolumeSource{
+					CephFS: &core.CephFSVolumeSource{
 						Monitors: []string{},
 						MonitorSRVRecord: &core.SRVRecordSource{
 							Name:     "test",
@@ -3023,7 +3023,7 @@ func TestValidateVolumes(t *testing.T) {
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{
-					RBD: &core.CephFSVolumeSource{
+					CephFS: &core.CephFSVolumeSource{
 						Monitors: []string{},
 						MonitorSRVRecord: &core.SRVRecordSource{
 							Name:     "test",
@@ -3039,7 +3039,7 @@ func TestValidateVolumes(t *testing.T) {
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{
-					RBD: &core.CephFSVolumeSource{
+					CephFS: &core.CephFSVolumeSource{
 						Monitors: []string{},
 						MonitorSRVRecord: &core.SRVRecordSource{
 							Name:     "test",
@@ -3057,7 +3057,7 @@ func TestValidateVolumes(t *testing.T) {
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{
-					RBD: &core.CephFSVolumeSource{
+					CephFS: &core.CephFSVolumeSource{
 						Monitors: []string{},
 						MonitorSRVRecord: &core.SRVRecordSource{
 							Domain: "sample.com",
@@ -3073,7 +3073,7 @@ func TestValidateVolumes(t *testing.T) {
 			vol: core.Volume{
 				Name: "cephfs",
 				VolumeSource: core.VolumeSource{
-					RBD: &core.CephFSVolumeSource{
+					CephFS: &core.CephFSVolumeSource{
 						Monitors: []string{},
 						MonitorSRVRecord: &core.SRVRecordSource{
 							Name: "someservice",
