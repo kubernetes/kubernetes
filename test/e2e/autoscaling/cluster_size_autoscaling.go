@@ -248,8 +248,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
+		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
@@ -278,8 +279,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
+		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		framework.ExpectNoError(disableAutoscaler(extraPoolName, 1, 2))
@@ -512,8 +514,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 		By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
+		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
 		defer disableAutoscaler(extraPoolName, 1, 2)
@@ -566,8 +569,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		increasedSize := manuallyIncreaseClusterSize(f, originalSizes)
 
 		const extraPoolName = "extra-pool"
-		extraNodes := addNodePool(extraPoolName, "n1-standard-1", 3)
+		addNodePool(extraPoolName, "n1-standard-1", 3)
 		defer deleteNodePool(extraPoolName)
+		extraNodes := getPoolInitialSize(extraPoolName)
 
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size >= increasedSize+extraNodes }, scaleUpTimeout))
@@ -681,8 +685,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// GKE-specific setup
 		By("Add a new node pool with size 1 and min size 0")
 		const extraPoolName = "extra-pool"
-		extraNodes := addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
+		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+extraNodes, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
 		defer disableAutoscaler(extraPoolName, 0, 1)
@@ -1286,15 +1291,14 @@ func waitTillAllNAPNodePoolsAreRemoved() error {
 }
 
 // Returns size of the newly added node pool
-func addNodePool(name string, machineType string, numNodes int) int {
+func addNodePool(name string, machineType string, numNodes int) {
 	args := []string{"container", "node-pools", "create", name, "--quiet",
 		"--machine-type=" + machineType,
 		"--num-nodes=" + strconv.Itoa(numNodes),
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	glog.Infof("Creating node-pool %s: %s", name, output)
-	framework.ExpectNoError(err)
-	return getPoolInitialSize(name)
+	framework.ExpectNoError(err, output)
 }
 
 func deleteNodePool(name string) {
