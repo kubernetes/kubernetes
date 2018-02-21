@@ -155,7 +155,7 @@ type Controller struct {
 
 	nodeLister                corelisters.NodeLister
 	nodeInformerSynced        cache.InformerSynced
-	nodeExistsInCloudProvider func(types.NodeName) (bool, error)
+	nodeExistsInCloudProvider func(providerID string, nodeName types.NodeName) (bool, error)
 
 	recorder record.EventRecorder
 
@@ -238,8 +238,8 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		now:           metav1.Now,
 		knownNodeSet:  make(map[string]*v1.Node),
 		nodeStatusMap: make(map[string]nodeStatusData),
-		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
-			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+		nodeExistsInCloudProvider: func(providerID string, nodeName types.NodeName) (bool, error) {
+			return nodeutil.ExistsInCloudProvider(cloud, providerID, nodeName)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -668,7 +668,7 @@ func (nc *Controller) monitorNodeStatus() error {
 			// Check with the cloud provider to see if the node still exists. If it
 			// doesn't, delete the node immediately.
 			if currentReadyCondition.Status != v1.ConditionTrue && nc.cloud != nil {
-				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
+				exists, err := nc.nodeExistsInCloudProvider(node.Spec.ProviderID, types.NodeName(node.Name))
 				if err != nil {
 					glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
 					continue

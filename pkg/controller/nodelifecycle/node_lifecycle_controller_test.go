@@ -1401,7 +1401,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
 	nodeController.recorder = testutil.NewFakeRecorder()
-	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+	nodeController.nodeExistsInCloudProvider = func(providerID string, nodeName types.NodeName) (bool, error) {
 		return false, nil
 	}
 	// monitorNodeStatus should allow this node to be immediately deleted
@@ -2239,7 +2239,7 @@ func TestNodeEventGeneration(t *testing.T) {
 		testNodeMonitorPeriod,
 		false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
-	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
+	nodeController.nodeExistsInCloudProvider = func(providerID string, nodeName types.NodeName) (bool, error) {
 		return false, nil
 	}
 	nodeController.now = func() metav1.Time { return fakeNow }

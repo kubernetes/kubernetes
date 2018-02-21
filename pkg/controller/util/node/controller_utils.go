@@ -173,18 +173,27 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 
 // ExistsInCloudProvider returns true if the node exists in the
 // cloud provider.
-func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeName) (bool, error) {
+func ExistsInCloudProvider(cloud cloudprovider.Interface, providerID string, nodeName types.NodeName) (bool, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
-	if _, err := instances.ExternalID(context.TODO(), nodeName); err != nil {
+
+	exists, err := instances.InstanceExistsByProviderID(context.TODO(), providerID)
+	if err != nil {
+		providerIDErr := err
+		_, err = instances.ExternalID(context.TODO(), nodeName)
+		if err == nil {
+			return true, nil
+		}
 		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
-		return false, err
+
+		return false, fmt.Errorf("ExistsInCloudProvider: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 	}
-	return true, nil
+
+	return exists, nil
 }
 
 // RecordNodeEvent records a event related to a node.
