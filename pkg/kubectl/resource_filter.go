@@ -18,7 +18,9 @@ package kubectl
 
 import (
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -50,6 +52,27 @@ func filterPods(obj runtime.Object, options printers.PrintOptions) bool {
 		return p.Status.Phase == v1.PodSucceeded || p.Status.Phase == v1.PodFailed
 	case *api.Pod:
 		return p.Status.Phase == api.PodSucceeded || p.Status.Phase == api.PodFailed
+	case *unstructured.Unstructured:
+		if (p.GroupVersionKind().GroupKind() != schema.GroupKind{Kind: "Pod"}) {
+			return false
+		}
+		status, ok := p.Object["status"]
+		if !ok {
+			return false
+		}
+		statusMap, ok := status.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		phase, ok := statusMap["phase"]
+		if !ok {
+			return false
+		}
+		phaseString, ok := phase.(string)
+		if !ok {
+			return false
+		}
+		return phaseString == string(api.PodSucceeded) || phaseString == string(api.PodFailed)
 	}
 	return false
 }
