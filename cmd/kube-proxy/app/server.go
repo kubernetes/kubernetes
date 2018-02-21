@@ -173,6 +173,11 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 }
 
+// AddOSFlags adds OS specific flags
+func (o *Options) AddOSFlags(fs *pflag.FlagSet) {
+	addOSFlags(fs)
+}
+
 func NewOptions() *Options {
 	return &Options{
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
@@ -342,6 +347,8 @@ with the apiserver API to configure the proxy.`,
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cmd.Flags())
 
+			initForOS()
+
 			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
@@ -355,6 +362,7 @@ with the apiserver API to configure the proxy.`,
 	}
 
 	opts.AddFlags(cmd.Flags())
+	opts.AddOSFlags(cmd.Flags())
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
