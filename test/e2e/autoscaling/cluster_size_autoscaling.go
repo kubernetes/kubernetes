@@ -1326,7 +1326,7 @@ func getPoolInitialSize(poolName string) int {
 	// get initial node count
 	args := []string{"container", "node-pools", "describe", poolName, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
-		"--format=value(initialNodeCount)"}
+		"--format=\"value(initialNodeCount)\""}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	glog.Infof("Node-pool initial size: %s", output)
 	framework.ExpectNoError(err)
@@ -1338,7 +1338,7 @@ func getPoolInitialSize(poolName string) int {
 	// get number of node pools
 	args = []string{"container", "node-pools", "describe", poolName, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
-		"--format=value(instanceGroupUrls)"}
+		"--format=\"value(instanceGroupUrls)\""}
 	output, err = execCmd(getGcloudCommand(args)...).CombinedOutput()
 	framework.ExpectNoError(err)
 	nodeGroupCount := len(strings.Split(string(output), ";"))
