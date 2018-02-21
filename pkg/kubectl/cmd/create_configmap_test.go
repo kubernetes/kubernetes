@@ -31,7 +31,6 @@ func TestCreateConfigMap(t *testing.T) {
 	configMap := &v1.ConfigMap{}
 	configMap.Name = "my-configmap"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 		NegotiatedSerializer: ns,
@@ -50,7 +49,7 @@ func TestCreateConfigMap(t *testing.T) {
 	cmd := NewCmdCreateConfigMap(f, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{configMap.Name})
-	expectedOutput := "configmaps/" + configMap.Name + "\n"
+	expectedOutput := "configmap/" + configMap.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

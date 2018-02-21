@@ -210,9 +210,9 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
-				return f.PrintResourceInfoForCommand(cmd, info, out)
+				return cmdutil.PrintObject(cmd, info.Object, out)
 			}
-			f.PrintSuccess(options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
+			cmdutil.PrintSuccess(options.OutputFormat == "name", out, info.Object, false, dataChangedMsg)
 
 			// if object was not successfully patched, exit with error code 1
 			if !didPatch {
@@ -246,7 +246,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err := info.Refresh(targetObj, true); err != nil {
 			return err
 		}
-		return f.PrintResourceInfoForCommand(cmd, info, out)
+		return cmdutil.PrintObject(cmd, info.Object, out)
 	})
 	if err != nil {
 		return err

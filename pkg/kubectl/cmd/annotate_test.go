@@ -416,7 +416,6 @@ func TestAnnotateErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
 		tf.ClientConfig = defaultClientConfig()
 
@@ -436,9 +435,6 @@ func TestAnnotateErrors(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
 		}
-		if tf.Printer.(*testPrinter).Objects != nil {
-			t.Errorf("unexpected print to default printer")
-		}
 		if buf.Len() > 0 {
 			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
 		}
@@ -449,7 +445,6 @@ func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -500,7 +495,6 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -581,7 +575,6 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,

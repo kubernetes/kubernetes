@@ -162,7 +162,6 @@ func TestTopPod(t *testing.T) {
 		}
 
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -303,7 +302,6 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 		}
 
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -482,7 +480,6 @@ func TestTopPodCustomDefaults(t *testing.T) {
 		}
 
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

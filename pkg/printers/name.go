@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -63,47 +64,47 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
+	return printObj(w, name, GetObjectGroupKind(obj, p.Typer))
+}
+
+func GetObjectGroupKind(obj runtime.Object, typer runtime.ObjectTyper) schema.GroupKind {
+	if obj == nil {
+		return schema.GroupKind{Kind: "<unknown>"}
+	}
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind()
 	if len(groupVersionKind.Kind) > 0 {
-		kind := groupVersionKind.Kind
-		group := groupVersionKind.Group
-		return printObj(w, name, group, kind)
+		return groupVersionKind.GroupKind()
 	}
 
-	if gvks, _, err := p.Typer.ObjectKinds(obj); err == nil {
+	if gvks, _, err := typer.ObjectKinds(obj); err == nil {
 		for _, gvk := range gvks {
 			if len(gvk.Kind) == 0 {
 				continue
 			}
-
-			return printObj(w, name, gvk.Group, gvk.Kind)
+			return gvk.GroupKind()
 		}
 	}
 
 	if uns, ok := obj.(*unstructured.Unstructured); ok {
-		group := uns.GroupVersionKind().Group
-		kind := uns.GroupVersionKind().Kind
-
-		if len(kind) > 0 {
-			return printObj(w, name, group, kind)
+		if len(uns.GroupVersionKind().Kind) > 0 {
+			return uns.GroupVersionKind().GroupKind()
 		}
 	}
 
-	fmt.Fprintf(w, "<unknown>/%s\n", name)
-	return nil
+	return schema.GroupKind{Kind: "<unknown>"}
 }
 
-func printObj(w io.Writer, name, group, kind string) error {
-	if len(kind) == 0 {
+func printObj(w io.Writer, name string, groupKind schema.GroupKind) error {
+	if len(groupKind.Kind) == 0 {
 		return fmt.Errorf("missing kind for resource with name %v", name)
 	}
 
-	if len(group) == 0 {
-		fmt.Fprintf(w, "%s/%s\n", strings.ToLower(kind), name)
+	if len(groupKind.Group) == 0 {
+		fmt.Fprintf(w, "%s/%s\n", strings.ToLower(groupKind.Kind), name)
 		return nil
 	}
 
-	fmt.Fprintf(w, "%s.%s/%s\n", strings.ToLower(kind), group, name)
+	fmt.Fprintf(w, "%s.%s/%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name)
 	return nil
 }
 

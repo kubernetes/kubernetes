@@ -291,7 +291,6 @@ func TestGenerateService(t *testing.T) {
 		sawPOST := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.ClientConfig = defaultClientConfig()
-		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: ns,
@@ -432,7 +431,6 @@ func TestRunValidations(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewTestFactory()
-		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},

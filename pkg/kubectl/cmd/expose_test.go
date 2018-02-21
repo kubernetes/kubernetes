@@ -31,7 +31,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -79,7 +78,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			expected: "services \"foo\" exposed",
+			expected: "service \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -110,7 +109,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"func": "stream"},
 				},
 			},
-			expected: "services \"foo\" exposed",
+			expected: "service \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -142,7 +141,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"run": "this"},
 				},
 			},
-			expected: "services \"mayor\" exposed",
+			expected: "service \"mayor\" exposed",
 			status:   200,
 		},
 		{
@@ -237,7 +236,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: "10.10.10.10",
 				},
 			},
-			expected: "services \"foo\" exposed",
+			expected: "service \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -269,7 +268,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "services \"foo\" exposed",
+			expected: "service \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -295,7 +294,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: api.ClusterIPNone,
 				},
 			},
-			expected: "services \"foo\" exposed",
+			expected: "service \"foo\" exposed",
 			status:   200,
 		},
 		{
@@ -353,7 +352,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "frompod"},
 				},
 			},
-			expected: "services \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
+			expected: "service \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
 			status:   200,
 		},
 		{
@@ -467,7 +466,6 @@ func TestRunExposeService(t *testing.T) {
 
 	for _, test := range tests {
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &printers.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: ns,
@@ -495,13 +493,7 @@ func TestRunExposeService(t *testing.T) {
 
 		out := buf.String()
 		if _, ok := test.flags["dry-run"]; ok {
-			buf.Reset()
-			if err := tf.Printer.PrintObj(test.output, buf); err != nil {
-				t.Errorf("%s: Unexpected error: %v", test.name, err)
-				continue
-			}
-
-			test.expected = fmt.Sprintf("services %q exposed (dry run)", test.flags["name"])
+			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
 		}
 
 		if !strings.Contains(out, test.expected) {

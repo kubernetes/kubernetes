@@ -84,7 +84,6 @@ func TestCreateDeployment(t *testing.T) {
 		}),
 	}
 	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -93,7 +92,7 @@ func TestCreateDeployment(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
 	cmd.Run(cmd, []string{depName})
-	expectedOutput := "deployments/" + depName + "\n"
+	expectedOutput := "deployment.extensions/" + depName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
@@ -112,7 +111,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 		}),
 	}
 	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 
 	buf := bytes.NewBuffer([]byte{})

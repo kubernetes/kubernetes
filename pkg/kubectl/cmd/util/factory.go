@@ -150,8 +150,6 @@ type ClientAccessFactory interface {
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
-	// Returns a Printer for formatting objects of the given type or an error.
-	Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused. Currently supported only for Deployments.
 	// Returns the patched object in bytes and any error that occurred during the encoding or
 	// in case the object is already paused.
@@ -231,24 +229,6 @@ type ObjectMappingFactory interface {
 // BuilderFactory holds the third level of factory methods. These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
-	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
-	// could not be found.
-	PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error)
-	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	// Returns a printer, true if the printer is generic (is not internal), or
-	// an error if a printer could not be found.
-	PrinterForMapping(options *printers.PrintOptions) (printers.ResourcePrinter, error)
-	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error
-	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
-	// attempts to print an info object based on the specified output format. If the
-	// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
-	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error
-	// PrintSuccess prints message after finishing mutating operations
-	PrintSuccess(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
 	NewBuilder() *resource.Builder
@@ -256,16 +236,6 @@ type BuilderFactory interface {
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.
 	PluginRunner() plugins.PluginRunner
-}
-
-func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema.GroupVersionKind {
-	result := []schema.GroupVersionKind{}
-	for ix := range gvks {
-		if gvks[ix].Group == group {
-			result = append(result, gvks[ix])
-		}
-	}
-	return result
 }
 
 type factory struct {

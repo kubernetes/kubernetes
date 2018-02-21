@@ -186,16 +186,16 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 
 			if len(o.Output) > 0 && !o.ShortOutput {
 				info.Refresh(patchedObj, false)
-				return f.PrintResourceInfoForCommand(cmd, info, o.Out)
+				return cmdutil.PrintObject(cmd, info.Object, o.Out)
 			}
-			f.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 
 		} else {
 			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
 			if err != nil {
 				return err
 			}
-			f.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 		}
 	}
 	return nil

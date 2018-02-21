@@ -80,7 +80,7 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 			}
 
 			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
-			printer, err := f.PrinterForOptions(printOpts)
+			printer, err := cmdutil.PrinterForOptions(printOpts)
 			cmdutil.CheckErr(err)
 
 			cmdutil.CheckErr(options.Run(out, printer))
