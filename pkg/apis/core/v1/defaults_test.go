@@ -1390,13 +1390,3 @@ func TestSetDefaultHostPathVolumeSource(t *testing.T) {
 	}
 }
 
-func TestSetDefaultSRVRecordSource(t *testing.T) {
-        s := &v1.SRVRecordSource{}
-        obj2 := roundTrip(t, runtime.Object(s))
-        s2 := obj2.(*v1.SRVRecordSource)
-
-        if s2.Protocol != v1.ProtocolTCP {
-                t.Errorf("Expected SRV protocol %v, got %v", v1.ProtocolTCP, s2.Protocol)
-        }
-}
-
