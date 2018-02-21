@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 const (
@@ -149,7 +150,10 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		new_node := &corev1.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
@@ -596,7 +600,10 @@ func TestDrain(t *testing.T) {
 			new_node := &corev1.Node{}
 			deleted := false
 			evicted := false
-			f, tf, codec, ns := cmdtesting.NewAPIFactory()
+			f, tf := cmdtesting.NewAPIFactory()
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
+
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 				NegotiatedSerializer: ns,
@@ -817,7 +824,7 @@ func TestDeletePods(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, _, _, _ := cmdtesting.NewAPIFactory()
+		f, _ := cmdtesting.NewAPIFactory()
 		o := DrainOptions{Factory: f}
 		o.mapper, _ = f.Object()
 		o.Out = os.Stdout

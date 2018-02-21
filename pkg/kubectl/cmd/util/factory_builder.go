@@ -54,7 +54,7 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 			RESTMapper:   mapper,
 			ObjectTyper:  typer,
 			ClientMapper: clientMapperFunc,
-			Decoder:      f.clientAccessFactory.Decoder(true),
+			Decoder:      InternalVersionDecoder(),
 		},
 		&resource.Mapper{
 			RESTMapper:   mapper,

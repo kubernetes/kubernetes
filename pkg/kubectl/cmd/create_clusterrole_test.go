@@ -32,7 +32,7 @@ import (
 func TestCreateClusterRole(t *testing.T) {
 	clusterRoleName := "my-cluster-role"
 
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfig = defaultClientConfig()
@@ -147,7 +147,7 @@ func TestCreateClusterRole(t *testing.T) {
 }
 
 func TestClusterRoleValidate(t *testing.T) {
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.Namespace = "test"
 
 	tests := map[string]struct {

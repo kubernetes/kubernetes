@@ -241,8 +241,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 
-	encoder := f.JSONEncoder()
-	decoder := f.Decoder(false)
+	encoder := scheme.DefaultJSONEncoder()
+	deserializer := scheme.Codecs.UniversalDeserializer()
 	mapper := r.Mapper().RESTMapper
 
 	visitedUids := sets.NewString()
@@ -316,7 +316,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &patcher{
 				encoder:       encoder,
-				decoder:       decoder,
+				decoder:       deserializer,
 				mapping:       info.Mapping,
 				helper:        helper,
 				clientFunc:    f.UnstructuredClientForMapping,

@@ -47,3 +47,8 @@ var ParameterCodec = runtime.NewParameterCodec(Scheme)
 // from the server for use in the client, but that gives conflicting lists of non-existent versions.  This only needs to
 // live until we stop attempting to perform any conversion client-side and is only valid for items existent in our scheme.
 var Versions = []schema.GroupVersion{}
+
+// DefaultJSONEncoder returns a default encoder for our scheme
+func DefaultJSONEncoder() runtime.Encoder {
+	return Codecs.LegacyCodec(Versions...)
+}
