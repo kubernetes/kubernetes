@@ -37,5 +37,4 @@ filegroup(
 filegroup(
     name = "go_default_library_protos",
     srcs = ["api.proto"],
-    visibility = ["//visibility:public"],
 )

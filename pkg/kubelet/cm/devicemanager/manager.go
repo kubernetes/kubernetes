@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -85,6 +85,7 @@ type ManagerImpl struct {
 	// podDevices contains pod to allocated device mapping.
 	podDevices podDevices
 	store      utilstore.Store
+	pluginOpts map[string]*pluginapi.DevicePluginOptions
 }
 
 type sourcesReadyStub struct{}
@@ -112,6 +113,7 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 		healthyDevices:   make(map[string]sets.String),
 		unhealthyDevices: make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
+		pluginOpts:       make(map[string]*pluginapi.DevicePluginOptions),
 		podDevices:       make(podDevices),
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
@@ -201,6 +203,7 @@ func (m *ManagerImpl) checkpointFile() string {
 // starts device plugin registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
 	glog.V(2).Infof("Starting Device Plugin manager")
+	fmt.Println("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
@@ -286,8 +289,15 @@ func (m *ManagerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.P
 func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	glog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)
 	metrics.DevicePluginRegistrationCount.WithLabelValues(r.ResourceName).Inc()
-	if r.Version != pluginapi.Version {
-		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.Version)
+	var versionCompatible bool
+	for _, v := range pluginapi.SupportedVersions {
+		if r.Version == v {
+			versionCompatible = true
+			break
+		}
+	}
+	if !versionCompatible {
+		errorString := fmt.Sprintf(errUnsupportedVersion, r.Version, pluginapi.SupportedVersions)
 		glog.Infof("Bad registration request from device plugin with resource name %q: %v", r.ResourceName, errorString)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
@@ -340,8 +350,10 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
 		return
 	}
-
 	m.mutex.Lock()
+	if r.Options != nil {
+		m.pluginOpts[r.ResourceName] = r.Options
+	}
 	// Check for potential re-registration during the initialization of new endpoint,
 	// and skip updating if re-registration happens.
 	// TODO: simplify the part once we have a better way to handle registered devices
@@ -590,11 +602,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		resource := string(k)
 		needed := int(v.Value())
 		glog.V(3).Infof("needs %d %s", needed, resource)
-		_, registeredResource := m.healthyDevices[resource]
-		_, allocatedResource := m.allocatedDevices[resource]
-		// Continues if this is neither an active device plugin resource nor
-		// a resource we have previously allocated.
-		if !registeredResource && !allocatedResource {
+		if !m.isDevicePluginResource(resource) {
 			continue
 		}
 		// Updates allocatedDevices to garbage collect any stranded resources
@@ -610,6 +618,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if allocDevices == nil || len(allocDevices) <= 0 {
 			continue
 		}
+
 		startRPCTime := time.Now()
 		// Manager.Allocate involves RPC calls to device plugin, which
 		// could be heavy-weight. Therefore we want to perform this operation outside
@@ -659,10 +668,60 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 // for the found one. An empty struct is returned in case no cached state is found.
-func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions {
+func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
+	podUID := string(pod.UID)
+	contName := container.Name
+	for k := range container.Resources.Limits {
+		resource := string(k)
+		if !m.isDevicePluginResource(resource) {
+			continue
+		}
+		err := m.callPreStartContainerIfNeeded(podUID, contName, resource)
+		if err != nil {
+			return nil, err
+		}
+	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name)
+	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
+}
+
+func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource string) error {
+	m.mutex.Lock()
+	opts, ok := m.pluginOpts[resource]
+	if !ok {
+		m.mutex.Unlock()
+		glog.V(4).Infof("Plugin options not found in cache for resource: %s. Skip PreStartContainer", resource)
+		return nil
+	}
+
+	if !opts.PreStartRequired {
+		m.mutex.Unlock()
+		glog.V(4).Infof("Plugin options indicate to skip PreStartContainer for resource, %v", resource)
+		return nil
+	}
+
+	devices := m.podDevices.containerDevices(podUID, contName, resource)
+	if devices == nil {
+		m.mutex.Unlock()
+		return fmt.Errorf("no devices found allocated in local cache for pod %s, container %s, resource %s", podUID, contName, resource)
+	}
+
+	e, ok := m.endpoints[resource]
+	if !ok {
+		m.mutex.Unlock()
+		return fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)
+	}
+
+	m.mutex.Unlock()
+	devs := devices.UnsortedList()
+	glog.V(4).Infof("Issuing an PreStartContainer call for container, %s, of pod %s", contName, podUID)
+	_, err := e.preStartContainer(devs)
+	if err != nil {
+		return fmt.Errorf("device plugin PreStartContainer rpc failed with err: %v", err)
+	}
+	// TODO: Add metrics support for init RPC
+	return nil
 }
 
 // sanitizeNodeAllocatable scans through allocatedDevices in the device manager
@@ -691,4 +750,15 @@ func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulercache.NodeInfo) {
 	if newAllocatableResource != nil {
 		node.SetAllocatableResource(newAllocatableResource)
 	}
+}
+
+func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
+	_, registeredResource := m.healthyDevices[resource]
+	_, allocatedResource := m.allocatedDevices[resource]
+	// Return true if this is either an active device plugin resource or
+	// a resource we have previously allocated.
+	if registeredResource || allocatedResource {
+		return true
+	}
+	return false
 }
