@@ -67,6 +67,9 @@ type MasterConfiguration struct {
 	// TokenTTL is a ttl for Token. Defaults to 24h.
 	TokenTTL *metav1.Duration
 
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string
+
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
 	// TODO: This is temporary and ideally we would like to switch all components to

@@ -112,6 +112,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		}
 	}
 
+	if obj.CRISocket == "" {
+		obj.CRISocket = DefaultCRISocket
+	}
+
 	if obj.ImageRepository == "" {
 		obj.ImageRepository = DefaultImageRepository
 	}

@@ -223,7 +223,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunInitMasterChecks(exec.New(), rt.cfg, "", sets.NewString())
+		actual := RunInitMasterChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
