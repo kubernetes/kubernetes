@@ -112,13 +112,6 @@ type ClientAccessFactory interface {
 	// TODO remove.  This should be rolled into `ClientConfig`
 	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
 
-	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
-	// into their internal form (if possible). Eventually the internal form will be removed as an option,
-	// and only versioned objects will be returned.
-	Decoder(toInternal bool) runtime.Decoder
-	// Returns an encoder capable of encoding a provided object into JSON in the default desired version.
-	JSONEncoder() runtime.Encoder
-
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.
 	UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)

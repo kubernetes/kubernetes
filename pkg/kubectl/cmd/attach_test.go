@@ -38,6 +38,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 type fakeRemoteAttach struct {
@@ -138,7 +139,10 @@ func TestPodAndContainerAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
@@ -215,7 +219,10 @@ func TestAttach(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
@@ -302,7 +309,10 @@ func TestAttachWarnings(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,

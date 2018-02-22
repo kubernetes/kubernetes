@@ -28,8 +28,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestLog(t *testing.T) {
@@ -47,7 +49,10 @@ func TestLog(t *testing.T) {
 	}
 	for _, test := range tests {
 		logContent := "test log content"
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -95,7 +100,7 @@ func testPod() *api.Pod {
 }
 
 func TestValidateLogFlags(t *testing.T) {
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
 		name     string
@@ -145,7 +150,7 @@ func TestValidateLogFlags(t *testing.T) {
 }
 
 func TestLogComplete(t *testing.T) {
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
 		name     string

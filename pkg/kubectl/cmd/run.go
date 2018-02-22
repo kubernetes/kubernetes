@@ -590,7 +590,7 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 	groupVersionKind := groupVersionKinds[0]
 
 	if len(overrides) > 0 {
-		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
+		codec := runtime.NewCodec(cmdutil.InternalVersionJSONEncoder(), cmdutil.InternalVersionDecoder())
 		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, err
@@ -620,14 +620,14 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
 		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return nil, err
 		}
 

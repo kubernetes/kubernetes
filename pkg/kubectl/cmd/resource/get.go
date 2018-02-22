@@ -295,7 +295,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 	var sorter *kubectl.RuntimeSort
 	if len(sorting) > 0 && len(objs) > 1 {
 		// TODO: questionable
-		if sorter, err = kubectl.SortObjects(f.Decoder(true), objs, sorting); err != nil {
+		if sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, sorting); err != nil {
 			return err
 		}
 	}

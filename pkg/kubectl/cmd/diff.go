@@ -439,7 +439,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 		obj := InfoObject{
 			Info:    info,
 			Parser:  parser,
-			Encoder: f.JSONEncoder(),
+			Encoder: cmdutil.InternalVersionJSONEncoder(),
 		}
 
 		return differ.Diff(obj, printer)

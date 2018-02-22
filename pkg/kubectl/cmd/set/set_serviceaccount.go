@@ -55,7 +55,6 @@ var (
 // serviceAccountConfig encapsulates the data required to perform the operation.
 type serviceAccountConfig struct {
 	fileNameOptions        resource.FilenameOptions
-	encoder                runtime.Encoder
 	out                    io.Writer
 	err                    io.Writer
 	dryRun                 bool
@@ -104,7 +103,6 @@ func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command 
 
 // Complete configures serviceAccountConfig from command line args.
 func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	saConfig.encoder = f.JSONEncoder()
 	saConfig.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	saConfig.record = cmdutil.GetRecordFlag(cmd)
 	saConfig.changeCause = f.Command(cmd, false)
@@ -151,9 +149,9 @@ func (saConfig *serviceAccountConfig) Run() error {
 			podSpec.ServiceAccountName = saConfig.serviceAccountName
 			return nil
 		})
-		return runtime.Encode(saConfig.encoder, info.Object)
+		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 	}
-	patches := CalculatePatches(saConfig.infos, saConfig.encoder, patchFn)
+	patches := CalculatePatches(saConfig.infos, cmdutil.InternalVersionJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {

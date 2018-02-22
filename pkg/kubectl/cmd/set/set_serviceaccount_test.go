@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -67,7 +68,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 	for i, input := range inputs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			f, tf, _, _ := cmdtesting.NewAPIFactory()
+			f, tf := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
 				GroupVersion: schema.GroupVersion{Version: "v1"},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -97,7 +98,8 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 func TestSetServiceAccountMultiLocal(t *testing.T) {
 	testapi.Default = testapi.Groups[""]
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -311,8 +313,9 @@ func TestSetServiceAccountRemote(t *testing.T) {
 	for _, input := range inputs {
 		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 		testapi.Default = testapi.Groups[input.testAPIGroup]
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
+		ns := legacyscheme.Codecs
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{
@@ -364,7 +367,7 @@ func TestServiceAccountValidation(t *testing.T) {
 		{args: []string{serviceAccount}, errorString: resourceMissingErrString},
 	}
 	for _, input := range inputs {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			GroupVersion: schema.GroupVersion{Version: "v1"},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

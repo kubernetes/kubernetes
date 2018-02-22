@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -176,7 +177,9 @@ func stringBody(body string) io.ReadCloser {
 }
 
 func Example_printMultiContainersReplicationControllerWithWide() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -224,7 +227,9 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 }
 
 func Example_printReplicationController() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -271,7 +276,9 @@ func Example_printReplicationController() {
 }
 
 func Example_printPodWithWideFormat() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -307,7 +314,9 @@ func Example_printPodWithWideFormat() {
 }
 
 func Example_printPodWithShowLabels() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -438,7 +447,9 @@ func newAllPhasePodList() *api.PodList {
 }
 
 func Example_printPodHideTerminated() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -470,7 +481,9 @@ func Example_printPodHideTerminated() {
 }
 
 func Example_printPodShowAll() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
@@ -491,7 +504,9 @@ func Example_printPodShowAll() {
 }
 
 func Example_printServiceWithLabels() {
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,

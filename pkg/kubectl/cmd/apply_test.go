@@ -38,12 +38,14 @@ import (
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 var (
@@ -65,7 +67,7 @@ func TestApplyExtraArgsFail(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f, _ := cmdtesting.NewAPIFactory()
 	c := NewCmdApply("kubectl", f, buf, errBuf)
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
@@ -329,7 +331,9 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 		tf.UnstructuredClient = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: unstructuredSerializer,
@@ -384,7 +388,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -428,7 +432,7 @@ func TestApplyObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -489,7 +493,7 @@ func TestApplyObjectOutput(t *testing.T) {
 	}
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -538,7 +542,7 @@ func TestApplyRetry(t *testing.T) {
 		firstPatch := true
 		retry := false
 		getCount := 0
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -595,7 +599,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -639,7 +643,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 
 	var body []byte
 
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -713,7 +717,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -796,7 +800,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 	deploymentBytes := readDeploymentFromFile(t, filenameDeployObjServerside)
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -868,7 +872,7 @@ func TestUnstructuredApply(t *testing.T) {
 	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -935,7 +939,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -1063,7 +1067,9 @@ func TestRunApplySetLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f, tf, codec, _ := cmdtesting.NewAPIFactory()
+			f, tf := cmdtesting.NewAPIFactory()
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
 				NegotiatedSerializer: unstructuredSerializer,
@@ -1153,7 +1159,7 @@ func TestForceApply(t *testing.T) {
 	for _, fn := range testingOpenAPISchemaFns {
 		deleted := false
 		counts := map[string]int{}
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

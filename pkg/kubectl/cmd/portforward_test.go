@@ -29,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 type fakePortForwarder struct {
@@ -70,7 +72,10 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 	}
 	for _, test := range tests {
 		var err error
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			VersionedAPIPath:     "/api/v1",
 			GroupVersion:         schema.GroupVersion{Group: ""},
