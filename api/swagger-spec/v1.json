@@ -19299,7 +19299,7 @@
      },
      "csi": {
       "$ref": "v1.CSIPersistentVolumeSource",
-      "description": "CSI represents storage that handled by an external CSI driver"
+      "description": "CSI represents storage that handled by an external CSI driver (Beta feature)."
      },
      "accessModes": {
       "type": "array",
@@ -19959,7 +19959,7 @@
    },
    "v1.CSIPersistentVolumeSource": {
     "id": "v1.CSIPersistentVolumeSource",
-    "description": "Represents storage that is managed by an external CSI volume driver",
+    "description": "Represents storage that is managed by an external CSI volume driver (Beta feature)",
     "required": [
      "driver",
      "volumeHandle"
