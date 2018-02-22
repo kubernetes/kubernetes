@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -50,5 +51,5 @@ var Versions = []schema.GroupVersion{}
 
 // DefaultJSONEncoder returns a default encoder for our scheme
 func DefaultJSONEncoder() runtime.Encoder {
-	return Codecs.LegacyCodec(Versions...)
+	return unstructured.JSONFallbackEncoder{Encoder: Codecs.LegacyCodec(Versions...)}
 }

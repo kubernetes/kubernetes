@@ -18,7 +18,6 @@ package versioning
 
 import (
 	"io"
-	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -178,7 +177,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 		}
 		targetGVK, ok := c.encodeVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
 		if !ok {
-			return runtime.NewNotRegisteredErrForTarget(reflect.TypeOf(obj).Elem(), c.encodeVersion)
+			return runtime.NewNotRegisteredGVKErrForTarget(objGVK, c.encodeVersion)
 		}
 		if targetGVK == objGVK {
 			return c.encoder.Encode(obj, w)
