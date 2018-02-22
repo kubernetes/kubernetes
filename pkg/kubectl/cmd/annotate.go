@@ -69,7 +69,7 @@ var (
 		All Kubernetes objects support the ability to store additional data with the object as
 		annotations. Annotations are key/value pairs that can be larger than labels and include
 		arbitrary string values such as structured JSON. Tools and system extensions may use
-		annotations to store their own data.  
+		annotations to store their own data.
 
 		Attempting to set an annotation that already exists will fail unless --overwrite is set.
 		If --resource-version is specified and does not match the current resource version on
@@ -202,7 +202,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 
 	// only apply resource version locking on a single resource.
 	// we must perform this check after o.builder.Do() as
-	// []o.resources can not not accurately return the proper number
+	// []o.resources can not accurately return the proper number
 	// of resources when they are not passed in "resource/name" format.
 	if !singleItemImpliedResource && len(o.resourceVersion) > 0 {
 		return fmt.Errorf("--resource-version may only be used with a single resource")
