@@ -72,8 +72,8 @@ const (
 	PodToleratesNodeNoExecuteTaintsPred = "PodToleratesNodeNoExecuteTaints"
 	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
 	CheckNodeLabelPresencePred = "CheckNodeLabelPresence"
-	// checkServiceAffinityPred defines the name of predicate checkServiceAffinity.
-	checkServiceAffinityPred = "checkServiceAffinity"
+	// CheckServiceAffinityPred defines the name of predicate checkServiceAffinity.
+	CheckServiceAffinityPred = "CheckServiceAffinity"
 	// MaxEBSVolumeCountPred defines the name of predicate MaxEBSVolumeCount.
 	MaxEBSVolumeCountPred = "MaxEBSVolumeCount"
 	// MaxGCEPDVolumeCountPred defines the name of predicate MaxGCEPDVolumeCount.
@@ -128,7 +128,7 @@ var (
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
-		checkServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
+		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		CheckNodeMemoryPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
 )
