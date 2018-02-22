@@ -11,18 +11,22 @@ Learn more at: https://kubernetes.io/docs/tasks/debug-application-cluster/loggin
 ## Troubleshooting
 
 In Kubernetes clusters in version 1.10.0 or later, fluentd-gcp DaemonSet can be
-manually scaled. This is useful e.g. when the applications running in the
-cluster are sending a large volume of logs (i.e. over 100kB/s), causing
-fluentd-gcp to fail with OOM errors. Conversely, if the applications aren't
-generating a lot of logs, it may be useful to reduce the amount of resources
-consumed by fluentd-gcp, making them available to other applications. To learn
+manually scaled. This is useful e.g. when applications running in the cluster
+are sending a large volume of logs (i.e. over 100kB/s), causing fluentd-gcp to
+fail with OutOfMemory errors. Conversely, if the applications aren't generating
+a lot of logs, it may be useful to reduce the amount of resources consumed by
+fluentd-gcp, making these resources available to other applications. To learn
 more about Kubernetes resource requests and limits, see the official
 documentation ([CPU][cpu], [memory][memory]). The amount of resources requested
 by fluentd-gcp on every node in the cluster can be fetched by running following
 command:
 
 ```
-$ kubectl get ds -n kube-system -l k8s-app=fluentd-gcp -o custom-columns=NAME:.metadata.name,CPU_REQUEST:.spec.template.spec.containers[].resources.requests.cpu,MEMORY_REQUEST:.spec.template.spec.containers[].resources.requests.memory,MEMORY_LIMIT:.spec.template.spec.containers[].resources.limits.memory
+$ kubectl get ds -n kube-system -l k8s-app=fluentd-gcp \
+-o custom-columns=NAME:.metadata.name,\
+CPU_REQUEST:.spec.template.spec.containers[].resources.requests.cpu,\
+MEMORY_REQUEST:.spec.template.spec.containers[].resources.requests.memory,\
+MEMORY_LIMIT:.spec.template.spec.containers[].resources.limits.memory
 ```
 
 This will display an output similar to the following:
