@@ -77,8 +77,10 @@ func TestRealHistory_ListControllerRevisions(t *testing.T) {
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
-	sel1 := labels.Set(ss1.Spec.Template.Labels).AsSelector()
-
+	sel1, err := metav1.LabelSelectorAsSelector(ss1.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +174,10 @@ func TestFakeHistory_ListControllerRevisions(t *testing.T) {
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
-	sel1 := labels.Set(ss1.Spec.Template.Labels).AsSelector()
+	sel1, err := metav1.LabelSelectorAsSelector(ss1.Spec.Selector)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1539,6 +1544,7 @@ func TestSortControllerRevisions(t *testing.T) {
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
+
 	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
@@ -1583,13 +1589,15 @@ func TestSortControllerRevisions(t *testing.T) {
 }
 
 func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]string) *apps.StatefulSet {
-	var testLabelKey string
-	var testLabelValue string
-	// Get the first label's key, value to be used for set based selector.
+	// Converting all the map-only selectors to set-based selectors.
+	var testMatchExpressions []metav1.LabelSelectorRequirement
 	for key, value := range labels {
-		testLabelKey = key
-		testLabelValue = value
-		break
+		sel := metav1.LabelSelectorRequirement{
+			Key:      key,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   []string{value},
+		}
+		testMatchExpressions = append(testMatchExpressions, sel)
 	}
 	return &apps.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
@@ -1603,14 +1611,10 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 		},
 		Spec: apps.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      testLabelKey,
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{testLabelValue},
-					},
-				},
+				// Purposely leaving MatchLabels nil, so to ensure it will break if any link
+				// in the chain ignores the set-based MatchExpressions.
+				MatchLabels:      nil,
+				MatchExpressions: testMatchExpressions,
 			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),
 			Template: v1.PodTemplateSpec{

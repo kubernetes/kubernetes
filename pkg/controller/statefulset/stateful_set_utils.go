@@ -312,10 +312,9 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 	if err != nil {
 		return nil, err
 	}
-	podLabels := set.Spec.Template.Labels
 	cr, err := history.NewControllerRevision(set,
 		controllerKind,
-		podLabels,
+		set.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},
 		revision,
 		collisionCount)

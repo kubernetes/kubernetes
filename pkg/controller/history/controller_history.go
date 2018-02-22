@@ -56,17 +56,20 @@ func ControllerRevisionName(prefix string, hash uint32) string {
 }
 
 // NewControllerRevision returns a ControllerRevision with a ControllerRef pointing to parent and indicating that
-// parent is of parentKind. The ControllerRevision has labels matching pod, contains Data equal to data, and
+// parent is of parentKind. The ControllerRevision has labels matching template labels, contains Data equal to data, and
 // has a Revision equal to revision. The collisionCount is used when creating the name of the ControllerRevision
 // so the name is likely unique. If the returned error is nil, the returned ControllerRevision is valid. If the
 // returned error is not nil, the returned ControllerRevision is invalid for use.
 func NewControllerRevision(parent metav1.Object,
 	parentKind schema.GroupVersionKind,
-	podLabels map[string]string,
+	templateLabels map[string]string,
 	data runtime.RawExtension,
 	revision int64,
 	collisionCount *int32) (*apps.ControllerRevision, error) {
-	labelMap := podLabels
+	labelMap := make(map[string]string)
+	for k, v := range templateLabels {
+		labelMap[k] = v
+	}
 	blockOwnerDeletion := true
 	isController := true
 	cr := &apps.ControllerRevision{
