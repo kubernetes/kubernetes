@@ -8,6 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
+	size = "small",
     srcs = ["oidc_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
