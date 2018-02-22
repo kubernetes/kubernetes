@@ -60,7 +60,7 @@ const (
 {{end}}`
 
 	// SectionTipsHelp is the help template section that displays the '--help' hint.
-	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{$rootCmd}} <command> --help" for more information about a given command.
+	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{$rootCmd}} <command> [<subcommand>] --help" for details about a given (sub)command.
 {{end}}`
 
 	// SectionTipsGlobalOptions is the help template section that displays the 'options' hint for displaying global flags.
