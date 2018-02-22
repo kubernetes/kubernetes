@@ -116,6 +116,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
 	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
 	cmd.AddCommand(NewCmdCreateJob(f, out))
+	cmd.AddCommand(NewCmdCreateDaemonset(f, out, errOut))
 	return cmd
 }
 

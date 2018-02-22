@@ -3353,6 +3353,19 @@ run_daemonset_tests() {
   # Clean up
   kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
 
+  ### Create a daemonset
+  kubectl create daemonset test-ds --image=test-image
+  # Post-condition: daemonset exists and has expected values
+  kube::test::get_object_assert 'daemonsets test-ds' "{{$id_field}}" 'test-ds'
+  # Ensure we can interact with daemonsets through extensions and apps endpoints
+  output_message=$(kubectl get daemonset.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
+  output_message=$(kubectl get daemonset.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'apps/v1'
+
+  # Clean up
+  kubectl delete daemonset test-ds "${kube_flags[@]}"
+
   set +o nounset
   set +o errexit
 }

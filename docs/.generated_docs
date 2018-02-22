@@ -181,6 +181,7 @@ docs/man/man1/kubectl-cp.1
 docs/man/man1/kubectl-create-clusterrole.1
 docs/man/man1/kubectl-create-clusterrolebinding.1
 docs/man/man1/kubectl-create-configmap.1
+docs/man/man1/kubectl-create-daemonset.1
 docs/man/man1/kubectl-create-deployment.1
 docs/man/man1/kubectl-create-job.1
 docs/man/man1/kubectl-create-namespace.1
@@ -282,6 +283,7 @@ docs/user-guide/kubectl/kubectl_create.md
 docs/user-guide/kubectl/kubectl_create_clusterrole.md
 docs/user-guide/kubectl/kubectl_create_clusterrolebinding.md
 docs/user-guide/kubectl/kubectl_create_configmap.md
+docs/user-guide/kubectl/kubectl_create_daemonset.md
 docs/user-guide/kubectl/kubectl_create_deployment.md
 docs/user-guide/kubectl/kubectl_create_job.md
 docs/user-guide/kubectl/kubectl_create_namespace.md

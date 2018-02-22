@@ -100,6 +100,7 @@ go_library(
         "clusterrolebinding.go",
         "conditions.go",
         "configmap.go",
+        "daemonset.go",
         "delete.go",
         "deployment.go",
         "doc.go",
