@@ -5108,7 +5108,7 @@ runTests() {
 
   kube::test::clear_all
 
-  if [ ! -z "${foundError}" ]; then
+  if [[ -n "${foundError}" ]]; then
     echo "FAILED TESTS: ""${foundError}"
     exit 1
   fi
