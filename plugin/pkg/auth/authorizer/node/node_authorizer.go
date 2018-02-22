@@ -94,9 +94,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 			return r.authorizeGet(nodeName, configMapVertexType, attrs)
 		case pvcResource:
 			if r.features.Enabled(features.ExpandPersistentVolumes) {
-				if attrs.GetSubresource() == "status" {
-					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
-				}
+				return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
 			}
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:
