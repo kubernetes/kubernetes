@@ -24,6 +24,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -1049,10 +1050,13 @@ func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 // defaultNodeStatusFuncs is a factory that generates the default set of
 // setNodeStatus funcs
 func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
+	var mutex = &sync.Mutex{}
 	// initial set of node status update handlers, can be modified by Option's
 	withoutError := func(f func(*v1.Node)) func(*v1.Node) error {
 		return func(n *v1.Node) error {
+			mutex.Lock()
 			f(n)
+			mutex.Unlock()
 			return nil
 		}
 	}
