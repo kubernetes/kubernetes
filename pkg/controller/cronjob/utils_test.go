@@ -353,7 +353,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		}
 	}
 	{
-		// Case 6: now is way way ahead of last start time, and there is no deadline.
+		// Case 6: now is way ahead of last start time, and there is no deadline.
 		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
@@ -363,7 +363,7 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		}
 	}
 	{
-		// Case 7: now is way way ahead of last start time, but there is a short deadline.
+		// Case 7: now is way ahead of last start time, but there is a short deadline.
 		sj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		sj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
