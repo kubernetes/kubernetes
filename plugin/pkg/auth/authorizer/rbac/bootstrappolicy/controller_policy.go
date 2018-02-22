@@ -324,7 +324,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 			Rules: []rbac.PolicyRule{
@@ -334,7 +334,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			},
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pv-protection-controller"},
 			Rules: []rbac.PolicyRule{

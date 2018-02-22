@@ -36,6 +36,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -51,7 +52,6 @@ type SetLastAppliedOptions struct {
 	ShortOutput      bool
 	CreateAnnotation bool
 	Output           string
-	Codec            runtime.Encoder
 	PatchBufferList  []PatchBuffer
 	Factory          cmdutil.Factory
 	Out              io.Writer
@@ -110,7 +110,6 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ShortOutput = o.Output == "name"
-	o.Codec = f.JSONEncoder()
 
 	var err error
 	o.Mapper, o.Typer = f.Object()
@@ -134,7 +133,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 		if err != nil {
 			return err
 		}
-		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, o.Codec)
+		patchBuf, diffBuf, patchType, err := editor.GetApplyPatch(info.Object, scheme.DefaultJSONEncoder())
 		if err != nil {
 			return err
 		}
@@ -186,16 +185,16 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 
 			if len(o.Output) > 0 && !o.ShortOutput {
 				info.Refresh(patchedObj, false)
-				return f.PrintResourceInfoForCommand(cmd, info, o.Out)
+				return cmdutil.PrintObject(cmd, info.Object, o.Out)
 			}
-			f.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 
 		} else {
 			err := o.formatPrinter(o.Output, patch.Patch, o.Out)
 			if err != nil {
 				return err
 			}
-			f.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
+			cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "configured")
 		}
 	}
 	return nil
@@ -224,7 +223,7 @@ func (o *SetLastAppliedOptions) getPatch(info *resource.Info) ([]byte, []byte, e
 	objMap := map[string]map[string]map[string]string{}
 	metadataMap := map[string]map[string]string{}
 	annotationsMap := map[string]string{}
-	localFile, err := runtime.Encode(o.Codec, info.Object)
+	localFile, err := runtime.Encode(scheme.DefaultJSONEncoder(), info.Object)
 	if err != nil {
 		return nil, localFile, err
 	}

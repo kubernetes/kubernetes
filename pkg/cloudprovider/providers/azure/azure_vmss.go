@@ -39,7 +39,8 @@ var (
 	// ErrorNotVmssInstance indicates an instance is not belongint to any vmss.
 	ErrorNotVmssInstance = errors.New("not a vmss instance")
 
-	scaleSetNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
+	scaleSetNameRE        = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachineScaleSets/(.+)/virtualMachines(?:.*)`)
+	vmssMachineIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s"
 )
 
 // scaleSet implements VMSet interface for Azure scale set.
@@ -139,14 +140,18 @@ func (ss *scaleSet) getVmssVMByInstanceID(scaleSetName, instanceID string) (vm c
 // It must return ("", cloudprovider.InstanceNotFound) if the instance does
 // not exist or is no longer running.
 func (ss *scaleSet) GetInstanceIDByNodeName(name string) (string, error) {
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name)
+	if err != nil {
+		glog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
+		return "", err
+	}
+	if managedByAS {
+		// vm is managed by availability set.
+		return ss.availabilitySet.GetInstanceIDByNodeName(name)
+	}
+
 	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(4).Infof("GetInstanceIDByNodeName: node %q is managed by availability set", name)
-			// Retry with standard type because nodes are not managed by vmss.
-			return ss.availabilitySet.GetInstanceIDByNodeName(name)
-		}
-
 		return "", err
 	}
 
@@ -183,14 +188,18 @@ func (ss *scaleSet) GetNodeNameByProviderID(providerID string) (types.NodeName, 
 
 // GetInstanceTypeByNodeName gets the instance type by node name.
 func (ss *scaleSet) GetInstanceTypeByNodeName(name string) (string, error) {
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name)
+	if err != nil {
+		glog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
+		return "", err
+	}
+	if managedByAS {
+		// vm is managed by availability set.
+		return ss.availabilitySet.GetInstanceTypeByNodeName(name)
+	}
+
 	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(4).Infof("GetInstanceTypeByNodeName: node %q is managed by availability set", name)
-			// Retry with standard type because nodes are not managed by vmss.
-			return ss.availabilitySet.GetInstanceTypeByNodeName(name)
-		}
-
 		return "", err
 	}
 
@@ -203,14 +212,18 @@ func (ss *scaleSet) GetInstanceTypeByNodeName(name string) (string, error) {
 
 // GetZoneByNodeName gets cloudprovider.Zone by node name.
 func (ss *scaleSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name)
+	if err != nil {
+		glog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
+		return cloudprovider.Zone{}, err
+	}
+	if managedByAS {
+		// vm is managed by availability set.
+		return ss.availabilitySet.GetZoneByNodeName(name)
+	}
+
 	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(4).Infof("GetZoneByNodeName: node %q is managed by availability set", name)
-			// Retry with standard type because nodes are not managed by vmss.
-			return ss.availabilitySet.GetZoneByNodeName(name)
-		}
-
 		return cloudprovider.Zone{}, err
 	}
 
@@ -325,7 +338,7 @@ func (ss *scaleSet) listScaleSetVMs(scaleSetName string) ([]computepreview.Virtu
 	return allVMs, nil
 }
 
-// getAgentPoolScaleSets lists the virtual machines for for the resource group and then builds
+// getAgentPoolScaleSets lists the virtual machines for the resource group and then builds
 // a list of scale sets that match the nodes available to k8s.
 func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
 	agentPoolScaleSets := &[]string{}
@@ -403,15 +416,19 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 
 // GetPrimaryInterface gets machine primary network interface by node name and vmSet.
 func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(nodeName)
+	if err != nil {
+		glog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
+		return network.Interface{}, err
+	}
+	if managedByAS {
+		// vm is managed by availability set.
+		return ss.availabilitySet.GetPrimaryInterface(nodeName, "")
+	}
+
 	ssName, instanceID, vm, err := ss.getVmssVM(nodeName)
 	if err != nil {
-		if err == ErrorNotVmssInstance {
-			glog.V(4).Infof("GetPrimaryInterface: node %q is managed by availability set", nodeName)
-			// Retry with standard type because nodes are not managed by vmss.
-			return ss.availabilitySet.GetPrimaryInterface(nodeName, "")
-		}
-
-		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.getCachedVirtualMachine(%s), err=%v", nodeName, nodeName, err)
+		glog.Errorf("error: ss.GetPrimaryInterface(%s), ss.getVmssVM(%s), err=%v", nodeName, nodeName, err)
 		return network.Interface{}, err
 	}
 
@@ -734,4 +751,14 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
 	}
 
 	return nil
+}
+
+// getVmssMachineID returns the full identifier of a vmss virtual machine.
+func (az *Cloud) getVmssMachineID(scaleSetName, instanceID string) string {
+	return fmt.Sprintf(
+		vmssMachineIDTemplate,
+		az.SubscriptionID,
+		az.ResourceGroup,
+		scaleSetName,
+		instanceID)
 }

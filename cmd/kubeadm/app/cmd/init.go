@@ -38,6 +38,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -46,7 +47,6 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -61,7 +61,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -83,7 +82,7 @@ var (
 		You can now join any number of machines by running the following on each node
 		as root:
 
-		  kubeadm join --token {{.Token}} {{.MasterHostPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
+		  {{.joinCommand}}
 
 		`)))
 
@@ -117,7 +116,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipTokenPrint bool
 	var dryRun bool
 	var featureGatesString string
-	var criSocket string
 	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
@@ -136,7 +134,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun, criSocket)
+			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
@@ -144,7 +142,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &criSocket, &ignorePreflightErrors)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
 
 	return cmd
 }
@@ -195,6 +193,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
 		"The duration before the bootstrap token is automatically deleted. If set to '0', the token will never expire.",
 	)
+	flagSet.StringVar(
+		&cfg.CRISocket, "cri-socket", cfg.CRISocket,
+		`Specify the CRI socket to connect to.`,
+	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 
@@ -204,7 +206,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, criSocket *string, ignorePreflightErrors *[]string) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -229,14 +231,10 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		dryRun, "dry-run", *dryRun,
 		"Don't apply any changes; just output what would be done.",
 	)
-	flagSet.StringVar(
-		criSocket, "cri-socket", "/var/run/dockershim.sock",
-		`Specify the CRI socket to connect to.`,
-	)
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -269,7 +267,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 
 	fmt.Println("[preflight] Running pre-flight checks.")
 
-	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, ignorePreflightErrors); err != nil {
+	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
@@ -468,26 +466,15 @@ func (i *Init) Run(out io.Writer) error {
 		return nil
 	}
 
-	// Load the CA certificate from so we can pin its public key
-	caCert, err := pkiutil.TryLoadCertFromDisk(i.cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	// Gets the join command
+	joinCommand, err := cmdutil.GetJoinCommand(kubeadmconstants.GetAdminKubeConfigPath(), i.cfg.Token, i.skipTokenPrint)
 	if err != nil {
-		return fmt.Errorf("error loading ca cert from disk: %v", err)
-	}
-
-	// Generate the Master host/port pair used by initDoneTempl
-	masterHostPort, err := kubeadmutil.GetMasterHostPort(i.cfg)
-	if err != nil {
-		return fmt.Errorf("error getting master host port: %v", err)
+		return fmt.Errorf("failed to get join command: %v", err)
 	}
 
 	ctx := map[string]string{
 		"KubeConfigPath": adminKubeConfigPath,
-		"Token":          i.cfg.Token,
-		"CAPubKeyPin":    pubkeypin.Hash(caCert),
-		"MasterHostPort": masterHostPort,
-	}
-	if i.skipTokenPrint {
-		ctx["Token"] = "<value withheld>"
+		"joinCommand":    joinCommand,
 	}
 
 	return initDoneTempl.Execute(out, ctx)

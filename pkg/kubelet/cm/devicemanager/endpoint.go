@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 )
 
 // endpoint maps to a single registered device plugin. It is responsible
@@ -36,6 +36,7 @@ type endpoint interface {
 	run()
 	stop()
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
+	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
 	getDevices() []pluginapi.Device
 	callback(resourceName string, added, updated, deleted []pluginapi.Device)
 }
@@ -178,6 +179,15 @@ func (e *endpointImpl) run() {
 // allocate issues Allocate gRPC call to the device plugin.
 func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
+		DevicesIDs: devs,
+	})
+}
+
+// preStartContainer issues PreStartContainer gRPC call to the device plugin.
+func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
+	defer cancel()
+	return e.client.PreStartContainer(ctx, &pluginapi.PreStartContainerRequest{
 		DevicesIDs: devs,
 	})
 }

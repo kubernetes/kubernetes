@@ -46,6 +46,7 @@ RUNTIME_CONFIG=""
 ETCDCTL=$(which etcdctl)
 KUBECTL="${KUBE_OUTPUT_HOSTBIN}/kubectl"
 UPDATE_ETCD_OBJECTS_SCRIPT="${KUBE_ROOT}/cluster/update-storage-objects.sh"
+DISABLE_ADMISSION_PLUGINS="ServiceAccount,NamespaceLifecycle,LimitRanger,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PersistentVolumeLabel,DefaultStorageClass"
 
 function startApiServer() {
   local storage_versions=${1:-""}
@@ -64,6 +65,7 @@ function startApiServer() {
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --etcd-prefix="/${ETCD_PREFIX}" \
     --runtime-config="${RUNTIME_CONFIG}" \
+    --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
     --storage-versions="${storage_versions}" \

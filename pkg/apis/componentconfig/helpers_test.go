@@ -25,7 +25,7 @@ import (
 
 func TestIPVar(t *testing.T) {
 	defaultIP := "0.0.0.0"
-	cases := []struct {
+	testCases := []struct {
 		argc      string
 		expectErr bool
 		expectVal string
@@ -41,7 +41,7 @@ func TestIPVar(t *testing.T) {
 			expectVal: defaultIP,
 		},
 	}
-	for _, c := range cases {
+	for _, tc := range testCases {
 		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
 		ip := defaultIP
 		fs.Var(IPVar{&ip}, "ip", "the ip")
@@ -53,19 +53,113 @@ func TestIPVar(t *testing.T) {
 					err = r.(error)
 				}
 			}()
-			fs.Parse(strings.Split(c.argc, " "))
+			fs.Parse(strings.Split(tc.argc, " "))
 		}()
 
-		if c.expectErr && err == nil {
+		if tc.expectErr && err == nil {
 			t.Errorf("did not observe an expected error")
 			continue
 		}
-		if !c.expectErr && err != nil {
-			t.Errorf("observed an unexpected error")
+		if !tc.expectErr && err != nil {
+			t.Errorf("observed an unexpected error: %v", err)
 			continue
 		}
-		if c.expectVal != ip {
-			t.Errorf("unexpected ip: expected %q, saw %q", c.expectVal, ip)
+		if tc.expectVal != ip {
+			t.Errorf("unexpected ip: expected %q, saw %q", tc.expectVal, ip)
+		}
+	}
+}
+
+func TestIPPortVar(t *testing.T) {
+	defaultIPPort := "0.0.0.0:8080"
+	testCases := []struct {
+		desc      string
+		argc      string
+		expectErr bool
+		expectVal string
+	}{
+
+		{
+			desc:      "valid ipv4 1",
+			argc:      "blah --ipport=0.0.0.0",
+			expectVal: "0.0.0.0",
+		},
+		{
+			desc:      "valid ipv4 2",
+			argc:      "blah --ipport=127.0.0.1",
+			expectVal: "127.0.0.1",
+		},
+
+		{
+			desc:      "invalid IP",
+			argc:      "blah --ipport=invalidip",
+			expectErr: true,
+			expectVal: defaultIPPort,
+		},
+		{
+			desc:      "valid ipv4 with port",
+			argc:      "blah --ipport=0.0.0.0:8080",
+			expectVal: "0.0.0.0:8080",
+		},
+		{
+			desc:      "invalid ipv4 with invalid port",
+			argc:      "blah --ipport=0.0.0.0:invalidport",
+			expectErr: true,
+			expectVal: defaultIPPort,
+		},
+		{
+			desc:      "invalid IP with port",
+			argc:      "blah --ipport=invalidip:8080",
+			expectErr: true,
+			expectVal: defaultIPPort,
+		},
+		{
+			desc:      "valid ipv6 1",
+			argc:      "blah --ipport=::1",
+			expectVal: "::1",
+		},
+		{
+			desc:      "valid ipv6 2",
+			argc:      "blah --ipport=::",
+			expectVal: "::",
+		},
+		{
+			desc:      "valid ipv6 with port",
+			argc:      "blah --ipport=[::1]:8080",
+			expectVal: "[::1]:8080",
+		},
+		{
+			desc:      "invalid ipv6 with port without bracket",
+			argc:      "blah --ipport=fd00:f00d:600d:f00d:8080",
+			expectErr: true,
+			expectVal: defaultIPPort,
+		},
+	}
+	for _, tc := range testCases {
+		fs := pflag.NewFlagSet("blah", pflag.PanicOnError)
+		ipport := defaultIPPort
+		fs.Var(IPPortVar{&ipport}, "ipport", "the ip:port")
+
+		var err error
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					err = r.(error)
+				}
+			}()
+			fs.Parse(strings.Split(tc.argc, " "))
+		}()
+
+		if tc.expectErr && err == nil {
+			t.Errorf("%q: Did not observe an expected error", tc.desc)
+			continue
+		}
+		if !tc.expectErr && err != nil {
+			t.Errorf("%q: Observed an unexpected error: %v", tc.desc, err)
+			continue
+		}
+		if tc.expectVal != ipport {
+			t.Errorf("%q: Unexpected ipport: expected %q, saw %q", tc.desc, tc.expectVal, ipport)
 		}
 	}
 }

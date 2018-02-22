@@ -27,8 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestValidateLabels(t *testing.T) {
@@ -319,8 +321,7 @@ func TestLabelErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.Namespace = "test"
 		tf.ClientConfig = defaultClientConfig()
 
@@ -343,9 +344,6 @@ func TestLabelErrors(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
 		}
-		if tf.Printer.(*testPrinter).Objects != nil {
-			t.Errorf("unexpected print to default printer")
-		}
 		if buf.Len() > 0 {
 			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
 		}
@@ -354,7 +352,9 @@ func TestLabelErrors(t *testing.T) {
 
 func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -404,7 +404,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 }
 
 func TestLabelLocal(t *testing.T) {
-	f, tf, _, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -437,7 +437,9 @@ func TestLabelLocal(t *testing.T) {
 
 func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

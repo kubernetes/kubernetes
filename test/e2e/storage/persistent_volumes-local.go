@@ -141,7 +141,7 @@ var (
 		Level: "s0:c0,c1"}
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
 
 	var (
@@ -680,8 +680,8 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 		},
 		NamePrefix:       "local-pv",
 		StorageClassName: config.scName,
-		NodeAffinity: &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+		NodeAffinity: &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{
 					{
 						MatchExpressions: []v1.NodeSelectorRequirement{

@@ -851,7 +851,7 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 }
 
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, criSocket string, ignorePreflightErrors sets.String) error {
+func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -869,7 +869,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		SystemVerificationCheck{CRISocket: criSocket},
+		SystemVerificationCheck{CRISocket: cfg.CRISocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
 		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion, exec: execer},
@@ -949,7 +949,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, criSocket string, ignorePreflightErrors sets.String) error {
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -966,7 +966,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 	useCRI := len(warns) == 0
 
 	checks := []Checker{
-		SystemVerificationCheck{CRISocket: criSocket},
+		SystemVerificationCheck{CRISocket: cfg.CRISocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
 		KubeletVersionCheck{exec: execer},
@@ -978,7 +978,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
 	if useCRI {
-		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
+		checks = append(checks, CRICheck{socket: cfg.CRISocket, exec: execer})
 	} else {
 		// assume docker
 		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})

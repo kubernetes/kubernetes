@@ -170,7 +170,7 @@ message Binding {
   optional ObjectReference target = 2;
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 message CSIPersistentVolumeSource {
   // Driver is the name of the driver to use for this volume.
   // Required.
@@ -2528,7 +2528,7 @@ message PersistentVolumeSource {
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
-  // CSI represents storage that handled by an external CSI driver
+  // CSI represents storage that handled by an external CSI driver (Beta feature).
   // +optional
   optional CSIPersistentVolumeSource csi = 22;
 }
@@ -2578,6 +2578,11 @@ message PersistentVolumeSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 8;
+
+  // NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+  // This field influences the scheduling of pods that use this volume.
+  // +optional
+  optional VolumeNodeAffinity nodeAffinity = 9;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -3077,6 +3082,16 @@ message PodSpec {
   // +k8s:conversion-gen=false
   // +optional
   optional bool hostIPC = 13;
+
+  // Share a single process namespace between all of the containers in a pod.
+  // When this is set containers will be able to view and signal processes from other containers
+  // in the same pod, and the first process in each container will not be assigned PID 1.
+  // HostPID and ShareProcessNamespace cannot both be set.
+  // Optional: Default to false.
+  // This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+  // +k8s:conversion-gen=false
+  // +optional
+  optional bool shareProcessNamespace = 27;
 
   // SecurityContext holds pod-level security attributes and common container settings.
   // Optional: Defaults to empty.  See type description for default values of each field.
@@ -4455,6 +4470,12 @@ message VolumeMount {
   // release.
   // +optional
   optional string mountPropagation = 5;
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+message VolumeNodeAffinity {
+  // Required specifies hard node constraints that must be met.
+  optional NodeSelector required = 1;
 }
 
 // Projection that may be projected along with other supported volume types

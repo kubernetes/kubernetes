@@ -62,7 +62,6 @@ type EditOptions struct {
 
 	ResourceMapper *resource.Mapper
 	OriginalResult *resource.Result
-	Encoder        runtime.Encoder
 
 	EditMode EditMode
 
@@ -137,7 +136,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 	}
 
 	o.CmdNamespace = cmdNamespace
-	o.Encoder = f.JSONEncoder()
 	o.f = f
 
 	// Set up writer
@@ -394,25 +392,25 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalJS, err := encodeToJson(o.Encoder, originalInfo.Object)
+		originalJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), originalInfo.Object)
 		if err != nil {
 			return err
 		}
 
-		editedJS, err := encodeToJson(o.Encoder, info.Object)
+		editedJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		if err != nil {
 			return err
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
-			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "skipped")
 			return nil
 		} else {
 			err := o.annotationPatch(info)
 			if err != nil {
 				return err
 			}
-			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "edited")
 			return nil
 		}
 	})
@@ -420,7 +418,7 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 }
 
 func (o *EditOptions) annotationPatch(update *resource.Info) error {
-	patch, _, patchType, err := GetApplyPatch(update.Object, o.Encoder)
+	patch, _, patchType, err := GetApplyPatch(update.Object, cmdutil.InternalVersionJSONEncoder())
 	if err != nil {
 		return err
 	}
@@ -519,19 +517,19 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return fmt.Errorf("no original object found for %#v", info.Object)
 		}
 
-		originalJS, err := encodeToJson(o.Encoder, originalInfo.Object)
+		originalJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), originalInfo.Object)
 		if err != nil {
 			return err
 		}
 
-		editedJS, err := encodeToJson(o.Encoder, info.Object)
+		editedJS, err := encodeToJson(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		if err != nil {
 			return err
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "skipped")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "skipped")
 			return nil
 		}
 
@@ -585,7 +583,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return nil
 		}
 		info.Refresh(patched, true)
-		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "edited")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "edited")
 		return nil
 	})
 	return err
@@ -596,7 +594,7 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		o.f.PrintSuccess(false, o.Out, info.Mapping.Resource, info.Name, false, "created")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "created")
 		return nil
 	})
 	return err
@@ -607,7 +605,7 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
 		if o.ApplyAnnotation {
-			if err := kubectl.CreateOrUpdateAnnotation(true, info, o.Encoder); err != nil {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 				return err
 			}
 		}

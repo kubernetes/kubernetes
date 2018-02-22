@@ -241,8 +241,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 
-	encoder := f.JSONEncoder()
-	decoder := f.Decoder(false)
+	encoder := scheme.DefaultJSONEncoder()
+	deserializer := scheme.Codecs.UniversalDeserializer()
 	mapper := r.Mapper().RESTMapper
 
 	visitedUids := sets.NewString()
@@ -298,9 +298,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			count++
 			if len(output) > 0 && !shortOutput {
-				return f.PrintResourceInfoForCommand(cmd, info, out)
+				return cmdutil.PrintObject(cmd, info.Object, out)
 			}
-			f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
+			cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "created")
 			return nil
 		}
 
@@ -316,7 +316,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &patcher{
 				encoder:       encoder,
-				decoder:       decoder,
+				decoder:       deserializer,
 				mapping:       info.Mapping,
 				helper:        helper,
 				clientFunc:    f.UnstructuredClientForMapping,
@@ -345,15 +345,15 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if string(patchBytes) == "{}" {
 				count++
-				f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, false, "unchanged")
+				cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "unchanged")
 				return nil
 			}
 		}
 		count++
 		if len(output) > 0 && !shortOutput {
-			return f.PrintResourceInfoForCommand(cmd, info, out)
+			return cmdutil.PrintObject(cmd, info.Object, out)
 		}
-		f.PrintSuccess(shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
+		cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "configured")
 		return nil
 	})
 
@@ -520,7 +520,7 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 				return err
 			}
 		}
-		f.PrintSuccess(shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
+		cmdutil.PrintSuccess(shortOutput, p.out, obj, p.dryRun, "pruned")
 	}
 	return nil
 }

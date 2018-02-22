@@ -23,7 +23,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestExtraArgsFail(t *testing.T) {
@@ -31,7 +33,7 @@ func TestExtraArgsFail(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	f, _, _, _ := cmdtesting.NewAPIFactory()
+	f, _ := cmdtesting.NewAPIFactory()
 	c := NewCmdCreate(f, buf, errBuf)
 	options := CreateOptions{}
 	if options.ValidateArgs(c, []string{"rc"}) == nil {
@@ -44,8 +46,9 @@ func TestCreateObject(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "redis-master-controller"
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -69,7 +72,7 @@ func TestCreateObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "replicationcontrollers/redis-master-controller\n" {
+	if buf.String() != "replicationcontroller/redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -78,8 +81,9 @@ func TestCreateMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -106,7 +110,7 @@ func TestCreateMultipleObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// Names should come from the REST response, NOT the files
-	if buf.String() != "replicationcontrollers/rc1\nservices/baz\n" {
+	if buf.String() != "replicationcontroller/rc1\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -116,8 +120,9 @@ func TestCreateDirectory(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "name"
 
-	f, tf, codec, _ := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -140,7 +145,7 @@ func TestCreateDirectory(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "replicationcontrollers/name\nreplicationcontrollers/name\nreplicationcontrollers/name\n" {
+	if buf.String() != "replicationcontroller/name\nreplicationcontroller/name\nreplicationcontroller/name\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

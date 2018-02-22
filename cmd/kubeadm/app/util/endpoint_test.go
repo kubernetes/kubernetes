@@ -30,6 +30,40 @@ func TestGetMasterEndpoint(t *testing.T) {
 		expected bool
 	}{
 		{
+			name: "bad controlplane endpooint dns",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "bad!!cp.k8s.io",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:1234",
+			expected: false,
+		},
+		{
+			name: "both DNS and IP passed",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress:     "1.2.3.4",
+					ControlPlaneEndpoint: "cp.k8s.io",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:1234",
+			expected: true,
+		},
+		{
+			name: "valid DNS endpoint",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "cp.k8s.io",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:1234",
+			expected: true,
+		},
+		{
 			name: "valid IPv4 endpoint",
 			cfg: &kubeadmapi.MasterConfiguration{
 				API: kubeadmapi.API{

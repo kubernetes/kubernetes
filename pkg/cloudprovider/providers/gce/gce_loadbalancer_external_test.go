@@ -18,6 +18,7 @@ package gce
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -261,13 +262,16 @@ var apiService = &v1.Service{
 	},
 }
 
-func fakeGCECloud() (*GCECloud, error) {
-	client, err := newOauthClient(nil)
-	if err != nil {
-		return nil, err
-	}
+type fakeRoundTripper struct{}
 
-	service, err := compute.New(client)
+func (*fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("err: test used fake http client")
+}
+
+func fakeGCECloud() (*GCECloud, error) {
+	c := &http.Client{Transport: &fakeRoundTripper{}}
+
+	service, err := compute.New(c)
 	if err != nil {
 		return nil, err
 	}

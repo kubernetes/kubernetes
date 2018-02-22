@@ -222,7 +222,7 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
-	if len(thresholds) == 0 {
+	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 		return nil
 	}
 

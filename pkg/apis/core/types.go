@@ -391,7 +391,7 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
-	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver
+	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Beta feature).
 	// +optional
 	CSI *CSIPersistentVolumeSource
 }
@@ -467,6 +467,16 @@ type PersistentVolumeSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
+	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+	// This field influences the scheduling of pods that use this volume.
+	// +optional
+	NodeAffinity *VolumeNodeAffinity
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+type VolumeNodeAffinity struct {
+	// Required specifies hard node constraints that must be met.
+	Required *NodeSelector
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
@@ -1603,7 +1613,7 @@ type LocalVolumeSource struct {
 	Path string
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 type CSIPersistentVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	// Required.
@@ -2634,6 +2644,15 @@ type PodSecurityContext struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool
+	// Share a single process namespace between all of the containers in a pod.
+	// When this is set containers will be able to view and signal processes from other containers
+	// in the same pod, and the first process in each container will not be assigned PID 1.
+	// HostPID and ShareProcessNamespace cannot both be set.
+	// Optional: Default to false.
+	// This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+	// +k8s:conversion-gen=false
+	// +optional
+	ShareProcessNamespace *bool
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in
@@ -4202,6 +4221,8 @@ const (
 	// HugePages request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// As burst is not supported for HugePages, we would only quota its request, and ignore the limit.
 	ResourceRequestsHugePagesPrefix = "requests.hugepages-"
+	// Default resource requests prefix
+	DefaultResourceRequestsPrefix = "requests."
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota

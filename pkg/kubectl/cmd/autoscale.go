@@ -143,7 +143,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
 		hpa, err := resourceMapper.InfoForObject(object, nil)
 		if err != nil {
@@ -156,10 +156,10 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			object = hpa.Object
 		}
 		if cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return cmdutil.PrintObject(cmd, object, out)
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 
@@ -170,10 +170,10 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 		count++
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return f.PrintObject(cmd, false, mapper, object, out)
+			return cmdutil.PrintObject(cmd, object, out)
 		}
 
-		f.PrintSuccess(false, out, info.Mapping.Resource, info.Name, cmdutil.GetDryRunFlag(cmd), "autoscaled")
+		cmdutil.PrintSuccess(false, out, info.Object, cmdutil.GetDryRunFlag(cmd), "autoscaled")
 		return nil
 	})
 	if err != nil {

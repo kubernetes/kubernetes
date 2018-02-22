@@ -41,6 +41,7 @@ const (
 )
 
 var classGold string = "gold"
+var extendedResourceName string = "example.com/dongle"
 
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
@@ -368,9 +369,12 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		By("Creating a Pod that fits quota")
 		podName := "test-pod"
 		requests := v1.ResourceList{}
+		limits := v1.ResourceList{}
 		requests[v1.ResourceCPU] = resource.MustParse("500m")
 		requests[v1.ResourceMemory] = resource.MustParse("252Mi")
-		pod := newTestPodForQuota(f, podName, requests, v1.ResourceList{})
+		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		pod := newTestPodForQuota(f, podName, requests, limits)
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 		podToUpdate := pod
@@ -380,6 +384,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourcePods] = resource.MustParse("1")
 		usedResources[v1.ResourceCPU] = requests[v1.ResourceCPU]
 		usedResources[v1.ResourceMemory] = requests[v1.ResourceMemory]
+		usedResources[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = requests[v1.ResourceName(extendedResourceName)]
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -388,6 +393,17 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceCPU] = resource.MustParse("600m")
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).To(HaveOccurred())
+
+		By("Not allowing a pod to be created that exceeds remaining quota(validation on extended resources)")
+		requests = v1.ResourceList{}
+		limits = v1.ResourceList{}
+		requests[v1.ResourceCPU] = resource.MustParse("500m")
+		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
+		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
+		pod = newTestPodForQuota(f, "fail-pod-for-extended-resource", requests, limits)
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
@@ -413,6 +429,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourcePods] = resource.MustParse("0")
 		usedResources[v1.ResourceCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceMemory] = resource.MustParse("0")
+		usedResources[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = resource.MustParse("0")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -833,6 +850,8 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("10Gi")
 	// test quota on discovered resource type
 	hard[v1.ResourceName("count/replicasets.extensions")] = resource.MustParse("5")
+	// test quota on extended resource
+	hard[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = resource.MustParse("3")
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard},

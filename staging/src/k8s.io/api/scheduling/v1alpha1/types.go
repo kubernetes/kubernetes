@@ -39,6 +39,9 @@ type PriorityClass struct {
 
 	// globalDefault specifies whether this PriorityClass should be considered as
 	// the default priority for pods that do not have any priority class.
+	// Only one PriorityClass can be marked as `globalDefault`. However, if more than
+	// one PriorityClasses exists with their `globalDefault` field set to true,
+	// the smallest value of such global default PriorityClasses will be used as the default priority.
 	// +optional
 	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"bytes,3,opt,name=globalDefault"`
 

@@ -26,6 +26,7 @@ import (
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -73,7 +74,9 @@ func Test_generatorFromName(t *testing.T) {
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -84,7 +87,6 @@ func TestCreateDeployment(t *testing.T) {
 		}),
 	}
 	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -93,7 +95,7 @@ func TestCreateDeployment(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
 	cmd.Run(cmd, []string{depName})
-	expectedOutput := "deployments/" + depName + "\n"
+	expectedOutput := "deployment.extensions/" + depName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
@@ -101,7 +103,9 @@ func TestCreateDeployment(t *testing.T) {
 
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -112,7 +116,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 		}),
 	}
 	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 
 	buf := bytes.NewBuffer([]byte{})

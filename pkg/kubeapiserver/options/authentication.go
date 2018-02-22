@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -61,6 +62,7 @@ type OIDCAuthenticationOptions struct {
 	UsernamePrefix string
 	GroupsClaim    string
 	GroupsPrefix   string
+	SigningAlgs    []string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -70,6 +72,7 @@ type PasswordFileAuthenticationOptions struct {
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles []string
 	Lookup   bool
+	Issuer   string
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -156,6 +159,12 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
 	}
 
+	if s.ServiceAccounts != nil && len(s.ServiceAccounts.Issuer) > 0 && strings.Contains(s.ServiceAccounts.Issuer, ":") {
+		if _, err := url.Parse(s.ServiceAccounts.Issuer); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
+		}
+	}
+
 	return allErrors
 }
 
@@ -208,6 +217,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"If provided, all groups will be prefixed with this value to prevent conflicts with "+
 			"other authentication strategies.")
 
+		fs.StringSliceVar(&s.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
+			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
+			"'alg' header value not in this list will be rejected. "+
+			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 	}
 
 	if s.PasswordFile != nil {
@@ -228,6 +241,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.BoolVar(&s.ServiceAccounts.Lookup, "service-account-lookup", s.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
+
+		fs.StringVar(&s.ServiceAccounts.Issuer, "service-account-issuer", s.ServiceAccounts.Issuer, ""+
+			"Identifier of the service account token issuer. The issuer will assert this identifier "+
+			"in \"iss\" claim of issued tokens. This value is a string or URI.")
 	}
 
 	if s.TokenFile != nil {
@@ -272,6 +289,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCIssuerURL = s.OIDC.IssuerURL
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
+		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
 	}
 
 	if s.PasswordFile != nil {

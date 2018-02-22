@@ -548,5 +548,10 @@ func getAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error
 		}
 	}
 
+	// add api server dns advertise address
+	if len(cfg.API.ControlPlaneEndpoint) > 0 {
+		altNames.DNSNames = append(altNames.DNSNames, cfg.API.ControlPlaneEndpoint)
+	}
+
 	return altNames, nil
 }

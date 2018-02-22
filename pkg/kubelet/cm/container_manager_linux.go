@@ -601,8 +601,10 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	opts := &kubecontainer.RunContainerOptions{}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
-	devOpts := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
-	if devOpts == nil {
+	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
+	if err != nil {
+		return nil, err
+	} else if devOpts == nil {
 		return opts, nil
 	}
 	opts.Devices = append(opts.Devices, devOpts.Devices...)

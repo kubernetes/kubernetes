@@ -268,6 +268,13 @@ func getCurrentCertificateOrBootstrap(
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
 	bootstrapCert.Leaf = certs[0]
+
+	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {
+		utilruntime.HandleError(fmt.Errorf("Unable to set the cert/key pair to the bootstrap certificate: %v", err))
+	} else {
+		glog.V(4).Infof("Updated the store to contain the initial bootstrap certificate")
+	}
+
 	return &bootstrapCert, true, nil
 }
 

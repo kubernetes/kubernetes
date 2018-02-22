@@ -207,7 +207,8 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Recorder: eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
+				Recorder:     eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
+				VolumeBinder: volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 			},
 		}
 
@@ -555,6 +556,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 			Recorder:            &record.FakeRecorder{},
 			PodConditionUpdater: fakePodConditionUpdater{},
 			PodPreemptor:        fakePodPreemptor{},
+			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 		},
 	}
 
@@ -604,6 +606,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			PodConditionUpdater: fakePodConditionUpdater{},
 			PodPreemptor:        fakePodPreemptor{},
 			StopEverything:      stop,
+			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 		},
 	}
 

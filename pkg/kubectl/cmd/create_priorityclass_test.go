@@ -25,12 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreatePriorityClass(t *testing.T) {
 	pcName := "my-pc"
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1alpha1"},
 		NegotiatedSerializer: ns,
@@ -42,7 +45,6 @@ func TestCreatePriorityClass(t *testing.T) {
 		}),
 	}
 	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreatePriorityClass(f, buf)
@@ -52,7 +54,7 @@ func TestCreatePriorityClass(t *testing.T) {
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
 	CreatePriorityClass(f, buf, cmd, []string{pcName})
-	expectedOutput := "priorityclasses/" + pcName + "\n"
+	expectedOutput := "priorityclass.scheduling.k8s.io/" + pcName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

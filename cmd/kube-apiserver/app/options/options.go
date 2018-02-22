@@ -71,6 +71,8 @@ type ServerRunOptions struct {
 
 	MasterCount            int
 	EndpointReconcilerType string
+
+	ServiceAccountSigningKeyFile string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -230,5 +232,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
+
+	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
+		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Ignored unless alpha TokenRequest is enabled")
 
 }

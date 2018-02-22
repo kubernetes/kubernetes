@@ -68,7 +68,7 @@ func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration)
 		for _, node := range nodeList.Items {
 			// cadvisor is not accessible directly unless its port (4194 by default) is exposed.
 			// Here, we access '/stats/' REST endpoint on the kubelet which polls cadvisor internally.
-			statsResource := fmt.Sprintf("api/v1/proxy/nodes/%s/stats/", node.Name)
+			statsResource := fmt.Sprintf("api/v1/nodes/%s/proxy/stats/", node.Name)
 			By(fmt.Sprintf("Querying stats from node %s using url %s", node.Name, statsResource))
 			_, err = c.CoreV1().RESTClient().Get().AbsPath(statsResource).Timeout(timeout).Do().Raw()
 			if err != nil {

@@ -67,6 +67,9 @@ type MasterConfiguration struct {
 	// TokenTTL is a ttl for Token. Defaults to 24h.
 	TokenTTL *metav1.Duration
 
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string
+
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
 	// TODO: This is temporary and ideally we would like to switch all components to
@@ -121,8 +124,10 @@ type MasterConfiguration struct {
 
 // API struct contains elements of API server address.
 type API struct {
-	// AdvertiseAddress sets the address for the API server to advertise.
+	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
+	// ControlPlaneEndpoint sets the DNS address for the API server
+	ControlPlaneEndpoint string
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32
@@ -217,6 +222,8 @@ type NodeConfiguration struct {
 	TLSBootstrapToken string
 	// Token is used for both discovery and TLS bootstrapping.
 	Token string
+	// CRISocket is used to retrieve container runtime info.
+	CRISocket string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery

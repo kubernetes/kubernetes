@@ -207,12 +207,17 @@ func getStableKey(pod *v1.Pod, container *v1.Container) string {
 
 // buildContainerLogsPath builds log path for container relative to pod logs directory.
 func buildContainerLogsPath(containerName string, restartCount int) string {
-	return fmt.Sprintf("%s_%d.log", containerName, restartCount)
+	return filepath.Join(containerName, fmt.Sprintf("%d.log", restartCount))
 }
 
 // buildFullContainerLogsPath builds absolute log path for container.
 func buildFullContainerLogsPath(podUID types.UID, containerName string, restartCount int) string {
 	return filepath.Join(buildPodLogsDirectory(podUID), buildContainerLogsPath(containerName, restartCount))
+}
+
+// BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
+func BuildContainerLogsDirectory(podUID types.UID, containerName string) string {
+	return filepath.Join(buildPodLogsDirectory(podUID), containerName)
 }
 
 // buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
@@ -294,10 +299,13 @@ func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 }
 
 func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostPID {
-		return runtimeapi.NamespaceMode_NODE
+	if pod != nil {
+		if pod.Spec.HostPID {
+			return runtimeapi.NamespaceMode_NODE
+		}
+		// TODO(verb): set NamespaceMode_POD based on ShareProcessNamespace after #58716 is merged
 	}
-	// Note that PID does not default to the zero value
+	// Note that PID does not default to the zero value for v1.Pod
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 

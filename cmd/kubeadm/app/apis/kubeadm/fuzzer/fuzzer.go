@@ -44,6 +44,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
 			obj.Token = "foo"
+			obj.CRISocket = "foo"
 			obj.Etcd.Image = "foo"
 			obj.Etcd.DataDir = "foo"
 			obj.ImageRepository = "foo"
@@ -124,6 +125,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryTokenAPIServers = []string{"foo"}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
+			obj.CRISocket = "foo"
 		},
 	}
 }

@@ -190,6 +190,11 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
+	logDir := BuildContainerLogsDirectory(kubetypes.UID(pod.UID), container.Name)
+	err = m.osInterface.MkdirAll(logDir, 0755)
+	if err != nil {
+		return nil, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
+	}
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeapi.ContainerConfig{

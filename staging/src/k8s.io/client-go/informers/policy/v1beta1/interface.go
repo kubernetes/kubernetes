@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// PodDisruptionBudgets returns a PodDisruptionBudgetInformer.
 	PodDisruptionBudgets() PodDisruptionBudgetInformer
+	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
+	PodSecurityPolicies() PodSecurityPolicyInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // PodDisruptionBudgets returns a PodDisruptionBudgetInformer.
 func (v *version) PodDisruptionBudgets() PodDisruptionBudgetInformer {
 	return &podDisruptionBudgetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// PodSecurityPolicies returns a PodSecurityPolicyInformer.
+func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
+	return &podSecurityPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -161,8 +162,9 @@ func TestTopPod(t *testing.T) {
 			}
 		}
 
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
+		f, tf := cmdtesting.NewAPIFactory()
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -302,8 +304,9 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			})
 		}
 
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
+		f, tf := cmdtesting.NewAPIFactory()
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -481,8 +484,9 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			}
 		}
 
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &testPrinter{}
+		f, tf := cmdtesting.NewAPIFactory()
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -37,10 +36,7 @@ import (
 type ImageOptions struct {
 	resource.FilenameOptions
 
-	Mapper       meta.RESTMapper
 	Infos        []*resource.Info
-	Encoder      runtime.Encoder
-	Decoder      runtime.Decoder
 	Selector     string
 	Out          io.Writer
 	Err          io.Writer
@@ -54,8 +50,6 @@ type ImageOptions struct {
 	Cmd          *cobra.Command
 	ResolveImage func(in string) (string, error)
 
-	PrintSuccess           func(shortOutput bool, out io.Writer, resource, name string, dryRun bool, operation string)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
 	ContainerImages        map[string]string
@@ -117,15 +111,10 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Mapper, _ = f.Object()
-	o.PrintSuccess = f.PrintSuccess
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.Encoder = f.JSONEncoder()
-	o.Decoder = f.Decoder(true)
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
-	o.PrintObject = f.PrintObject
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = f.ResolveImage
@@ -191,7 +180,7 @@ func (o *ImageOptions) Validate() error {
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false
 		info.Object = info.AsVersioned()
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
@@ -231,7 +220,7 @@ func (o *ImageOptions) Run() error {
 			return nil
 		})
 		if transformed && err == nil {
-			return runtime.Encode(o.Encoder, info.Object)
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})
@@ -248,8 +237,8 @@ func (o *ImageOptions) Run() error {
 			continue
 		}
 
-		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+		if o.Local || o.DryRun {
+			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -275,12 +264,12 @@ func (o *ImageOptions) Run() error {
 		info.Refresh(obj, true)
 
 		if len(o.Output) > 0 {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
 		}
-		o.PrintSuccess(o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "image updated")
+		cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "image updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

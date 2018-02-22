@@ -20,7 +20,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -117,7 +117,9 @@ func (pdev podDevices) devices() map[string]sets.String {
 				if _, exists := ret[resource]; !exists {
 					ret[resource] = sets.NewString()
 				}
-				ret[resource] = ret[resource].Union(devices.deviceIds)
+				if devices.allocResp != nil {
+					ret[resource] = ret[resource].Union(devices.deviceIds)
+				}
 			}
 		}
 	}

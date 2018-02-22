@@ -96,7 +96,6 @@ type ConvertOptions struct {
 	builder *resource.Builder
 	local   bool
 
-	encoder runtime.Encoder
 	out     io.Writer
 	printer printers.ResourcePrinter
 
@@ -155,8 +154,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		// TODO: once printing is abstracted, this should be handled at flag declaration time
 		cmd.Flags().Set("output", outputFormat)
 	}
-	o.encoder = f.JSONEncoder()
-	o.printer, err = f.PrinterForOptions(cmdutil.ExtractCmdPrintOptions(cmd, false))
+	o.printer, err = cmdutil.PrinterForOptions(cmdutil.ExtractCmdPrintOptions(cmd, false))
 	return err
 }
 
@@ -178,7 +176,7 @@ func (o *ConvertOptions) RunConvert() error {
 		return fmt.Errorf("no objects passed to convert")
 	}
 
-	objects, err := asVersionedObject(infos, !singleItemImplied, o.specifiedOutputVersion, o.encoder)
+	objects, err := asVersionedObject(infos, !singleItemImplied, o.specifiedOutputVersion, cmdutil.InternalVersionJSONEncoder())
 	if err != nil {
 		return err
 	}

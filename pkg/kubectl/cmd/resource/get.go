@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
@@ -260,7 +261,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := f.PrinterForOptions(printOpts)
+	printer, err := cmdutil.PrinterForOptions(printOpts)
 	if err != nil {
 		return err
 	}
@@ -294,7 +295,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 	var sorter *kubectl.RuntimeSort
 	if len(sorting) > 0 && len(objs) > 1 {
 		// TODO: questionable
-		if sorter, err = kubectl.SortObjects(f.Decoder(true), objs, sorting); err != nil {
+		if sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, sorting); err != nil {
 			return err
 		}
 	}
@@ -340,7 +341,7 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				updatePrintOptionsForOpenAPI(f, mapping, printOpts)
 			}
 
-			printer, err = f.PrinterForMapping(printOpts, mapping)
+			printer, err = cmdutil.PrinterForOptions(printOpts)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -493,7 +494,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	info := infos[0]
 	mapping := info.ResourceMapping()
 	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := f.PrinterForMapping(printOpts, mapping)
+	printer, err := cmdutil.PrinterForOptions(printOpts)
 	if err != nil {
 		return err
 	}
@@ -531,7 +532,13 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 			if isFiltered, err := filterFuncs.Filter(objToPrint, filterOpts); !isFiltered {
 				if err != nil {
 					glog.V(2).Infof("Unable to filter resource: %v", err)
-				} else if err := printer.PrintObj(objToPrint, writer); err != nil {
+					continue
+				}
+
+				// printing always takes the internal version, but the watch event uses externals
+				// TODO fix printing to use server-side or be version agnostic
+				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+				if err := printer.PrintObj(attemptToConvertToInternal(objToPrint, mapping, internalGV), writer); err != nil {
 					return fmt.Errorf("unable to output the provided object: %v", err)
 				}
 			}
@@ -558,7 +565,13 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 			if isFiltered, err := filterFuncs.Filter(e.Object, filterOpts); !isFiltered {
 				if err != nil {
 					glog.V(2).Infof("Unable to filter resource: %v", err)
-				} else if err := printer.PrintObj(e.Object, options.Out); err != nil {
+					return false, nil
+				}
+
+				// printing always takes the internal version, but the watch event uses externals
+				// TODO fix printing to use server-side or be version agnostic
+				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+				if err := printer.PrintObj(attemptToConvertToInternal(e.Object, mapping, internalGV), options.Out); err != nil {
 					return false, err
 				}
 			}
@@ -567,6 +580,16 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	})
 	return nil
+}
+
+// attemptToConvertToInternal tries to convert to an internal type, but returns the original if it can't
+func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConvertor, targetVersion schema.GroupVersion) runtime.Object {
+	internalObject, err := converter.ConvertToVersion(obj, targetVersion)
+	if err != nil {
+		glog.V(1).Infof("Unable to convert %T to %v: err", obj, targetVersion, err)
+		return obj
+	}
+	return internalObject
 }
 
 func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *resource.Result, filterFuncs kubectl.Filters, filterOpts *printers.PrintOptions) error {

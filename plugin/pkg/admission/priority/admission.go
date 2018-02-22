@@ -231,12 +231,17 @@ func (p *PriorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, e
 	if err != nil {
 		return nil, err
 	}
+	// In case more than one global default priority class is added as a result of a race condition,
+	// we pick the one with the lowest priority value.
+	var defaultPC *scheduling.PriorityClass
 	for _, pci := range list {
 		if pci.GlobalDefault {
-			return pci, nil
+			if defaultPC == nil || defaultPC.Value > pci.Value {
+				defaultPC = pci
+			}
 		}
 	}
-	return nil, nil
+	return defaultPC, nil
 }
 
 func (p *PriorityPlugin) getDefaultPriority() (int32, error) {

@@ -52,6 +52,7 @@ go_test(
     srcs = ["cani_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

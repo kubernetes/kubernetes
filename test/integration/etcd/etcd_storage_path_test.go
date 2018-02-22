@@ -296,6 +296,11 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		stub:             `{"metadata": {"name": "pdb1"}, "spec": {"selector": {"matchLabels": {"anokkey": "anokvalue"}}}}`,
 		expectedEtcdPath: "/registry/poddisruptionbudgets/etcdstoragepathtestnamespace/pdb1",
 	},
+	gvr("policy", "v1beta1", "podsecuritypolicies"): {
+		stub:             `{"metadata": {"name": "psp2"}, "spec": {"fsGroup": {"rule": "RunAsAny"}, "privileged": true, "runAsUser": {"rule": "RunAsAny"}, "seLinux": {"rule": "MustRunAs"}, "supplementalGroups": {"rule": "RunAsAny"}}}`,
+		expectedEtcdPath: "/registry/podsecuritypolicy/psp2",
+		expectedGVK:      gvkP("extensions", "v1beta1", "PodSecurityPolicy"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/storage/v1alpha1
@@ -723,13 +728,13 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 		}
 
 		kubeAPIServerOptions := options.NewServerRunOptions()
-
 		kubeAPIServerOptions.SecureServing.Listener = listener
 		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 		kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
 		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
 		kubeAPIServerOptions.Authorization.Mode = "RBAC"
+		kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
 
 		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
 		if err != nil {

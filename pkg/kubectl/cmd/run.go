@@ -91,7 +91,6 @@ var (
 type RunObject struct {
 	Object  runtime.Object
 	Kind    string
-	Mapper  meta.RESTMapper
 	Mapping *meta.RESTMapping
 }
 
@@ -370,7 +369,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 				// asked for us to remove the pod (via --rm) then telling them
 				// its been deleted is unnecessary since that's what they asked
 				// for. We should only print something if the "rm" fails.
-				err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, obj.Mapper, true)
+				err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, true)
 				if err != nil {
 					return err
 				}
@@ -407,9 +406,9 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if runObject != nil {
 		outputFormat := cmdutil.GetFlagString(cmd, "output")
 		if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
-			return f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, cmdOut)
+			return cmdutil.PrintObject(cmd, runObject.Object, cmdOut)
 		}
-		f.PrintSuccess(false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+		cmdutil.PrintSuccess(false, cmdOut, runObject.Object, cmdutil.GetDryRunFlag(cmd), "created")
 	}
 
 	return utilerrors.NewAggregate(allErrs)
@@ -557,7 +556,7 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 	}
 
 	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		err := f.PrintObject(cmd, false, runObject.Mapper, runObject.Object, out)
+		err := cmdutil.PrintObject(cmd, runObject.Object, out)
 		if err != nil {
 			return nil, err
 		}
@@ -566,7 +565,7 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		}
 		return runObject, nil
 	}
-	f.PrintSuccess(false, out, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
+	cmdutil.PrintSuccess(false, out, runObject.Object, cmdutil.GetDryRunFlag(cmd), "created")
 
 	return runObject, nil
 }
@@ -591,7 +590,7 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 	groupVersionKind := groupVersionKinds[0]
 
 	if len(overrides) > 0 {
-		codec := runtime.NewCodec(f.JSONEncoder(), f.Decoder(true))
+		codec := runtime.NewCodec(cmdutil.InternalVersionJSONEncoder(), cmdutil.InternalVersionDecoder())
 		obj, err = cmdutil.Merge(codec, obj, overrides)
 		if err != nil {
 			return nil, err
@@ -621,14 +620,14 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 			ObjectTyper:  typer,
 			RESTMapper:   mapper,
 			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      f.Decoder(true),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
 		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return nil, err
 		}
 
@@ -640,7 +639,6 @@ func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kube
 	return &RunObject{
 		Object:  obj,
 		Kind:    groupVersionKind.Kind,
-		Mapper:  mapper,
 		Mapping: mapping,
 	}, nil
 }

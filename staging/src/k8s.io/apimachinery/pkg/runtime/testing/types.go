@@ -315,6 +315,9 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (u *Unstructured) SetGroupVersionKind(gvk schema.GroupVersionKind) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
 	u.Object["apiVersion"] = gvk.GroupVersion().String()
 	u.Object["kind"] = gvk.Kind
 }

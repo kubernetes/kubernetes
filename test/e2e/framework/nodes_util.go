@@ -74,17 +74,21 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 }
 
 func ingressUpgradeGCE(isUpgrade bool) error {
-	// Flip glbc image from latest release image to HEAD to simulate an upgrade.
-	// Flip from HEAD to latest release image to simulate a downgrade.
-	// Kubelet should restart glbc automatically.
 	var command string
 	if isUpgrade {
-		// Upgrade
-		command = "sudo sed -i -re 's/(image:)(.*)/\\1 gcr.io\\/k8s-ingress-image-push\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest"
+		// User specified image to upgrade to.
+		targetImage := TestContext.IngressUpgradeImage
+		if targetImage != "" {
+			command = fmt.Sprintf("sudo sed -i -re 's|(image:)(.*)|\\1 %s|' /etc/kubernetes/manifests/glbc.manifest", targetImage)
+		} else {
+			// Upgrade to latest HEAD image.
+			command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/k8s-ingress-image-push\\/ingress-gce-e2e-glbc-amd64:latest/' /etc/kubernetes/manifests/glbc.manifest"
+		}
 	} else {
-		// Downgrade
-		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+		// Downgrade to latest release image.
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
 	}
+	// Kubelet should restart glbc automatically.
 	sshResult, err := NodeExec(GetMasterHost(), command)
 	LogSSHResult(sshResult)
 	return err

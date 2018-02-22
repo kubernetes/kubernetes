@@ -24,14 +24,18 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateNamespace(t *testing.T) {
 	namespaceObject := &v1.Namespace{}
 	namespaceObject.Name = "my-namespace"
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	f, tf := cmdtesting.NewAPIFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
@@ -49,7 +53,7 @@ func TestCreateNamespace(t *testing.T) {
 	cmd := NewCmdCreateNamespace(f, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{namespaceObject.Name})
-	expectedOutput := "namespaces/" + namespaceObject.Name + "\n"
+	expectedOutput := "namespace/" + namespaceObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

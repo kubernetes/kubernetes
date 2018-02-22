@@ -21,7 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
+
+	"k8s.io/kubernetes/pkg/util/nsenter"
 
 	"github.com/golang/glog"
 )
@@ -54,25 +55,20 @@ type NsenterWriter struct{}
 // WriteFile calls 'nsenter cat - > <the file>' and 'nsenter chmod' to create a
 // file on the host.
 func (writer *NsenterWriter) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	cmd := "nsenter"
-	baseArgs := []string{
-		"--mount=/rootfs/proc/1/ns/mnt",
-		"--",
-	}
-
-	echoArgs := append(baseArgs, "sh", "-c", fmt.Sprintf("cat > %s", filename))
-	glog.V(5).Infof("Command to write data to file: %v %v", cmd, echoArgs)
-	command := exec.Command(cmd, echoArgs...)
-	command.Stdin = bytes.NewBuffer(data)
+	ne := nsenter.NewNsenter()
+	echoArgs := []string{"-c", fmt.Sprintf("cat > %s", filename)}
+	glog.V(5).Infof("nsenter: write data to file %s by nsenter", filename)
+	command := ne.Exec("sh", echoArgs)
+	command.SetStdin(bytes.NewBuffer(data))
 	outputBytes, err := command.CombinedOutput()
 	if err != nil {
 		glog.Errorf("Output from writing to %q: %v", filename, string(outputBytes))
 		return err
 	}
 
-	chmodArgs := append(baseArgs, "chmod", fmt.Sprintf("%o", perm), filename)
-	glog.V(5).Infof("Command to change permissions to file: %v %v", cmd, chmodArgs)
-	outputBytes, err = exec.Command(cmd, chmodArgs...).CombinedOutput()
+	chmodArgs := []string{fmt.Sprintf("%o", perm), filename}
+	glog.V(5).Infof("nsenter: change permissions of file %s to %s", filename, chmodArgs[0])
+	outputBytes, err = ne.Exec("chmod", chmodArgs).CombinedOutput()
 	if err != nil {
 		glog.Errorf("Output from chmod command: %v", string(outputBytes))
 		return err

@@ -61,22 +61,6 @@ var _ = SIGDescribe("Proxy", func() {
 		f := framework.NewFramework("proxy", options, nil)
 		prefix := "/api/" + version
 
-		// Port here has to be kept in sync with default kubelet port.
-		/*
-			    Testname: proxy-prefix-node-logs-port
-			    Description: Ensure that proxy on node logs works with generic top
-				level prefix proxy and explicit kubelet port.
-		*/
-		framework.ConformanceIt("should proxy logs on node with explicit kubelet port ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
-
-		/*
-			    Testname: proxy-prefix-node-logs
-			    Description: Ensure that proxy on node logs works with generic top
-				level prefix proxy.
-		*/
-		framework.ConformanceIt("should proxy logs on node ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
-		It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
-
 		/*
 			    Testname: proxy-subresource-node-logs-port
 			    Description: Ensure that proxy on node logs works with node proxy
@@ -185,14 +169,8 @@ var _ = SIGDescribe("Proxy", func() {
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
-			svcProxyURL := func(scheme, port string) string {
-				return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port)
-			}
 			subresourceServiceProxyURL := func(scheme, port string) string {
 				return prefix + "/namespaces/" + f.Namespace.Name + "/services/" + net.JoinSchemeNamePort(scheme, service.Name, port) + "/proxy"
-			}
-			podProxyURL := func(scheme, port string) string {
-				return prefix + "/proxy/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port)
 			}
 			subresourcePodProxyURL := func(scheme, port string) string {
 				return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
@@ -200,35 +178,12 @@ var _ = SIGDescribe("Proxy", func() {
 
 			// construct the table
 			expectations := map[string]string{
-				svcProxyURL("", "portname1") + "/": "foo",
-				svcProxyURL("", "80") + "/":        "foo",
-				svcProxyURL("", "portname2") + "/": "bar",
-				svcProxyURL("", "81") + "/":        "bar",
-
-				svcProxyURL("http", "portname1") + "/": "foo",
-				svcProxyURL("http", "80") + "/":        "foo",
-				svcProxyURL("http", "portname2") + "/": "bar",
-				svcProxyURL("http", "81") + "/":        "bar",
-
-				svcProxyURL("https", "tlsportname1") + "/": "tls baz",
-				svcProxyURL("https", "443") + "/":          "tls baz",
-				svcProxyURL("https", "tlsportname2") + "/": "tls qux",
-				svcProxyURL("https", "444") + "/":          "tls qux",
-
 				subresourceServiceProxyURL("", "portname1") + "/":         "foo",
 				subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
 				subresourceServiceProxyURL("", "portname2") + "/":         "bar",
 				subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
 				subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
 				subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
-
-				podProxyURL("", "1080") + "/": `<a href="` + podProxyURL("", "1080") + `/rewriteme">test</a>`,
-				podProxyURL("", "160") + "/":  "foo",
-				podProxyURL("", "162") + "/":  "bar",
-
-				podProxyURL("http", "1080") + "/": `<a href="` + podProxyURL("http", "1080") + `/rewriteme">test</a>`,
-				podProxyURL("http", "160") + "/":  "foo",
-				podProxyURL("http", "162") + "/":  "bar",
 
 				subresourcePodProxyURL("", "") + "/":         `<a href="` + subresourcePodProxyURL("", "") + `/rewriteme">test</a>`,
 				subresourcePodProxyURL("", "1080") + "/":     `<a href="` + subresourcePodProxyURL("", "1080") + `/rewriteme">test</a>`,
