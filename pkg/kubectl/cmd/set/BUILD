@@ -11,6 +11,7 @@ go_library(
         "set.go",
         "set_env.go",
         "set_image.go",
+        "set_probe.go",
         "set_resources.go",
         "set_selector.go",
         "set_serviceaccount.go",
@@ -34,6 +35,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
@@ -46,6 +48,7 @@ go_test(
     srcs = [
         "set_env_test.go",
         "set_image_test.go",
+        "set_probe_test.go",
         "set_resources_test.go",
         "set_selector_test.go",
         "set_serviceaccount_test.go",

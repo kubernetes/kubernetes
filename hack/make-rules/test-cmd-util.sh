@@ -2927,6 +2927,38 @@ run_rc_tests() {
   # Clean up
   kubectl delete deployment nginx-deployment-resources "${kube_flags[@]}"
 
+  ## Set probe of a deployment
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Set probe of a local file without talking to the server
+  kubectl set probe -f hack/testdata/deployment-multicontainer-resources.yaml -c=perl --liveness --local -o yaml -- echo ok "${kube_flags[@]}"
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer-resources.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment-resources:'
+  kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{$image_field1}}:{{end}}" "${IMAGE_PERL}:"
+  # Set the deployment's liveness command probe
+  kubectl set probe deployment nginx-deployment-resources --liveness -- echo ok "${kube_flags[@]}"
+  # Set the deployment's readiness tcp probe
+  kubectl set probe deployment nginx-deployment-resources --readiness --open-tcp=3306 "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).readinessProbe.tcpSocket.port}}:{{end}}" "3306:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).readinessProbe.tcpSocket.port}}:{{end}}" "3306:"
+  # Set the deployment's readiness https probe
+  kubectl set probe deployment nginx-deployment-resources --readiness --get-url=https://127.0.0.1:1936/stats "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).readinessProbe.httpGet.host}}:{{end}}" "127.0.0.1:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).readinessProbe.httpGet.path}}:{{end}}" "/stats:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).readinessProbe.httpGet.port}}:{{end}}" "1936:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).readinessProbe.httpGet.scheme}}:{{end}}" "HTTPS:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).readinessProbe.httpGet.host}}:{{end}}" "127.0.0.1:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).readinessProbe.httpGet.path}}:{{end}}" "/stats:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).readinessProbe.httpGet.port}}:{{end}}" "1936:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).readinessProbe.httpGet.scheme}}:{{end}}" "HTTPS:"
+  # Remove the deployment's readiness and liveness
+  kubectl set probe deployment nginx-deployment-resources --remove --readiness --liveness "${kube_flags[@]}"
+
+  # Clean up
+  kubectl delete deployment nginx-deployment-resources "${kube_flags[@]}"
+
   set +o nounset
   set +o errexit
 }
