@@ -60,6 +60,14 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 		}
 		if a.VolumeSource.RBD != nil {
 			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+				v1.SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+			}
+		}
+		if a.VolumeSource.CephFS != nil {
+			if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+				v1.SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -204,6 +212,14 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 		}
 		if a.VolumeSource.RBD != nil {
 			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+				v1.SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+			}
+		}
+		if a.VolumeSource.CephFS != nil {
+			if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+				v1.SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -370,6 +386,14 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 		}
 		if a.VolumeSource.RBD != nil {
 			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.MonitorSRVRecord != nil {
+				v1.SetDefaults_SRVRecordSource(a.VolumeSource.RBD.MonitorSRVRecord)
+			}
+		}
+		if a.VolumeSource.CephFS != nil {
+			if a.VolumeSource.CephFS.MonitorSRVRecord != nil {
+				v1.SetDefaults_SRVRecordSource(a.VolumeSource.CephFS.MonitorSRVRecord)
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
