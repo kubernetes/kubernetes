@@ -34,10 +34,12 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
@@ -63,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 // LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
@@ -77,6 +80,8 @@ type LegacyRESTStorageProvider struct {
 	// ServiceIPRange is used to build cluster IPs for discovery.
 	ServiceIPRange       net.IPNet
 	ServiceNodePortRange utilnet.PortRange
+
+	ServiceAccountIssuer serviceaccount.TokenGenerator
 
 	LoopbackClientConfig *restclient.Config
 }
@@ -115,7 +120,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotastore.NewREST(restOptionsGetter)
 	secretStorage := secretstore.NewREST(restOptionsGetter)
-	serviceAccountStorage := serviceaccountstore.NewREST(restOptionsGetter)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvstore.NewREST(restOptionsGetter)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcstore.NewREST(restOptionsGetter)
 	configMapStorage := configmapstore.NewREST(restOptionsGetter)
@@ -136,6 +140,13 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		c.ProxyTransport,
 		podDisruptionClient,
 	)
+
+	var serviceAccountStorage *serviceaccountstore.REST
+	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, podStorage.Pod.Store, secretStorage.Store)
+	} else {
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, nil)
+	}
 
 	serviceRESTStorage, serviceStatusStorage := servicestore.NewREST(restOptionsGetter)
 	serviceRegistry := service.NewRegistry(serviceRESTStorage)
@@ -223,6 +234,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 	if legacyscheme.Registry.IsEnabledVersion(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
+	}
+	if serviceAccountStorage.Token != nil {
+		restStorageMap["serviceaccounts/token"] = serviceAccountStorage.Token
 	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
 
