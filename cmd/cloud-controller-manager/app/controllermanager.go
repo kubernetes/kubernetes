@@ -118,12 +118,16 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.Generic.SecureServing != nil {
-		if err := genericcontrollermanager.Serve(&c.Generic, c.Generic.SecureServing.Serve, stopCh); err != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
+		if err := c.Generic.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.Generic.InsecureServing != nil {
-		if err := genericcontrollermanager.Serve(&c.Generic, c.Generic.InsecureServing.Serve, stopCh); err != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
+		if err := c.Generic.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}

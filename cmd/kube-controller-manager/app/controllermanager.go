@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
-	genericcontrollerconfig "k8s.io/kubernetes/cmd/controller-manager/app"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -126,12 +126,16 @@ func Run(c *config.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.Generic.SecureServing != nil {
-		if err := genericcontrollerconfig.Serve(&c.Generic, c.Generic.SecureServing.Serve, stopCh); err != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
+		if err := c.Generic.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.Generic.InsecureServing != nil {
-		if err := genericcontrollerconfig.Serve(&c.Generic, c.Generic.InsecureServing.Serve, stopCh); err != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
+		if err := c.Generic.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
