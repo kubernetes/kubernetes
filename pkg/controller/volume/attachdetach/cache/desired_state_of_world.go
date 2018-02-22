@@ -167,7 +167,7 @@ type nodeManaged struct {
 // The volumeToAttach object represents a volume that should be attached to a node.
 type volumeToAttach struct {
 	// multiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
-	// It is used to to prevent reporting the error from being reported more than once for a given volume.
+	// It is used to prevent reporting the error from being reported more than once for a given volume.
 	multiAttachErrorReported bool
 
 	// volumeName contains the unique identifier for this volume.
