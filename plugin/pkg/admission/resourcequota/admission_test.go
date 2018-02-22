@@ -681,7 +681,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	}
 }
 
-// TestAdmitEnforceQuotaConstraints verifies that if a quota tracks a particular resource that that resource is
+// TestAdmitEnforceQuotaConstraints verifies that if a quota tracks a particular resource that resource is
 // specified on the pod.  In this case, we create a quota that tracks cpu request, memory request, and memory limit.
 // We ensure that a pod that does not specify a memory limit that it fails in admission.
 func TestAdmitEnforceQuotaConstraints(t *testing.T) {
