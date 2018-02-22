@@ -190,7 +190,7 @@ func TestTopPod(t *testing.T) {
 		tf.ClientConfig = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd, _ := NewCmdTopPod(f, nil, buf)
+		cmd := NewCmdTopPod(f, nil, buf)
 		for name, value := range testCase.flags {
 			cmd.Flags().Set(name, value)
 		}
@@ -226,7 +226,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
-		flags           map[string]string
+		options         *TopPodOptions
 		args            []string
 		expectedPath    string
 		expectedQuery   string
@@ -236,7 +236,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 	}{
 		{
 			name:            "all namespaces",
-			flags:           map[string]string{"all-namespaces": "true"},
+			options:         &TopPodOptions{AllNamespaces: true},
 			expectedPath:    topMetricsAPIPathPrefix + "/pods",
 			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
 			listsNamespaces: true,
@@ -254,14 +254,14 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 		},
 		{
 			name:          "pod with label selector",
-			flags:         map[string]string{"selector": "key=value"},
+			options:       &TopPodOptions{Selector: "key=value"},
 			expectedPath:  topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods",
 			expectedQuery: "labelSelector=" + url.QueryEscape("key=value"),
 			namespaces:    []string{testNS, testNS},
 		},
 		{
 			name:         "pod with container metrics",
-			flags:        map[string]string{"containers": "true"},
+			options:      &TopPodOptions{PrintContainers: true},
 			args:         []string{"pod1"},
 			expectedPath: topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
 			namespaces:   []string{testNS},
@@ -326,9 +326,12 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			tf.ClientConfig = defaultClientConfig()
 			buf := bytes.NewBuffer([]byte{})
 
-			cmd, cmdOptions := NewCmdTopPod(f, nil, buf)
-			for name, value := range testCase.flags {
-				cmd.Flags().Set(name, value)
+			cmd := NewCmdTopPod(f, nil, buf)
+			var cmdOptions *TopPodOptions
+			if testCase.options != nil {
+				cmdOptions = testCase.options
+			} else {
+				cmdOptions = &TopPodOptions{}
 			}
 
 			// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
@@ -532,7 +535,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			},
 			DiscoveryClient: &fakeDiscovery{},
 		}
-		cmd, _ := NewCmdTopPod(f, opts, buf)
+		cmd := NewCmdTopPod(f, opts, buf)
 		for name, value := range testCase.flags {
 			cmd.Flags().Set(name, value)
 		}

@@ -78,7 +78,7 @@ var (
 		kubectl top pod -l name=myLabel`))
 )
 
-func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) (*cobra.Command, *TopPodOptions) {
+func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) *cobra.Command {
 	if options == nil {
 		options = &TopPodOptions{}
 	}
@@ -106,7 +106,7 @@ func NewCmdTopPod(f cmdutil.Factory, options *TopPodOptions, out io.Writer) (*co
 	cmd.Flags().BoolVar(&options.PrintContainers, "containers", false, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	options.HeapsterOptions.Bind(cmd.Flags())
-	return cmd, options
+	return cmd
 }
 
 func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
