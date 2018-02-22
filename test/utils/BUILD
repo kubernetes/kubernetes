@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conditions.go",
+        "create_resources.go",
         "density_utils.go",
         "deployment.go",
         "pod_store.go",
