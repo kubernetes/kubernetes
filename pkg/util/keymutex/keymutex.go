@@ -18,15 +18,46 @@ package keymutex
 
 import (
 	"fmt"
-	"sync"
-
 	"github.com/golang/glog"
+	"sync"
+	"sync/atomic"
 )
+
+type tryMutex struct {
+	sync.Mutex
+	acq int32
+}
+
+func (tm *tryMutex) Lock() {
+	atomic.StoreInt32(&tm.acq, 1)
+	tm.Mutex.Lock()
+}
+
+func (tm *tryMutex) TryLock() bool {
+	if !atomic.CompareAndSwapInt32(&tm.acq, 0, 1) {
+		return false
+	}
+
+	atomic.StoreInt32(&tm.acq, 1)
+	tm.Mutex.Lock()
+
+	return true
+}
+
+func (tm *tryMutex) Unlock() {
+	tm.Mutex.Unlock()
+	atomic.StoreInt32(&tm.acq, 0)
+}
 
 // KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.
 type KeyMutex interface {
 	// Acquires a lock associated with the specified ID, creates the lock if one doesn't already exist.
 	LockKey(id string)
+
+	// Tries to acquire a lock associated with the specified ID, returns immediately.
+	// Returns false if the lock exists and is already acquired, otherwise returns true.
+	// Unlikely, but may fail spuriously and return false, even if the lock is not actually held.
+	TryLockKey(id string) bool
 
 	// Releases the lock associated with the specified ID.
 	// Returns an error if the specified ID doesn't exist.
@@ -36,13 +67,13 @@ type KeyMutex interface {
 // Returns a new instance of a key mutex.
 func NewKeyMutex() KeyMutex {
 	return &keyMutex{
-		mutexMap: make(map[string]*sync.Mutex),
+		mutexMap: make(map[string]*tryMutex),
 	}
 }
 
 type keyMutex struct {
 	sync.RWMutex
-	mutexMap map[string]*sync.Mutex
+	mutexMap map[string]*tryMutex
 }
 
 // Acquires a lock associated with the specified ID (creates the lock if one doesn't already exist).
@@ -51,6 +82,21 @@ func (km *keyMutex) LockKey(id string) {
 	mutex := km.getOrCreateLock(id)
 	mutex.Lock()
 	glog.V(5).Infof("LockKey(...) for id %q completed.\r\n", id)
+}
+
+// Tries to acquire a lock associated with the specified ID (creates the lock if one doesn't already exist).
+// Returns false if the lock exists and is already acquired, otherwise returns true.
+func (km *keyMutex) TryLockKey(id string) bool {
+	glog.V(5).Infof("TryLockKey(...) called for id %q\r\n", id)
+
+	mutex := km.getOrCreateLock(id)
+	if mutex.TryLock() {
+		glog.V(5).Infof("TryLockKey(...) for id %q completed.\r\n", id)
+		return true
+	}
+
+	glog.V(5).Infof("TryLockKey(...) for id %q could not acquire the lock.\r\n", id)
+	return false
 }
 
 // Releases the lock associated with the specified ID.
@@ -71,12 +117,12 @@ func (km *keyMutex) UnlockKey(id string) error {
 }
 
 // Returns lock associated with the specified ID, or creates the lock if one doesn't already exist.
-func (km *keyMutex) getOrCreateLock(id string) *sync.Mutex {
+func (km *keyMutex) getOrCreateLock(id string) *tryMutex {
 	km.Lock()
 	defer km.Unlock()
 
 	if _, exists := km.mutexMap[id]; !exists {
-		km.mutexMap[id] = &sync.Mutex{}
+		km.mutexMap[id] = &tryMutex{}
 	}
 
 	return km.mutexMap[id]

@@ -62,14 +62,42 @@ func Test_DoubleLock_DoubleUnlock(t *testing.T) {
 	verifyCallbackHappens(t, callbackCh1stLock)
 	go lockAndCallback(km, key, callbackCh2ndLock)
 	verifyCallbackDoesntHappens(t, callbackCh2ndLock)
+
 	km.UnlockKey(key)
 	verifyCallbackHappens(t, callbackCh2ndLock)
+	km.UnlockKey(key)
+}
+
+func Test_TryLock(t *testing.T) {
+	// Arrange
+
+	km := NewKeyMutex()
+	key := "fakeid"
+	callbackCh := make(chan bool)
+
+	// Act & Assert
+
+	go tryLockAndCallback(km, key, callbackCh)
+	verifyTryCallbackHappens(t, callbackCh)
+
+	go tryLockAndCallback(km, key, callbackCh)
+	verifyTryCallbackDoesntHappen(t, callbackCh)
+
+	km.UnlockKey(key)
+
+	go tryLockAndCallback(km, key, callbackCh)
+	verifyTryCallbackHappens(t, callbackCh)
+
 	km.UnlockKey(key)
 }
 
 func lockAndCallback(km KeyMutex, id string, callbackCh chan<- interface{}) {
 	km.LockKey(id)
 	callbackCh <- true
+}
+
+func tryLockAndCallback(km KeyMutex, id string, callbackCh chan<- bool) {
+	callbackCh <- km.TryLockKey(id)
 }
 
 func verifyCallbackHappens(t *testing.T, callbackCh <-chan interface{}) bool {
@@ -90,4 +118,34 @@ func verifyCallbackDoesntHappens(t *testing.T, callbackCh <-chan interface{}) bo
 	case <-time.After(callbackTimeout):
 		return true
 	}
+}
+
+func verifyTryCallbackHappens(t *testing.T, callbackCh <-chan bool) bool {
+	select {
+	case acquired := <-callbackCh:
+		if !acquired {
+			t.Fatalf("Unexpected lock acquisition")
+			return false
+		}
+	case <-time.After(callbackTimeout):
+		t.Fatalf("Timed out waiting for callback.")
+		return false
+	}
+
+	return true
+}
+
+func verifyTryCallbackDoesntHappen(t *testing.T, callbackCh <-chan bool) bool {
+	select {
+	case acquired := <-callbackCh:
+		if acquired {
+			t.Fatalf("Expected lock acquisition")
+			return false
+		}
+	case <-time.After(callbackTimeout):
+		t.Fatalf("Timed out waiting for callback.")
+		return false
+	}
+
+	return true
 }
