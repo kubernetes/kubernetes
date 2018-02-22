@@ -60,8 +60,8 @@ const (
 var errNotInVMSet = errors.New("vm is not in the vmset")
 var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
 
-// returns the full identifier of a machine
-func (az *Cloud) getMachineID(machineName string) string {
+// getStandardMachineID returns the full identifier of a virtual machine.
+func (az *Cloud) getStandardMachineID(machineName string) string {
 	return fmt.Sprintf(
 		machineIDTemplate,
 		az.SubscriptionID,
