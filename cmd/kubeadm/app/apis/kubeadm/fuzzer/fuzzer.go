@@ -60,6 +60,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				Name:      "foo",
 				HostPath:  "foo",
 				MountPath: "foo",
+				Writable:  false,
 			}}
 			obj.Etcd.ExtraArgs = map[string]string{"foo": "foo"}
 			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
