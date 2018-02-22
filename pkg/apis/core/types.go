@@ -1085,10 +1085,23 @@ type GlusterfsVolumeSource struct {
 	ReadOnly bool
 }
 
+// Represents a DNS SRV record that can be used to lookup the real names/IPs,
+// instead of hard-coding the information inline. Default protocol is TCP.
+type SRVRecordSource struct {
+	// Required: Name is the service as it's registered in DNS
+	Name string
+	// Optional: Supports "TCP" and "UDP".
+	// +optional
+	Protocol Protocol
+	//Required: Domain is the domain the service belongs to.
+	Domain string
+}
+
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDVolumeSource struct {
-	// Required: CephMonitors is a collection of Ceph monitors
+	// Required: CephMonitors is a collection of Ceph monitors.
+	// Optional, if MonitorSRVRecord is set.
 	CephMonitors []string
 	// Required: RBDImage is the rados image name
 	RBDImage string
@@ -1114,12 +1127,16 @@ type RBDVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	MonitorSRVRecord *SRVRecordSource
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
 type RBDPersistentVolumeSource struct {
-	// Required: CephMonitors is a collection of Ceph monitors
+	// Required: CephMonitors is a collection of Ceph monitors.
+	// Optional, if MonitorSRVRecord is set.
 	CephMonitors []string
 	// Required: RBDImage is the rados image name
 	RBDImage string
@@ -1145,6 +1162,9 @@ type RBDPersistentVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	MonitorSRVRecord *SRVRecordSource
 }
 
 // Represents a cinder volume resource in Openstack. A Cinder volume
@@ -1168,7 +1188,8 @@ type CinderVolumeSource struct {
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSVolumeSource struct {
-	// Required: Monitors is a collection of Ceph monitors
+	// Required: Monitors is a collection of Ceph monitors. Optional, if
+	// MonitorSRVRecord is set.
 	Monitors []string
 	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
@@ -1186,6 +1207,9 @@ type CephFSVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	MonitorSRVRecord *SRVRecordSource
 }
 
 // SecretReference represents a Secret Reference. It has enough information to retrieve secret
@@ -1202,7 +1226,8 @@ type SecretReference struct {
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 type CephFSPersistentVolumeSource struct {
-	// Required: Monitors is a collection of Ceph monitors
+	// Required: Monitors is a collection of Ceph monitors. Optional, if
+	// MonitorSRVRecord is set.
 	Monitors []string
 	// Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
@@ -1220,6 +1245,9 @@ type CephFSPersistentVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly bool
+	// Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for
+	// ceph monitors' SRV records, instead of setting the names/IPs directly.
+	MonitorSRVRecord *SRVRecordSource
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
