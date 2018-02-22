@@ -3485,6 +3485,15 @@ func (in *PodAffinityTerm) DeepCopyInto(out *PodAffinityTerm) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.NamespaceSelector != nil {
+		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(meta_v1.LabelSelector)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	return
 }
 
