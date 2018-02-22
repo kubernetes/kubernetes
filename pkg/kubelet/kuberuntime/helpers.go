@@ -207,12 +207,17 @@ func getStableKey(pod *v1.Pod, container *v1.Container) string {
 
 // buildContainerLogsPath builds log path for container relative to pod logs directory.
 func buildContainerLogsPath(containerName string, restartCount int) string {
-	return fmt.Sprintf("%s_%d.log", containerName, restartCount)
+	return filepath.Join(containerName, fmt.Sprintf("%d.log", restartCount))
 }
 
 // buildFullContainerLogsPath builds absolute log path for container.
 func buildFullContainerLogsPath(podUID types.UID, containerName string, restartCount int) string {
 	return filepath.Join(buildPodLogsDirectory(podUID), buildContainerLogsPath(containerName, restartCount))
+}
+
+// BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
+func BuildContainerLogsDirectory(podUID types.UID, containerName string) string {
+	return filepath.Join(buildPodLogsDirectory(podUID), containerName)
 }
 
 // buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
