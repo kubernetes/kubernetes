@@ -1466,6 +1466,11 @@ function start-kube-apiserver {
   if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
     params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
   fi
+  if [[ -n "${SERVICEACCOUNT_ISSUER:-}" ]]; then
+    params+=" --service-account-issuer=${SERVICEACCOUNT_ISSUER}"
+    params+=" --service-account-signing-key-file=${SERVICEACCOUNT_KEY_PATH}"
+    params+=" --service-account-api-audiences=${SERVICEACCOUNT_API_AUDIENCES}"
+  fi
 
   local audit_policy_config_mount=""
   local audit_policy_config_volume=""

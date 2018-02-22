@@ -399,3 +399,9 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 # The number of services that are allowed to sync concurrently. Will be passed
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
+
+if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
+  FEATURE_GATES="${FEATURE_GATES},TokenRequest=true"
+  SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
+  SERVICEACCOUNT_API_AUDIENCES="https://kubernetes.default.svc"
+fi
