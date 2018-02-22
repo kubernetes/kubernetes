@@ -531,11 +531,13 @@ def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
+    metricsEnabled = str(hookenv.config('enable-metrics')).lower()
     args = [
         'arch=' + arch(),
         'dns-ip=' + get_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
-        'enable-dashboard=' + dbEnabled
+        'enable-dashboard=' + dbEnabled,
+        'enable-metrics=' + metricsEnabled
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -1054,6 +1056,18 @@ def configure_apiserver(etcd):
         hookenv.log('Removing Initializers from admission-control')
         admission_control.remove('Initializers')
     api_opts['admission-control'] = ','.join(admission_control)
+
+    if get_version('kube-apiserver') > (1, 6) and \
+       hookenv.config('enable-metrics'):
+        api_opts['requestheader-client-ca-file'] = ca_cert_path
+        api_opts['requestheader-allowed-names'] = 'client'
+        api_opts['requestheader-extra-headers-prefix'] = 'X-Remote-Extra-'
+        api_opts['requestheader-group-headers'] = 'X-Remote-Group'
+        api_opts['requestheader-username-headers'] = 'X-Remote-User'
+        api_opts['proxy-client-cert-file'] = client_cert_path
+        api_opts['proxy-client-key-file'] = client_key_path
+        api_opts['enable-aggregator-routing'] = 'true'
+        api_opts['client-ca-file'] = ca_cert_path
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
 

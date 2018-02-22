@@ -70,3 +70,8 @@ options:
     description: |
       Comma separated authorization modes. Allowed values are
       "RBAC", "Node", "Webhook", "ABAC", "AlwaysDeny" and "AlwaysAllow".
+  enable-metrics:
+    type: boolean
+    default: true
+    description: |
+      If true the metrics server for Kubernetes will be deployed onto the cluster.
