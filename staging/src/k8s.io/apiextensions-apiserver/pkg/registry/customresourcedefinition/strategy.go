@@ -57,6 +57,10 @@ func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Obje
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
 		crd.Spec.Validation = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceRemoveUnknownFields) {
+		crd.Spec.RemoveUnknownFields = nil
+	}
 }
 
 func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
@@ -79,6 +83,11 @@ func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
 		newCRD.Spec.Validation = nil
 		oldCRD.Spec.Validation = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceRemoveUnknownFields) {
+		newCRD.Spec.RemoveUnknownFields = nil
+		oldCRD.Spec.RemoveUnknownFields = nil
 	}
 }
 
@@ -146,7 +155,7 @@ func (statusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old run
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	apiserver, ok := obj.(*apiextensions.CustomResourceDefinition)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition.")
+		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition")
 	}
 	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), apiserver.Initializers != nil, nil
 }

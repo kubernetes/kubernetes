@@ -242,3 +242,44 @@ func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStri
 	}
 	return nil
 }
+
+// RemoveUnknownFields removes those fields from the object which are not specified in the properties construct of the schema.
+func RemoveUnknownFields(object map[string]interface{}, schema *apiextensions.JSONSchemaProps) {
+	if object == nil || schema == nil || schema.Properties == nil {
+		return
+	}
+
+	for field := range object {
+		// don't consider typemeta and objectmeta
+		if field == "apiVersion" || field == "kind" || field == "metadata" {
+			continue
+		}
+
+		// TODO: patternProperties as well?
+		pSchema, ok := schema.Properties[field]
+
+		// if the field does not exist in the properties construct, remove it
+		if !ok {
+			delete(object, field)
+			continue
+		}
+
+		// check if the subobject is a map
+		subObject := object[field]
+		subObjectMap, ok := subObject.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// if the subObject is a map, then the subschema should have a properties construct
+		// if it doesn't, it means we can delete all fields in it and hence the field itself
+		// TODO: double check if we want this behavior?
+		if pSchema.Properties == nil {
+			delete(object, field)
+			continue
+		}
+
+		// recursively go through all fields in the object comparing with the corresponding schema
+		RemoveUnknownFields(subObjectMap, &pSchema)
+	}
+}

@@ -33,6 +33,13 @@ const (
 	//
 	// CustomResourceValidation is a list of validation methods for CustomResources
 	CustomResourceValidation utilfeature.Feature = "CustomResourceValidation"
+
+	// owner: @sttts, @nikhita
+	// alpha: v1.10
+	//
+	// CustomResourceRemoveUnknownFields indicates whether fields not specified in the Properties
+	// construct of the CustomResourceValidation schema should be removed
+	CustomResourceRemoveUnknownFields utilfeature.Feature = "CustomResourceRemoveUnknownFields"
 )
 
 func init() {
@@ -42,6 +49,8 @@ func init() {
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
+// If you add a feature here, please add it in pkg/features/kube_features.go as well.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	CustomResourceValidation: {Default: true, PreRelease: utilfeature.Beta},
+	CustomResourceValidation:          {Default: true, PreRelease: utilfeature.Beta},
+	CustomResourceRemoveUnknownFields: {Default: false, PreRelease: utilfeature.Alpha},
 }

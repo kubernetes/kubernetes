@@ -351,6 +351,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		return nil, err
 	}
 
+	var openAPIV3Schema *apiextensions.JSONSchemaProps
+	if crd.Spec.Validation != nil && crd.Spec.RemoveUnknownFields != nil && *crd.Spec.RemoveUnknownFields {
+		openAPIV3Schema = crd.Spec.Validation.OpenAPIV3Schema
+	}
+
 	storage := customresource.NewREST(
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Status.AcceptedNames.Plural},
 		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.ListKind},
@@ -358,7 +363,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			typer,
 			crd.Spec.Scope == apiextensions.NamespaceScoped,
 			kind,
-			validator,
+			validator, openAPIV3Schema,
 		),
 		r.restOptionsGetter,
 	)

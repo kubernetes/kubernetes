@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
@@ -45,7 +46,7 @@ type customResourceDefinitionStorageStrategy struct {
 	validator       customResourceValidator
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, validator *validate.SchemaValidator) customResourceDefinitionStorageStrategy {
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, validator *validate.SchemaValidator, schema *apiextensions.JSONSchemaProps) customResourceDefinitionStorageStrategy {
 	return customResourceDefinitionStorageStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
@@ -54,6 +55,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			namespaceScoped: namespaceScoped,
 			kind:            kind,
 			validator:       validator,
+			schema:          schema,
 		},
 	}
 }
@@ -62,10 +64,14 @@ func (a customResourceDefinitionStorageStrategy) NamespaceScoped() bool {
 	return a.namespaceScoped
 }
 
-func (customResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (a customResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+	// remove fields not specified in the properties construct of the CRD validation schema
+	removeUnknownFields(obj, a)
 }
 
-func (customResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (a customResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	// remove fields not specified in the properties construct of the CRD validation schema
+	removeUnknownFields(obj, a)
 }
 
 func (a customResourceDefinitionStorageStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -120,6 +126,7 @@ type customResourceValidator struct {
 	namespaceScoped bool
 	kind            schema.GroupVersionKind
 	validator       *validate.SchemaValidator
+	schema          *apiextensions.JSONSchemaProps
 }
 
 func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -184,4 +191,17 @@ func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, o
 	}
 
 	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))
+}
+
+func removeUnknownFields(obj runtime.Object, a customResourceDefinitionStorageStrategy) {
+	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return
+	}
+	customResource := customResourceObject.UnstructuredContent()
+
+	// TODO: We should probably reinforce that the root schema must have a properties construct?
+	if a.validator.schema != nil && a.validator.schema.Properties != nil {
+		apiservervalidation.RemoveUnknownFields(customResource, a.validator.schema)
+	}
 }
