@@ -52,8 +52,10 @@ func NewCmdTop(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 
 	// create subcommands
+	topPod, _ := NewCmdTopPod(f, nil, out)
 	cmd.AddCommand(NewCmdTopNode(f, nil, out))
-	cmd.AddCommand(NewCmdTopPod(f, nil, out))
+	cmd.AddCommand(topPod)
+
 	return cmd
 }
 
