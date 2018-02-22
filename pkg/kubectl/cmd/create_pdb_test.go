@@ -31,7 +31,7 @@ import (
 
 func TestCreatePdb(t *testing.T) {
 	pdbName := "my-pdb"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -44,16 +44,16 @@ func TestCreatePdb(t *testing.T) {
 			}, nil
 		}),
 	}
-	tf.ClientConfig = &restclient.Config{}
+	tf.ClientConfigVal = &restclient.Config{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreatePodDisruptionBudget(f, buf)
+	cmd := NewCmdCreatePodDisruptionBudget(tf, buf)
 	cmd.Flags().Set("min-available", "1")
 	cmd.Flags().Set("selector", "app=rails")
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
-	CreatePodDisruptionBudget(f, buf, cmd, []string{pdbName})
+	CreatePodDisruptionBudget(tf, buf, cmd, []string{pdbName})
 	expectedOutput := "poddisruptionbudget.policy/" + pdbName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())

@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -68,7 +67,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 	for i, input := range inputs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			tf.Client = &fake.RESTClient{
 				GroupVersion: schema.GroupVersion{Version: "v1"},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -78,7 +77,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			out := new(bytes.Buffer)
-			cmd := NewCmdServiceAccount(f, out, out)
+			cmd := NewCmdServiceAccount(tf, out, out)
 			cmd.SetOutput(out)
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("local", "true")
@@ -87,7 +86,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 				Filenames: []string{input.yaml}},
 				out:   out,
 				local: true}
-			err := saConfig.Complete(f, cmd, []string{serviceAccount})
+			err := saConfig.Complete(tf, cmd, []string{serviceAccount})
 			assert.NoError(t, err)
 			err = saConfig.Run()
 			assert.NoError(t, err)
@@ -98,7 +97,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 func TestSetServiceAccountMultiLocal(t *testing.T) {
 	testapi.Default = testapi.Groups[""]
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
@@ -109,10 +108,10 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdServiceAccount(f, buf, buf)
+	cmd := NewCmdServiceAccount(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
@@ -121,7 +120,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 		out:   buf,
 		local: true}
 
-	err := opts.Complete(f, cmd, []string{serviceAccount})
+	err := opts.Complete(tf, cmd, []string{serviceAccount})
 	if err == nil {
 		err = opts.Run()
 	}
@@ -313,11 +312,10 @@ func TestSetServiceAccountRemote(t *testing.T) {
 	for _, input := range inputs {
 		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 		testapi.Default = testapi.Groups[input.testAPIGroup]
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
 		ns := legacyscheme.Codecs
 		tf.Namespace = "test"
-		tf.CategoryExpander = categories.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         groupVersion,
 			NegotiatedSerializer: ns,
@@ -345,13 +343,13 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 		}
 		out := new(bytes.Buffer)
-		cmd := NewCmdServiceAccount(f, out, out)
+		cmd := NewCmdServiceAccount(tf, out, out)
 		cmd.SetOutput(out)
 		cmd.Flags().Set("output", "yaml")
 		saConfig := serviceAccountConfig{
 			out:   out,
 			local: false}
-		err := saConfig.Complete(f, cmd, input.args)
+		err := saConfig.Complete(tf, cmd, input.args)
 		assert.NoError(t, err)
 		err = saConfig.Run()
 		assert.NoError(t, err)
@@ -367,7 +365,7 @@ func TestServiceAccountValidation(t *testing.T) {
 		{args: []string{serviceAccount}, errorString: resourceMissingErrString},
 	}
 	for _, input := range inputs {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.Client = &fake.RESTClient{
 			GroupVersion: schema.GroupVersion{Version: "v1"},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -377,11 +375,11 @@ func TestServiceAccountValidation(t *testing.T) {
 		}
 		tf.Namespace = "test"
 		out := bytes.NewBuffer([]byte{})
-		cmd := NewCmdServiceAccount(f, out, out)
+		cmd := NewCmdServiceAccount(tf, out, out)
 		cmd.SetOutput(out)
 
 		saConfig := &serviceAccountConfig{}
-		err := saConfig.Complete(f, cmd, input.args)
+		err := saConfig.Complete(tf, cmd, input.args)
 		assert.EqualError(t, err, input.errorString)
 	}
 }

@@ -321,12 +321,12 @@ func TestLabelErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdLabel(f, buf)
+		cmd := NewCmdLabel(tf, buf)
 		cmd.SetOutput(buf)
 
 		for k, v := range testCase.flags {
@@ -338,7 +338,7 @@ func TestLabelErrors(t *testing.T) {
 			err = opts.Validate()
 		}
 		if err == nil {
-			err = opts.RunLabel(f, cmd)
+			err = opts.RunLabel(tf, cmd)
 		}
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
@@ -352,7 +352,7 @@ func TestLabelErrors(t *testing.T) {
 
 func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -382,10 +382,10 @@ func TestLabelForResourceFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(f, buf)
+	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
 	err := opts.Complete(buf, cmd, []string{"a=b"})
@@ -393,7 +393,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 		err = opts.Validate()
 	}
 	if err == nil {
-		err = opts.RunLabel(f, cmd)
+		err = opts.RunLabel(tf, cmd)
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -404,7 +404,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 }
 
 func TestLabelLocal(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -413,10 +413,10 @@ func TestLabelLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(f, buf)
+	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}},
 		local: true}
@@ -425,7 +425,7 @@ func TestLabelLocal(t *testing.T) {
 		err = opts.Validate()
 	}
 	if err == nil {
-		err = opts.RunLabel(f, cmd)
+		err = opts.RunLabel(tf, cmd)
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -437,7 +437,7 @@ func TestLabelLocal(t *testing.T) {
 
 func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -469,17 +469,17 @@ func TestLabelMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(f, buf)
+	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{all: true}
 	err := opts.Complete(buf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
 	if err == nil {
-		err = opts.RunLabel(f, cmd)
+		err = opts.RunLabel(tf, cmd)
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

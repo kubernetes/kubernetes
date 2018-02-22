@@ -49,7 +49,7 @@ func TestLog(t *testing.T) {
 	}
 	for _, test := range tests {
 		logContent := "test log content"
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -71,10 +71,10 @@ func TestLog(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdLogs(f, buf, buf)
+		cmd := NewCmdLogs(tf, buf, buf)
 		cmd.Flags().Set("namespace", "test")
 		cmd.Run(cmd, []string{"foo"})
 
@@ -100,7 +100,7 @@ func testPod() *api.Pod {
 }
 
 func TestValidateLogFlags(t *testing.T) {
-	f, _ := cmdtesting.NewAPIFactory()
+	f := cmdtesting.NewTestFactory()
 
 	tests := []struct {
 		name     string
@@ -151,7 +151,7 @@ func TestValidateLogFlags(t *testing.T) {
 }
 
 func TestLogComplete(t *testing.T) {
-	f, _ := cmdtesting.NewAPIFactory()
+	f := cmdtesting.NewTestFactory()
 
 	tests := []struct {
 		name     string

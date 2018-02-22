@@ -34,10 +34,10 @@ import (
 func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	tests := map[string]struct {
 		verbs         string
@@ -124,7 +124,7 @@ func TestCreateRole(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdCreateRole(f, buf)
+			cmd := NewCmdCreateRole(tf, buf)
 			cmd.Flags().Set("dry-run", "true")
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("verb", test.verbs)
@@ -146,7 +146,7 @@ func TestCreateRole(t *testing.T) {
 }
 
 func TestValidate(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
@@ -331,7 +331,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test.roleOptions.Mapper, _ = f.Object()
+		test.roleOptions.Mapper, _ = tf.Object()
 		err := test.roleOptions.Validate()
 		if test.expectErr && err == nil {
 			t.Errorf("%s: expect error happens but validate passes.", name)
@@ -345,13 +345,13 @@ func TestValidate(t *testing.T) {
 func TestComplete(t *testing.T) {
 	roleName := "my-role"
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateRole(f, buf)
+	cmd := NewCmdCreateRole(tf, buf)
 	cmd.Flags().Set("resource", "pods,deployments.extensions")
 
 	tests := map[string]struct {
@@ -476,7 +476,7 @@ func TestComplete(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		err := test.roleOptions.Complete(f, cmd, test.params)
+		err := test.roleOptions.Complete(tf, cmd, test.params)
 		if !test.expectErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", name, err)
 		}

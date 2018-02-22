@@ -39,14 +39,13 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestResourcesLocal(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -58,10 +57,10 @@ func TestResourcesLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(f, buf, buf)
+	cmd := NewCmdResources(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
@@ -74,7 +73,7 @@ func TestResourcesLocal(t *testing.T) {
 		Requests:          "cpu=200m,memory=512Mi",
 		ContainerSelector: "*"}
 
-	err := opts.Complete(f, cmd, []string{})
+	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -90,7 +89,7 @@ func TestResourcesLocal(t *testing.T) {
 }
 
 func TestSetMultiResourcesLimitsLocal(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -102,10 +101,10 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(f, buf, buf)
+	cmd := NewCmdResources(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
@@ -118,7 +117,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 		Requests:          "cpu=200m,memory=512Mi",
 		ContainerSelector: "*"}
 
-	err := opts.Complete(f, cmd, []string{})
+	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -446,11 +445,10 @@ func TestSetResourcesRemote(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
 			ns := legacyscheme.Codecs
 			tf.Namespace = "test"
-			tf.CategoryExpander = categories.LegacyCategoryExpander
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: ns,
@@ -478,14 +476,14 @@ func TestSetResourcesRemote(t *testing.T) {
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
 			buf := new(bytes.Buffer)
-			cmd := NewCmdResources(f, buf, buf)
+			cmd := NewCmdResources(tf, buf, buf)
 			cmd.SetOutput(buf)
 			cmd.Flags().Set("output", "yaml")
 			opts := ResourcesOptions{
 				Out:               buf,
 				Limits:            "cpu=200m,memory=512Mi",
 				ContainerSelector: "*"}
-			err := opts.Complete(f, cmd, input.args)
+			err := opts.Complete(tf, cmd, input.args)
 			if err == nil {
 				err = opts.Validate()
 			}
