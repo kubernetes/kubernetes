@@ -8,11 +8,13 @@ load(
 
 go_test(
     name = "go_default_test",
+    size = "small",
     srcs = ["oidc_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/coreos/go-oidc:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
