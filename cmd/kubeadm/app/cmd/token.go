@@ -31,6 +31,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
@@ -44,7 +45,6 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // NewCmdToken returns cobra.Command for token management
@@ -310,7 +310,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 				fmt.Fprintf(errW, "can't parse expiration time of bootstrap token %s\n", secret.Name)
 				continue
 			}
-			ttl = printers.ShortHumanDuration(expireTime.Sub(time.Now()))
+			ttl = duration.ShortHumanDuration(expireTime.Sub(time.Now()))
 			expires = expireTime.Format(time.RFC3339)
 		}
 

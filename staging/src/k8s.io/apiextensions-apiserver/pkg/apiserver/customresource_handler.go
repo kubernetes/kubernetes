@@ -64,6 +64,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -420,7 +421,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	}
 	creator := unstructuredCreator{}
 
-	validator, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
+	validator, _, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
 	if err != nil {
 		return nil, err
 	}
@@ -447,6 +448,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		scaleSpec = crd.Spec.Subresources.Scale
 	}
 
+	// TODO: identify how to pass printer specification from the CRD
+	table, err := tableconvertor.New(nil)
+	if err != nil {
+		glog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+	}
+
 	customResourceStorage := customresource.NewStorage(
 		schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Status.AcceptedNames.Plural},
 		schema.GroupVersionKind{Group: crd.Spec.Group, Version: crd.Spec.Version, Kind: crd.Status.AcceptedNames.ListKind},
@@ -459,7 +466,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			statusSpec,
 			scaleSpec,
 		),
-		r.restOptionsGetter, crd.Status.AcceptedNames.Categories,
+		r.restOptionsGetter,
+		crd.Status.AcceptedNames.Categories,
+		table,
 	)
 
 	selfLinkPrefix := ""
@@ -506,6 +515,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		Kind:     kind,
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
+
+		TableConvertor: customResourceStorage.CustomResource,
 	}
 
 	ret := &crdInfo{

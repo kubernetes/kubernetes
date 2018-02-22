@@ -9,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "common.go",
         "customcolumn.go",
         "humanreadable.go",
         "interface.go",
