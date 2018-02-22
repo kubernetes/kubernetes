@@ -208,19 +208,11 @@ func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(nil)
 }
 
-func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return f.clientCache.ClientSetForVersion(requiredVersion)
-}
-
 func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
 	return f.clientCache.ClientConfigForVersion(nil)
 }
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientConfig.ClientConfig()
-}
-
-func (f *ring0Factory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {

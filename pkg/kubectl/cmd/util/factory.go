@@ -106,11 +106,6 @@ type ClientAccessFactory interface {
 	// just directions to the server. People use this to build RESTMappers on top of
 	BareClientConfig() (*restclient.Config, error)
 
-	// TODO remove.  This should be rolled into `ClientSet`
-	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
-	// TODO remove.  This should be rolled into `ClientConfig`
-	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
-
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.
 	UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
