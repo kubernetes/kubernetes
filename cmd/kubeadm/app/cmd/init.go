@@ -38,6 +38,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -46,7 +47,6 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -61,7 +61,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -83,7 +82,7 @@ var (
 		You can now join any number of machines by running the following on each node
 		as root:
 
-		  kubeadm join --token {{.Token}} {{.MasterHostPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
+		  {{.joinCommand}}
 
 		`)))
 
@@ -467,26 +466,15 @@ func (i *Init) Run(out io.Writer) error {
 		return nil
 	}
 
-	// Load the CA certificate from so we can pin its public key
-	caCert, err := pkiutil.TryLoadCertFromDisk(i.cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	// Gets the join command
+	joinCommand, err := cmdutil.GetJoinCommand(kubeadmconstants.GetAdminKubeConfigPath(), i.cfg.Token, i.skipTokenPrint)
 	if err != nil {
-		return fmt.Errorf("error loading ca cert from disk: %v", err)
-	}
-
-	// Generate the Master host/port pair used by initDoneTempl
-	masterHostPort, err := kubeadmutil.GetMasterHostPort(i.cfg)
-	if err != nil {
-		return fmt.Errorf("error getting master host port: %v", err)
+		return fmt.Errorf("failed to get join command: %v", err)
 	}
 
 	ctx := map[string]string{
 		"KubeConfigPath": adminKubeConfigPath,
-		"Token":          i.cfg.Token,
-		"CAPubKeyPin":    pubkeypin.Hash(caCert),
-		"MasterHostPort": masterHostPort,
-	}
-	if i.skipTokenPrint {
-		ctx["Token"] = "<value withheld>"
+		"joinCommand":    joinCommand,
 	}
 
 	return initDoneTempl.Execute(out, ctx)
