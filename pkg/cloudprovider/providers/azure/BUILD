@@ -72,6 +72,7 @@ go_test(
     srcs = [
         "azure_backoff_test.go",
         "azure_cache_test.go",
+        "azure_controller_common_test.go",
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
         "azure_routes_test.go",

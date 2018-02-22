@@ -340,8 +340,13 @@ func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 
 // CreateOrUpdateVMWithRetry invokes az.VirtualMachinesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualMachine) error {
+	return az.CreateOrUpdateVMWithRetryRG(az.ResourceGroup, vmName, newVM)
+}
+
+// CreateOrUpdateVMWithRetryRG invokes az.VirtualMachinesClient.CreateOrUpdate with exponential backoff retry using the resource group provided.
+func (az *Cloud) CreateOrUpdateVMWithRetryRG(resourceGroup, vmName string, newVM compute.VirtualMachine) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		respChan, errChan := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+		respChan, errChan := az.VirtualMachinesClient.CreateOrUpdate(resourceGroup, vmName, newVM, nil)
 		resp := <-respChan
 		err := <-errChan
 		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
