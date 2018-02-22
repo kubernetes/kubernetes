@@ -35,7 +35,7 @@ const (
 	numIngressesSmall      = 5
 	numIngressesMedium     = 20
 	numIngressesLarge      = 50
-	numIngressesExtraLarge = 100
+	numIngressesExtraLarge = 99
 
 	scaleTestIngressNamePrefix = "ing-scale"
 	scaleTestBackendName       = "echoheaders-scale"
