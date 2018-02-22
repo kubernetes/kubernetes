@@ -19,7 +19,6 @@ package testing
 import (
 	"errors"
 	"fmt"
-	"io"
 	"path/filepath"
 	"time"
 
@@ -438,9 +437,6 @@ func (f *FakeFactory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.Pod
 
 func (f *FakeFactory) EditorEnvs() []string {
 	return nil
-}
-
-func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 }
 
 func (f *FakeFactory) Command(*cobra.Command, bool) string {

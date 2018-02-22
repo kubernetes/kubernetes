@@ -660,34 +660,6 @@ func (f *ring0Factory) EditorEnvs() []string {
 	return []string{"KUBE_EDITOR", "EDITOR"}
 }
 
-func (f *ring0Factory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
-	switch obj := obj.(type) {
-	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeNodePort {
-			msg := fmt.Sprintf(
-				`You have exposed your service on an external port on all nodes in your
-cluster.  If you want to expose this service to the external internet, you may
-need to set up firewall rules for the service port(s) (%s) to serve traffic.
-
-See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
-`,
-				makePortsString(obj.Spec.Ports, true))
-			out.Write([]byte(msg))
-		}
-
-		if _, ok := obj.Annotations[api.AnnotationLoadBalancerSourceRangesKey]; ok {
-			msg := fmt.Sprintf(
-				`You are using service annotation [service.beta.kubernetes.io/load-balancer-source-ranges].
-It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.
-Please use the loadBalancerSourceRanges field instead.
-
-See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
-`)
-			out.Write([]byte(msg))
-		}
-	}
-}
-
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
 var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
 

@@ -154,7 +154,6 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		}
 
 		info.Refresh(obj, true)
-		f.PrintObjectSpecificMessage(obj, out)
 		cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "replaced")
 		return nil
 	})
@@ -276,7 +275,6 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 
 		count++
 		info.Refresh(obj, true)
-		f.PrintObjectSpecificMessage(obj, out)
 		cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "replaced")
 		return nil
 	})

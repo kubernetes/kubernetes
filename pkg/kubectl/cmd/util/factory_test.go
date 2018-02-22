@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -414,41 +413,6 @@ func TestGetFirstPod(t *testing.T) {
 		}
 		if !apiequality.Semantic.DeepEqual(test.expected, pod) {
 			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
-		}
-	}
-}
-
-func TestPrintObjectSpecificMessage(t *testing.T) {
-	f := NewFactory(nil)
-	tests := []struct {
-		obj          runtime.Object
-		expectOutput bool
-	}{
-		{
-			obj:          &api.Service{},
-			expectOutput: false,
-		},
-		{
-			obj:          &api.Pod{},
-			expectOutput: false,
-		},
-		{
-			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer}},
-			expectOutput: false,
-		},
-		{
-			obj:          &api.Service{Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort}},
-			expectOutput: true,
-		},
-	}
-	for _, test := range tests {
-		buff := &bytes.Buffer{}
-		f.PrintObjectSpecificMessage(test.obj, buff)
-		if test.expectOutput && buff.Len() == 0 {
-			t.Errorf("Expected output, saw none for %v", test.obj)
-		}
-		if !test.expectOutput && buff.Len() > 0 {
-			t.Errorf("Expected no output, saw %s for %v", buff.String(), test.obj)
 		}
 	}
 }
