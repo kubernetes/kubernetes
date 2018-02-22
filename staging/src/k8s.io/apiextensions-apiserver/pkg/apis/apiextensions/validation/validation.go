@@ -79,6 +79,13 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 	} else if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
 	}
+	if len(spec.TransitionalVersionAlias) > 0 {
+		if errs := validationutil.IsDNS1035Label(spec.TransitionalVersionAlias); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("transitional-version-alias"), spec.TransitionalVersionAlias, strings.Join(errs, ",")))
+		} else if spec.Version == spec.TransitionalVersionAlias {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("transitional-version-alias"), spec.TransitionalVersionAlias, "should be different than version"))
+		}
+	}
 
 	switch spec.Scope {
 	case "":
@@ -119,7 +126,6 @@ func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.Cus
 
 	if established {
 		// these effect the storage and cannot be changed therefore
-		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Version, oldSpec.Version, fldPath.Child("version"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Scope, oldSpec.Scope, fldPath.Child("scope"))...)
 		allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Names.Kind, oldSpec.Names.Kind, fldPath.Child("names", "kind"))...)
 	}

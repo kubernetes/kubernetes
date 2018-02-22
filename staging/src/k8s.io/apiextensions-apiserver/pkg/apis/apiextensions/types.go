@@ -24,6 +24,11 @@ type CustomResourceDefinitionSpec struct {
 	Group string
 	// Version is the version this resource belongs in
 	Version string
+	// TransitionalVersionAlias is a version alias of the main version. The CustomResources will be available
+	// under both version, without any conversion being performed and with the same validations being applied.
+	// This can be used to transition an alpha to a beta or beta to a GA version.
+	// +optional
+	TransitionalVersionAlias string
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
