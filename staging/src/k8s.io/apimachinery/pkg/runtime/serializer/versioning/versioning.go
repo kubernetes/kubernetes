@@ -167,9 +167,13 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	switch obj.(type) {
-	case *runtime.Unknown, runtime.Unstructured:
+	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
 	}
+
+	// Note: for runtime.Unstructured, the typer will return the GVK in the object and we will do conversion as normal below.
+	// For the normal runtime.Scheme converter the conversion will be a no-op for Unstructured. For CustomResources
+	// the conversion will actually do something.
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
 	if err != nil {
