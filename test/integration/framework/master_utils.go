@@ -294,6 +294,7 @@ func NewMasterConfig() *master.Config {
 		ExtraConfig: master.ExtraConfig{
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			StorageFactory:          storageFactory,
+			EnableProxyHandlers:     true,
 			EnableCoreControllers:   true,
 			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 			APIServerServicePort:    443,

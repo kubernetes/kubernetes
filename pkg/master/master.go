@@ -106,6 +106,7 @@ type ExtraConfig struct {
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	EventTTL                 time.Duration
+	EnableProxyHandlers      bool
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
 	// Used to start and monitor tunneling
@@ -315,6 +316,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:       c.ExtraConfig.StorageFactory,
+			EnableProxyHandlers:  c.ExtraConfig.EnableProxyHandlers,
 			ProxyTransport:       c.ExtraConfig.ProxyTransport,
 			KubeletClientConfig:  c.ExtraConfig.KubeletClientConfig,
 			EventTTL:             c.ExtraConfig.EventTTL,

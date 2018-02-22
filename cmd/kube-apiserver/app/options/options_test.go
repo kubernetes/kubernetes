@@ -103,6 +103,7 @@ func TestAddFlags(t *testing.T) {
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
 		AllowPrivileged:        false,
+		EnableProxyHandlers:    true,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},

@@ -53,8 +53,10 @@ type ServerRunOptions struct {
 	StorageSerialization    *kubeoptions.StorageSerializationOptions
 	APIEnablement           *genericoptions.APIEnablementOptions
 
-	AllowPrivileged           bool
-	EnableLogsHandler         bool
+	AllowPrivileged     bool
+	EnableProxyHandlers bool
+	EnableLogsHandler   bool
+
 	EventTTL                  time.Duration
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
@@ -92,6 +94,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		APIEnablement:        genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
+		EnableProxyHandlers:    true,
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
 		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
@@ -149,6 +152,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
+
+	fs.BoolVar(&s.EnableProxyHandlers, "enable-proxy-handlers", s.EnableProxyHandlers,
+		"If true, install a /proxy handler on resources that support proxying.")
 
 	// Deprecated in release 1.9
 	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,

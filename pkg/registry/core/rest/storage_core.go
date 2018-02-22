@@ -73,6 +73,7 @@ import (
 type LegacyRESTStorageProvider struct {
 	StorageFactory serverstorage.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
+	EnableProxyHandlers bool
 	ProxyTransport      http.RoundTripper
 	KubeletClientConfig kubeletclient.KubeletClientConfig
 	EventTTL            time.Duration
@@ -192,7 +193,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"pods/log":         podStorage.Log,
 		"pods/exec":        podStorage.Exec,
 		"pods/portforward": podStorage.PortForward,
-		"pods/proxy":       podStorage.Proxy,
 		"pods/binding":     podStorage.Binding,
 		"bindings":         podStorage.Binding,
 
@@ -202,14 +202,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"replicationControllers/status": controllerStorage.Status,
 
 		"services":        serviceRest.Service,
-		"services/proxy":  serviceRest.Proxy,
 		"services/status": serviceStatusStorage,
 
 		"endpoints": endpointsStorage,
 
 		"nodes":        nodeStorage.Node,
 		"nodes/status": nodeStorage.Status,
-		"nodes/proxy":  nodeStorage.Proxy,
 
 		"events": eventStorage,
 
@@ -228,6 +226,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"configMaps":                    configMapStorage,
 
 		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
+	}
+	if c.EnableProxyHandlers {
+		restStorageMap["pods/proxy"] = podStorage.Proxy
+		restStorageMap["services/proxy"] = serviceRest.Proxy
+		restStorageMap["nodes/proxy"] = nodeStorage.Proxy
+
 	}
 	if legacyscheme.Registry.IsEnabledVersion(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
