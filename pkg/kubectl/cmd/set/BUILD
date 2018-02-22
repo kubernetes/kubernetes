@@ -11,6 +11,7 @@ go_library(
         "set.go",
         "set_env.go",
         "set_image.go",
+        "set_port.go",
         "set_resources.go",
         "set_selector.go",
         "set_serviceaccount.go",
@@ -46,6 +47,7 @@ go_test(
     srcs = [
         "set_env_test.go",
         "set_image_test.go",
+        "set_port_test.go",
         "set_resources_test.go",
         "set_selector_test.go",
         "set_serviceaccount_test.go",
