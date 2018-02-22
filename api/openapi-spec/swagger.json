@@ -77799,7 +77799,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.VolumeNodeAffinity"
      },
      "persistentVolumeReclaimPolicy": {
-      "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
+      "description": "What happens to a persistent volume when released from its claim. Valid options are `Retain` (default), `Recycle` and `Delete`. Recycling must be supported by the volume plugin underlying this persistent volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
       "type": "string"
      },
      "photonPersistentDisk": {
@@ -83352,7 +83352,7 @@
       "type": "string"
      },
      "reclaimPolicy": {
-      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
+      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Valid options are `Retain` and `Delete` (default).",
       "type": "string"
      },
      "volumeBindingMode": {
@@ -83583,7 +83583,7 @@
       "type": "string"
      },
      "reclaimPolicy": {
-      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
+      "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Valid options are `Retain` and `Delete` (default).",
       "type": "string"
      },
      "volumeBindingMode": {

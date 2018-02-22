@@ -46,7 +46,8 @@ type StorageClass struct {
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 
 	// Dynamically provisioned PersistentVolumes of this storage class are
-	// created with this reclaimPolicy. Defaults to Delete.
+	// created with this reclaimPolicy. Valid options are `Retain` and
+	// `Delete` (default).
 	// +optional
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
 

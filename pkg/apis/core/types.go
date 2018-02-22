@@ -451,7 +451,8 @@ type PersistentVolumeSpec struct {
 	// ignored, i.e. labels of this PV do not need to match PVC selector.
 	// +optional
 	ClaimRef *ObjectReference
-	// Optional: what happens to a persistent volume when released from its claim.
+	// What happens to a persistent volume when released from its claim.
+	// Valid option values are `Retain` (default), `Recycle` and `Delete`.
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy
 	// Name of StorageClass to which this persistent volume belongs. Empty value

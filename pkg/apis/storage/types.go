@@ -51,7 +51,8 @@ type StorageClass struct {
 	Parameters map[string]string
 
 	// reclaimPolicy is the reclaim policy that dynamically provisioned
-	// PersistentVolumes of this storage class are created with
+	// PersistentVolumes of this storage class are created with.
+	// Valid option values are `Retain` and `Delete` (default).
 	// +optional
 	ReclaimPolicy *api.PersistentVolumeReclaimPolicy
 
