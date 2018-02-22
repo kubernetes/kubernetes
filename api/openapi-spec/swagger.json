@@ -83905,6 +83905,10 @@
       "description": "Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced",
       "type": "string"
      },
+     "subresources": {
+      "description": "Subresources describes the subresources for CustomResources This field is alpha-level and should only be sent to servers that enable subresources via the CustomResourceSubresources feature gate.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
+     },
      "validation": {
       "description": "Validation describes the validation methods for CustomResources",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
@@ -83932,6 +83936,43 @@
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinitionCondition"
       }
+     }
+    }
+   },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceScale": {
+    "description": "CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.",
+    "required": [
+     "specReplicasPath",
+     "statusReplicasPath"
+    ],
+    "properties": {
+     "labelSelectorPath": {
+      "description": "LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector. Only JSON paths without the array notation are allowed. Must be a JSON Path under .status. Must be set to work with HPA. If there is no value under the given path in the CustomResource, the status label selector value in the /scale subresource will default to the empty string.",
+      "type": "string"
+     },
+     "specReplicasPath": {
+      "description": "SpecReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Spec.Replicas. Only JSON paths without the array notation are allowed. Must be a JSON Path under .spec. If there is no value under the given path in the CustomResource, the /scale subresource will return an error on GET.",
+      "type": "string"
+     },
+     "statusReplicasPath": {
+      "description": "StatusReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Replicas. Only JSON paths without the array notation are allowed. Must be a JSON Path under .status. If there is no value under the given path in the CustomResource, the status replica value in the /scale subresource will default to 0.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceStatus": {
+    "description": "CustomResourceSubresourceStatus defines how to serve the status subresource for CustomResources. Status is represented by the `.status` JSON path inside of a CustomResource. When set, * exposes a /status subresource for the custom resource * PUT requests to the /status subresource take a custom resource object, and ignore changes to anything except the status stanza * PUT/POST/PATCH requests to the custom resource ignore changes to the status stanza"
+   },
+   "io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources": {
+    "description": "CustomResourceSubresources defines the status and scale subresources for CustomResources.",
+    "properties": {
+     "scale": {
+      "description": "Scale denotes the scale subresource for CustomResources",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceScale"
+     },
+     "status": {
+      "description": "Status denotes the status subresource for CustomResources",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresourceStatus"
      }
     }
    },

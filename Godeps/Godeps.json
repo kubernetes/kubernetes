@@ -1263,7 +1263,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/validate",
-			"Rev": "deaf2c9013bc1a7f4c774662259a506ba874d80f"
+			"Rev": "d509235108fcf6ab4913d2dcb3a2260c0db2108e"
 		},
 		{
 			"ImportPath": "github.com/godbus/dbus",

@@ -15,6 +15,8 @@
 package validate
 
 import (
+	"encoding/json"
+	"log"
 	"reflect"
 
 	"github.com/go-openapi/spec"
@@ -80,12 +82,16 @@ func (s *SchemaValidator) Applies(source interface{}, kind reflect.Kind) bool {
 
 // Validate validates the data against the schema
 func (s *SchemaValidator) Validate(data interface{}) *Result {
+	result := new(Result)
+	if s == nil {
+		return result
+	}
+
 	if data == nil {
 		v := s.validators[0].Validate(data)
 		v.Merge(s.validators[6].Validate(data))
 		return v
 	}
-	result := new(Result)
 
 	tpe := reflect.TypeOf(data)
 	kind := tpe.Kind()
@@ -98,8 +104,35 @@ func (s *SchemaValidator) Validate(data interface{}) *Result {
 		d = swag.ToDynamicJSON(data)
 	}
 
+	isnumber := s.Schema.Type.Contains("number") || s.Schema.Type.Contains("integer")
+	if num, ok := data.(json.Number); ok && isnumber {
+		if s.Schema.Type.Contains("integer") { // avoid lossy conversion
+			in, erri := num.Int64()
+			if erri != nil {
+				result.AddErrors(erri)
+				result.Inc()
+				return result
+			}
+			d = in
+		} else {
+			nf, errf := num.Float64()
+			if errf != nil {
+				result.AddErrors(errf)
+				result.Inc()
+				return result
+			}
+			d = nf
+		}
+
+		tpe = reflect.TypeOf(d)
+		kind = tpe.Kind()
+	}
+
 	for _, v := range s.validators {
 		if !v.Applies(s.Schema, kind) {
+			if Debug {
+				log.Printf("%T does not apply for %v", v, kind)
+			}
 			continue
 		}
 
@@ -117,10 +150,9 @@ func (s *SchemaValidator) typeValidator() valueValidator {
 
 func (s *SchemaValidator) commonValidator() valueValidator {
 	return &basicCommonValidator{
-		Path:    s.Path,
-		In:      s.in,
-		Default: s.Schema.Default,
-		Enum:    s.Schema.Enum,
+		Path: s.Path,
+		In:   s.in,
+		Enum: s.Schema.Enum,
 	}
 }
 
@@ -155,7 +187,6 @@ func (s *SchemaValidator) stringValidator() valueValidator {
 	return &stringValidator{
 		Path:      s.Path,
 		In:        s.in,
-		Default:   s.Schema.Default,
 		MaxLength: s.Schema.MaxLength,
 		MinLength: s.Schema.MinLength,
 		Pattern:   s.Schema.Pattern,
@@ -164,9 +195,8 @@ func (s *SchemaValidator) stringValidator() valueValidator {
 
 func (s *SchemaValidator) formatValidator() valueValidator {
 	return &formatValidator{
-		Path: s.Path,
-		In:   s.in,
-		//Default:      s.Schema.Default,
+		Path:         s.Path,
+		In:           s.in,
 		Format:       s.Schema.Format,
 		KnownFormats: s.KnownFormats,
 	}
