@@ -153,7 +153,7 @@ func walk(root mo.Reference, f func(child types.ManagedObjectReference)) {
 	var children []types.ManagedObjectReference
 
 	switch e := root.(type) {
-	case *mo.Datacenter:
+	case *Datacenter:
 		children = []types.ManagedObjectReference{e.VmFolder, e.HostFolder, e.DatastoreFolder, e.NetworkFolder}
 	case *Folder:
 		children = e.ChildEntity
