@@ -241,7 +241,7 @@ func contactOthers(state *State) {
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
-	// Double check that that worked by getting the server version.
+	// Double check that worked by getting the server version.
 	if v, err := client.Discovery().ServerVersion(); err != nil {
 		log.Fatalf("Unable to get server version: %v\n", err)
 	} else {
