@@ -142,6 +142,7 @@ func TestPodAndContainer(t *testing.T) {
 
 		cmd := &cobra.Command{}
 		options := test.p
+		options.Err = bytes.NewBuffer([]byte{})
 		err := options.Complete(f, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("%s: unexpected non-error", test.name)
