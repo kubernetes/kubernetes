@@ -117,7 +117,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 
 func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 	q := NewPriorityQueue()
-	q.unschedulableQ.Add(&highPriNominatedPod)
+	q.unschedulableQ.addOrUpdate(&highPriNominatedPod)
 	q.AddIfNotPresent(&highPriNominatedPod) // Must not add anything.
 	q.AddIfNotPresent(&medPriorityPod)
 	q.AddIfNotPresent(&unschedulablePod)
@@ -136,7 +136,7 @@ func TestPriorityQueue_AddIfNotPresent(t *testing.T) {
 	if len(q.nominatedPods) != 0 {
 		t.Errorf("Expected nomindatePods to be empty: %v", q.nominatedPods)
 	}
-	if q.unschedulableQ.Get(&highPriNominatedPod) != &highPriNominatedPod {
+	if q.unschedulableQ.get(&highPriNominatedPod) != &highPriNominatedPod {
 		t.Errorf("Pod %v was not found in the unschedulableQ.", highPriNominatedPod.Name)
 	}
 }
@@ -162,7 +162,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	if len(q.nominatedPods) != 1 {
 		t.Errorf("Expected nomindatePods to have one element: %v", q.nominatedPods)
 	}
-	if q.unschedulableQ.Get(&unschedulablePod) != &unschedulablePod {
+	if q.unschedulableQ.get(&unschedulablePod) != &unschedulablePod {
 		t.Errorf("Pod %v was not found in the unschedulableQ.", unschedulablePod.Name)
 	}
 }
@@ -243,8 +243,8 @@ func TestPriorityQueue_Delete(t *testing.T) {
 func TestPriorityQueue_MoveAllToActiveQueue(t *testing.T) {
 	q := NewPriorityQueue()
 	q.Add(&medPriorityPod)
-	q.unschedulableQ.Add(&unschedulablePod)
-	q.unschedulableQ.Add(&highPriorityPod)
+	q.unschedulableQ.addOrUpdate(&unschedulablePod)
+	q.unschedulableQ.addOrUpdate(&highPriorityPod)
 	q.MoveAllToActiveQueue()
 	if q.activeQ.data.Len() != 3 {
 		t.Error("Expected all items to be in activeQ.")
@@ -290,19 +290,19 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	q := NewPriorityQueue()
 	q.Add(&medPriorityPod)
 	// Add a couple of pods to the unschedulableQ.
-	q.unschedulableQ.Add(&unschedulablePod)
-	q.unschedulableQ.Add(affinityPod)
+	q.unschedulableQ.addOrUpdate(&unschedulablePod)
+	q.unschedulableQ.addOrUpdate(affinityPod)
 	// Simulate addition of an assigned pod. The pod has matching labels for
 	// affinityPod. So, affinityPod should go to activeQ.
 	q.AssignedPodAdded(&labelPod)
-	if q.unschedulableQ.Get(affinityPod) != nil {
+	if q.unschedulableQ.get(affinityPod) != nil {
 		t.Error("affinityPod is still in the unschedulableQ.")
 	}
 	if _, exists, _ := q.activeQ.Get(affinityPod); !exists {
 		t.Error("affinityPod is not moved to activeQ.")
 	}
 	// Check that the other pod is still in the unschedulableQ.
-	if q.unschedulableQ.Get(&unschedulablePod) == nil {
+	if q.unschedulableQ.get(&unschedulablePod) == nil {
 		t.Error("unschedulablePod is not in the unschedulableQ.")
 	}
 }
@@ -438,7 +438,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 	for i, test := range tests {
 		upm := newUnschedulablePodsMap()
 		for _, p := range test.podsToAdd {
-			upm.Add(p)
+			upm.addOrUpdate(p)
 		}
 		if !reflect.DeepEqual(upm.pods, test.expectedMapAfterAdd) {
 			t.Errorf("#%d: Unexpected map after adding pods. Expected: %v, got: %v",
@@ -447,7 +447,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 		if len(test.podsToUpdate) > 0 {
 			for _, p := range test.podsToUpdate {
-				upm.Update(p)
+				upm.addOrUpdate(p)
 			}
 			if !reflect.DeepEqual(upm.pods, test.expectedMapAfterUpdate) {
 				t.Errorf("#%d: Unexpected map after updating pods. Expected: %v, got: %v",
@@ -455,13 +455,13 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			}
 		}
 		for _, p := range test.podsToDelete {
-			upm.Delete(p)
+			upm.delete(p)
 		}
 		if !reflect.DeepEqual(upm.pods, test.expectedMapAfterDelete) {
 			t.Errorf("#%d: Unexpected map after deleting pods. Expected: %v, got: %v",
 				i, test.expectedMapAfterDelete, upm.pods)
 		}
-		upm.Clear()
+		upm.clear()
 		if len(upm.pods) != 0 {
 			t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.pods))
 		}
