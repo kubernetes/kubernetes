@@ -138,6 +138,8 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		iptablesData:        bytes.NewBuffer(nil),
 		natChains:           bytes.NewBuffer(nil),
 		natRules:            bytes.NewBuffer(nil),
+		filterChains:        bytes.NewBuffer(nil),
+		filterRules:         bytes.NewBuffer(nil),
 		netlinkHandle:       netlinktest.NewFakeNetlinkHandle(),
 		loopbackSet:         NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
 		clusterIPSet:        NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
