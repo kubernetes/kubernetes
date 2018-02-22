@@ -63,6 +63,7 @@ go_test(
         "datacenter_test.go",
         "datastore_test.go",
         "folder_test.go",
+        "utils_test.go",
         "virtualmachine_test.go",
     ],
     embed = [":go_default_library"],
