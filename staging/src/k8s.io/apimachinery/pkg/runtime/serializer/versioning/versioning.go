@@ -18,6 +18,7 @@ package versioning
 
 import (
 	"io"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -166,14 +167,20 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
-	switch obj.(type) {
+	switch obj := obj.(type) {
 	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
+	case runtime.Unstructured:
+		// avoid conversion roundtrip if GVK is the right one already
+		objGVK := obj.GetObjectKind().GroupVersionKind()
+		targetGVK, ok := c.encodeVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
+		if !ok {
+			return runtime.NewNotRegisteredErrForTarget(reflect.TypeOf(obj).Elem(), c.encodeVersion)
+		}
+		if targetGVK == objGVK {
+			return c.encoder.Encode(obj, w)
+		}
 	}
-
-	// Note: for runtime.Unstructured, the typer will return the GVK in the object and we will do conversion as normal below.
-	// For the normal runtime.Scheme converter the conversion will be a no-op for Unstructured. For CustomResources
-	// the conversion will actually do something.
 
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
 	if err != nil {
