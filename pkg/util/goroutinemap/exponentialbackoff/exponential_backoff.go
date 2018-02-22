@@ -99,7 +99,7 @@ func IsExponentialBackoff(err error) bool {
 	}
 }
 
-// exponentialBackoffError is the error returned returned from GoroutineMap when
+// exponentialBackoffError is the error returned from GoroutineMap when
 // a new operation can not be started because exponentialBackOffOnError is
 // enabled and a previous operation with the same operation failed within the
 // durationBeforeRetry period.
