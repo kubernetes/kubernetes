@@ -511,8 +511,9 @@ type PersistentVolumeSpec struct {
 	// +optional
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" protobuf:"bytes,4,opt,name=claimRef"`
 	// What happens to a persistent volume when released from its claim.
-	// Valid options are Retain (default) and Recycle.
-	// Recycling must be supported by the volume plugin underlying this persistent volume.
+	// Valid options are Retain (default for manually created PersistentVolumes), Delete (default
+	// for dynamically provisioned PersistentVolumes), and Recycle (deprecated).
+	// Recycle must be supported by the volume plugin underlying this PersistentVolume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
