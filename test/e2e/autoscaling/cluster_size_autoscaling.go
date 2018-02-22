@@ -1298,7 +1298,7 @@ func addNodePool(name string, machineType string, numNodes int) {
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	glog.Infof("Creating node-pool %s: %s", name, output)
-	framework.ExpectNoError(err, output)
+	framework.ExpectNoError(err, string(output))
 }
 
 func deleteNodePool(name string) {
