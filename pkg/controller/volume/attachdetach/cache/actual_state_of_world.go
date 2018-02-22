@@ -131,7 +131,7 @@ type ActualStateOfWorld interface {
 type AttachedVolume struct {
 	operationexecutor.AttachedVolume
 
-	// MountedByNode indicates that this volume has been been mounted by the
+	// MountedByNode indicates that this volume has been mounted by the
 	// node and is unsafe to detach.
 	// The value is set and unset by SetVolumeMountedByNode(...).
 	MountedByNode bool
