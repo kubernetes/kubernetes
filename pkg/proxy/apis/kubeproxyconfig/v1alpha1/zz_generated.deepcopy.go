@@ -45,6 +45,13 @@ func (in *ClientConnectionConfiguration) DeepCopy() *ClientConnectionConfigurati
 func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.FeatureGates != nil {
+		in, out := &in.FeatureGates, &out.FeatureGates
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	out.ClientConnection = in.ClientConnection
 	in.IPTables.DeepCopyInto(&out.IPTables)
 	out.IPVS = in.IPVS
