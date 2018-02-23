@@ -44,7 +44,9 @@ func startCronJobController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
 		return false, nil
 	}
-	cjc, err := cronjob.NewCronJobController(
+	cjc, err := cronjob.NewCronJobControllerFromInformer(ctx.InformerFactory.Batch().V1beta1().CronJobs(),
+		ctx.InformerFactory.Batch().V1().Jobs(),
+		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {

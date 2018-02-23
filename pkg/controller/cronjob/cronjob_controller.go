@@ -16,18 +16,6 @@ limitations under the License.
 
 package cronjob
 
-/*
-I did not use watch or expectations.  Those add a lot of corner cases, and we aren't
-expecting a large volume of jobs or scheduledJobs.  (We are favoring correctness
-over scalability.  If we find a single controller thread is too slow because
-there are a lot of Jobs or CronJobs, we we can parallelize by Namespace.
-If we find the load on the API server is too high, we can use a watch and
-UndeltaStore.)
-
-Just periodically list jobs and SJs, and then reconcile them.
-
-*/
-
 import (
 	"fmt"
 	"sort"
@@ -40,20 +28,28 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	batchv1informer "k8s.io/client-go/informers/batch/v1"
+	batchv1beta1informer "k8s.io/client-go/informers/batch/v1beta1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	batchv1Lister "k8s.io/client-go/listers/batch/v1"
+	batchv1beta1Lister "k8s.io/client-go/listers/batch/v1beta1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
-
-// Utilities for dealing with Jobs and CronJobs and time.
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
@@ -64,9 +60,25 @@ type CronJobController struct {
 	sjControl  sjControlInterface
 	podControl podControlInterface
 	recorder   record.EventRecorder
+	// CronJob that need to be synced
+	queue workqueue.RateLimitingInterface
+	// cjobSynced returns true if the cronJob store has been synced at least once.
+	cjobSynced cache.InformerSynced
+	// jobSynced returns true if the job store has been synced at least once.
+	jobSynced cache.InformerSynced
+	// podSynced returns true if the pod store has been synced at least once.
+	podSynced cache.InformerSynced
+	// CronJob sync handler
+	syncHandler func(key string) error
+	// podLister can list/get pods from the shared informer's store
+	podLister corelisters.PodLister
+	//cjobLister can list/get CronJobs from shared informer's store
+	cjobLister batchv1beta1Lister.CronJobLister
+	//jobLister can list/get Job from shared informer's store
+	jobLister batchv1Lister.JobLister
 }
 
-func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, error) {
+func NewCronJobControllerFromInformer(cjbInformer batchv1beta1informer.CronJobInformer, jobInformer batchv1informer.JobInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface) (*CronJobController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -84,58 +96,156 @@ func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, e
 		sjControl:  &realSJControl{KubeClient: kubeClient},
 		podControl: &realPodControl{KubeClient: kubeClient},
 		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
+		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
 	}
+	cjbInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    jm.addCronjob,
+		UpdateFunc: jm.updateCronjob,
+		DeleteFunc: jm.deleteCronjob,
+	})
 
-	return jm, nil
-}
-
-func NewCronJobControllerFromClient(kubeClient clientset.Interface) (*CronJobController, error) {
-	jm, err := NewCronJobController(kubeClient)
-	if err != nil {
-		return nil, err
-	}
+	jm.cjobLister = cjbInformer.Lister()
+	jm.jobLister = jobInformer.Lister()
+	jm.podLister = podInformer.Lister()
+	jm.cjobSynced = cjbInformer.Informer().HasSynced
+	jm.jobSynced = jobInformer.Informer().HasSynced
+	jm.podSynced = podInformer.Informer().HasSynced
+	jm.syncHandler = jm.syncCronJob
 	return jm, nil
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer jm.queue.ShutDown()
+
+	if !controller.WaitForCacheSync("cronjob", stopCh, jm.cjobSynced, jm.jobSynced, jm.podSynced) {
+		return
+	}
+
 	glog.Infof("Starting CronJob Manager")
-	// Check things every 10 second.
-	go wait.Until(jm.syncAll, 10*time.Second, stopCh)
+
+	// we need add all the CronJobs to the queue periodically to make sure we can start a job according to the schedule
+	go wait.Until(func() {
+		glog.Info("Start enqueue all CronJobs")
+		cjobs, err := jm.cjobLister.List(labels.Everything())
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't list CronJobs %v", err))
+			return
+		}
+		for _, job := range cjobs {
+			glog.Infof("Start enqueue CronJob: %v", job)
+			jm.enqueue(job)
+		}
+		glog.Infof("Finished enqueue %v CronJobs", len(cjobs))
+	}, time.Second*10, stopCh)
+
+	//TODO Add ConcurrentCronJobSyncs to KubeControllerManagerConfiguration
+	for i := 0; i < 5; i++ {
+		go wait.Until(jm.worker, time.Second, stopCh)
+	}
 	<-stopCh
 	glog.Infof("Shutting down CronJob Manager")
 }
 
-// syncAll lists all the CronJobs and Jobs and reconciles them.
-func (jm *CronJobController) syncAll() {
-	// List children (Jobs) before parents (CronJob).
-	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
-	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
-	// Note that this only works because we are NOT using any caches here.
-	jl, err := jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(metav1.ListOptions{})
+// worker runs a worker thread that just dequeues items, processes them, and marks them done.
+// It enforces that the syncHandler is never invoked concurrently with the same key.
+func (jm *CronJobController) worker() {
+	for jm.processNextWorkItem() {
+	}
+}
+
+func (jm *CronJobController) processNextWorkItem() bool {
+	key, quit := jm.queue.Get()
+	if quit {
+		return false
+	}
+	defer jm.queue.Done(key)
+
+	err := jm.syncHandler(key.(string))
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error syncing cronjob: %v", err))
+		jm.queue.AddRateLimited(key)
+	}
+	return true
+}
+
+func (jm *CronJobController) enqueue(cronjob *batchv1beta1.CronJob) {
+	key, err := controller.KeyFunc(cronjob)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", cronjob, err))
+		return
+	}
+
+	jm.queue.Add(key)
+}
+func (jm *CronJobController) syncCronJob(key string) error {
+	startTime := time.Now()
+	glog.V(4).Infof("Started syncing CronJob %q (%v)", key, startTime)
+	defer func() {
+		glog.V(4).Infof("Finished syncing CronJob %q (%v)", key, time.Since(startTime))
+	}()
+
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+
+	cjob, err := jm.cjobLister.CronJobs(namespace).Get(name)
+	if errors.IsNotFound(err) {
+		glog.V(2).Infof("CronJob %v has been deleted", key)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	jobs, err := jm.jobLister.Jobs(namespace).List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("can't list Jobs: %v", err))
-		return
+		return err
 	}
-	js := jl.Items
-	glog.V(4).Infof("Found %d jobs", len(js))
-
-	sjl, err := jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(metav1.ListOptions{})
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't list CronJobs: %v", err))
-		return
+	var jobsCopy []batchv1.Job
+	for _, job := range jobs {
+		jobsCopy = append(jobsCopy, *job.DeepCopy())
 	}
-	sjs := sjl.Items
-	glog.V(4).Infof("Found %d cronjobs", len(sjs))
+	jobsBySj := groupJobsByParent(jobsCopy)
 
-	jobsBySj := groupJobsByParent(js)
 	glog.V(4).Infof("Found %d groups", len(jobsBySj))
+	cjobCopy := cjob.DeepCopy()
+	syncOne(cjobCopy, jobsBySj[cjob.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+	cleanupFinishedJobs(cjobCopy, jobsBySj[cjob.UID], jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+	return nil
+}
 
-	for _, sj := range sjs {
-		syncOne(&sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
-		cleanupFinishedJobs(&sj, jobsBySj[sj.UID], jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
+func (jm *CronJobController) addCronjob(obj interface{}) {
+	d := obj.(*batchv1beta1.CronJob)
+	glog.V(4).Infof("Adding CronJob %s", d.Name)
+	jm.enqueue(d)
+}
+
+func (jm *CronJobController) updateCronjob(old, cur interface{}) {
+	oldC := old.(*batchv1beta1.CronJob)
+	curC := cur.(*batchv1beta1.CronJob)
+	glog.V(4).Infof("Updating CronJob %s", oldC.Name)
+	jm.enqueue(curC)
+}
+
+func (jm *CronJobController) deleteCronjob(obj interface{}) {
+	d, ok := obj.(*batchv1beta1.CronJob)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			return
+		}
+		d, ok = tombstone.Obj.(*batchv1beta1.CronJob)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a CronJob %#v", obj))
+			return
+		}
 	}
+	glog.V(4).Infof("Deleting CronJob %s", d.Name)
+	jm.enqueue(d)
 }
 
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob
@@ -221,7 +331,7 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 
 			// TODO: maybe handle the adoption case?  Concurrency/suspend rules will not apply in that case, obviously, since we can't
 			// stop users from creating jobs if they have permission.  It is assumed that if a
-			// user has permission to create a job within a namespace, then they have permission to make any scheduledJob
+			// user has permission to create a job within a namespace, then they have permission to make any cronJob
 			// in the same namespace "adopt" that job.  ReplicaSets and their Pods work the same way.
 			// TBS: how to update sj.Status.LastScheduleTime if the adopted job is newer than any we knew about?
 		} else if found && IsJobFinished(&j) {
