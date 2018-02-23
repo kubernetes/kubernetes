@@ -49,8 +49,6 @@ const (
 	// Maximal number of concurrent CreateRoute API calls.
 	// TODO: This should be per-provider.
 	maxConcurrentRouteCreations int = 200
-	// Maximum number of retries of route creations.
-	maxRetries int = 5
 	// Maximum number of retries of node status update.
 	updateNodeStatusMaxRetries int = 3
 )
@@ -165,7 +163,13 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			wg.Add(1)
 			go func(nodeName types.NodeName, nameHint string, route *cloudprovider.Route) {
 				defer wg.Done()
-				for i := 0; i < maxRetries; i++ {
+				backoff := wait.Backoff{
+					Duration: 1 * time.Second,
+					Factor:   2,
+					Jitter:   0,
+					Steps:    4,
+				}
+				wait.ExponentialBackoff(backoff, func() (bool, error) {
 					startTime := time.Now()
 					// Ensure that we don't have more than maxConcurrentRouteCreations
 					// CreateRoute calls in flight.
@@ -190,9 +194,10 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 					} else {
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-						return
+						return true, nil
 					}
-				}
+					return false, err
+				})
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
