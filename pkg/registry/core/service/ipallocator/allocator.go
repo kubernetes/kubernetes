@@ -262,11 +262,18 @@ func calculateIPOffset(base *big.Int, ip net.IP) int {
 // RangeSize returns the size of a range in valid addresses.
 func RangeSize(subnet *net.IPNet) int64 {
 	ones, bits := subnet.Mask.Size()
-	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 63 {
+	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
 		return 0
 	}
-	max := int64(1) << uint(bits-ones)
-	return max
+	// For IPv6, the max size will be limited to 65536
+	// This is due to the allocator keeping track of all the
+	// allocated IP's in a bitmap. This will keep the size of
+	// the bitmap to 64k.
+	if bits == 128 && (bits-ones) >= 16 {
+		return int64(1) << uint(16)
+	} else {
+		return int64(1) << uint(bits-ones)
+	}
 }
 
 // GetIndexedIP returns a net.IP that is subnet.IP + index in the contiguous IP space.
