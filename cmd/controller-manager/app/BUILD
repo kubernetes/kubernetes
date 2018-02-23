@@ -11,7 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/controller/apis/controllerconfig:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

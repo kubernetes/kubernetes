@@ -11,8 +11,8 @@ go_library(
     deps = [
         "//cmd/controller-manager/app:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/leaderelectionconfig:go_default_library",
+        "//pkg/controller/apis/controllerconfig:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/helpers:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
