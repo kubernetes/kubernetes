@@ -197,8 +197,8 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	if obj.KubeletConfiguration.BaseConfig == nil {
 		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 	}
-	if obj.KubeletConfiguration.BaseConfig.PodManifestPath == "" {
-		obj.KubeletConfiguration.BaseConfig.PodManifestPath = DefaultManifestsDir
+	if obj.KubeletConfiguration.BaseConfig.StaticPodPath == "" {
+		obj.KubeletConfiguration.BaseConfig.StaticPodPath = DefaultManifestsDir
 	}
 	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
 		dnsIP, err := constants.GetDNSIP(obj.Networking.ServiceSubnet)

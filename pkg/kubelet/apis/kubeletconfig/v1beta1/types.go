@@ -44,11 +44,11 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// podManifestPath is the path to the directory containing pod manifests to
-	// run, or the path to a single manifest file.
+	// staticPodPath is the path to the directory containing local (static) pods to
+	// run, or the path to a single static pod file.
 	// Default: ""
 	// +optional
-	PodManifestPath string `json:"podManifestPath,omitempty"`
+	StaticPodPath string `json:"staticPodPath,omitempty"`
 	// syncFrequency is the max period between synchronizing running
 	// containers and config.
 	// Default: "1m"
@@ -63,14 +63,14 @@ type KubeletConfiguration struct {
 	// Default: "20s"
 	// +optional
 	HTTPCheckFrequency metav1.Duration `json:"httpCheckFrequency,omitempty"`
-	// manifestURL is the URL for accessing the container manifest
+	// staticPodURL is the URL for accessing static pods to run
 	// Default: ""
 	// +optional
-	ManifestURL string `json:"manifestURL,omitempty"`
-	// manifestURLHeader is a map of slices with HTTP headers to use when accessing the manifestURL
+	StaticPodURL string `json:"staticPodURL,omitempty"`
+	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
 	// Default: nil
 	// +optional
-	ManifestURLHeader map[string][]string `json:"manifestURLHeader,omitempty"`
+	StaticPodURLHeader map[string][]string `json:"staticPodURLHeader,omitempty"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces).
 	// Default: "0.0.0.0"

@@ -141,12 +141,12 @@ func Convert_kubeletconfig_KubeletAuthorization_To_v1beta1_KubeletAuthorization(
 }
 
 func autoConvert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfiguration(in *KubeletConfiguration, out *kubeletconfig.KubeletConfiguration, s conversion.Scope) error {
-	out.PodManifestPath = in.PodManifestPath
+	out.StaticPodPath = in.StaticPodPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
-	out.ManifestURL = in.ManifestURL
-	out.ManifestURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.ManifestURLHeader))
+	out.StaticPodURL = in.StaticPodURL
+	out.StaticPodURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.StaticPodURLHeader))
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
@@ -262,12 +262,12 @@ func Convert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfiguration(
 }
 
 func autoConvert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in *kubeletconfig.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
-	out.PodManifestPath = in.PodManifestPath
+	out.StaticPodPath = in.StaticPodPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
-	out.ManifestURL = in.ManifestURL
-	out.ManifestURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.ManifestURLHeader))
+	out.StaticPodURL = in.StaticPodURL
+	out.StaticPodURLHeader = *(*map[string][]string)(unsafe.Pointer(&in.StaticPodURLHeader))
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
