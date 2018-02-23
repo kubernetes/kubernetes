@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
 // +k8s:deepcopy-gen=true
@@ -245,7 +244,6 @@ type TestFactory struct {
 	Command            string
 	TmpDir             string
 	CategoryExpander   categories.CategoryExpander
-	MetricsClientSet   metricsclientset.Interface
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -297,10 +295,6 @@ func (f *FakeFactory) RESTClient() (*restclient.RESTClient, error) {
 
 func (f *FakeFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return nil, nil
-}
-
-func (f *FakeFactory) MetricsClientSet() (metricsclientset.Interface, error) {
-	return f.tf.MetricsClientSet, f.tf.Err
 }
 
 func (f *FakeFactory) ClientSet() (internalclientset.Interface, error) {
@@ -546,10 +540,6 @@ func (f *fakeAPIFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
 	return clientset, f.tf.Err
-}
-
-func (f *fakeAPIFactory) MetricsClientSet() (metricsclientset.Interface, error) {
-	return f.tf.MetricsClientSet, f.tf.Err
 }
 
 func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {

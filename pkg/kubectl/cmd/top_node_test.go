@@ -303,13 +303,25 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, expectedMetrics, nil
 	})
-	tf.MetricsClientSet = fakemetricsClientset
 	tf.Namespace = "test"
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, nil, buf)
-	cmd.Run(cmd, []string{})
+
+	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+	// TODO then check the particular Run functionality and harvest results from fake clients
+	cmdOptions := &TopNodeOptions{}
+	if err := cmdOptions.Complete(f, cmd, []string{}, buf); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = fakemetricsClientset
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check the presence of node names in the output.
 	result := buf.String()
@@ -355,13 +367,25 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("get", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &expectedMetrics, nil
 	})
-	tf.MetricsClientSet = fakemetricsClientset
 	tf.Namespace = "test"
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, nil, buf)
-	cmd.Run(cmd, []string{expectedMetrics.Name})
+
+	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+	// TODO then check the particular Run functionality and harvest results from fake clients
+	cmdOptions := &TopNodeOptions{}
+	if err := cmdOptions.Complete(f, cmd, []string{expectedMetrics.Name}, buf); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = fakemetricsClientset
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check the presence of node names in the output.
 	result := buf.String()
@@ -418,14 +442,26 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 	fakemetricsClientset.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, expectedMetrics, nil
 	})
-	tf.MetricsClientSet = fakemetricsClientset
 	tf.Namespace = "test"
 	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, nil, buf)
 	cmd.Flags().Set("selector", label)
-	cmd.Run(cmd, []string{})
+
+	// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
+	// TODO then check the particular Run functionality and harvest results from fake clients
+	cmdOptions := &TopNodeOptions{}
+	if err := cmdOptions.Complete(f, cmd, []string{}, buf); err != nil {
+		t.Fatal(err)
+	}
+	cmdOptions.MetricsClient = fakemetricsClientset
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdOptions.RunTopNode(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Check the presence of node names in the output.
 	result := buf.String()
