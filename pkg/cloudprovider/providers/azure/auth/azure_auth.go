@@ -66,7 +66,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 				config.UserAssignedID)
 
 		}
-		glog.V(2).Infoln("azure: using implicit MSI to retrieve access token")
+		glog.V(2).Infoln("azure: using SystemAssigned MSI to retrieve access token")
 		return adal.NewServicePrincipalTokenFromMSI(
 			msiEndpoint,
 			env.ServiceManagementEndpoint)
