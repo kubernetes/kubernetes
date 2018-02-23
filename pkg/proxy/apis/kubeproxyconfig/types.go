@@ -146,13 +146,19 @@ type KubeProxyConfiguration struct {
 	ConfigSyncPeriod metav1.Duration
 }
 
-// Currently, four modes of proxying are available total: 'userspace' (older, stable), 'iptables'
-// (newer, faster), 'ipvs', and 'kernelspace' (Windows only, newer).
+// Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
+// (newer, faster), 'ipvs'(newest, better in performance and scalability).
 //
-// If blank, use the best-available proxy (currently iptables, but may change in
-// future versions). If the iptables proxy is selected, regardless of how, but
-// the system's kernel or iptables versions are insufficient, this always falls
-// back to the userspace proxy.
+// Two modes of proxy are available in Windows platform: 'userspace'(older, stable) and 'kernelspace' (newer, faster).
+//
+// In Linux platform, if proxy mode is blank, use the best-available proxy (currently iptables, but may change in the
+// future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
+// insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
+// and the fall back path is firstly iptables and then userspace.
+
+// In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
+// future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
+// this always falls back to the userspace proxy.
 type ProxyMode string
 
 const (
