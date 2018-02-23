@@ -149,7 +149,7 @@ const (
 	MasterConfigurationConfigMapKey = "MasterConfiguration"
 
 	// KubeletBaseConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
-	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
+	KubeletBaseConfigurationConfigMap = "kubelet-base-config"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
 	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
