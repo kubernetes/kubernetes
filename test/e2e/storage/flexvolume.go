@@ -137,7 +137,7 @@ func sshAndLog(cmd, host string) {
 	}
 }
 
-var _ = utils.SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
+var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 
 	// note that namespace deletion is handled by delete-namespace flag
