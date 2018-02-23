@@ -220,7 +220,9 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 
 	// We must make a copy of array, otherwise the timeseries order is changed.
 	usages := make([]*framework.ContainerResourceUsage, 0)
-	usages = append(usages, r.buffers[containerName]...)
+	for _, usage := range r.buffers[containerName] {
+		usages = append(usages, usage)
+	}
 
 	sort.Sort(resourceUsageByCPU(usages))
 	for _, q := range percentiles {

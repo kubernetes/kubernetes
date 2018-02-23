@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
@@ -44,11 +46,20 @@ const (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", func() {
+var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 
 	Context("DevicePlugin", func() {
+		By("Enabling support for Device Plugin")
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.DevicePlugins)] = true
+		})
+
 		It("Verifies the Kubelet device plugin functionality.", func() {
+
+			By("Wait for node is ready")
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+
 			By("Start stub device plugin")
 			// fake devices for e2e test
 			devs := []*pluginapi.Device{
@@ -218,38 +229,34 @@ func numberOfDevices(node *v1.Node, resourceName string) int64 {
 
 // stubAllocFunc will pass to stub device plugin
 func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
-	var responses pluginapi.AllocateResponse
-	for _, req := range r.ContainerRequests {
-		response := &pluginapi.ContainerAllocateResponse{}
-		for _, requestID := range req.DevicesIDs {
-			dev, ok := devs[requestID]
-			if !ok {
-				return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
-			}
-
-			if dev.Health != pluginapi.Healthy {
-				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", requestID)
-			}
-
-			// create fake device file
-			fpath := filepath.Join("/tmp", dev.ID)
-
-			// clean first
-			os.RemoveAll(fpath)
-			f, err := os.Create(fpath)
-			if err != nil && !os.IsExist(err) {
-				return nil, fmt.Errorf("failed to create fake device file: %s", err)
-			}
-
-			f.Close()
-
-			response.Mounts = append(response.Mounts, &pluginapi.Mount{
-				ContainerPath: fpath,
-				HostPath:      fpath,
-			})
+	var response pluginapi.AllocateResponse
+	for _, requestID := range r.DevicesIDs {
+		dev, ok := devs[requestID]
+		if !ok {
+			return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
 		}
-		responses.ContainerResponses = append(responses.ContainerResponses, response)
+
+		if dev.Health != pluginapi.Healthy {
+			return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", requestID)
+		}
+
+		// create fake device file
+		fpath := filepath.Join("/tmp", dev.ID)
+
+		// clean first
+		os.RemoveAll(fpath)
+		f, err := os.Create(fpath)
+		if err != nil && !os.IsExist(err) {
+			return nil, fmt.Errorf("failed to create fake device file: %s", err)
+		}
+
+		f.Close()
+
+		response.Mounts = append(response.Mounts, &pluginapi.Mount{
+			ContainerPath: fpath,
+			HostPath:      fpath,
+		})
 	}
 
-	return &responses, nil
+	return &response, nil
 }
