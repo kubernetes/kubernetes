@@ -25,7 +25,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -303,7 +305,9 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 		if pod.Spec.HostPID {
 			return runtimeapi.NamespaceMode_NODE
 		}
-		// TODO(verb): set NamespaceMode_POD based on ShareProcessNamespace after #58716 is merged
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
+			return runtimeapi.NamespaceMode_POD
+		}
 	}
 	// Note that PID does not default to the zero value for v1.Pod
 	return runtimeapi.NamespaceMode_CONTAINER
