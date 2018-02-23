@@ -137,16 +137,6 @@ type TableConvertor interface {
 	ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error)
 }
 
-// Deleter is an object that can delete a named RESTful resource.
-type Deleter interface {
-	// Delete finds a resource in the storage and deletes it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
-	// returned error value err when the specified resource is not found.
-	// Delete *may* return the object that was deleted, or a status object indicating additional
-	// information about deletion.
-	Delete(ctx genericapirequest.Context, name string) (runtime.Object, error)
-}
-
 // GracefulDeleter knows how to pass deletion options to allow delayed deletion of a
 // RESTful object.
 type GracefulDeleter interface {
@@ -160,17 +150,6 @@ type GracefulDeleter interface {
 	// It also returns a boolean which is set to true if the resource was instantly
 	// deleted or false if it will be deleted asynchronously.
 	Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error)
-}
-
-// GracefulDeleteAdapter adapts the Deleter interface to GracefulDeleter
-type GracefulDeleteAdapter struct {
-	Deleter
-}
-
-// Delete implements RESTGracefulDeleter in terms of Deleter
-func (w GracefulDeleteAdapter) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	obj, err := w.Deleter.Delete(ctx, name)
-	return obj, true, err
 }
 
 // CollectionDeleter is an object that can delete a collection

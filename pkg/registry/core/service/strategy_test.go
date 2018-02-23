@@ -27,6 +27,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestExportService(t *testing.T) {
@@ -111,17 +112,17 @@ func TestExportService(t *testing.T) {
 
 func TestCheckGeneratedNameError(t *testing.T) {
 	expect := errors.NewNotFound(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{}); err != expect {
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Service{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{}); err != expect {
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Service{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Pod{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
+	if err := rest.CheckGeneratedNameError(Strategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }

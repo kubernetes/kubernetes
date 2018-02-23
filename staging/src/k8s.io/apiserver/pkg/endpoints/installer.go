@@ -227,7 +227,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	lister, isLister := storage.(rest.Lister)
 	getter, isGetter := storage.(rest.Getter)
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
-	deleter, isDeleter := storage.(rest.Deleter)
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
 	collectionDeleter, isCollectionDeleter := storage.(rest.CollectionDeleter)
 	updater, isUpdater := storage.(rest.Updater)
@@ -273,16 +272,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var versionedDeleteOptions runtime.Object
 	var versionedDeleterObject interface{}
-	switch {
-	case isGracefulDeleter:
+	if isGracefulDeleter {
 		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, err
 		}
 		versionedDeleterObject = indirectArbitraryPointer(versionedDeleteOptions)
-		isDeleter = true
-	case isDeleter:
-		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
 	}
 
 	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
@@ -416,7 +411,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
@@ -462,7 +457,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer, false}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer, false}, isPatcher)
-		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
+		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isGracefulDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)

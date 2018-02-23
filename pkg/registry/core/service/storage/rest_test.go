@@ -14,28 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package storage
 
 import (
-	"testing"
-
 	"net"
 	"reflect"
 	"strings"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+
 	"k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -46,28 +51,121 @@ import (
 // It is now testing mostly the same things as other resources but
 // in a completely different way. We should unify it.
 
+type serviceStorage struct {
+	GottenID           string
+	UpdatedID          string
+	CreatedID          string
+	DeletedID          string
+	Created            bool
+	DeletedImmediately bool
+	Service            *api.Service
+	OldService         *api.Service
+	ServiceList        *api.ServiceList
+	Err                error
+}
+
+func (s *serviceStorage) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	s.GottenID = name
+	return s.Service, s.Err
+}
+
+func (s *serviceStorage) GetService(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (*api.Service, error) {
+	return s.Service, s.Err
+}
+
+func (s *serviceStorage) NewList() runtime.Object {
+	panic("not implemented")
+}
+
+func (s *serviceStorage) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	ns, _ := genericapirequest.NamespaceFrom(ctx)
+
+	// Copy metadata from internal list into result
+	res := new(api.ServiceList)
+	res.TypeMeta = s.ServiceList.TypeMeta
+	res.ListMeta = s.ServiceList.ListMeta
+
+	if ns != metav1.NamespaceAll {
+		for _, service := range s.ServiceList.Items {
+			if ns == service.Namespace {
+				res.Items = append(res.Items, service)
+			}
+		}
+	} else {
+		res.Items = append([]api.Service{}, s.ServiceList.Items...)
+	}
+
+	return res, s.Err
+}
+
+func (s *serviceStorage) New() runtime.Object {
+	panic("not implemented")
+}
+
+func (s *serviceStorage) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+	svc := obj.(*api.Service)
+	s.CreatedID = obj.(metav1.Object).GetName()
+	s.Service = svc.DeepCopy()
+
+	if s.ServiceList == nil {
+		s.ServiceList = &api.ServiceList{}
+	}
+
+	s.ServiceList.Items = append(s.ServiceList.Items, *svc)
+	return svc, s.Err
+}
+
+func (s *serviceStorage) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	s.UpdatedID = name
+	obj, err := objInfo.UpdatedObject(ctx, s.OldService)
+	if err != nil {
+		return nil, false, err
+	}
+	s.Service = obj.(*api.Service)
+	return s.Service, s.Created, s.Err
+}
+
+func (s *serviceStorage) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	s.DeletedID = name
+	return s.Service, s.DeletedImmediately, s.Err
+}
+
+func (s *serviceStorage) DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	panic("not implemented")
+}
+
+func (s *serviceStorage) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	panic("not implemented")
+}
+
+func (s *serviceStorage) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	panic("not implemented")
+}
+
+func (s *serviceStorage) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+	panic("not implemented")
+}
+
 func generateRandomNodePort() int32 {
 	return int32(rand.IntnRange(30001, 30999))
 }
 
-func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry, *etcdtesting.EtcdTestServer) {
+func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *serviceStorage, *etcdtesting.EtcdTestServer) {
 	return NewTestRESTWithPods(t, endpoints, nil)
 }
 
-func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.PodList) (*REST, *registrytest.ServiceRegistry, *etcdtesting.EtcdTestServer) {
-	registry := registrytest.NewServiceRegistry()
-	endpointRegistry := &registrytest.EndpointRegistry{
-		Endpoints: endpoints,
-	}
+func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.PodList) (*REST, *serviceStorage, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	restOptions := generic.RESTOptions{
+
+	serviceStorage := &serviceStorage{}
+
+	podStorage := podstore.NewStorage(generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
-	}
-	podStorage := podstore.NewStorage(restOptions, nil, nil, nil)
-	if pods != nil && pods.Items != nil {
+	}, nil, nil, nil)
+	if pods != nil && len(pods.Items) > 0 {
 		ctx := genericapirequest.NewDefaultContext()
 		for ix := range pods.Items {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods.Items[ix].Name)
@@ -76,14 +174,29 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 			}
 		}
 	}
+	endpointStorage := endpointstore.NewREST(generic.RESTOptions{
+		StorageConfig:  etcdStorage,
+		Decorator:      generic.UndecoratedStorage,
+		ResourcePrefix: "endpoints",
+	})
+	if endpoints != nil && len(endpoints.Items) > 0 {
+		ctx := genericapirequest.NewDefaultContext()
+		for ix := range endpoints.Items {
+			key, _ := endpointStorage.KeyFunc(ctx, endpoints.Items[ix].Name)
+			if err := endpointStorage.Store.Storage.Create(ctx, key, &endpoints.Items[ix], nil, 0); err != nil {
+				t.Fatalf("Couldn't create endpoint: %v", err)
+			}
+		}
+	}
+
 	r := ipallocator.NewCIDRRange(makeIPNet(t))
 
 	portRange := utilnet.PortRange{Base: 30000, Size: 1000}
 	portAllocator := portallocator.NewPortAllocator(portRange)
 
-	storage := NewStorage(registry, endpointRegistry, podStorage.Pod, r, portAllocator, nil)
+	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, r, portAllocator, nil)
 
-	return storage.Service, registry, server
+	return rest, serviceStorage, server
 }
 
 func makeIPNet(t *testing.T) *net.IPNet {
@@ -94,15 +207,16 @@ func makeIPNet(t *testing.T) *net.IPNet {
 	return net
 }
 
-func releaseServiceNodePorts(t *testing.T, ctx genericapirequest.Context, svcName string, rest *REST, registry *registrytest.ServiceRegistry) {
-	srv, err := registry.GetService(ctx, svcName, &metav1.GetOptions{})
+func releaseServiceNodePorts(t *testing.T, ctx genericapirequest.Context, svcName string, rest *REST, registry ServiceStorage) {
+	obj, err := registry.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+	srv := obj.(*api.Service)
 	if srv == nil {
 		t.Fatalf("Failed to find service: %s", svcName)
 	}
-	serviceNodePorts := CollectServiceNodePorts(srv)
+	serviceNodePorts := collectServiceNodePorts(srv)
 	if len(serviceNodePorts) == 0 {
 		t.Errorf("Failed to find NodePorts of service : %s", srv.Name)
 	}
@@ -271,7 +385,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		if created_service.Name != test.name {
 			t.Errorf("Expected %s, but got %s", test.name, created_service.Name)
 		}
-		serviceNodePorts := CollectServiceNodePorts(created_service)
+		serviceNodePorts := collectServiceNodePorts(created_service)
 		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
 			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
 		}
@@ -348,7 +462,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	storage, registry, server := NewTestREST(t, nil)
 	defer server.Terminate(t)
 
-	svc, err := registry.CreateService(ctx, &api.Service{
+	obj, err := registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz1"},
@@ -358,8 +472,8 @@ func TestServiceRegistryUpdate(t *testing.T) {
 				TargetPort: intstr.FromInt(6502),
 			}},
 		},
-	}, rest.ValidateAllObjectFunc)
-
+	}, rest.ValidateAllObjectFunc, false)
+	svc := obj.(*api.Service)
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -400,7 +514,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil)
 	defer server.Terminate(t)
-	registry.CreateService(ctx, &api.Service{
+	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
@@ -409,7 +523,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 				Protocol: api.ProtocolTCP,
 			}},
 		},
-	}, rest.ValidateAllObjectFunc)
+	}, rest.ValidateAllObjectFunc, false)
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			ObjectMeta: metav1.ObjectMeta{Name: ""},
@@ -477,7 +591,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if srv == nil {
 		t.Fatalf("Failed to find service: %s", svc.Name)
 	}
-	serviceNodePorts := CollectServiceNodePorts(srv)
+	serviceNodePorts := collectServiceNodePorts(srv)
 	if len(serviceNodePorts) == 0 {
 		t.Errorf("Failed to find NodePorts of service : %s", srv.Name)
 	}
@@ -504,8 +618,8 @@ func TestServiceRegistryDelete(t *testing.T) {
 			}},
 		},
 	}
-	registry.CreateService(ctx, svc, rest.ValidateAllObjectFunc)
-	storage.Delete(ctx, svc.Name)
+	registry.Create(ctx, svc, rest.ValidateAllObjectFunc, false)
+	storage.Delete(ctx, svc.Name, &metav1.DeleteOptions{})
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
@@ -527,8 +641,8 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 			}},
 		},
 	}
-	registry.CreateService(ctx, svc, rest.ValidateAllObjectFunc)
-	storage.Delete(ctx, svc.Name)
+	registry.Create(ctx, svc, rest.ValidateAllObjectFunc, false)
+	storage.Delete(ctx, svc.Name, &metav1.DeleteOptions{})
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
@@ -615,12 +729,12 @@ func TestServiceRegistryGet(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil)
 	defer server.Terminate(t)
-	registry.CreateService(ctx, &api.Service{
+	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
-	}, rest.ValidateAllObjectFunc)
+	}, rest.ValidateAllObjectFunc, false)
 	storage.Get(ctx, "foo", &metav1.GetOptions{})
 	if e, a := "foo", registry.GottenID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
@@ -653,22 +767,6 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}}},
 					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
-				}},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{},
-					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
-				}, {
-					Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault}}},
-					Ports:     []api.EndpointPort{{Name: "", Port: 80}, {Name: "p", Port: 93}},
-				}, {
-					Addresses: []api.EndpointAddress{{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Name: "bar", Namespace: metav1.NamespaceDefault}}},
-					Ports:     []api.EndpointPort{},
 				}},
 			},
 		},
@@ -708,7 +806,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	storage, registry, server := NewTestRESTWithPods(t, endpoints, pods)
 	defer server.Terminate(t)
 	for _, name := range []string{"foo", "bad"} {
-		registry.CreateService(ctx, &api.Service{
+		registry.Create(ctx, &api.Service{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 			Spec: api.ServiceSpec{
 				Selector: map[string]string{"bar": "baz"},
@@ -721,7 +819,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 					{Name: "", Port: 93, TargetPort: intstr.FromInt(80)},
 				},
 			},
-		}, rest.ValidateAllObjectFunc)
+		}, rest.ValidateAllObjectFunc, false)
 	}
 	redirector := rest.Redirector(storage)
 
@@ -807,19 +905,19 @@ func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil)
 	defer server.Terminate(t)
-	registry.CreateService(ctx, &api.Service{
+	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 		},
-	}, rest.ValidateAllObjectFunc)
-	registry.CreateService(ctx, &api.Service{
+	}, rest.ValidateAllObjectFunc, false)
+	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar2": "baz2"},
 		},
-	}, rest.ValidateAllObjectFunc)
-	registry.List.ResourceVersion = "1"
+	}, rest.ValidateAllObjectFunc, false)
+	registry.ServiceList.ResourceVersion = "1"
 	s, _ := storage.List(ctx, nil)
 	sl := s.(*api.ServiceList)
 	if len(sl.Items) != 2 {
@@ -946,7 +1044,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		t.Errorf("Unexpected ClusterIP: %s", created_service_1.Spec.ClusterIP)
 	}
 
-	_, err := storage.Delete(ctx, created_service_1.Name)
+	_, _, err := storage.Delete(ctx, created_service_1.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error deleting service: %v", err)
 	}
@@ -1303,7 +1401,7 @@ func TestInitClusterIP(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		hasAllocatedIP, err := storage.initClusterIP(test.svc)
+		hasAllocatedIP, err := initClusterIP(test.svc, storage.serviceIPs)
 		if err != nil {
 			t.Errorf("%q: unexpected error: %v", test.name, err)
 		}
@@ -1488,13 +1586,13 @@ func TestInitNodePorts(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		err := storage.initNodePorts(test.service, nodePortOp)
+		err := initNodePorts(test.service, nodePortOp)
 		if err != nil {
 			t.Errorf("%q: unexpected error: %v", test.name, err)
 			continue
 		}
 
-		serviceNodePorts := CollectServiceNodePorts(test.service)
+		serviceNodePorts := collectServiceNodePorts(test.service)
 		if len(test.expectSpecifiedNodePorts) == 0 {
 			for _, nodePort := range serviceNodePorts {
 				if !storage.serviceNodePorts.Has(nodePort) {
@@ -1758,13 +1856,13 @@ func TestUpdateNodePorts(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		err := storage.updateNodePorts(test.oldService, test.newService, nodePortOp)
+		err := updateNodePorts(test.oldService, test.newService, nodePortOp)
 		if err != nil {
 			t.Errorf("%q: unexpected error: %v", test.name, err)
 			continue
 		}
 
-		serviceNodePorts := CollectServiceNodePorts(test.newService)
+		serviceNodePorts := collectServiceNodePorts(test.newService)
 		if len(test.expectSpecifiedNodePorts) == 0 {
 			for _, nodePort := range serviceNodePorts {
 				if !storage.serviceNodePorts.Has(nodePort) {
