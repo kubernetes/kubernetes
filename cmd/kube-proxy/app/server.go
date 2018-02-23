@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	goruntime "runtime"
 	"strings"
@@ -38,6 +37,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -472,17 +473,14 @@ func (s *ProxyServer) Run() error {
 
 	// Start up a metrics server if requested
 	if len(s.MetricsBindAddress) > 0 {
-		mux := http.NewServeMux()
+		mux := mux.NewPathRecorderMux("kube-proxy")
 		healthz.InstallHandler(mux)
 		mux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
 		mux.Handle("/metrics", prometheus.Handler())
 		if s.EnableProfiling {
-			mux.HandleFunc("/debug/pprof/", pprof.Index)
-			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			routes.Profiling{}.Install(mux)
 		}
 		configz.InstallHandler(mux)
 		go wait.Until(func() {
