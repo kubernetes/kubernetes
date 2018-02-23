@@ -28,7 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	apps "k8s.io/api/apps/v1"
+	"k8s.io/api/apps"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -210,7 +211,7 @@ func TestAscendingOrdinal(t *testing.T) {
 }
 
 func TestOverlappingStatefulSets(t *testing.T) {
-	sets := make([]*apps.StatefulSet, 10)
+	sets := make([]*appsv1.StatefulSet, 10)
 	perm := rand.Perm(10)
 	for i, v := range perm {
 		sets[i] = newStatefulSet(10)
@@ -237,7 +238,7 @@ func TestNewPodControllerRef(t *testing.T) {
 	if controllerRef == nil {
 		t.Fatalf("No ControllerRef found on new pod")
 	}
-	if got, want := controllerRef.APIVersion, apps.SchemeGroupVersion.String(); got != want {
+	if got, want := controllerRef.APIVersion, appsv1.SchemeGroupVersion.String(); got != want {
 		t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
 	}
 	if got, want := controllerRef.Kind, "StatefulSet"; got != want {
@@ -303,7 +304,7 @@ func newPVC(name string) v1.PersistentVolumeClaim {
 	}
 }
 
-func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount) *apps.StatefulSet {
+func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount) *appsv1.StatefulSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []v1.PersistentVolumeClaim{}
 	for _, m := range petMounts {
@@ -337,7 +338,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 
 	template.Labels = map[string]string{"foo": "bar"}
 
-	return &apps.StatefulSet{
+	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1",
@@ -347,7 +348,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Namespace: v1.NamespaceDefault,
 			UID:       types.UID("test"),
 		},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
@@ -355,7 +356,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 			Template:             template,
 			VolumeClaimTemplates: claims,
 			ServiceName:          "governingsvc",
-			UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy:       appsv1.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			RevisionHistoryLimit: func() *int32 {
 				limit := int32(2)
 				return &limit
@@ -364,7 +365,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 	}
 }
 
-func newStatefulSet(replicas int) *apps.StatefulSet {
+func newStatefulSet(replicas int) *appsv1.StatefulSet {
 	petMounts := []v1.VolumeMount{
 		{Name: "datadir", MountPath: "/tmp/zookeeper"},
 	}
