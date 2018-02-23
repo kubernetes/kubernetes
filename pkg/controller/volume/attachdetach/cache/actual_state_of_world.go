@@ -131,8 +131,8 @@ type ActualStateOfWorld interface {
 type AttachedVolume struct {
 	operationexecutor.AttachedVolume
 
-	// MountedByNode indicates that this volume has been been mounted by the
-	// node and is unsafe to detach.
+	// MountedByNode indicates that this volume has been mounted by the node and
+	// is unsafe to detach.
 	// The value is set and unset by SetVolumeMountedByNode(...).
 	MountedByNode bool
 
@@ -473,7 +473,7 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 	nodeToUpdate, nodeToUpdateExists := asw.nodesToUpdateStatusFor[nodeName]
 	if !nodeToUpdateExists {
 		// should not happen
-		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t because nodeName=%q  does not exist",
+		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
 			needed, nodeName)
 		return fmt.Errorf(errMsg)
 	}
