@@ -111,7 +111,7 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash stri
 	return newTemplate
 }
 
-// IsPodUpdate checks if pod contains label value that either matches templateGeneration or hash
+// IsPodUpdated checks if pod contains label value that either matches templateGeneration or hash
 func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
 	templateMatches := dsTemplateGeneration != nil &&
