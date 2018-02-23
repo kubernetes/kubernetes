@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
+	"k8s.io/api/apps"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -76,7 +77,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *appsinternalversion.StatefulSetSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
@@ -117,7 +118,7 @@ func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.Sta
 	return nil
 }
 
-func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1beta1.StatefulSetSpec, s conversion.Scope) error {
+func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *appsinternalversion.StatefulSetSpec, out *appsv1beta1.StatefulSetSpec, s conversion.Scope) error {
 	out.Replicas = new(int32)
 	*out.Replicas = in.Replicas
 	if in.Selector != nil {
@@ -150,17 +151,17 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 		out.RevisionHistoryLimit = nil
 	}
 	out.ServiceName = in.ServiceName
-	out.PodManagementPolicy = appsv1beta1.PodManagementPolicyType(in.PodManagementPolicy)
+	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1beta1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
+func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1beta1.StatefulSetUpdateStrategy, out *appsinternalversion.StatefulSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = appsinternalversion.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(apps.RollingUpdateStatefulSetStrategy)
+		out.RollingUpdate = new(appsinternalversion.RollingUpdateStatefulSetStrategy)
 		out.RollingUpdate.Partition = *in.RollingUpdate.Partition
 	} else {
 		out.RollingUpdate = nil
@@ -168,7 +169,7 @@ func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy
 	return nil
 }
 
-func Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *appsv1beta1.StatefulSetUpdateStrategy, s conversion.Scope) error {
+func Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(in *appsinternalversion.StatefulSetUpdateStrategy, out *appsv1beta1.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = appsv1beta1.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(appsv1beta1.RollingUpdateStatefulSetStrategy)
@@ -269,7 +270,7 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 }
 
 func Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in *extensions.DeploymentStrategy, out *appsv1beta1.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = appsv1beta1.DeploymentStrategyType(in.Type)
+	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(appsv1beta1.RollingUpdateDeployment)
 		if err := Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {

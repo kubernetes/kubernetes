@@ -19,14 +19,15 @@ package fuzzer
 import (
 	fuzz "github.com/google/gofuzz"
 
+	"k8s.io/api/apps"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 )
 
 // Funcs returns the fuzzer functions for the apps api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(s *apps.StatefulSet, c fuzz.Continue) {
+		func(s *appsinternalversion.StatefulSet, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 
 			// match defaulter

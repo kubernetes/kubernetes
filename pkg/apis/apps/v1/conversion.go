@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"strconv"
 
+	"k8s.io/api/apps"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -116,7 +117,7 @@ func Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(in *extensions.Deplo
 }
 
 func Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(in *extensions.DeploymentStrategy, out *appsv1.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = appsv1.DeploymentStrategyType(in.Type)
+	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(appsv1.RollingUpdateDeployment)
 		if err := Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in.RollingUpdate, out.RollingUpdate, s); err != nil {
@@ -175,14 +176,14 @@ func Convert_v1_Deployment_To_extensions_Deployment(in *appsv1.Deployment, out *
 
 	// Copy annotation to deprecated rollbackTo field for roundtrip
 	// TODO: remove this conversion after we delete extensions/v1beta1 and apps/v1beta1 Deployment
-	if revision, _ := in.Annotations[appsv1.DeprecatedRollbackTo]; revision != "" {
+	if revision, _ := in.Annotations[apps.DeprecatedRollbackTo]; revision != "" {
 		if revision64, err := strconv.ParseInt(revision, 10, 64); err != nil {
-			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", appsv1.DeprecatedRollbackTo, revision, err)
+			return fmt.Errorf("failed to parse annotation[%s]=%s as int64: %v", apps.DeprecatedRollbackTo, revision, err)
 		} else {
 			out.Spec.RollbackTo = new(extensions.RollbackConfig)
 			out.Spec.RollbackTo.Revision = revision64
 		}
-		delete(out.Annotations, appsv1.DeprecatedRollbackTo)
+		delete(out.Annotations, apps.DeprecatedRollbackTo)
 	} else {
 		out.Spec.RollbackTo = nil
 	}
@@ -205,9 +206,9 @@ func Convert_extensions_Deployment_To_v1_Deployment(in *extensions.Deployment, o
 		if out.Annotations == nil {
 			out.Annotations = make(map[string]string)
 		}
-		out.Annotations[appsv1.DeprecatedRollbackTo] = strconv.FormatInt(in.Spec.RollbackTo.Revision, 10)
+		out.Annotations[apps.DeprecatedRollbackTo] = strconv.FormatInt(in.Spec.RollbackTo.Revision, 10)
 	} else {
-		delete(out.Annotations, appsv1.DeprecatedRollbackTo)
+		delete(out.Annotations, apps.DeprecatedRollbackTo)
 	}
 
 	if err := Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
@@ -238,7 +239,7 @@ func Convert_extensions_DaemonSet_To_v1_DaemonSet(in *extensions.DaemonSet, out 
 	if out.Annotations == nil {
 		out.Annotations = make(map[string]string)
 	}
-	out.Annotations[appsv1.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
+	out.Annotations[apps.DeprecatedTemplateGeneration] = strconv.FormatInt(in.Spec.TemplateGeneration, 10)
 	if err := Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -267,7 +268,7 @@ func Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(in *extensions.DaemonS
 }
 
 func Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(in *extensions.DaemonSetUpdateStrategy, out *appsv1.DaemonSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = appsv1.DaemonSetUpdateStrategyType(in.Type)
+	out.Type = apps.DaemonSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = &appsv1.RollingUpdateDaemonSet{}
 		if err := Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
@@ -282,12 +283,12 @@ func Convert_v1_DaemonSet_To_extensions_DaemonSet(in *appsv1.DaemonSet, out *ext
 	if err := Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if value, ok := in.Annotations[appsv1.DeprecatedTemplateGeneration]; ok {
+	if value, ok := in.Annotations[apps.DeprecatedTemplateGeneration]; ok {
 		if value64, err := strconv.ParseInt(value, 10, 64); err != nil {
 			return err
 		} else {
 			out.Spec.TemplateGeneration = value64
-			delete(out.Annotations, appsv1.DeprecatedTemplateGeneration)
+			delete(out.Annotations, apps.DeprecatedTemplateGeneration)
 		}
 	}
 	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
@@ -348,7 +349,7 @@ func Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1.ReplicaSe
 	return nil
 }
 
-func Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
+func Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSpec, out *appsinternalversion.StatefulSetSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
@@ -389,7 +390,7 @@ func Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSp
 	return nil
 }
 
-func Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec, out *appsv1.StatefulSetSpec, s conversion.Scope) error {
+func Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *appsinternalversion.StatefulSetSpec, out *appsv1.StatefulSetSpec, s conversion.Scope) error {
 	out.Replicas = new(int32)
 	*out.Replicas = in.Replicas
 	if in.Selector != nil {
@@ -422,17 +423,17 @@ func Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec
 		out.RevisionHistoryLimit = nil
 	}
 	out.ServiceName = in.ServiceName
-	out.PodManagementPolicy = appsv1.PodManagementPolicyType(in.PodManagementPolicy)
+	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
-	out.Type = apps.StatefulSetUpdateStrategyType(in.Type)
+func Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1.StatefulSetUpdateStrategy, out *appsinternalversion.StatefulSetUpdateStrategy, s conversion.Scope) error {
+	out.Type = appsinternalversion.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
-		out.RollingUpdate = new(apps.RollingUpdateStatefulSetStrategy)
+		out.RollingUpdate = new(appsinternalversion.RollingUpdateStatefulSetStrategy)
 		out.RollingUpdate.Partition = *in.RollingUpdate.Partition
 	} else {
 		out.RollingUpdate = nil
@@ -440,7 +441,7 @@ func Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *
 	return nil
 }
 
-func Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *apps.StatefulSetUpdateStrategy, out *appsv1.StatefulSetUpdateStrategy, s conversion.Scope) error {
+func Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *appsinternalversion.StatefulSetUpdateStrategy, out *appsv1.StatefulSetUpdateStrategy, s conversion.Scope) error {
 	out.Type = appsv1.StatefulSetUpdateStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		out.RollingUpdate = new(appsv1.RollingUpdateStatefulSetStrategy)
@@ -452,7 +453,7 @@ func Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(in *
 	return nil
 }
 
-func Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1.StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+func Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1.StatefulSetStatus, out *appsinternalversion.StatefulSetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = new(int64)
 	*out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
@@ -465,7 +466,7 @@ func Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1.StatefulS
 		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
 	}
-	out.Conditions = make([]apps.StatefulSetCondition, len(in.Conditions))
+	out.Conditions = make([]appsinternalversion.StatefulSetCondition, len(in.Conditions))
 	for i := range in.Conditions {
 		if err := Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
 			return err
@@ -474,7 +475,7 @@ func Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1.StatefulS
 	return nil
 }
 
-func Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *apps.StatefulSetStatus, out *appsv1.StatefulSetStatus, s conversion.Scope) error {
+func Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(in *appsinternalversion.StatefulSetStatus, out *appsv1.StatefulSetStatus, s conversion.Scope) error {
 	if in.ObservedGeneration != nil {
 		out.ObservedGeneration = *in.ObservedGeneration
 	}

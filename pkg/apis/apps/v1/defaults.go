@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/api/apps"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -41,9 +42,9 @@ func SetDefaults_Deployment(obj *appsv1.Deployment) {
 	strategy := &obj.Spec.Strategy
 	// Set default DeploymentStrategyType as RollingUpdate.
 	if strategy.Type == "" {
-		strategy.Type = appsv1.RollingUpdateDeploymentStrategyType
+		strategy.Type = apps.RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == appsv1.RollingUpdateDeploymentStrategyType {
+	if strategy.Type == apps.RollingUpdateDeploymentStrategyType {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := appsv1.RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate
@@ -72,9 +73,9 @@ func SetDefaults_Deployment(obj *appsv1.Deployment) {
 func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
-		updateStrategy.Type = appsv1.RollingUpdateDaemonSetStrategyType
+		updateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	}
-	if updateStrategy.Type == appsv1.RollingUpdateDaemonSetStrategyType {
+	if updateStrategy.Type == apps.RollingUpdateDaemonSetStrategyType {
 		if updateStrategy.RollingUpdate == nil {
 			rollingUpdate := appsv1.RollingUpdateDaemonSet{}
 			updateStrategy.RollingUpdate = &rollingUpdate
@@ -93,17 +94,17 @@ func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 
 func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
-		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+		obj.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
 	}
 
 	if obj.Spec.UpdateStrategy.Type == "" {
-		obj.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
+		obj.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 
 		// UpdateStrategy.RollingUpdate will take default values below.
 		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
 	}
 
-	if obj.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+	if obj.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
 		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
