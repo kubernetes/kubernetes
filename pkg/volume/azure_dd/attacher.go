@@ -262,6 +262,9 @@ func (detacher *azureDiskDetacher) Detach(diskName string, nodeName types.NodeNa
 		instanceid = instanceid[(ind + 1):]
 	}
 
+	getLunMutex.LockKey(instanceid)
+	defer getLunMutex.UnlockKey(instanceid)
+
 	glog.V(4).Infof("detach %v from node %q", diskName, nodeName)
 	err = detacher.azureProvider.DetachDiskByName(diskName, "" /* diskURI */, nodeName)
 	if err != nil {
