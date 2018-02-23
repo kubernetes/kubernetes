@@ -83954,6 +83954,13 @@
      "kind"
     ],
     "properties": {
+     "categories": {
+      "description": "Categories is a list of grouped resources custom resources belong to (e.g. 'all')",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
      "kind": {
       "description": "Kind is the serialized kind of the resource.  It is normally CamelCase and singular.",
       "type": "string"

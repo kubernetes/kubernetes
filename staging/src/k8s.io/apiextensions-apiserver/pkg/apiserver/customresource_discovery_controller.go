@@ -117,6 +117,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			Kind:         crd.Status.AcceptedNames.Kind,
 			Verbs:        verbs,
 			ShortNames:   crd.Status.AcceptedNames.ShortNames,
+			Categories:   crd.Status.AcceptedNames.Categories,
 		})
 
 		if crd.Spec.Subresources != nil && crd.Spec.Subresources.Status != nil {

@@ -388,6 +388,10 @@ func TestDiscovery(t *testing.T) {
 	if !reflect.DeepEqual([]string(r.Verbs), expectedVerbs) {
 		t.Fatalf("Unexpected verbs for resource \"noxus\" in group version %v/%v via discovery: expected=%v got=%v", group, version, expectedVerbs, r.Verbs)
 	}
+
+	if !reflect.DeepEqual(r.Categories, []string{"all"}) {
+		t.Fatalf("Expected exactly the category \"all\" in group version %v/%v via discovery, got: %v", group, version, r.Categories)
+	}
 }
 
 func TestNoNamespaceReject(t *testing.T) {

@@ -459,7 +459,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			statusSpec,
 			scaleSpec,
 		),
-		r.restOptionsGetter,
+		r.restOptionsGetter, crd.Status.AcceptedNames.Categories,
 	)
 
 	selfLinkPrefix := ""

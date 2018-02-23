@@ -88,6 +88,10 @@ message CustomResourceDefinitionNames {
 
   // ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
   optional string listKind = 5;
+
+  // Categories is a list of grouped resources custom resources belong to (e.g. 'all')
+  // +optional
+  repeated string categories = 6;
 }
 
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear

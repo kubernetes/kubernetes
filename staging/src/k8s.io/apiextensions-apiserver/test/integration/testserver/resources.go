@@ -72,6 +72,7 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 				Kind:       "WishIHadChosenNoxu",
 				ShortNames: []string{"foo", "bar", "abc", "def"},
 				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
 			},
 			Scope: scope,
 		},

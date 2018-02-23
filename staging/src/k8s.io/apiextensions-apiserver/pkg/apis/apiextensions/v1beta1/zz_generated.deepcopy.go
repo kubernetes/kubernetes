@@ -112,6 +112,11 @@ func (in *CustomResourceDefinitionNames) DeepCopyInto(out *CustomResourceDefinit
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Categories != nil {
+		in, out := &in.Categories, &out.Categories
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
