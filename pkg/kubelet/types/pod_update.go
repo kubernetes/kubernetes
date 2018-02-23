@@ -140,8 +140,7 @@ func (sp SyncPodType) String() string {
 }
 
 // IsCriticalPod returns true if the pod bears the critical pod annotation
-// key. Both the rescheduler and the kubelet use this key to make admission
-// and scheduling decisions.
+// key. The kubelet uses this key to make admission decision.
 func IsCriticalPod(pod *v1.Pod) bool {
 	return IsCritical(pod.Namespace, pod.Annotations)
 }
