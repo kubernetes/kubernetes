@@ -527,38 +527,9 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
 		podsToDelete := getPodsToDelete(filteredPods, diff)
 
-		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
-		// deleted, so we know to record their expectations exactly once either
-		// when we see it as an update of the deletion timestamp, or as a delete.
-		// Note that if the labels on a pod/rs change in a way that the pod gets
-		// orphaned, the rs will only wake up after the expectations have
-		// expired even if other pods are deleted.
-		rsc.expectations.ExpectDeletions(rsKey, getPodKeys(podsToDelete))
-
-		errCh := make(chan error, diff)
-		var wg sync.WaitGroup
-		wg.Add(diff)
-		for _, pod := range podsToDelete {
-			go func(targetPod *v1.Pod) {
-				defer wg.Done()
-				if err := rsc.podControl.DeletePod(rs.Namespace, targetPod.Name, rs); err != nil {
-					// Decrement the expected number of deletes because the informer won't observe this deletion
-					podKey := controller.PodKey(targetPod)
-					glog.V(2).Infof("Failed to delete %v, decrementing expectations for %v %s/%s", podKey, rsc.Kind, rs.Namespace, rs.Name)
-					rsc.expectations.DeletionObserved(rsKey, podKey)
-					errCh <- err
-				}
-			}(pod)
-		}
-		wg.Wait()
-
-		select {
-		case err := <-errCh:
-			// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
-			if err != nil {
-				return err
-			}
-		default:
+		err := rsc.deletePods(rs, rsKey, podsToDelete, diff)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -603,19 +574,28 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	if err != nil {
 		return err
 	}
+
+	allPods, err = rsc.claimPods(rs, selector, allPods)
+	if err != nil {
+		return err
+	}
+
+	// Failed pods without DeletionTimestamp set will never be deleted.
+	// This can happen when kubelet evict pods.
+	// Clean up those pods before continuing.
+	found, err := rsc.killFailedPods(rs, key, allPods)
+	if found || err != nil {
+		return err
+	}
+
+	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// modify them, you need to copy it first.
 	// Ignore inactive pods.
 	var filteredPods []*v1.Pod
 	for _, pod := range allPods {
 		if controller.IsPodActive(pod) {
 			filteredPods = append(filteredPods, pod)
 		}
-	}
-
-	// NOTE: filteredPods are pointing to objects from cache - if you need to
-	// modify them, you need to copy it first.
-	filteredPods, err = rsc.claimPods(rs, selector, filteredPods)
-	if err != nil {
-		return err
 	}
 
 	var manageReplicasErr error
@@ -713,4 +693,56 @@ func getPodKeys(pods []*v1.Pod) []string {
 		podKeys = append(podKeys, controller.PodKey(pod))
 	}
 	return podKeys
+}
+
+func (rsc *ReplicaSetController) deletePods(rs *extensions.ReplicaSet, rsKey string, podsToDelete []*v1.Pod, diff int) error {
+	// Snapshot the UIDs (ns/name) of the pods we're expecting to see
+	// deleted, so we know to record their expectations exactly once either
+	// when we see it as an update of the deletion timestamp, or as a delete.
+	// Note that if the labels on a pod/rs change in a way that the pod gets
+	// orphaned, the rs will only wake up after the expectations have
+	// expired even if other pods are deleted.
+	rsc.expectations.ExpectDeletions(rsKey, getPodKeys(podsToDelete))
+
+	errCh := make(chan error, diff)
+	var wg sync.WaitGroup
+	wg.Add(diff)
+	for _, pod := range podsToDelete {
+		go func(targetPod *v1.Pod) {
+			defer wg.Done()
+			if err := rsc.podControl.DeletePod(rs.Namespace, targetPod.Name, rs); err != nil {
+				// Decrement the expected number of deletes because the informer won't observe this deletion
+				podKey := controller.PodKey(targetPod)
+				glog.V(2).Infof("Failed to delete %v, decrementing expectations for %v %s/%s", podKey, rsc.Kind, rs.Namespace, rs.Name)
+				rsc.expectations.DeletionObserved(rsKey, podKey)
+				errCh <- err
+			}
+		}(pod)
+	}
+	wg.Wait()
+
+	select {
+	case err := <-errCh:
+		// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
+		if err != nil {
+			return err
+		}
+	default:
+	}
+	return nil
+}
+
+func (rsc *ReplicaSetController) killFailedPods(rs *extensions.ReplicaSet, rsKey string, pods []*v1.Pod) (bool, error) {
+	var failedPods []*v1.Pod
+	for _, pod := range pods {
+		if pod.DeletionTimestamp == nil && pod.Status.Phase == v1.PodFailed {
+			failedPods = append(failedPods, pod)
+		}
+	}
+	found := len(failedPods) > 0
+	if found {
+		glog.V(2).Infof("Found %d failed ReplicaSet pods without DeletionTimestamp, will try to kill them", len(failedPods))
+	}
+	err := rsc.deletePods(rs, rsKey, failedPods, len(failedPods))
+	return found, err
 }
