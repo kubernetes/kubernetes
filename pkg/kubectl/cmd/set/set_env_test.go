@@ -39,7 +39,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -123,7 +122,6 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 }
 
 func TestSetEnvRemote(t *testing.T) {
-	out := new(bytes.Buffer)
 	inputs := []struct {
 		object                          runtime.Object
 		apiPrefix, apiGroup, apiVersion string
@@ -150,7 +148,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "extensions", apiVersion: "v1beta1",
 			args: []string{"replicaset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1beta2.ReplicaSet{
@@ -171,7 +169,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
 			args: []string{"replicaset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1.ReplicaSet{
@@ -192,7 +190,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
 			args: []string{"replicaset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &extensionsv1beta1.DaemonSet{
@@ -213,7 +211,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "extensions", apiVersion: "v1beta1",
 			args: []string{"daemonset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1beta2.DaemonSet{
@@ -234,7 +232,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
 			args: []string{"daemonset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1.DaemonSet{
@@ -255,7 +253,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
 			args: []string{"daemonset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &extensionsv1beta1.Deployment{
@@ -276,7 +274,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "extensions", apiVersion: "v1beta1",
 			args: []string{"deployment", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1beta1.Deployment{
@@ -297,7 +295,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta1",
 			args: []string{"deployment", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1beta2.Deployment{
@@ -318,7 +316,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
 			args: []string{"deployment", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1.Deployment{
@@ -339,7 +337,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
 			args: []string{"deployment", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1beta1.StatefulSet{
@@ -360,7 +358,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "apps",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta1",
 			args: []string{"statefulset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1beta2.StatefulSet{
@@ -381,7 +379,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "apps",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
 			args: []string{"statefulset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1.StatefulSet{
@@ -402,7 +400,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "apps",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
 			args: []string{"statefulset", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &batchv1.Job{
@@ -423,7 +421,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "batch",
 			apiPrefix:    "/apis", apiGroup: "batch", apiVersion: "v1",
 			args: []string{"job", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &v1.ReplicationController{
@@ -444,7 +442,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "",
 			apiPrefix:    "/api", apiGroup: "", apiVersion: "v1",
 			args: []string{"replicationcontroller", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out, Local: false},
+			opts: &EnvOptions{Local: false},
 		},
 		{
 			object: &appsv1.Deployment{
@@ -465,7 +463,7 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
 			args: []string{"deployment", "nginx", "env=prod"},
-			opts: &EnvOptions{Out: out,
+			opts: &EnvOptions{
 				Local: false,
 				From:  "configmap/myconfigmap"},
 		},
@@ -488,55 +486,60 @@ func TestSetEnvRemote(t *testing.T) {
 			testAPIGroup: "extensions",
 			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
 			args: []string{"deployment", "nginx"},
-			opts: &EnvOptions{Out: out,
+			opts: &EnvOptions{
 				Local: false,
 				Keys:  []string{"test-key"},
 				From:  "configmap/myconfigmap"},
 		},
 	}
-	for _, input := range inputs {
-		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
-		testapi.Default = testapi.Groups[input.testAPIGroup]
-		tf := cmdtesting.NewTestFactory()
-		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-		ns := legacyscheme.Codecs
-		tf.Namespace = "test"
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         groupVersion,
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
-				switch p, m := req.URL.Path, req.Method; {
-				case p == resourcePath && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
-				case p == resourcePath && m == http.MethodPatch:
-					stream, err := req.GetBody()
-					if err != nil {
-						return nil, err
+	for i, input := range inputs {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
+			tf := cmdtesting.NewTestFactory()
+			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
+			ns := legacyscheme.Codecs
+			tf.Namespace = "test"
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         groupVersion,
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					resourcePathPrefix := ""
+					if len(groupVersion.Group) > 0 {
+						resourcePathPrefix = input.apiPrefix + "/" + groupVersion.Group + "/" + groupVersion.Version
+					} else {
+						resourcePathPrefix = input.apiPrefix + "/" + groupVersion.Version
 					}
-					bytes, err := ioutil.ReadAll(stream)
-					if err != nil {
-						return nil, err
+					resourcePath := resourcePathPrefix + "/namespaces/" + tf.Namespace + "/" + input.args[0] + "s" + "/" + input.args[1]
+
+					switch p, m := req.URL.Path, req.Method; {
+					case p == resourcePath && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+					case p == resourcePath && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := ioutil.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+					default:
+						t.Fatalf("unexpected request: %s %v expected %v\n%#v", req.Method, req.URL.Path, resourcePath, req)
+						return nil, fmt.Errorf("unexpected request")
 					}
-					assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
-				default:
-					t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
-					return nil, fmt.Errorf("unexpected request")
-				}
-			}),
-			VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
-		}
-		cmd := NewCmdEnv(tf, out, out, out)
-		cmd.SetOutput(out)
-		cmd.Flags().Set("output", "yaml")
-		opts := input.opts
-		opts.Complete(tf, cmd)
-		err := opts.Validate(input.args)
-		assert.NoError(t, err)
-		err = opts.RunEnv(tf)
-		assert.NoError(t, err)
+				}),
+				VersionedAPIPath: path.Join(input.apiPrefix, groupVersion.Group, groupVersion.Version),
+			}
+			cmd := NewCmdEnv(tf, &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{})
+			opts := input.opts
+			opts.Out = &bytes.Buffer{}
+			opts.Complete(tf, cmd)
+			err := opts.Validate(input.args)
+			assert.NoError(t, err)
+			err = opts.RunEnv(tf)
+			assert.NoError(t, err)
+		})
 	}
-	// TODO This global state restoration needs fixing, b/c it's wrong. Tests should not modify global state
-	testapi.Default = testapi.Groups[""]
 }
