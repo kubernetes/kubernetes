@@ -417,12 +417,12 @@ func TestAnnotateErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdAnnotate(f, buf)
+		cmd := NewCmdAnnotate(tf, buf)
 		cmd.SetOutput(buf)
 
 		for k, v := range testCase.flags {
@@ -446,7 +446,7 @@ func TestAnnotateErrors(t *testing.T) {
 func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -477,10 +477,10 @@ func TestAnnotateObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(f, buf)
+	cmd := NewCmdAnnotate(tf, buf)
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
 	args := []string{"pods/foo", "a=b", "c-"}
@@ -490,7 +490,7 @@ func TestAnnotateObject(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f, cmd); err != nil {
+	if err := options.RunAnnotate(tf, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -498,7 +498,7 @@ func TestAnnotateObject(t *testing.T) {
 func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -529,10 +529,10 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(f, buf)
+	cmd := NewCmdAnnotate(tf, buf)
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
 	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
@@ -543,13 +543,13 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f, cmd); err != nil {
+	if err := options.RunAnnotate(tf, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestAnnotateLocal(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -559,10 +559,10 @@ func TestAnnotateLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(f, buf)
+	cmd := NewCmdAnnotate(tf, buf)
 	options := &AnnotateOptions{local: true}
 	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
 	args := []string{"a=b"}
@@ -572,7 +572,7 @@ func TestAnnotateLocal(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f, cmd); err != nil {
+	if err := options.RunAnnotate(tf, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -580,7 +580,7 @@ func TestAnnotateLocal(t *testing.T) {
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
@@ -612,10 +612,10 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(f, buf)
+	cmd := NewCmdAnnotate(tf, buf)
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{all: true}
 	args := []string{"pods", "a=b", "c-"}
@@ -625,7 +625,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	if err := options.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(f, cmd); err != nil {
+	if err := options.RunAnnotate(tf, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -39,14 +39,13 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestImageLocal(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -58,10 +57,10 @@ func TestImageLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdImage(f, buf, buf)
+	cmd := NewCmdImage(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
@@ -70,7 +69,7 @@ func TestImageLocal(t *testing.T) {
 		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
 		Out:   buf,
 		Local: true}
-	err := opts.Complete(f, cmd, []string{"cassandra=thingy"})
+	err := opts.Complete(tf, cmd, []string{"cassandra=thingy"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -149,7 +148,7 @@ func TestSetImageValidation(t *testing.T) {
 }
 
 func TestSetMultiResourcesImageLocal(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -161,10 +160,10 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdImage(f, buf, buf)
+	cmd := NewCmdImage(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
@@ -173,7 +172,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Out:   buf,
 		Local: true}
-	err := opts.Complete(f, cmd, []string{"*=thingy"})
+	err := opts.Complete(tf, cmd, []string{"*=thingy"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -500,11 +499,10 @@ func TestSetImageRemote(t *testing.T) {
 	for _, input := range inputs {
 		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 		testapi.Default = testapi.Groups[input.testAPIGroup]
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
 		ns := legacyscheme.Codecs
 		tf.Namespace = "test"
-		tf.CategoryExpander = categories.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         groupVersion,
 			NegotiatedSerializer: ns,
@@ -532,13 +530,13 @@ func TestSetImageRemote(t *testing.T) {
 			VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 		}
 		out := new(bytes.Buffer)
-		cmd := NewCmdImage(f, out, out)
+		cmd := NewCmdImage(tf, out, out)
 		cmd.SetOutput(out)
 		cmd.Flags().Set("output", "yaml")
 		opts := ImageOptions{
 			Out:   out,
 			Local: false}
-		err := opts.Complete(f, cmd, input.args)
+		err := opts.Complete(tf, cmd, input.args)
 		assert.NoError(t, err)
 		err = opts.Run()
 		assert.NoError(t, err)

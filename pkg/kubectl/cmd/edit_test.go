@@ -206,7 +206,7 @@ func TestEdit(t *testing.T) {
 				t.Fatalf("%s: %v", name, err)
 			}
 
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 				versionedAPIPath := ""
 				if mapping.GroupVersionKind.Group == "" {
@@ -224,20 +224,20 @@ func TestEdit(t *testing.T) {
 			if len(testcase.Namespace) > 0 {
 				tf.Namespace = testcase.Namespace
 			}
-			tf.ClientConfig = defaultClientConfig()
-			tf.Command = "edit test cmd invocation"
+			tf.ClientConfigVal = defaultClientConfig()
+			tf.CommandVal = "edit test cmd invocation"
 			buf := bytes.NewBuffer([]byte{})
 			errBuf := bytes.NewBuffer([]byte{})
 
 			var cmd *cobra.Command
 			switch testcase.Mode {
 			case "edit":
-				cmd = NewCmdEdit(f, buf, errBuf)
+				cmd = NewCmdEdit(tf, buf, errBuf)
 			case "create":
-				cmd = NewCmdCreate(f, buf, errBuf)
+				cmd = NewCmdCreate(tf, buf, errBuf)
 				cmd.Flags().Set("edit", "true")
 			case "edit-last-applied":
-				cmd = NewCmdApplyEditLastApplied(f, buf, errBuf)
+				cmd = NewCmdApplyEditLastApplied(tf, buf, errBuf)
 			default:
 				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
 			}

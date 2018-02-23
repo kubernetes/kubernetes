@@ -69,7 +69,7 @@ func TestCreateRoleBinding(t *testing.T) {
 		},
 	}
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
@@ -111,7 +111,7 @@ func TestCreateRoleBinding(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateRoleBinding(f, buf)
+	cmd := NewCmdCreateRoleBinding(tf, buf)
 	cmd.Flags().Set("role", "fake-role")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")

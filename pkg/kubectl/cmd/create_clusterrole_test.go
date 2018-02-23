@@ -32,10 +32,10 @@ import (
 func TestCreateClusterRole(t *testing.T) {
 	clusterRoleName := "my-cluster-role"
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	tests := map[string]struct {
 		verbs               string
@@ -125,7 +125,7 @@ func TestCreateClusterRole(t *testing.T) {
 
 	for name, test := range tests {
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdCreateClusterRole(f, buf)
+		cmd := NewCmdCreateClusterRole(tf, buf)
 		cmd.Flags().Set("dry-run", "true")
 		cmd.Flags().Set("output", "yaml")
 		cmd.Flags().Set("verb", test.verbs)
@@ -147,7 +147,7 @@ func TestCreateClusterRole(t *testing.T) {
 }
 
 func TestClusterRoleValidate(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
@@ -426,7 +426,7 @@ func TestClusterRoleValidate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			test.clusterRoleOptions.Mapper, _ = f.Object()
+			test.clusterRoleOptions.Mapper, _ = tf.Object()
 			err := test.clusterRoleOptions.Validate()
 			if test.expectErr && err == nil {
 				t.Errorf("%s: expect error happens, but validate passes.", name)

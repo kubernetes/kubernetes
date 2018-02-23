@@ -92,7 +92,7 @@ func TestPluginCmd(t *testing.T) {
 			success: test.expectedSuccess,
 		}
 
-		f, _ := cmdtesting.NewAPIFactory()
+		f := cmdtesting.NewTestFactory()
 		cmd := NewCmdForPlugin(f, test.plugin, runner, inBuf, outBuf, errBuf)
 		if cmd == nil {
 			if !test.expectedNilCmd {

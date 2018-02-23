@@ -81,7 +81,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		submittedJob = ca.GetObject().(*batchv1.Job)
 		return true, expectJob, nil
 	})
-	f, _ := cmdtesting.NewAPIFactory()
+	f := cmdtesting.NewTestFactory()
 	buf := bytes.NewBuffer([]byte{})
 	cmdOptions := &CreateJobOptions{
 		Name:      testJobName,

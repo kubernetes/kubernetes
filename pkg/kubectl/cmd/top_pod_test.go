@@ -162,7 +162,7 @@ func TestTopPod(t *testing.T) {
 			}
 		}
 
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		ns := legacyscheme.Codecs
 
 		tf.Client = &fake.RESTClient{
@@ -187,10 +187,10 @@ func TestTopPod(t *testing.T) {
 			}),
 		}
 		tf.Namespace = testNS
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdTopPod(f, nil, buf)
+		cmd := NewCmdTopPod(tf, nil, buf)
 		for name, value := range testCase.flags {
 			cmd.Flags().Set(name, value)
 		}
@@ -304,7 +304,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 				})
 			}
 
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
@@ -323,10 +323,10 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 				}),
 			}
 			tf.Namespace = testNS
-			tf.ClientConfig = defaultClientConfig()
+			tf.ClientConfigVal = defaultClientConfig()
 			buf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdTopPod(f, nil, buf)
+			cmd := NewCmdTopPod(tf, nil, buf)
 			var cmdOptions *TopPodOptions
 			if testCase.options != nil {
 				cmdOptions = testCase.options
@@ -336,7 +336,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 
 			// TODO in the long run, we want to test most of our commands like this. Wire the options struct with specific mocks
 			// TODO then check the particular Run functionality and harvest results from fake clients.  We probably end up skipping the factory altogether.
-			if err := cmdOptions.Complete(f, cmd, testCase.args, buf); err != nil {
+			if err := cmdOptions.Complete(tf, cmd, testCase.args, buf); err != nil {
 				t.Fatal(err)
 			}
 			cmdOptions.MetricsClient = fakemetricsClientset
@@ -499,7 +499,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			}
 		}
 
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		ns := legacyscheme.Codecs
 
 		tf.Client = &fake.RESTClient{
@@ -524,7 +524,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			}),
 		}
 		tf.Namespace = testNS
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		buf := bytes.NewBuffer([]byte{})
 
 		opts := &TopPodOptions{
@@ -535,7 +535,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			},
 			DiscoveryClient: &fakeDiscovery{},
 		}
-		cmd := NewCmdTopPod(f, opts, buf)
+		cmd := NewCmdTopPod(tf, opts, buf)
 		for name, value := range testCase.flags {
 			cmd.Flags().Set(name, value)
 		}

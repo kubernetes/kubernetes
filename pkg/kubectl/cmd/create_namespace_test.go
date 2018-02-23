@@ -32,7 +32,7 @@ import (
 func TestCreateNamespace(t *testing.T) {
 	namespaceObject := &v1.Namespace{}
 	namespaceObject.Name = "my-namespace"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 
@@ -50,7 +50,7 @@ func TestCreateNamespace(t *testing.T) {
 		}),
 	}
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateNamespace(f, buf)
+	cmd := NewCmdCreateNamespace(tf, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{namespaceObject.Name})
 	expectedOutput := "namespace/" + namespaceObject.Name + "\n"

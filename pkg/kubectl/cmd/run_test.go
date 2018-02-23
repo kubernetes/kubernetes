@@ -168,7 +168,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -186,11 +186,11 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{}
-		cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+		tf.ClientConfigVal = &restclient.Config{}
+		cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 		cmd.Flags().Set("image", "nginx")
 		cmd.Flags().Set("generator", "run/v1")
-		err := RunRun(f, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
+		err := RunRun(tf, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("unexpected non-error (%s)", test.name)
 		}
@@ -293,11 +293,11 @@ func TestGenerateService(t *testing.T) {
 	}
 	for _, test := range tests {
 		sawPOST := false
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: ns,
@@ -346,7 +346,7 @@ func TestGenerateService(t *testing.T) {
 		}
 
 		buff := &bytes.Buffer{}
-		_, err := generateService(f, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
+		_, err := generateService(tf, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -437,23 +437,23 @@ func TestRunValidations(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf := cmdtesting.NewTestFactory()
+		tf := cmdtesting.NewTestFactory()
 		_, _, codec := cmdtesting.NewExternalScheme()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: scheme.Codecs,
 			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		inBuf := bytes.NewReader([]byte{})
 		outBuf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdRun(f, inBuf, outBuf, errBuf)
+		cmd := NewCmdRun(tf, inBuf, outBuf, errBuf)
 		for flagName, flagValue := range test.flags {
 			cmd.Flags().Set(flagName, flagValue)
 		}
-		err := RunRun(f, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
+		err := RunRun(tf, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
 		if err != nil && len(test.expectedErr) > 0 {
 			if !strings.Contains(err.Error(), test.expectedErr) {
 				t.Errorf("unexpected error: %v", err)
