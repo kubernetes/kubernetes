@@ -45,6 +45,7 @@ QUICK_PATTERNS+=(
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"

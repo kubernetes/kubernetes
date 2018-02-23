@@ -47,6 +47,7 @@ filegroup(
         "//vendor/github.com/beorn7/perks/quantile:all-srcs",
         "//vendor/github.com/blang/semver:all-srcs",
         "//vendor/github.com/chai2010/gettext-go/gettext:all-srcs",
+        "//vendor/github.com/client9/misspell:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/auth:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/certdb:all-srcs",
         "//vendor/github.com/cloudflare/cfssl/config:all-srcs",
