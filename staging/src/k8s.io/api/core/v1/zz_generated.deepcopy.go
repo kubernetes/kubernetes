@@ -256,6 +256,33 @@ func (in *CSIPersistentVolumeSource) DeepCopyInto(out *CSIPersistentVolumeSource
 			(*out)[key] = val
 		}
 	}
+	if in.ControllerPublishSecretRef != nil {
+		in, out := &in.ControllerPublishSecretRef, &out.ControllerPublishSecretRef
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(SecretReference)
+			**out = **in
+		}
+	}
+	if in.NodeStageSecretRef != nil {
+		in, out := &in.NodeStageSecretRef, &out.NodeStageSecretRef
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(SecretReference)
+			**out = **in
+		}
+	}
+	if in.NodePublishSecretRef != nil {
+		in, out := &in.NodePublishSecretRef, &out.NodePublishSecretRef
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(SecretReference)
+			**out = **in
+		}
+	}
 	return
 }
 
