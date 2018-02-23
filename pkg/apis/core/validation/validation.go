@@ -1452,6 +1452,45 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))
 	}
 
+	if csi.ControllerPublishSecretRef != nil {
+		if len(csi.ControllerPublishSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerPublishSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.ControllerPublishSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerPublishSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
+	if csi.NodePublishSecretRef != nil {
+		if len(csi.NodePublishSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.NodePublishSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodePublishSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
+	if csi.NodeStageSecretRef != nil {
+		if len(csi.NodeStageSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.NodeStageSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("nodeStageSecretRef", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.NodeStageSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
 	return allErrs
 }
 

@@ -32,7 +32,6 @@ import (
 
 type csiClient interface {
 	AssertSupportedVersion(ctx grpctx.Context, ver *csipb.Version) error
-	NodeProbe(ctx grpctx.Context, ver *csipb.Version) error
 	NodePublishVolume(
 		ctx grpctx.Context,
 		volumeid string,
@@ -41,9 +40,15 @@ type csiClient interface {
 		accessMode api.PersistentVolumeAccessMode,
 		volumeInfo map[string]string,
 		volumeAttribs map[string]string,
+		nodePublishCredentials map[string]string,
 		fsType string,
 	) error
-	NodeUnpublishVolume(ctx grpctx.Context, volID string, targetPath string) error
+	NodeUnpublishVolume(
+		ctx grpctx.Context,
+		volID string,
+		targetPath string,
+		nodeUnpublishCredentials map[string]string,
+	) error
 }
 
 // csiClient encapsulates all csi-plugin methods
@@ -146,13 +151,6 @@ func (c *csiDriverClient) AssertSupportedVersion(ctx grpctx.Context, ver *csipb.
 	return nil
 }
 
-func (c *csiDriverClient) NodeProbe(ctx grpctx.Context, ver *csipb.Version) error {
-	glog.V(4).Info(log("sending NodeProbe rpc call to csi driver: [version %v]", ver))
-	req := &csipb.NodeProbeRequest{Version: ver}
-	_, err := c.nodeClient.NodeProbe(ctx, req)
-	return err
-}
-
 func (c *csiDriverClient) NodePublishVolume(
 	ctx grpctx.Context,
 	volID string,
@@ -161,6 +159,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	accessMode api.PersistentVolumeAccessMode,
 	volumeInfo map[string]string,
 	volumeAttribs map[string]string,
+	nodePublishCredentials map[string]string,
 	fsType string,
 ) error {
 	glog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
@@ -176,13 +175,13 @@ func (c *csiDriverClient) NodePublishVolume(
 	}
 
 	req := &csipb.NodePublishVolumeRequest{
-		Version:          csiVersion,
-		VolumeId:         volID,
-		TargetPath:       targetPath,
-		Readonly:         readOnly,
-		PublishInfo:      volumeInfo,
-		VolumeAttributes: volumeAttribs,
-
+		Version:                csiVersion,
+		VolumeId:               volID,
+		TargetPath:             targetPath,
+		Readonly:               readOnly,
+		PublishInfo:            volumeInfo,
+		VolumeAttributes:       volumeAttribs,
+		NodePublishCredentials: nodePublishCredentials,
 		VolumeCapability: &csipb.VolumeCapability{
 			AccessMode: &csipb.VolumeCapability_AccessMode{
 				Mode: asCSIAccessMode(accessMode),
@@ -199,7 +198,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	return err
 }
 
-func (c *csiDriverClient) NodeUnpublishVolume(ctx grpctx.Context, volID string, targetPath string) error {
+func (c *csiDriverClient) NodeUnpublishVolume(ctx grpctx.Context, volID string, targetPath string, nodeUnpublishCredentials map[string]string) error {
 	glog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
@@ -213,9 +212,10 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx grpctx.Context, volID string, 
 	}
 
 	req := &csipb.NodeUnpublishVolumeRequest{
-		Version:    csiVersion,
-		VolumeId:   volID,
-		TargetPath: targetPath,
+		Version:                  csiVersion,
+		VolumeId:                 volID,
+		TargetPath:               targetPath,
+		NodeUnpublishCredentials: nodeUnpublishCredentials,
 	}
 
 	_, err := c.nodeClient.NodeUnpublishVolume(ctx, req)
