@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -78,6 +80,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		pv, err = client.CoreV1().PersistentVolumes().Create(pv)
 		Expect(err).NotTo(HaveOccurred(), "Error creating PV")
 
+		time.Sleep(5 * time.Second)
 		By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred(), "While getting PV status")
