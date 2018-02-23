@@ -322,13 +322,6 @@ func (f *FakeFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 	return f.tf.Client, f.tf.Err
 }
 
-func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return nil, nil
-}
-func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	return nil, nil
-}
-
 func (f *FakeFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if f.tf.UnstructuredClientForMappingFunc != nil {
 		return f.tf.UnstructuredClientForMappingFunc(mapping)
@@ -604,10 +597,6 @@ func (f *fakeAPIFactory) CategoryExpander() categories.CategoryExpander {
 		return f.tf.CategoryExpander
 	}
 	return f.Factory.CategoryExpander()
-}
-
-func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return f.ClientSet()
 }
 
 func (f *fakeAPIFactory) ClientConfig() (*restclient.Config, error) {
