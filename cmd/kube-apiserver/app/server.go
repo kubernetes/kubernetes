@@ -471,7 +471,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		)
 	}
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, sharedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, clientgoExternalClient, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
@@ -555,25 +555,10 @@ func BuildAdmissionPluginInitializers(s *options.ServerRunOptions, client intern
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorage.StorageFactory, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorage.StorageFactory, client internalclientset.Interface, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
-		// we have to go direct to storage because the clientsets fail when they're initialized with some API versions excluded
-		// we should stop trying to control them like that.
-		storageConfigServiceAccounts, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to get serviceaccounts storage: %v", err)
-		}
-		storageConfigSecrets, err := storageFactory.NewConfig(api.Resource("secrets"))
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to get secrets storage: %v", err)
-		}
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(
-			storageConfigServiceAccounts,
-			storageFactory.ResourcePrefix(api.Resource("serviceaccounts")),
-			storageConfigSecrets,
-			storageFactory.ResourcePrefix(api.Resource("secrets")),
-		)
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
 	}
 	if client == nil || reflect.ValueOf(client).IsNil() {
 		// TODO: Remove check once client can never be nil.
