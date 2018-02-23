@@ -26,8 +26,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -109,6 +111,11 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 			zonesPresent = true
 			configuredZones = v
 		case "replication-type":
+			if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
+				return "", 0, nil, "",
+					fmt.Errorf("the %q option for volume plugin %v is only supported with the %q Kubernetes feature gate enabled",
+						k, c.plugin.GetPluginName(), features.GCERegionalPersistentDisk)
+			}
 			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
 			fstype = v
