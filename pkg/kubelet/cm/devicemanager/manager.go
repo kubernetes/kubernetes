@@ -86,6 +86,7 @@ type ManagerImpl struct {
 	podDevices podDevices
 	store      utilstore.Store
 	pluginOpts map[string]*pluginapi.DevicePluginOptions
+	wg         sync.WaitGroup
 }
 
 type sourcesReadyStub struct{}
@@ -312,6 +313,7 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 	// add some policies here, e.g., verify whether an old device plugin with the
 	// same resource name is still alive to determine whether we want to accept
 	// the new registration.
+	m.wg.Add(1)
 	go m.addEndpoint(r)
 
 	return &pluginapi.Empty{}, nil
@@ -320,12 +322,13 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 // Stop is the function that can stop the gRPC server.
 func (m *ManagerImpl) Stop() error {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	for _, e := range m.endpoints {
 		e.stop()
 	}
 
 	m.server.Stop()
+	m.mutex.Unlock()
+	m.wg.Wait()
 	return nil
 }
 
@@ -374,19 +377,33 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		old.stop()
 	}
 
-	go func() {
-		e.run()
-		e.stop()
+	e.run()
+	e.stop()
 
-		m.mutex.Lock()
-		if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
-			glog.V(2).Infof("Delete resource for endpoint %v", e)
-			delete(m.endpoints, r.ResourceName)
+	m.mutex.Lock()
+	if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
+		glog.V(2).Infof("Mark all resources Unhealthy for endpoint %v", e)
+
+		// NOTE: Health state is being flipped, instead of removing resources for
+		// supporting cluster-level resources.
+		// For more details please refer: https://github.com/kubernetes/kubernetes/issues/60176
+
+		delete(m.endpoints, r.ResourceName)
+
+		healthyDevices := sets.NewString()
+		if _, ok := m.healthyDevices[r.ResourceName]; ok {
+			healthyDevices = m.healthyDevices[r.ResourceName]
+			m.healthyDevices[r.ResourceName] = sets.NewString()
 		}
+		if _, ok := m.unhealthyDevices[r.ResourceName]; !ok {
+			m.unhealthyDevices[r.ResourceName] = sets.NewString()
+		}
+		m.unhealthyDevices[r.ResourceName] = m.unhealthyDevices[r.ResourceName].Union(healthyDevices)
+	}
 
-		glog.V(2).Infof("Unregistered endpoint %v", e)
-		m.mutex.Unlock()
-	}()
+	glog.V(2).Infof("Unregistered endpoint %v", e)
+	m.mutex.Unlock()
+	m.wg.Done()
 }
 
 // GetCapacity is expected to be called when Kubelet updates its node status.
@@ -405,12 +422,13 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	needsUpdateCheckpoint := false
 	var capacity = v1.ResourceList{}
 	var allocatable = v1.ResourceList{}
-	var deletedResources []string
+	deletedResources := []string{}
 	m.mutex.Lock()
+
 	for resourceName, devices := range m.healthyDevices {
 		if _, ok := m.endpoints[resourceName]; !ok {
-			delete(m.healthyDevices, resourceName)
-			deletedResources = append(deletedResources, resourceName)
+			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+			allocatable[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			needsUpdateCheckpoint = true
 		} else {
 			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
@@ -419,16 +437,8 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	}
 	for resourceName, devices := range m.unhealthyDevices {
 		if _, ok := m.endpoints[resourceName]; !ok {
-			delete(m.unhealthyDevices, resourceName)
-			alreadyDeleted := false
-			for _, name := range deletedResources {
-				if name == resourceName {
-					alreadyDeleted = true
-				}
-			}
-			if !alreadyDeleted {
-				deletedResources = append(deletedResources, resourceName)
-			}
+			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
+			allocatable[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			needsUpdateCheckpoint = true
 		} else {
 			capacityCount := capacity[v1.ResourceName(resourceName)]
