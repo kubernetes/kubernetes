@@ -74123,6 +74123,55 @@
      }
     }
    },
+   "io.k8s.api.autoscaling.v2beta1.ExternalMetricSource": {
+    "description": "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster). Exactly one \"target\" type should be set.",
+    "required": [
+     "metricName"
+    ],
+    "properties": {
+     "metricName": {
+      "description": "metricName is the name of the metric in question.",
+      "type": "string"
+     },
+     "metricSelector": {
+      "description": "metricSelector is used to identify a specific time series within a given metric.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+     },
+     "targetAverageValue": {
+      "description": "targetAverageValue is the target per-pod value of global metric (as a quantity). Mutually exclusive with TargetValue.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     },
+     "targetValue": {
+      "description": "targetValue is the target value of the metric (as a quantity). Mutually exclusive with TargetAverageValue.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     }
+    }
+   },
+   "io.k8s.api.autoscaling.v2beta1.ExternalMetricStatus": {
+    "description": "ExternalMetricStatus indicates the current value of a global metric not associated with any Kubernetes object.",
+    "required": [
+     "metricName",
+     "currentValue"
+    ],
+    "properties": {
+     "currentAverageValue": {
+      "description": "currentAverageValue is the current value of metric averaged over autoscaled pods.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     },
+     "currentValue": {
+      "description": "currentValue is the current value of the metric (as a quantity)",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+     },
+     "metricName": {
+      "description": "metricName is the name of a metric used for autoscaling in metric system.",
+      "type": "string"
+     },
+     "metricSelector": {
+      "description": "metricSelector is used to identify a specific time series within a given metric.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+     }
+    }
+   },
    "io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler": {
     "description": "HorizontalPodAutoscaler is the configuration for a horizontal pod autoscaler, which automatically manages the replica count of any resource implementing the scale subresource based on the metrics specified.",
     "properties": {
@@ -74298,6 +74347,10 @@
      "type"
     ],
     "properties": {
+     "external": {
+      "description": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ExternalMetricSource"
+     },
      "object": {
       "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ObjectMetricSource"
@@ -74322,6 +74375,10 @@
      "type"
     ],
     "properties": {
+     "external": {
+      "description": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
+      "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ExternalMetricStatus"
+     },
      "object": {
       "description": "object refers to a metric describing a single kubernetes object (for example, hits-per-second on an Ingress object).",
       "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.ObjectMetricStatus"
