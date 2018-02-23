@@ -75,7 +75,6 @@ go_library(
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
         "//pkg/kubectl/apply/strategy:go_default_library",

@@ -38,7 +38,6 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 // Scaler provides an interface for resources that can be scaled.
@@ -311,7 +310,7 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		if rs.Initializers != nil {
 			return nil
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, ReplicaSetHasDesiredReplicas(scaler.c, rs))
 
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
@@ -383,7 +382,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 		if job.Initializers != nil {
 			return nil
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.StatefulSetHasDesiredReplicas(scaler.c, job))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, StatefulSetHasDesiredReplicas(scaler.c, job))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}
@@ -440,7 +439,7 @@ func (scaler *jobScaler) Scale(namespace, name string, newSize uint, preconditio
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.JobHasDesiredParallelism(scaler.c, job))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, JobHasDesiredParallelism(scaler.c, job))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}
@@ -511,7 +510,7 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, DeploymentHasDesiredReplicas(scaler.c, deployment))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}

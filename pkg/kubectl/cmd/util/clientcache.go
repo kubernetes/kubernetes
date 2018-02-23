@@ -24,8 +24,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -150,7 +150,7 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 	}
 
 	// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
-	oldclient.SetKubernetesDefaults(&config)
+	setKubernetesDefaults(&config)
 
 	if requiredVersion != nil {
 		c.configs[*requiredVersion] = copyConfig(&config)
@@ -163,6 +163,22 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 	c.configs[*config.GroupVersion] = copyConfig(&config)
 
 	return copyConfig(&config), nil
+}
+
+// setKubernetesDefaults sets default values on the provided client config for accessing the
+// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
+func setKubernetesDefaults(config *restclient.Config) error {
+	if config.APIPath == "" {
+		config.APIPath = "/api"
+	}
+	// TODO chase down uses and tolerate nil
+	if config.GroupVersion == nil {
+		config.GroupVersion = &schema.GroupVersion{}
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = legacyscheme.Codecs
+	}
+	return restclient.SetKubernetesDefaults(config)
 }
 
 func copyConfig(in *restclient.Config) *restclient.Config {

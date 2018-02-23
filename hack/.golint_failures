@@ -81,7 +81,6 @@ pkg/client/chaosclient
 pkg/client/informers/informers_generated/internalversion/internalinterfaces
 pkg/client/leaderelectionconfig
 pkg/client/tests
-pkg/client/unversioned/testclient/simple
 pkg/cloudprovider
 pkg/cloudprovider/providers/aws
 pkg/cloudprovider/providers/fake
