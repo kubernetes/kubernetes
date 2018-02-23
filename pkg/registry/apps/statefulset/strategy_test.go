@@ -19,10 +19,11 @@ package statefulset
 import (
 	"testing"
 
+	"k8s.io/api/apps"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -48,15 +49,15 @@ func TestStatefulSetStrategy(t *testing.T) {
 			},
 		},
 	}
-	ps := &apps.StatefulSet{
+	ps := &appsinternalversion.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsinternalversion.StatefulSetSpec{
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
 			Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
 			Template:            validPodTemplate.Template,
-			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy:      appsinternalversion.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
-		Status: apps.StatefulSetStatus{Replicas: 3},
+		Status: appsinternalversion.StatefulSetStatus{Replicas: 3},
 	}
 
 	Strategy.PrepareForCreate(ctx, ps)
@@ -69,15 +70,15 @@ func TestStatefulSetStrategy(t *testing.T) {
 	}
 
 	// Just Spec.Replicas is allowed to change
-	validPs := &apps.StatefulSet{
+	validPs := &appsinternalversion.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsinternalversion.StatefulSetSpec{
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
 			Selector:            ps.Spec.Selector,
 			Template:            validPodTemplate.Template,
-			UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy:      appsinternalversion.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
-		Status: apps.StatefulSetStatus{Replicas: 4},
+		Status: appsinternalversion.StatefulSetStatus{Replicas: 4},
 	}
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
@@ -168,27 +169,27 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	oldPS := &apps.StatefulSet{
+	oldPS := &appsinternalversion.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsinternalversion.StatefulSetSpec{
 			Replicas:       3,
 			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
 			Template:       validPodTemplate.Template,
-			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy: appsinternalversion.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
-		Status: apps.StatefulSetStatus{
+		Status: appsinternalversion.StatefulSetStatus{
 			Replicas: 1,
 		},
 	}
-	newPS := &apps.StatefulSet{
+	newPS := &appsinternalversion.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsinternalversion.StatefulSetSpec{
 			Replicas:       1,
 			Selector:       &metav1.LabelSelector{MatchLabels: validSelector},
 			Template:       validPodTemplate.Template,
-			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy: appsinternalversion.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
-		Status: apps.StatefulSetStatus{
+		Status: appsinternalversion.StatefulSetStatus{
 			Replicas: 2,
 		},
 	}

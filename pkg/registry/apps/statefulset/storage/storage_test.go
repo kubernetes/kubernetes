@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	"k8s.io/api/apps"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -38,20 +39,20 @@ import (
 
 // TODO: allow for global factory override
 func newStorage(t *testing.T) (StatefulSetStorage, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, apps.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorage(t, appsinternalversion.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "statefulsets"}
 	storage := NewStorage(restOptions)
 	return storage, server
 }
 
-func validNewStatefulSet() *apps.StatefulSet {
-	return &apps.StatefulSet{
+func validNewStatefulSet() *appsinternalversion.StatefulSet {
+	return &appsinternalversion.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
 		},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsinternalversion.StatefulSetSpec{
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
 			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
@@ -71,9 +72,9 @@ func validNewStatefulSet() *apps.StatefulSet {
 				},
 			},
 			Replicas:       7,
-			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy: appsinternalversion.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
-		Status: apps.StatefulSetStatus{},
+		Status: appsinternalversion.StatefulSetStatus{},
 	}
 }
 
@@ -105,12 +106,12 @@ func TestStatusUpdate(t *testing.T) {
 	if err := storage.StatefulSet.Storage.Create(ctx, key, validStatefulSet, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	update := apps.StatefulSet{
+	update := appsinternalversion.StatefulSet{
 		ObjectMeta: validStatefulSet.ObjectMeta,
-		Spec: apps.StatefulSetSpec{
+		Spec: appsinternalversion.StatefulSetSpec{
 			Replicas: 7,
 		},
-		Status: apps.StatefulSetStatus{
+		Status: appsinternalversion.StatefulSetStatus{
 			Replicas: 7,
 		},
 	}
@@ -123,7 +124,7 @@ func TestStatusUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ps := obj.(*apps.StatefulSet)
+	ps := obj.(*appsinternalversion.StatefulSet)
 	if ps.Spec.Replicas != 7 {
 		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", ps.Spec.Replicas)
 	}
@@ -207,7 +208,7 @@ func TestScaleGet(t *testing.T) {
 
 	name := "foo"
 
-	var sts apps.StatefulSet
+	var sts appsinternalversion.StatefulSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
@@ -251,7 +252,7 @@ func TestScaleUpdate(t *testing.T) {
 
 	name := "foo"
 
-	var sts apps.StatefulSet
+	var sts appsinternalversion.StatefulSet
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/statefulsets/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.StatefulSet.Storage.Create(ctx, key, &validStatefulSet, &sts, 0); err != nil {
