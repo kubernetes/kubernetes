@@ -4,7 +4,7 @@ syntax = "proto3";
 package v1beta1;
 
 // This service defines the public APIs for remote KMS provider.
-service KMSService {
+service KeyManagementService {
     // Version returns the runtime name and runtime version of the KMS provider.
     rpc Version(VersionRequest) returns (VersionResponse) {}
 

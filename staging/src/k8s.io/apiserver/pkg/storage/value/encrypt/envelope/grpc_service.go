@@ -46,7 +46,7 @@ const (
 // The gRPC implementation for envelope.Service.
 type gRPCService struct {
 	// gRPC client instance
-	kmsClient  kmsapi.KMSServiceClient
+	kmsClient  kmsapi.KeyManagementServiceClient
 	connection *grpc.ClientConn
 }
 
@@ -64,7 +64,7 @@ func NewGRPCService(endpoint string) (Service, error) {
 		return nil, fmt.Errorf("connect remote KMS provider %q failed, error: %v", addr, err)
 	}
 
-	kmsClient := kmsapi.NewKMSServiceClient(connection)
+	kmsClient := kmsapi.NewKeyManagementServiceClient(connection)
 
 	err = checkAPIVersion(kmsClient)
 	if err != nil {
@@ -99,7 +99,7 @@ func parseEndpoint(endpoint string) (string, error) {
 
 // Check the KMS provider API version.
 // Only matching kmsapiVersion is supported now.
-func checkAPIVersion(kmsClient kmsapi.KMSServiceClient) error {
+func checkAPIVersion(kmsClient kmsapi.KeyManagementServiceClient) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
