@@ -130,23 +130,26 @@ func TestAllocate(t *testing.T) {
 	defer ecleanup(t, p, e)
 
 	resp := new(pluginapi.AllocateResponse)
-	resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+	contResp := new(pluginapi.ContainerAllocateResponse)
+	contResp.Devices = append(contResp.Devices, &pluginapi.DeviceSpec{
 		ContainerPath: "/dev/aaa",
 		HostPath:      "/dev/aaa",
 		Permissions:   "mrw",
 	})
 
-	resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
+	contResp.Devices = append(contResp.Devices, &pluginapi.DeviceSpec{
 		ContainerPath: "/dev/bbb",
 		HostPath:      "/dev/bbb",
 		Permissions:   "mrw",
 	})
 
-	resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
+	contResp.Mounts = append(contResp.Mounts, &pluginapi.Mount{
 		ContainerPath: "/container_dir1/file1",
 		HostPath:      "host_dir1/file1",
 		ReadOnly:      true,
 	})
+
+	resp.ContainerResponses = append(resp.ContainerResponses, contResp)
 
 	p.SetAllocFunc(func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
 		return resp, nil

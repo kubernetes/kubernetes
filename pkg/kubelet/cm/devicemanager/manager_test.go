@@ -279,8 +279,8 @@ func constructDevices(devices []string) sets.String {
 	return ret
 }
 
-func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.AllocateResponse {
-	resp := &pluginapi.AllocateResponse{}
+func constructAllocResp(devices, mounts, envs map[string]string) *pluginapi.ContainerAllocateResponse {
+	resp := &pluginapi.ContainerAllocateResponse{}
 	for k, v := range devices {
 		resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
 			HostPath:      k,
@@ -458,7 +458,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		if res.resourceName == "domain2.com/resource2" {
 			testManager.endpoints[res.resourceName] = &MockEndpoint{
 				allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
-					resp := new(pluginapi.AllocateResponse)
+					resp := new(pluginapi.ContainerAllocateResponse)
 					resp.Envs = make(map[string]string)
 					for _, dev := range devs {
 						switch dev {
@@ -469,7 +469,9 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 							resp.Envs["key2"] = "val3"
 						}
 					}
-					return resp, nil
+					resps := new(pluginapi.AllocateResponse)
+					resps.ContainerResponses = append(resps.ContainerResponses, resp)
+					return resps, nil
 				},
 			}
 		}
@@ -774,8 +776,10 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Contains(initializedDevs, "dev2")
 	as.Equal(len(initializedDevs), len(res1.devs))
 
-	expectedResp, err := allocateStubFunc()([]string{"dev1", "dev2"})
+	expectedResps, err := allocateStubFunc()([]string{"dev1", "dev2"})
 	as.Nil(err)
+	as.Equal(1, len(expectedResps.ContainerResponses))
+	expectedResp := expectedResps.ContainerResponses[0]
 	as.Equal(len(runContainerOpts.Devices), len(expectedResp.Devices))
 	as.Equal(len(runContainerOpts.Mounts), len(expectedResp.Mounts))
 	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
@@ -783,7 +787,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error) {
 	return func(devs []string) (*pluginapi.AllocateResponse, error) {
-		resp := new(pluginapi.AllocateResponse)
+		resp := new(pluginapi.ContainerAllocateResponse)
 		resp.Envs = make(map[string]string)
 		for _, dev := range devs {
 			switch dev {
@@ -822,6 +826,8 @@ func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error)
 				resp.Envs["key1"] = "val1"
 			}
 		}
-		return resp, nil
+		resps := new(pluginapi.AllocateResponse)
+		resps.ContainerResponses = append(resps.ContainerResponses, resp)
+		return resps, nil
 	}
 }

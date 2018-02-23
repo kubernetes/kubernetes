@@ -643,6 +643,8 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		}
 
 		devs := allocDevices.UnsortedList()
+		// TODO: refactor this part of code to just append a ContainerAllocationRequest
+		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
 		glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
 		resp, err := e.allocate(devs)
 		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
@@ -657,7 +659,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
-		m.podDevices.insert(podUID, contName, resource, allocDevices, resp)
+		m.podDevices.insert(podUID, contName, resource, allocDevices, resp.ContainerResponses[0])
 		m.mutex.Unlock()
 	}
 

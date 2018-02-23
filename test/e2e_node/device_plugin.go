@@ -229,34 +229,38 @@ func numberOfDevices(node *v1.Node, resourceName string) int64 {
 
 // stubAllocFunc will pass to stub device plugin
 func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
-	var response pluginapi.AllocateResponse
-	for _, requestID := range r.DevicesIDs {
-		dev, ok := devs[requestID]
-		if !ok {
-			return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
+	var responses pluginapi.AllocateResponse
+	for _, req := range r.ContainerRequests {
+		response := &pluginapi.ContainerAllocateResponse{}
+		for _, requestID := range req.DevicesIDs {
+			dev, ok := devs[requestID]
+			if !ok {
+				return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
+			}
+
+			if dev.Health != pluginapi.Healthy {
+				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", requestID)
+			}
+
+			// create fake device file
+			fpath := filepath.Join("/tmp", dev.ID)
+
+			// clean first
+			os.RemoveAll(fpath)
+			f, err := os.Create(fpath)
+			if err != nil && !os.IsExist(err) {
+				return nil, fmt.Errorf("failed to create fake device file: %s", err)
+			}
+
+			f.Close()
+
+			response.Mounts = append(response.Mounts, &pluginapi.Mount{
+				ContainerPath: fpath,
+				HostPath:      fpath,
+			})
 		}
-
-		if dev.Health != pluginapi.Healthy {
-			return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", requestID)
-		}
-
-		// create fake device file
-		fpath := filepath.Join("/tmp", dev.ID)
-
-		// clean first
-		os.RemoveAll(fpath)
-		f, err := os.Create(fpath)
-		if err != nil && !os.IsExist(err) {
-			return nil, fmt.Errorf("failed to create fake device file: %s", err)
-		}
-
-		f.Close()
-
-		response.Mounts = append(response.Mounts, &pluginapi.Mount{
-			ContainerPath: fpath,
-			HostPath:      fpath,
-		})
+		responses.ContainerResponses = append(responses.ContainerResponses, response)
 	}
 
-	return &response, nil
+	return &responses, nil
 }
