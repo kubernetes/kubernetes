@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/server/options"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 )
 
 // InsecureServingOptions are for creating an unauthenticated, unauthorized, insecure port.
@@ -82,7 +82,7 @@ func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 
 // ApplyTo adds InsecureServingOptions to the insecureserverinfo amd kube-controller manager configuration.
 // Note: the double pointer allows to set the *InsecureServingInfo to nil without referencing the struct hosting this pointer.
-func (s *InsecureServingOptions) ApplyTo(c **genericcontrollermanager.InsecureServingInfo, cfg *componentconfig.KubeControllerManagerConfiguration) error {
+func (s *InsecureServingOptions) ApplyTo(c **genericcontrollermanager.InsecureServingInfo, cfg *controllerconfig.KubeControllerManagerConfiguration) error {
 	if s == nil {
 		return nil
 	}

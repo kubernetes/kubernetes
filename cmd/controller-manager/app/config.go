@@ -21,13 +21,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 )
 
 // Config is the main context object for the controller manager.
 type Config struct {
 	// TODO: split up the component config. This is not generic.
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	ComponentConfig controllerconfig.KubeControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
 	// TODO: remove deprecated insecure serving

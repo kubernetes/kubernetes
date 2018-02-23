@@ -29,6 +29,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -72,7 +73,7 @@ func TestAddFlags(t *testing.T) {
 
 	expected := &CloudControllerManagerOptions{
 		Generic: cmoptions.GenericControllerManagerOptions{
-			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
+			ComponentConfig: controllerconfig.KubeControllerManagerConfiguration{
 				CloudProvider:                                   "gce",
 				CloudConfigFile:                                 "/cloud-config",
 				Port:                                            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
@@ -111,11 +112,11 @@ func TestAddFlags(t *testing.T) {
 				EnableGarbageCollector:                          true,
 				EnableTaintManager:                              true,
 				HorizontalPodAutoscalerUseRESTClients:           true,
-				VolumeConfiguration: componentconfig.VolumeConfiguration{
+				VolumeConfiguration: controllerconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  true,
 					EnableHostPathProvisioning: false,
 					FlexVolumePluginDir:        "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-					PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+					PersistentVolumeRecyclerConfiguration: controllerconfig.PersistentVolumeRecyclerConfiguration{
 						MaximumRetry:             3,
 						MinimumTimeoutNFS:        300,
 						IncrementTimeoutNFS:      30,

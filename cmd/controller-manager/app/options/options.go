@@ -35,15 +35,15 @@ import (
 	"k8s.io/client-go/tools/record"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 )
 
 // GenericControllerManagerOptions is the common structure for a controller manager. It works with NewGenericControllerManagerOptions
 // and AddDefaultControllerFlags to create the common components of kube-controller-manager and cloud-controller-manager.
 type GenericControllerManagerOptions struct {
 	// TODO: turn ComponentConfig into modular option structs. This is not generic.
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	ComponentConfig controllerconfig.KubeControllerManagerConfiguration
 
 	SecureServing *apiserveroptions.SecureServingOptions
 	// TODO: remove insecure serving mode
@@ -68,7 +68,7 @@ const (
 // NewGenericControllerManagerOptions returns common/default configuration values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeControllerManagerConfiguration) GenericControllerManagerOptions {
+func NewGenericControllerManagerOptions(componentConfig controllerconfig.KubeControllerManagerConfiguration) GenericControllerManagerOptions {
 	o := GenericControllerManagerOptions{
 		ComponentConfig: componentConfig,
 		SecureServing:   apiserveroptions.NewSecureServingOptions(),
@@ -89,8 +89,8 @@ func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeCont
 }
 
 // NewDefaultControllerManagerComponentConfig returns default kube-controller manager configuration object.
-func NewDefaultControllerManagerComponentConfig(insecurePort int32) componentconfig.KubeControllerManagerConfiguration {
-	return componentconfig.KubeControllerManagerConfiguration{
+func NewDefaultControllerManagerComponentConfig(insecurePort int32) controllerconfig.KubeControllerManagerConfiguration {
+	return controllerconfig.KubeControllerManagerConfiguration{
 		Controllers:                                     []string{"*"},
 		Port:                                            insecurePort,
 		Address:                                         "0.0.0.0",
@@ -123,10 +123,10 @@ func NewDefaultControllerManagerComponentConfig(insecurePort int32) componentcon
 		NodeCIDRMaskSize:                                24,
 		ConfigureCloudRoutes:                            true,
 		TerminatedPodGCThreshold:                        12500,
-		VolumeConfiguration: componentconfig.VolumeConfiguration{
+		VolumeConfiguration: controllerconfig.VolumeConfiguration{
 			EnableHostPathProvisioning: false,
 			EnableDynamicProvisioning:  true,
-			PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+			PersistentVolumeRecyclerConfiguration: controllerconfig.PersistentVolumeRecyclerConfiguration{
 				MaximumRetry:             3,
 				MinimumTimeoutNFS:        300,
 				IncrementTimeoutNFS:      30,

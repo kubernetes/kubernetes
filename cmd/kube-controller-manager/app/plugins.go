@@ -24,8 +24,8 @@ import (
 	"fmt"
 
 	// Cloud providers
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 
 	// Volume plugins
 	"github.com/golang/glog"
@@ -86,12 +86,12 @@ func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(config componentconfig.VolumeConfiguration) volume.DynamicPluginProber {
+func GetDynamicPluginProber(config controllerconfig.VolumeConfiguration) volume.DynamicPluginProber {
 	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeExpandableVolumePlugins(config controllerconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
@@ -113,7 +113,7 @@ func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config controllerconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not

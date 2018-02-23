@@ -45,9 +45,9 @@ import (
 	genericcontrollerconfig "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -219,7 +219,7 @@ type ControllerContext struct {
 	InformerFactory informers.SharedInformerFactory
 
 	// Options provides access to init options for a given controller
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	ComponentConfig controllerconfig.KubeControllerManagerConfiguration
 
 	// AvailableResources is a map listing currently available resources
 	AvailableResources map[schema.GroupVersionResource]bool

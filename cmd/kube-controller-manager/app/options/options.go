@@ -27,8 +27,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
 
@@ -55,9 +55,9 @@ func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 	s.Generic.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.Generic.SecureServing.ServerCert.PairName = "kube-controller-manager"
 
-	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
+	gcIgnoredResources := make([]controllerconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
 	for r := range garbagecollector.DefaultIgnoredResources() {
-		gcIgnoredResources = append(gcIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
+		gcIgnoredResources = append(gcIgnoredResources, controllerconfig.GroupResource{Group: r.Group, Resource: r.Resource})
 	}
 	s.Generic.ComponentConfig.GCIgnoredResources = gcIgnoredResources
 	s.Generic.ComponentConfig.LeaderElection.LeaderElect = true

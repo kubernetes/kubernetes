@@ -30,6 +30,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/controller/apis/controllerconfig"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -116,7 +117,7 @@ func TestAddFlags(t *testing.T) {
 
 	expected := &KubeControllerManagerOptions{
 		Generic: cmoptions.GenericControllerManagerOptions{
-			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
+			ComponentConfig: controllerconfig.KubeControllerManagerConfiguration{
 				Port:                                            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				AllocateNodeCIDRs:                               true,
@@ -158,11 +159,11 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
 				HorizontalPodAutoscalerTolerance:                0.1,
 				TerminatedPodGCThreshold:                        12000,
-				VolumeConfiguration: componentconfig.VolumeConfiguration{
+				VolumeConfiguration: controllerconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  false,
 					EnableHostPathProvisioning: true,
 					FlexVolumePluginDir:        "/flex-volume-plugin",
-					PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+					PersistentVolumeRecyclerConfiguration: controllerconfig.PersistentVolumeRecyclerConfiguration{
 						MaximumRetry:             3,
 						MinimumTimeoutNFS:        200,
 						IncrementTimeoutNFS:      45,
@@ -185,7 +186,7 @@ func TestAddFlags(t *testing.T) {
 				ServiceAccountKeyFile:  "/service-account-private-key",
 				ClusterSigningDuration: metav1.Duration{Duration: 10 * time.Hour},
 				EnableGarbageCollector: false,
-				GCIgnoredResources: []componentconfig.GroupResource{
+				GCIgnoredResources: []controllerconfig.GroupResource{
 					{Group: "extensions", Resource: "replicationcontrollers"},
 					{Group: "", Resource: "bindings"},
 					{Group: "", Resource: "componentstatuses"},
@@ -236,7 +237,7 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
-type sortedGCIgnoredResources []componentconfig.GroupResource
+type sortedGCIgnoredResources []controllerconfig.GroupResource
 
 func (r sortedGCIgnoredResources) Len() int {
 	return len(r)
