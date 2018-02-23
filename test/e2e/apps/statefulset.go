@@ -23,7 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1"
+	"k8s.io/api/apps"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -67,7 +68,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		}
 		headlessSvcName := "test"
 		var statefulPodMounts, podMounts []v1.VolumeMount
-		var ss *apps.StatefulSet
+		var ss *appsv1.StatefulSet
 
 		BeforeEach(func() {
 			statefulPodMounts = []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
@@ -273,7 +274,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
 			Expect(oldImage).NotTo(Equal(newImage), "Incorrect test setup: should update to a different image")
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -317,7 +318,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
 			priorRevision := currentRevision
 			currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = oldImage
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -362,10 +363,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
-					return &apps.RollingUpdateStatefulSetStrategy{
+				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
+					return &appsv1.RollingUpdateStatefulSetStrategy{
 						Partition: func() *int32 {
 							i := int32(3)
 							return &i
@@ -394,7 +395,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 			Expect(oldImage).NotTo(Equal(newImage), "Incorrect test setup: should update to a different image")
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -422,21 +423,21 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 
 			By("By performing a canary update")
-			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
-					return &apps.RollingUpdateStatefulSetStrategy{
+				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
+					return &appsv1.RollingUpdateStatefulSetStrategy{
 						Partition: func() *int32 {
 							i := int32(2)
 							return &i
 						}()}
 				}(),
 			}
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
-				update.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+				update.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 					Type: apps.RollingUpdateStatefulSetStrategyType,
-					RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
-						return &apps.RollingUpdateStatefulSetStrategy{
+					RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
+						return &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition: func() *int32 {
 								i := int32(2)
 								return &i
@@ -514,12 +515,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Performing a phased rolling update")
 			for i := int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) - 1; i >= 0; i-- {
-				ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
-					update.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+				ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
+					update.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 						Type: apps.RollingUpdateStatefulSetStrategyType,
-						RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+						RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 							j := int32(i)
-							return &apps.RollingUpdateStatefulSetStrategy{
+							return &appsv1.RollingUpdateStatefulSetStrategy{
 								Partition: &j,
 							}
 						}(),
@@ -571,7 +572,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
-			ss.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
 				Type: apps.OnDeleteStatefulSetStrategyType,
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
@@ -612,7 +613,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 			Expect(oldImage).NotTo(Equal(newImage), "Incorrect test setup: should update to a different image")
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -936,7 +937,7 @@ func kubectlExecWithRetries(args ...string) (out string) {
 }
 
 type statefulPodTester interface {
-	deploy(ns string) *apps.StatefulSet
+	deploy(ns string) *appsv1.StatefulSet
 	write(statefulPodIndex int, kv map[string]string)
 	read(statefulPodIndex int, key string) string
 	name() string
@@ -973,7 +974,7 @@ func (c *clusterAppTester) run() {
 }
 
 type zookeeperTester struct {
-	ss     *apps.StatefulSet
+	ss     *appsv1.StatefulSet
 	tester *framework.StatefulSetTester
 }
 
@@ -981,7 +982,7 @@ func (z *zookeeperTester) name() string {
 	return "zookeeper"
 }
 
-func (z *zookeeperTester) deploy(ns string) *apps.StatefulSet {
+func (z *zookeeperTester) deploy(ns string) *appsv1.StatefulSet {
 	z.ss = z.tester.CreateStatefulSet(zookeeperManifestPath, ns)
 	return z.ss
 }
@@ -1003,7 +1004,7 @@ func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 }
 
 type mysqlGaleraTester struct {
-	ss     *apps.StatefulSet
+	ss     *appsv1.StatefulSet
 	tester *framework.StatefulSetTester
 }
 
@@ -1019,7 +1020,7 @@ func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
 	return kubectlExecWithRetries(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
-func (m *mysqlGaleraTester) deploy(ns string) *apps.StatefulSet {
+func (m *mysqlGaleraTester) deploy(ns string) *appsv1.StatefulSet {
 	m.ss = m.tester.CreateStatefulSet(mysqlGaleraManifestPath, ns)
 
 	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
@@ -1046,7 +1047,7 @@ func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
 }
 
 type redisTester struct {
-	ss     *apps.StatefulSet
+	ss     *appsv1.StatefulSet
 	tester *framework.StatefulSetTester
 }
 
@@ -1059,7 +1060,7 @@ func (m *redisTester) redisExec(cmd, ns, podName string) string {
 	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
-func (m *redisTester) deploy(ns string) *apps.StatefulSet {
+func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
 	m.ss = m.tester.CreateStatefulSet(redisManifestPath, ns)
 	return m.ss
 }
@@ -1077,7 +1078,7 @@ func (m *redisTester) read(statefulPodIndex int, key string) string {
 }
 
 type cockroachDBTester struct {
-	ss     *apps.StatefulSet
+	ss     *appsv1.StatefulSet
 	tester *framework.StatefulSetTester
 }
 
@@ -1090,7 +1091,7 @@ func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
-func (c *cockroachDBTester) deploy(ns string) *apps.StatefulSet {
+func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {
 	c.ss = c.tester.CreateStatefulSet(cockroachDBManifestPath, ns)
 	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
 	for _, cmd := range []string{
