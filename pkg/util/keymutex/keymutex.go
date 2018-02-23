@@ -20,33 +20,31 @@ import (
 	"fmt"
 	"github.com/golang/glog"
 	"sync"
-	"sync/atomic"
 )
 
 type tryMutex struct {
-	sync.Mutex
-	acq int32
+	ch chan struct{}
+}
+
+func newTryMutex() *tryMutex {
+	return &tryMutex{ch: make(chan struct{}, 1)}
 }
 
 func (tm *tryMutex) Lock() {
-	atomic.StoreInt32(&tm.acq, 1)
-	tm.Mutex.Lock()
+	tm.ch <- struct{}{}
 }
 
 func (tm *tryMutex) TryLock() bool {
-	if !atomic.CompareAndSwapInt32(&tm.acq, 0, 1) {
+	select {
+	case tm.ch <- struct{}{}:
+		return true
+	default:
 		return false
 	}
-
-	atomic.StoreInt32(&tm.acq, 1)
-	tm.Mutex.Lock()
-
-	return true
 }
 
 func (tm *tryMutex) Unlock() {
-	tm.Mutex.Unlock()
-	atomic.StoreInt32(&tm.acq, 0)
+	<-tm.ch
 }
 
 // KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.
@@ -56,7 +54,6 @@ type KeyMutex interface {
 
 	// Tries to acquire a lock associated with the specified ID, returns immediately.
 	// Returns false if the lock exists and is already acquired, otherwise returns true.
-	// Unlikely, but may fail spuriously and return false, even if the lock is not actually held.
 	TryLockKey(id string) bool
 
 	// Releases the lock associated with the specified ID.
@@ -122,7 +119,7 @@ func (km *keyMutex) getOrCreateLock(id string) *tryMutex {
 	defer km.Unlock()
 
 	if _, exists := km.mutexMap[id]; !exists {
-		km.mutexMap[id] = &tryMutex{}
+		km.mutexMap[id] = newTryMutex()
 	}
 
 	return km.mutexMap[id]
