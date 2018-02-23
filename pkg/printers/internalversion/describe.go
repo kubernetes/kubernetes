@@ -2823,6 +2823,22 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 		w.Write(LEVEL_0, "Metrics:\t( current / target )\n")
 		for i, metric := range hpa.Spec.Metrics {
 			switch metric.Type {
+			case autoscaling.ExternalMetricSourceType:
+				if metric.External.TargetAverageValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
+						hpa.Status.CurrentMetrics[i].External.CurrentAverageValue != nil {
+						current = hpa.Status.CurrentMetrics[i].External.CurrentAverageValue.String()
+					}
+					w.Write(LEVEL_1, "%q:\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetAverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil {
+						current = hpa.Status.CurrentMetrics[i].External.CurrentValue.String()
+					}
+					w.Write(LEVEL_1, "%q:\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetValue.String())
+
+				}
 			case autoscaling.PodsMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {

@@ -1491,6 +1491,20 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	count := 0
 	for i, spec := range specs {
 		switch spec.Type {
+		case autoscaling.ExternalMetricSourceType:
+			if spec.External.TargetAverageValue != nil {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].External != nil && statuses[i].External.CurrentAverageValue != nil {
+					current = statuses[i].External.CurrentAverageValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.TargetAverageValue.String()))
+			} else {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].External != nil {
+					current = statuses[i].External.CurrentValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.TargetValue.String()))
+			}
 		case autoscaling.PodsMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Pods != nil {
