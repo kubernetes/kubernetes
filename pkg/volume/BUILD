@@ -83,7 +83,6 @@ go_test(
         "util_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -107,7 +106,6 @@ go_test(
         ],
         "//conditions:default": [],
     }),
-    importpath = "k8s.io/kubernetes/pkg/volume_test",
     deps = [
         ":go_default_library",
         "//pkg/volume/testing:go_default_library",

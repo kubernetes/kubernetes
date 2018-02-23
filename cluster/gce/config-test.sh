@@ -80,7 +80,8 @@ NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
-LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-docker load -i}
+CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
+LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
 RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
@@ -145,11 +146,21 @@ ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 # TODO(piosz) remove this option once Metrics Server became a stable thing.
 ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
 
+# Optional: Metadata agent to setup as part of the cluster bring up:
+#   none        - No metadata agent
+#   stackdriver - Stackdriver metadata agent
+# Metadata agent is a daemon set that provides metadata of kubernetes objects
+# running on the same node for exporting metrics and logs.
+ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
+
+# Version tag of metadata agent
+METADATA_AGENT_VERSION="${KUBE_METADATA_AGENT_VERSION:-0.2-0.0.16-1}"
+
 # One special node out of NUM_NODES would be created of this type if specified.
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.2.14) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.2.14) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -388,9 +399,9 @@ if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
 fi
 
 # Fluentd requirements
-FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-300Mi}"
-FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-100m}"
-FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-200Mi}"
+FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
+FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
+FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
 
 # Heapster requirements
 HEAPSTER_GCP_BASE_MEMORY="${HEAPSTER_GCP_BASE_MEMORY:-140Mi}"
@@ -409,6 +420,9 @@ ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-true}"
 # TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
 # Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
+
+# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
+KUBE_PROXY_MODE="${KUBE_PROXY_MODE:-iptables}"
 
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"

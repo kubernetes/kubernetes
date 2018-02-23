@@ -13,7 +13,6 @@ go_test(
         "versions_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns",
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",

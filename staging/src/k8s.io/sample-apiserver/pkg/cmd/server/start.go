@@ -57,9 +57,9 @@ func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 }
 
 // NewCommandStartWardleServer provides a CLI handler for 'start master' command
-func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewWardleServerOptions(out, errOut)
-
+// with a default WardleServerOptions.
+func NewCommandStartWardleServer(defaults *WardleServerOptions, stopCh <-chan struct{}) *cobra.Command {
+	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",

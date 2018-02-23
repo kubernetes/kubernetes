@@ -21,6 +21,7 @@ package mount
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type FileType string
@@ -125,12 +126,6 @@ type SafeFormatAndMount struct {
 // disk is already formatted or it is being mounted as read-only, it
 // will be mounted without formatting.
 func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, fstype string, options []string) error {
-	// Don't attempt to format if mounting as readonly. Go straight to mounting.
-	for _, option := range options {
-		if option == "ro" {
-			return mounter.Interface.Mount(source, target, fstype, options)
-		}
-	}
 	return mounter.formatAndMount(source, target, fstype, options)
 }
 
@@ -260,4 +255,22 @@ func isBind(options []string) (bool, []string) {
 	}
 
 	return bind, bindRemountOpts
+}
+
+// TODO: this is a workaround for the unmount device issue caused by gci mounter.
+// In GCI cluster, if gci mounter is used for mounting, the container started by mounter
+// script will cause additional mounts created in the container. Since these mounts are
+// irrelevant to the original mounts, they should be not considered when checking the
+// mount references. Current solution is to filter out those mount paths that contain
+// the string of original mount path.
+// Plan to work on better approach to solve this issue.
+
+func HasMountRefs(mountPath string, mountRefs []string) bool {
+	count := 0
+	for _, ref := range mountRefs {
+		if !strings.Contains(ref, mountPath) {
+			count = count + 1
+		}
+	}
+	return count > 0
 }

@@ -103,9 +103,10 @@ go_test(
         "metrics_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
     deps = [
         "//pkg/cloudprovider:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
+        "//pkg/cloudprovider/providers/gce/cloud/mock:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

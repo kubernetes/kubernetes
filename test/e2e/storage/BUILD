@@ -18,6 +18,7 @@ go_library(
         "persistent_volumes-disruptive.go",
         "persistent_volumes-gce.go",
         "persistent_volumes-local.go",
+        "pv_protection.go",
         "pvc_protection.go",
         "volume_expand.go",
         "volume_io.go",

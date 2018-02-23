@@ -82,13 +82,16 @@ NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
-LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-docker load -i}
+CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
+LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
 RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
 NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
+# KUBELET_TEST_ARGS are extra arguments passed to kubelet.
+KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
 # Enable network deletion by default (for kube-down), unless we're using 'default' network.
@@ -155,7 +158,7 @@ ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
 ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 
 # Version tag of metadata agent
-METADATA_AGENT_VERSION="${KUBE_METADATA_AGENT_VERSION:-0.2-0.0.13-5-watch}"
+METADATA_AGENT_VERSION="${KUBE_METADATA_AGENT_VERSION:-0.2-0.0.16-1}"
 
 # One special node out of NUM_NODES would be created of this type if specified.
 # Useful for scheduling heapster in large clusters with nodes of small size.
@@ -292,11 +295,16 @@ if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageProtection
+ADMISSION_CONTROL=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection
 
 if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
   ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
 fi
+
+# MutatingAdmissionWebhook should be the last controller that modifies the
+# request object, otherwise users will be confused if the mutating webhooks'
+# modification is overwritten.
+ADMISSION_CONTROL="${ADMISSION_CONTROL},MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
 
 # ResourceQuota must come last, or a creation is recorded, but the pod was forbidden.
 ADMISSION_CONTROL="${ADMISSION_CONTROL},ResourceQuota"
@@ -351,9 +359,9 @@ if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
 fi
 
 # Fluentd requirements
-FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-300Mi}"
-FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-100m}"
-FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-200Mi}"
+FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
+FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
+FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
 
 # Heapster requirements
 HEAPSTER_GCP_BASE_MEMORY="${HEAPSTER_GCP_BASE_MEMORY:-140Mi}"

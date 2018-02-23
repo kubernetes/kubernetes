@@ -172,7 +172,7 @@ func IsPodReady(pod *api.Pod) bool {
 	return IsPodReadyConditionTrue(pod.Status)
 }
 
-// IsPodReadyConditionTrue retruns true if a pod is ready; false otherwise.
+// IsPodReadyConditionTrue returns true if a pod is ready; false otherwise.
 func IsPodReadyConditionTrue(status api.PodStatus) bool {
 	condition := GetPodReadyCondition(status)
 	return condition != nil && condition.Status == api.ConditionTrue
@@ -242,6 +242,10 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
 			}
 		}
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && podSpec.SecurityContext != nil {
+		podSpec.SecurityContext.ShareProcessNamespace = nil
 	}
 
 	for i := range podSpec.Containers {

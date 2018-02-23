@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -34,12 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/master/ports"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
+
+const defaultRootDir = "/var/lib/kubelet"
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
 // - its value will never, or cannot safely be changed during the lifetime of a node
@@ -63,6 +67,9 @@ type KubeletFlags struct {
 	// If runOnce is true, the Kubelet will check the API server once for pods,
 	// run those in addition to the pods specified by the local manifest, and exit.
 	RunOnce bool
+
+	// enableServer enables the Kubelet's server
+	EnableServer bool
 
 	// HostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
@@ -114,6 +121,9 @@ type KubeletFlags struct {
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
 	RegisterWithTaints []core.Taint
+
+	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
+	CAdvisorPort int32
 
 	// EXPERIMENTAL FLAGS
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
@@ -210,9 +220,10 @@ func NewKubeletFlags() *KubeletFlags {
 	}
 
 	return &KubeletFlags{
+		EnableServer:                        true,
 		ContainerRuntimeOptions:             *NewContainerRuntimeOptions(),
 		CertDirectory:                       "/var/lib/kubelet/pki",
-		RootDirectory:                       v1alpha1.DefaultRootDir,
+		RootDirectory:                       defaultRootDir,
 		MasterServiceNamespace:              metav1.NamespaceDefault,
 		MaxContainerCount:                   -1,
 		MaxPerPodContainerCount:             1,
@@ -228,10 +239,12 @@ func NewKubeletFlags() *KubeletFlags {
 		NodeLabels:          make(map[string]string),
 		VolumePluginDir:     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 		RegisterNode:        true,
-		SeccompProfileRoot:  filepath.Join(v1alpha1.DefaultRootDir, "seccomp"),
+		SeccompProfileRoot:  filepath.Join(defaultRootDir, "seccomp"),
 		HostNetworkSources:  []string{kubetypes.AllSource},
 		HostPIDSources:      []string{kubetypes.AllSource},
 		HostIPCSources:      []string{kubetypes.AllSource},
+		// TODO(#56523): default CAdvisorPort to 0 (disabled) and deprecate it
+		CAdvisorPort: 4194,
 	}
 }
 
@@ -239,6 +252,9 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
 	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
+	}
+	if f.CAdvisorPort != 0 && utilvalidation.IsValidPortNum(int(f.CAdvisorPort)) != nil {
+		return fmt.Errorf("invalid configuration: CAdvisorPort (--cadvisor-port) %v must be between 0 and 65535, inclusive", f.CAdvisorPort)
 	}
 	return nil
 }
@@ -249,13 +265,28 @@ func NewKubeletConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
 	if err != nil {
 		return nil, err
 	}
-	versioned := &v1alpha1.KubeletConfiguration{}
+	versioned := &v1beta1.KubeletConfiguration{}
 	scheme.Default(versioned)
 	config := &kubeletconfig.KubeletConfiguration{}
 	if err := scheme.Convert(versioned, config, nil); err != nil {
 		return nil, err
 	}
+	applyLegacyDefaults(config)
 	return config, nil
+}
+
+// applyLegacyDefaults applies legacy default values to the KubeletConfiguration in order to
+// preserve the command line API. This is used to construct the baseline default KubeletConfiguration
+// before the first round of flag parsing.
+func applyLegacyDefaults(kc *kubeletconfig.KubeletConfiguration) {
+	// --anonymous-auth
+	kc.Authentication.Anonymous.Enabled = true
+	// --authentication-token-webhook
+	kc.Authentication.Webhook.Enabled = false
+	// --authorization-mode
+	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
+	// --read-only-port
+	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 }
 
 // KubeletServer encapsulates all of the parameters necessary for starting up
@@ -299,14 +330,11 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	f.ContainerRuntimeOptions.AddFlags(fs)
 
+	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
 	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "deprecated: use --bootstrap-kubeconfig")
-	// TODO: when pull-kubernetes-e2e-kops-aws does not need this parameter, delete requireKubeConfig.
-	var requireKubeConfig bool
-	fs.BoolVar(&requireKubeConfig, "require-kubeconfig", requireKubeConfig, "This flag is no longer necessary. It has been deprecated and will be removed in a future version.")
-	fs.MarkDeprecated("require-kubeconfig", "You no longer need to use --require-kubeconfig. This will be removed in a future version. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode unless --require-kubeconfig=true is also set. In the latter case, the legacy default kubeconfig path will be used until --require-kubeconfig is removed.")
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
@@ -317,6 +345,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.Float64Var(&f.ChaosChance, "chaos-chance", f.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing.")
 
 	fs.BoolVar(&f.RunOnce, "runonce", f.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --enable-server")
+	fs.BoolVar(&f.EnableServer, "enable-server", f.EnableServer, "Enable the Kubelet's server")
 
 	fs.StringVar(&f.HostnameOverride, "hostname-override", f.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 
@@ -339,13 +368,12 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&f.Containerized, "containerized", f.Containerized, "Running kubelet in a container.")
 
 	// EXPERIMENTAL FLAGS
-	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "<Warning: Alpha feature> The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Note that the format of the config file is still Alpha.")
 	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
 	fs.StringSliceVar(&f.AllowedUnsafeSysctls, "experimental-allowed-unsafe-sysctls", f.AllowedUnsafeSysctls, "Comma-separated whitelist of unsafe sysctls or unsafe sysctl patterns (ending in *). Use these at your own risk.")
 	fs.BoolVar(&f.ExperimentalKernelMemcgNotification, "experimental-kernel-memcg-notification", f.ExperimentalKernelMemcgNotification, "If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.")
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "[Experimental] The endpoint of remote runtime service. Currently unix socket is supported on Linux, and tcp is supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'tcp://localhost:3735'")
 	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "[Experimental] The endpoint of remote image service. If not specified, it will be the same with container-runtime-endpoint by default. Currently unix socket is supported on Linux, and tcp is supported on windows.  Examples:'unix:///var/run/dockershim.sock', 'tcp://localhost:3735'")
-	fs.BoolVar(&f.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", f.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required componenets (binaries, etc.) before performing the mount")
+	fs.BoolVar(&f.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", f.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required components (binaries, etc.) before performing the mount")
 	fs.BoolVar(&f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "experimental-allocatable-ignore-eviction", f.ExperimentalNodeAllocatableIgnoreEvictionThreshold, "When set to 'true', Hard Eviction Thresholds will be ignored while calculating Node Allocatable. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details. [default=false]")
 	fs.Var(flag.NewMapStringString(&f.ExperimentalQOSReserved), "experimental-qos-reserved", "A set of ResourceName=Percentage (e.g. memory=50%) pairs that describe how pod resource requests are reserved at the QoS level. Currently only memory is supported. [default=none]")
 	bindableNodeLabels := flag.ConfigurationMap(f.NodeLabels)
@@ -357,6 +385,8 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to to the directory where the checkpoints are stored")
 
 	// DEPRECATED FLAGS
+	fs.Int32Var(&f.CAdvisorPort, "cadvisor-port", f.CAdvisorPort, "The port of the localhost cAdvisor endpoint (set to 0 to disable)")
+	fs.MarkDeprecated("cadvisor-port", "The default will change to 0 (disabled) in 1.12, and the cadvisor port will be removed entirely in 1.13")
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	fs.MarkDeprecated("minimum-container-ttl-duration", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&f.MaxPerPodContainerCount, "maximum-dead-containers-per-container", f.MaxPerPodContainerCount, "Maximum number of old instances to retain per container.  Each container takes up some disk space.")
@@ -390,7 +420,22 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 }
 
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
-func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
+func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
+	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	defer func() {
+		// All KubeletConfiguration flags are now deprecated, and any new flags that point to
+		// KubeletConfiguration fields are deprecated-on-creation. When removing flags at the end
+		// of their deprecation period, be careful to check that they have *actually* been deprecated
+		// members of the KubeletConfiguration for the entire deprecation period:
+		// e.g. if a flag was added after this deprecation function, it may not be at the end
+		// of its lifetime yet, even if the rest are.
+		deprecated := "This parameter should be set via the config file specified by the Kubelet's --config flag. See https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/ for more information."
+		fs.VisitAll(func(f *pflag.Flag) {
+			f.Deprecated = deprecated
+		})
+		mainfs.AddFlagSet(fs)
+	}()
+
 	fs.BoolVar(&c.FailSwapOn, "fail-swap-on", c.FailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. ")
 	fs.BoolVar(&c.FailSwapOn, "experimental-fail-swap-on", c.FailSwapOn, "DEPRECATED: please use --fail-swap-on instead.")
 	fs.MarkDeprecated("experimental-fail-swap-on", "This flag is deprecated and will be removed in future releases. please use --fail-swap-on instead.")
@@ -401,7 +446,6 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	fs.DurationVar(&c.HTTPCheckFrequency.Duration, "http-check-frequency", c.HTTPCheckFrequency.Duration, "Duration between checking http for new data")
 	fs.StringVar(&c.ManifestURL, "manifest-url", c.ManifestURL, "URL for accessing the container manifest")
 	fs.Var(flag.NewColonSeparatedMultimapStringString(&c.ManifestURLHeader), "manifest-url-header", "Comma-separated list of HTTP headers to use when accessing the manifest URL. Multiple headers with the same name will be added in the same order provided. This flag can be repeatedly invoked. For example: `--manifest-url-header 'a:hello,b:again,c:world' --manifest-url-header 'b:beautiful'`")
-	fs.BoolVar(&c.EnableServer, "enable-server", c.EnableServer, "Enable the Kubelet's server")
 	fs.Var(componentconfig.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Int32Var(&c.Port, "port", c.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&c.ReadOnlyPort, "read-only-port", c.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
@@ -448,7 +492,6 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 
 	fs.BoolVar(&c.EnableDebuggingHandlers, "enable-debugging-handlers", c.EnableDebuggingHandlers, "Enables server endpoints for log collection and local running of containers and commands")
 	fs.BoolVar(&c.EnableContentionProfiling, "contention-profiling", c.EnableContentionProfiling, "Enable lock contention profiling, if profiling is enabled")
-	fs.Int32Var(&c.CAdvisorPort, "cadvisor-port", c.CAdvisorPort, "The port of the localhost cAdvisor endpoint (set to 0 to disable)")
 	fs.Int32Var(&c.HealthzPort, "healthz-port", c.HealthzPort, "The port of the localhost healthz endpoint (set to 0 to disable)")
 	fs.Var(componentconfig.IPVar{Val: &c.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Int32Var(&c.OOMScoreAdj, "oom-score-adj", c.OOMScoreAdj, "The oom-score-adj value for kubelet process. Values must be within the range [-1000, 1000]")
@@ -475,7 +518,7 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	fs.StringVar(&c.HairpinMode, "hairpin-mode", c.HairpinMode, "How should the kubelet setup hairpin NAT. This allows endpoints of a Service to loadbalance back to themselves if they should try to access their own Service. Valid values are \"promiscuous-bridge\", \"hairpin-veth\" and \"none\".")
 	fs.Int32Var(&c.MaxPods, "max-pods", c.MaxPods, "Number of Pods that can run on this Kubelet.")
 
-	fs.StringVar(&c.PodCIDR, "pod-cidr", c.PodCIDR, "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master.")
+	fs.StringVar(&c.PodCIDR, "pod-cidr", c.PodCIDR, "The CIDR to use for pod IP addresses, only used in standalone mode.  In cluster mode, this is obtained from the master. For IPv6, the minimum length of the cluster or pod CIDR is /66.")
 	fs.Int64Var(&c.PodPidsLimit, "pod-max-pids", c.PodPidsLimit, "<Warning: Alpha feature> Set the maximum number of processes per pod.")
 
 	fs.StringVar(&c.ResolverConfig, "resolv-conf", c.ResolverConfig, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
@@ -484,6 +527,8 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	fs.BoolVar(&c.MakeIPTablesUtilChains, "make-iptables-util-chains", c.MakeIPTablesUtilChains, "If true, kubelet will ensure iptables utility rules are present on host.")
 	fs.Int32Var(&c.IPTablesMasqueradeBit, "iptables-masquerade-bit", c.IPTablesMasqueradeBit, "The bit of the fwmark space to mark packets for SNAT. Must be within the range [0, 31]. Please match this parameter with corresponding parameter in kube-proxy.")
 	fs.Int32Var(&c.IPTablesDropBit, "iptables-drop-bit", c.IPTablesDropBit, "The bit of the fwmark space to mark packets for dropping. Must be within the range [0, 31].")
+	fs.StringVar(&c.ContainerLogMaxSize, "container-log-max-size", c.ContainerLogMaxSize, "<Warning: Alpha feature> Set the maximum size (e.g. 10Mi) of container log file before it is rotated.")
+	fs.Int32Var(&c.ContainerLogMaxFiles, "container-log-max-files", c.ContainerLogMaxFiles, "<Warning: Alpha feature> Set the maximum number of container log files that can be present for a container. The number must be >= 2.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.Int64Var(&c.MaxOpenFiles, "max-open-files", c.MaxOpenFiles, "Number of files that can be opened by Kubelet process.")
@@ -505,7 +550,7 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	// Node Allocatable Flags
 	fs.Var(flag.NewMapStringString(&c.SystemReserved), "system-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
 	fs.Var(flag.NewMapStringString(&c.KubeReserved), "kube-reserved", "A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=500Mi,ephemeral-storage=1Gi) pairs that describe resources reserved for kubernetes system components. Currently cpu, memory and local ephemeral storage for root file system are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. [default=none]")
-	fs.StringSliceVar(&c.EnforceNodeAllocatable, "enforce-node-allocatable", c.EnforceNodeAllocatable, "A comma separated list of levels of node allocatable enforcement to be enforced by kubelet. Acceptible options are 'pods', 'system-reserved' & 'kube-reserved'. If the latter two options are specified, '--system-reserved-cgroup' & '--kube-reserved-cgroup' must also be set respectively. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details.")
+	fs.StringSliceVar(&c.EnforceNodeAllocatable, "enforce-node-allocatable", c.EnforceNodeAllocatable, "A comma separated list of levels of node allocatable enforcement to be enforced by kubelet. Acceptable options are 'none', 'pods', 'system-reserved', and 'kube-reserved'. If the latter two options are specified, '--system-reserved-cgroup' and '--kube-reserved-cgroup' must also be set, respectively. If 'none' is specified, no additional options should be set. See https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/ for more details.")
 	fs.StringVar(&c.SystemReservedCgroup, "system-reserved-cgroup", c.SystemReservedCgroup, "Absolute name of the top level cgroup that is used to manage non-kubernetes components for which compute resources were reserved via '--system-reserved' flag. Ex. '/system-reserved'. [default='']")
 	fs.StringVar(&c.KubeReservedCgroup, "kube-reserved-cgroup", c.KubeReservedCgroup, "Absolute name of the top level cgroup that is used to manage kubernetes components for which compute resources were reserved via '--kube-reserved' flag. Ex. '/kube-reserved'. [default='']")
 }

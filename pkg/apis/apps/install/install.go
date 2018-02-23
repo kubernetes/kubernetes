@@ -38,7 +38,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apps.GroupName,
-			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version, v1beta2.SchemeGroupVersion.Version, v1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v1beta2.SchemeGroupVersion.Version, v1beta1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: apps.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{

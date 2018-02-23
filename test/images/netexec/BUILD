@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "netexec",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/netexec",
 )
 
 go_library(

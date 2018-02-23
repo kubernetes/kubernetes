@@ -237,6 +237,10 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		BeforeEach(func() {
+			if !metricsGrabber.HasRegisteredMaster() {
+				framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+			}
+
 			pv = framework.MakePersistentVolume(pvConfig)
 			pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
 
@@ -262,18 +266,12 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		})
 
 		It("should create none metrics for pvc controller before creating any PV or PVC", func() {
-			if !metricsGrabber.HasRegisteredMaster() {
-				framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
-			}
 			validator([]map[string]int64{nil, nil, nil, nil})
 		})
 
 		It("should create unbound pv count metrics for pvc controller after creating pv only",
 			func() {
 				var err error
-				if !metricsGrabber.HasRegisteredMaster() {
-					framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
-				}
 				pv, err = framework.CreatePV(c, pv)
 				Expect(err).NotTo(HaveOccurred(), "Error creating pv: %v", err)
 				waitForPVControllerSync(metricsGrabber, unboundPVKey, classKey)
@@ -283,9 +281,6 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		It("should create unbound pvc count metrics for pvc controller after creating pvc only",
 			func() {
 				var err error
-				if !metricsGrabber.HasRegisteredMaster() {
-					framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
-				}
 				pvc, err = framework.CreatePVC(c, ns, pvc)
 				Expect(err).NotTo(HaveOccurred(), "Error creating pvc: %v", err)
 				waitForPVControllerSync(metricsGrabber, unboundPVCKey, namespaceKey)
@@ -295,12 +290,10 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		It("should create bound pv/pvc count metrics for pvc controller after creating both pv and pvc",
 			func() {
 				var err error
-				if !metricsGrabber.HasRegisteredMaster() {
-					framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
-				}
 				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
 				Expect(err).NotTo(HaveOccurred(), "Error creating pv pvc: %v", err)
 				waitForPVControllerSync(metricsGrabber, boundPVKey, classKey)
+				waitForPVControllerSync(metricsGrabber, boundPVCKey, namespaceKey)
 				validator([]map[string]int64{{className: 1}, nil, {ns: 1}, nil})
 
 			})
@@ -449,10 +442,13 @@ func getPVControllerMetrics(ms metrics.ControllerManagerMetrics, metricName, dim
 func calculateRelativeValues(originValues, updatedValues map[string]int64) map[string]int64 {
 	relativeValues := make(map[string]int64)
 	for key, value := range updatedValues {
-		relativeValues[key] = value - originValues[key]
+		relativeValue := value - originValues[key]
+		if relativeValue != 0 {
+			relativeValues[key] = relativeValue
+		}
 	}
 	for key, value := range originValues {
-		if _, exist := updatedValues[key]; !exist {
+		if _, exist := updatedValues[key]; !exist && value > 0 {
 			relativeValues[key] = -value
 		}
 	}

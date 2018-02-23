@@ -49,7 +49,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
@@ -1129,7 +1129,7 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 
 	switch {
 	case previous:
-		if lastState.Terminated == nil {
+		if lastState.Terminated == nil || lastState.Terminated.ContainerID == "" {
 			return kubecontainer.ContainerID{}, fmt.Errorf("previous terminated container %q in pod %q not found", containerName, podName)
 		}
 		cID = lastState.Terminated.ContainerID
@@ -1138,9 +1138,21 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 		cID = cStatus.ContainerID
 
 	case terminated != nil:
-		cID = terminated.ContainerID
+		// in cases where the next container didn't start, terminated.ContainerID will be empty, so get logs from the lastState.Terminated.
+		if terminated.ContainerID == "" {
+			if lastState.Terminated != nil && lastState.Terminated.ContainerID != "" {
+				cID = lastState.Terminated.ContainerID
+			} else {
+				return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is terminated", containerName, podName)
+			}
+		} else {
+			cID = terminated.ContainerID
+		}
 
 	case lastState.Terminated != nil:
+		if lastState.Terminated.ContainerID == "" {
+			return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is terminated", containerName, podName)
+		}
 		cID = lastState.Terminated.ContainerID
 
 	case waiting != nil:
@@ -1347,6 +1359,15 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	spec := &pod.Spec
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(spec, allStatus)
+	// Check for illegal phase transition
+	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+		// API server shows terminal phase; transitions are not allowed
+		if s.Phase != pod.Status.Phase {
+			glog.Errorf("Pod attempted illegal phase transition from %s to %s: %v", pod.Status.Phase, s.Phase, s)
+			// Force back to phase from the API server
+			s.Phase = pod.Status.Phase
+		}
+	}
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
@@ -1356,7 +1377,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if _, oldPodScheduled := podutil.GetPodCondition(&pod.Status, v1.PodScheduled); oldPodScheduled != nil {
 		s.Conditions = append(s.Conditions, *oldPodScheduled)
 	}
-	podutil.UpdatePodCondition(&pod.Status, &v1.PodCondition{
+	podutil.UpdatePodCondition(s, &v1.PodCondition{
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})

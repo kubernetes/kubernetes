@@ -34,7 +34,6 @@ go_test(
     name = "go_default_test",
     srcs = ["local_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/local",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",

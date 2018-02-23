@@ -23,6 +23,9 @@ const (
 	// that do not specify any priority class and there is no priority class
 	// marked as default.
 	DefaultPriorityWhenNoDefaultClassExists = 0
+	// SystemPriorityClassPrefix is the prefix reserved for system priority class names. Other priority
+	// classes are not allowed to start with this prefix.
+	SystemPriorityClassPrefix = "system-"
 )
 
 // +genclient
@@ -41,8 +44,11 @@ type PriorityClass struct {
 	// receive when they have the name of this class in their pod spec.
 	Value int32
 
-	// GlobalDefault specifies whether this PriorityClass should be considered as
+	// globalDefault specifies whether this PriorityClass should be considered as
 	// the default priority for pods that do not have any priority class.
+	// Only one PriorityClass can be marked as `globalDefault`. However, if more than
+	// one PriorityClasses exists with their `globalDefault` field set to true,
+	// the smallest value of such global default PriorityClasses will be used as the default priority.
 	// +optional
 	GlobalDefault bool
 

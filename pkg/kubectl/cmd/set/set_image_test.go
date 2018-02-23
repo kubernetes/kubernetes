@@ -37,16 +37,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestImageLocal(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -63,8 +65,6 @@ func TestImageLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 
 	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
@@ -80,7 +80,7 @@ func TestImageLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "replicationcontrollers/cassandra") {
+	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set image: %s", buf.String())
 	}
 }
@@ -122,7 +122,7 @@ func TestSetImageValidation(t *testing.T) {
 			expectErr: "all containers are already specified by *, but saw more than one container_name=container_image pairs",
 		},
 		{
-			name: "sucess case",
+			name: "success case",
 			imageOptions: &ImageOptions{
 				Resources: []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
@@ -149,7 +149,9 @@ func TestSetImageValidation(t *testing.T) {
 }
 
 func TestSetMultiResourcesImageLocal(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -166,8 +168,6 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 
 	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
@@ -183,7 +183,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
 	}
@@ -500,9 +500,9 @@ func TestSetImageRemote(t *testing.T) {
 	for _, input := range inputs {
 		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 		testapi.Default = testapi.Groups[input.testAPIGroup]
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
+		ns := legacyscheme.Codecs
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{

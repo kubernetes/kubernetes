@@ -30,7 +30,7 @@ func ConfigSourceEq(a, b *apiv1.NodeConfigSource) bool {
 	if a.ConfigMapRef != b.ConfigMapRef {
 		return ObjectRefEq(a.ConfigMapRef, b.ConfigMapRef)
 	}
-	// all internal subfields of the config soruce are equal
+	// all internal subfields of the config source are equal
 	return true
 }
 
@@ -45,7 +45,7 @@ func ObjectRefEq(a, b *apiv1.ObjectReference) bool {
 	return a.UID == b.UID && a.Namespace == b.Namespace && a.Name == b.Name
 }
 
-// ConfigOKEq returns true if the two conditions are semantically equivalent in the context of dynamic config
-func ConfigOKEq(a, b *apiv1.NodeCondition) bool {
+// KubeletConfigOkEq returns true if the two conditions are semantically equivalent in the context of dynamic config
+func KubeletConfigOkEq(a, b *apiv1.NodeCondition) bool {
 	return a.Message == b.Message && a.Reason == b.Reason && a.Status == b.Status
 }

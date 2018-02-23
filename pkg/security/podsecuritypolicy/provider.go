@@ -179,8 +179,8 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 	return nil
 }
 
-// Ensure a pod's SecurityContext is in compliance with the given constraints.
-func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field.Path) field.ErrorList {
+// ValidatePod ensure a pod is in compliance with the given constraints.
+func (s *simpleProvider) ValidatePod(pod *api.Pod, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	sc := securitycontext.NewPodSecurityContextAccessor(pod.Spec.SecurityContext)
@@ -209,8 +209,6 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 
 	allErrs = append(allErrs, s.strategies.SysctlsStrategy.Validate(pod)...)
 
-	// TODO(tallclair): ValidatePodSecurityContext should be renamed to ValidatePod since its scope
-	// is not limited to the PodSecurityContext.
 	if len(pod.Spec.Volumes) > 0 {
 		allowsAllVolumeTypes := psputil.PSPAllowsAllVolumes(s.psp)
 		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)

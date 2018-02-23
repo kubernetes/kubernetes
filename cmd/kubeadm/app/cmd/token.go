@@ -17,15 +17,12 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
-	"text/template"
 	"time"
 
 	"github.com/renstrom/dedent"
@@ -38,8 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcertutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -47,15 +42,10 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 )
-
-var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join --token {{.Token}} {{.MasterHostPort}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}`,
-))
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
@@ -247,7 +237,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 	// if --print-join-command was specified, print the full `kubeadm join` command
 	// otherwise, just print the token
 	if printJoinCommand {
-		joinCommand, err := getJoinCommand(token, kubeConfigFile)
+		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, token, false)
 		if err != nil {
 			return fmt.Errorf("failed to get join command: %v", err)
 		}
@@ -394,53 +384,4 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
-}
-
-func getJoinCommand(token string, kubeConfigFile string) (string, error) {
-	// load the kubeconfig file to get the CA certificate and endpoint
-	config, err := clientcmd.LoadFromFile(kubeConfigFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to load kubeconfig: %v", err)
-	}
-
-	// load the default cluster config
-	clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
-	if clusterConfig == nil {
-		return "", fmt.Errorf("failed to get default cluster config")
-	}
-
-	// load CA certificates from the kubeconfig (either from PEM data or by file path)
-	var caCerts []*x509.Certificate
-	if clusterConfig.CertificateAuthorityData != nil {
-		caCerts, err = clientcertutil.ParseCertsPEM(clusterConfig.CertificateAuthorityData)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse CA certificate from kubeconfig: %v", err)
-		}
-	} else if clusterConfig.CertificateAuthority != "" {
-		caCerts, err = clientcertutil.CertsFromFile(clusterConfig.CertificateAuthority)
-		if err != nil {
-			return "", fmt.Errorf("failed to load CA certificate referenced by kubeconfig: %v", err)
-		}
-	} else {
-		return "", fmt.Errorf("no CA certificates found in kubeconfig")
-	}
-
-	// hash all the CA certs and include their public key pins as trusted values
-	publicKeyPins := make([]string, 0, len(caCerts))
-	for _, caCert := range caCerts {
-		publicKeyPins = append(publicKeyPins, pubkeypin.Hash(caCert))
-	}
-
-	ctx := map[string]interface{}{
-		"Token":          token,
-		"CAPubKeyPins":   publicKeyPins,
-		"MasterHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
-	}
-
-	var out bytes.Buffer
-	err = joinCommandTemplate.Execute(&out, ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to render join command template: %v", err)
-	}
-	return out.String(), nil
 }

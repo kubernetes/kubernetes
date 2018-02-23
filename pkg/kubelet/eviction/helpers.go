@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -73,6 +72,7 @@ func init() {
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsInodesFree] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalPIDAvailable] = v1.NodePIDPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
@@ -100,15 +100,11 @@ func validSignal(signal evictionapi.Signal) bool {
 // ParseThresholdConfig parses the flags for thresholds.
 func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
-	allocatableThresholds := getAllocatableThreshold(allocatableConfig)
-	results = append(results, allocatableThresholds...)
-
 	hardThresholds, err := parseThresholdStatements(evictionHard)
 	if err != nil {
 		return nil, err
 	}
 	results = append(results, hardThresholds...)
-
 	softThresholds, err := parseThresholdStatements(evictionSoft)
 	if err != nil {
 		return nil, err
@@ -138,7 +134,29 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 			}
 		}
 	}
+	for _, key := range allocatableConfig {
+		if key == kubetypes.NodeAllocatableEnforcementKey {
+			results = addAllocatableThresholds(results)
+			break
+		}
+	}
 	return results, nil
+}
+
+func addAllocatableThresholds(thresholds []evictionapi.Threshold) []evictionapi.Threshold {
+	additionalThresholds := []evictionapi.Threshold{}
+	for _, threshold := range thresholds {
+		if threshold.Signal == evictionapi.SignalMemoryAvailable && isHardEvictionThreshold(threshold) {
+			// Copy the SignalMemoryAvailable to SignalAllocatableMemoryAvailable
+			additionalThresholds = append(additionalThresholds, evictionapi.Threshold{
+				Signal:     evictionapi.SignalAllocatableMemoryAvailable,
+				Operator:   threshold.Operator,
+				Value:      threshold.Value,
+				MinReclaim: threshold.MinReclaim,
+			})
+		}
+	}
+	return append(thresholds, additionalThresholds...)
 }
 
 // parseThresholdStatements parses the input statements into a list of Threshold objects.
@@ -152,26 +170,36 @@ func parseThresholdStatements(statements map[string]string) ([]evictionapi.Thres
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, result)
+		if result != nil {
+			results = append(results, *result)
+		}
 	}
 	return results, nil
 }
 
-// parseThresholdStatement parses a threshold statement.
-func parseThresholdStatement(signal evictionapi.Signal, val string) (evictionapi.Threshold, error) {
+// parseThresholdStatement parses a threshold statement and returns a threshold,
+// or nil if the threshold should be ignored.
+func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionapi.Threshold, error) {
 	if !validSignal(signal) {
-		return evictionapi.Threshold{}, fmt.Errorf(unsupportedEvictionSignal, signal)
+		return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
 	}
 	operator := evictionapi.OpForSignal[signal]
 	if strings.HasSuffix(val, "%") {
+		// ignore 0% and 100%
+		if val == "0%" || val == "100%" {
+			return nil, nil
+		}
 		percentage, err := parsePercentage(val)
 		if err != nil {
-			return evictionapi.Threshold{}, err
+			return nil, err
 		}
-		if percentage <= 0 {
-			return evictionapi.Threshold{}, fmt.Errorf("eviction percentage threshold %v must be positive: %s", signal, val)
+		if percentage < 0 {
+			return nil, fmt.Errorf("eviction percentage threshold %v must be >= 0%%: %s", signal, val)
 		}
-		return evictionapi.Threshold{
+		if percentage > 100 {
+			return nil, fmt.Errorf("eviction percentage threshold %v must be <= 100%%: %s", signal, val)
+		}
+		return &evictionapi.Threshold{
 			Signal:   signal,
 			Operator: operator,
 			Value: evictionapi.ThresholdValue{
@@ -181,39 +209,18 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (evictionapi
 	}
 	quantity, err := resource.ParseQuantity(val)
 	if err != nil {
-		return evictionapi.Threshold{}, err
+		return nil, err
 	}
 	if quantity.Sign() < 0 || quantity.IsZero() {
-		return evictionapi.Threshold{}, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
+		return nil, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
 	}
-	return evictionapi.Threshold{
+	return &evictionapi.Threshold{
 		Signal:   signal,
 		Operator: operator,
 		Value: evictionapi.ThresholdValue{
 			Quantity: &quantity,
 		},
 	}, nil
-}
-
-// getAllocatableThreshold returns the thresholds applicable for the allocatable configuration
-func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold {
-	for _, key := range allocatableConfig {
-		if key == kubetypes.NodeAllocatableEnforcementKey {
-			return []evictionapi.Threshold{
-				{
-					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
-					Operator: evictionapi.OpLessThan,
-					Value: evictionapi.ThresholdValue{
-						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
-					},
-					MinReclaim: &evictionapi.ThresholdValue{
-						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
-					},
-				},
-			}
-		}
-	}
-	return []evictionapi.Threshold{}
 }
 
 // parsePercentage parses a string representing a percentage value
@@ -715,12 +722,7 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvider CapacityProvider, pods []*v1.Pod) (signalObservations, statsFunc, error) {
-	updateStats := true
-	summary, err := summaryProvider.Get(updateStats)
-	if err != nil {
-		return nil, nil, err
-	}
+func makeSignalObservations(summary *statsapi.Summary) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
@@ -731,6 +733,17 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
 			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
 			time:      memory.Time,
+		}
+	}
+	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
+		glog.Errorf("eviction manager: failed to construct signal: %q error: %v", evictionapi.SignalAllocatableMemoryAvailable, err)
+	} else {
+		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
+			result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+				time:      memory.Time,
+			}
 		}
 	}
 	if nodeFs := summary.Node.Fs; nodeFs != nil {
@@ -767,27 +780,26 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 			}
 		}
 	}
-
-	if memoryAllocatableCapacity, ok := capacityProvider.GetCapacity()[v1.ResourceMemory]; ok {
-		memoryAllocatableAvailable := memoryAllocatableCapacity.Copy()
-		if reserved, exists := capacityProvider.GetNodeAllocatableReservation()[v1.ResourceMemory]; exists {
-			memoryAllocatableAvailable.Sub(reserved)
-		}
-		for _, pod := range summary.Pods {
-			mu, err := podMemoryUsage(pod)
-			if err == nil {
-				memoryAllocatableAvailable.Sub(mu[v1.ResourceMemory])
+	if rlimit := summary.Node.Rlimit; rlimit != nil {
+		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
+			available := int64(*rlimit.MaxPID) - int64(*rlimit.NumOfRunningProcesses)
+			result[evictionapi.SignalPIDAvailable] = signalObservation{
+				available: resource.NewQuantity(available, resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.BinarySI),
+				time:      rlimit.Time,
 			}
 		}
-		result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
-			available: memoryAllocatableAvailable,
-			capacity:  &memoryAllocatableCapacity,
-		}
-	} else {
-		glog.Errorf("Could not find capacity information for resource %v", v1.ResourceMemory)
 	}
+	return result, statsFunc
+}
 
-	return result, statsFunc, nil
+func getSysContainer(sysContainers []statsapi.ContainerStats, name string) (*statsapi.ContainerStats, error) {
+	for _, cont := range sysContainers {
+		if cont.Name == name {
+			return &cont, nil
+		}
+	}
+	return nil, fmt.Errorf("system container %q not found in metrics", name)
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
@@ -1056,38 +1068,15 @@ func buildResourceToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, w
 		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{}
 		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{}
 		// with an imagefs, imagefs pressure should delete unused images
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
 		// since imagefs and nodefs share a common device, they share common reclaim functions
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 	}
 	return resourceToReclaimFunc
-}
-
-// deleteTerminatedContainers will delete terminated containers to free up disk pressure.
-func deleteTerminatedContainers(containerGC ContainerGC) nodeReclaimFunc {
-	return func() (*resource.Quantity, error) {
-		glog.Infof("eviction manager: attempting to delete unused containers")
-		err := containerGC.DeleteAllUnusedContainers()
-		// Calculating bytes freed is not yet supported.
-		return resource.NewQuantity(int64(0), resource.BinarySI), err
-	}
-}
-
-// deleteImages will delete unused images to free up disk pressure.
-func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
-	return func() (*resource.Quantity, error) {
-		glog.Infof("eviction manager: attempting to delete unused images")
-		bytesFreed, err := imageGC.DeleteUnusedImages()
-		reclaimed := int64(0)
-		if reportBytesFreed {
-			reclaimed = bytesFreed
-		}
-		return resource.NewQuantity(reclaimed, resource.BinarySI), err
-	}
 }

@@ -12,7 +12,7 @@
     "OneKind": {
       "description": "OneKind has a short description",
       "required": [
-        "field1",
+        "field1"
       ],
       "properties": {
         "field1": {
@@ -42,23 +42,23 @@
     "OtherKind": {
       "description": "This is another kind of Kind",
       "required": [
-        "string",
+        "string"
       ],
       "properties": {
         "string": {
           "description": "This string must be a string",
-          "type": "string",
+          "type": "string"
         },
         "int": {
           "description": "This int must be an int",
-          "type": "integer",
+          "type": "integer"
         },
         "array": {
           "description": "This array must be an array of int",
           "type": "array",
           "items": {
             "description": "This is an int in an array",
-            "type": "integer",
+            "type": "integer"
           }
         },
         "object": {
@@ -66,7 +66,7 @@
           "type": "object",
           "additionalProperties": {
             "description": "this is a string in an object",
-            "type": "string",
+            "type": "string"
           }
         },
         "primitive": {

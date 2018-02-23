@@ -28,11 +28,13 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     cifs-utils \
     conntrack \
     e2fsprogs \
+    xfsprogs \
     ebtables \
     ethtool \
     git \
     glusterfs-client \
     iptables \
+    ipset \
     jq \
     kmod \
     openssh-client \

@@ -30,7 +30,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -118,7 +118,7 @@ func (ds *dockerService) updateCreateConfig(
 		if err := applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, createConfig.HostConfig, securityOptSep); err != nil {
 			return fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
 		}
-		modifyPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, createConfig.HostConfig)
+		modifyContainerPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, createConfig.HostConfig, podSandboxID)
 	}
 
 	// Apply cgroupsParent derived from the sandbox config.

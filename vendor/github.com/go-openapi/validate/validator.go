@@ -16,6 +16,7 @@ package validate
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 
 	"github.com/go-openapi/errors"
@@ -156,8 +157,15 @@ func (b *basicCommonValidator) Applies(source interface{}, kind reflect.Kind) bo
 func (b *basicCommonValidator) Validate(data interface{}) (res *Result) {
 	if len(b.Enum) > 0 {
 		for _, enumValue := range b.Enum {
-			if data != nil && reflect.DeepEqual(enumValue, data) {
-				return nil
+			actualType := reflect.TypeOf(enumValue)
+			if actualType == nil {
+				continue
+			}
+			expectedValue := reflect.ValueOf(data)
+			if expectedValue.IsValid() && expectedValue.Type().ConvertibleTo(actualType) {
+				if reflect.DeepEqual(expectedValue.Convert(actualType).Interface(), enumValue) {
+					return nil
+				}
 			}
 		}
 		return sErr(errors.EnumFail(b.Path, b.In, data, b.Enum))
@@ -474,10 +482,14 @@ func (n *numberValidator) Applies(source interface{}, kind reflect.Kind) bool {
 		isInt := kind >= reflect.Int && kind <= reflect.Uint64
 		isFloat := kind == reflect.Float32 || kind == reflect.Float64
 		r := isInt || isFloat
-		// fmt.Printf("schema props validator for %q applies %t for %T (kind: %v)\n", n.Path, r, source, kind)
+		if Debug {
+			log.Printf("schema props validator for %q applies %t for %T (kind: %v)\n", n.Path, r, source, kind)
+		}
 		return r
 	}
-	// fmt.Printf("schema props validator for %q applies %t for %T (kind: %v)\n", n.Path, false, source, kind)
+	if Debug {
+		log.Printf("schema props validator for %q applies %t for %T (kind: %v)\n", n.Path, false, source, kind)
+	}
 	return false
 }
 
@@ -536,15 +548,22 @@ func (s *stringValidator) Applies(source interface{}, kind reflect.Kind) bool {
 	switch source.(type) {
 	case *spec.Parameter, *spec.Schema, *spec.Items, *spec.Header:
 		r := kind == reflect.String
-		// fmt.Printf("string validator for %q applies %t for %T (kind: %v)\n", s.Path, r, source, kind)
+		if Debug {
+			log.Printf("string validator for %q applies %t for %T (kind: %v)\n", s.Path, r, source, kind)
+		}
 		return r
 	}
-	// fmt.Printf("string validator for %q applies %t for %T (kind: %v)\n", s.Path, false, source, kind)
+	if Debug {
+		log.Printf("string validator for %q applies %t for %T (kind: %v)\n", s.Path, false, source, kind)
+	}
 	return false
 }
 
 func (s *stringValidator) Validate(val interface{}) *Result {
-	data := val.(string)
+	data, ok := val.(string)
+	if !ok {
+		return sErr(errors.InvalidType(s.Path, s.In, "string", val))
+	}
 
 	if s.Required && !s.AllowEmptyValue && (s.Default == nil || s.Default == "") {
 		if err := RequiredString(s.Path, s.In, data); err != nil {

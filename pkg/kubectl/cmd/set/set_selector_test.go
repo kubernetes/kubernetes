@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -316,7 +316,8 @@ func TestGetResourcesAndSelector(t *testing.T) {
 }
 
 func TestSelectorTest(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -335,11 +336,9 @@ func TestSelectorTest(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
 
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 	cmd.Run(cmd, []string{"environment=qa"})
 
-	if !strings.Contains(buf.String(), "services/cassandra") {
+	if !strings.Contains(buf.String(), "service/cassandra") {
 		t.Errorf("did not set selector: %s", buf.String())
 	}
 }

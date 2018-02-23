@@ -381,15 +381,3 @@ func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 		}
 	}
 }
-
-// printAllPods prints a list of all the pods and their node names. This is used
-// for debugging.
-func printAllPods(t *testing.T, cs clientset.Interface, nsName string) {
-	podList, err := cs.CoreV1().Pods(nsName).List(metav1.ListOptions{})
-	if err != nil {
-		t.Logf("Error getting pods: %v", err)
-	}
-	for _, pod := range podList.Items {
-		t.Logf("Pod:\n\tName:%v\n\tNamespace:%v\n\tNode Name:%v\n", pod.Name, pod.Namespace, pod.Spec.NodeName)
-	}
-}

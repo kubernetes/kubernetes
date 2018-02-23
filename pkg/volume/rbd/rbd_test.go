@@ -55,8 +55,23 @@ func TestCanSupport(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/rbd" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
+	if plug.CanSupport(&volume.Spec{}) {
+		t.Errorf("Expected false")
+	}
 	if plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{}}}) {
 		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{Volume: &v1.Volume{VolumeSource: v1.VolumeSource{RBD: &v1.RBDVolumeSource{}}}}) {
+		t.Errorf("Expected true")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{}}}) {
+		t.Errorf("Expected false")
+	}
+	if plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{}}}}) {
+		t.Errorf("Expected false")
+	}
+	if !plug.CanSupport(&volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}}}}}) {
+		t.Errorf("Expected true")
 	}
 }
 

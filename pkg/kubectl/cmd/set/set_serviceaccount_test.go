@@ -37,12 +37,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 const serviceAccount = "serviceaccount1"
@@ -68,7 +68,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 	for i, input := range inputs {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			f, tf, _, _ := cmdtesting.NewAPIFactory()
+			f, tf := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
 				GroupVersion: schema.GroupVersion{Version: "v1"},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -83,7 +83,6 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
-			tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
 			saConfig := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
 				Filenames: []string{input.yaml}},
 				out:   out,
@@ -99,7 +98,8 @@ func TestSetServiceAccountLocal(t *testing.T) {
 
 func TestSetServiceAccountMultiLocal(t *testing.T) {
 	testapi.Default = testapi.Groups[""]
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	f, tf := cmdtesting.NewAPIFactory()
+	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -116,8 +116,6 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 	opts := serviceAccountConfig{fileNameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		out:   buf,
@@ -130,7 +128,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
 	}
@@ -315,9 +313,9 @@ func TestSetServiceAccountRemote(t *testing.T) {
 	for _, input := range inputs {
 		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 		testapi.Default = testapi.Groups[input.testAPIGroup]
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-		tf.Printer = printers.NewVersionedPrinter(&printers.YAMLPrinter{}, testapi.Default.Converter(), *testapi.Default.GroupVersion())
+		ns := legacyscheme.Codecs
 		tf.Namespace = "test"
 		tf.CategoryExpander = categories.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{
@@ -369,7 +367,7 @@ func TestServiceAccountValidation(t *testing.T) {
 		{args: []string{serviceAccount}, errorString: resourceMissingErrString},
 	}
 	for _, input := range inputs {
-		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			GroupVersion: schema.GroupVersion{Version: "v1"},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

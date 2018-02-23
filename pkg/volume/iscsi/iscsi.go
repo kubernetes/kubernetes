@@ -69,11 +69,7 @@ func (plugin *iscsiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
-	if (spec.Volume != nil && spec.Volume.ISCSI == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI == nil) {
-		return false
-	}
-
-	return true
+	return (spec.Volume != nil && spec.Volume.ISCSI != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI != nil)
 }
 
 func (plugin *iscsiPlugin) RequiresRemount() bool {
@@ -245,7 +241,7 @@ func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName
 		return nil, err
 	}
 	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
-	// Retreive volume information from globalMapPathUUID
+	// Retrieve volume information from globalMapPathUUID
 	// globalMapPathUUID example:
 	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
 	// plugins/kubernetes.io/iscsi/volumeDevices/iface-default/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0/{pod uuid}
@@ -602,7 +598,7 @@ func createPersistentVolumeFromISCSIPVSource(volumeName string, iscsi v1.ISCSIPe
 }
 
 func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.Spec, error) {
-	// Retreive volume spec information from globalMapPath
+	// Retrieve volume spec information from globalMapPath
 	// globalMapPath example:
 	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}
 	// plugins/kubernetes.io/iscsi/volumeDevices/iface-default/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
@@ -618,7 +614,7 @@ func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.S
 	}
 	arr := strings.Split(device, "-lun-")
 	if len(arr) < 2 {
-		return nil, fmt.Errorf("failed to retreive lun from globalMapPath: %v", globalMapPath)
+		return nil, fmt.Errorf("failed to retrieve lun from globalMapPath: %v", globalMapPath)
 	}
 	lun, err := strconv.Atoi(arr[1])
 	if err != nil {
@@ -626,7 +622,7 @@ func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.S
 	}
 	iface, found := extractIface(globalMapPath)
 	if !found {
-		return nil, fmt.Errorf("failed to retreive iface from globalMapPath: %v", globalMapPath)
+		return nil, fmt.Errorf("failed to retrieve iface from globalMapPath: %v", globalMapPath)
 	}
 	iscsiPV := createPersistentVolumeFromISCSIPVSource(volumeName,
 		v1.ISCSIPersistentVolumeSource{

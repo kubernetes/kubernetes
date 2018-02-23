@@ -13,7 +13,6 @@ go_test(
         "main_test.go",
         "persistent_volumes_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/volume",
     tags = ["integration"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",

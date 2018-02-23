@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["storage_core_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/core/rest",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/registry/core/componentstatus:go_default_library",
@@ -51,6 +51,7 @@ go_library(
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/registry/core/service/storage:go_default_library",
         "//pkg/registry/core/serviceaccount/storage:go_default_library",
+        "//pkg/serviceaccount:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
@@ -59,6 +60,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/util:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )

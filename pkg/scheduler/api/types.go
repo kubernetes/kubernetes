@@ -26,20 +26,31 @@ import (
 )
 
 const (
-	MaxUint          = ^uint(0)
-	MaxInt           = int(MaxUint >> 1)
+	// MaxUint defines the max unsigned int value.
+	MaxUint = ^uint(0)
+	// MaxInt defines the max signed int value.
+	MaxInt = int(MaxUint >> 1)
+	// MaxTotalPriority defines the max total priority value.
 	MaxTotalPriority = MaxInt
-	MaxPriority      = 10
-	MaxWeight        = MaxInt / MaxPriority
+	// MaxPriority defines the max priority value.
+	MaxPriority = 10
+	// MaxWeight defines the max weight value.
+	MaxWeight = MaxInt / MaxPriority
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Policy describes a struct of a policy resource in api.
 type Policy struct {
 	metav1.TypeMeta
-	// Holds the information to configure the fit predicate functions
+	// Holds the information to configure the fit predicate functions.
+	// If unspecified, the default predicate functions will be applied.
+	// If empty list, all predicates (except the mandatory ones) will be
+	// bypassed.
 	Predicates []PredicatePolicy
-	// Holds the information to configure the priority functions
+	// Holds the information to configure the priority functions.
+	// If unspecified, the default priority functions will be applied.
+	// If empty list, all priority functions will be bypassed.
 	Priorities []PriorityPolicy
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig
@@ -55,6 +66,7 @@ type Policy struct {
 	AlwaysCheckAllPredicates bool
 }
 
+// PredicatePolicy describes a struct of a predicate policy.
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
@@ -64,6 +76,7 @@ type PredicatePolicy struct {
 	Argument *PredicateArgument
 }
 
+// PriorityPolicy describes a struct of a priority policy.
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
@@ -146,8 +159,8 @@ type ExtenderConfig struct {
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string
-	// EnableHttps specifies whether https should be used to communicate with the extender
-	EnableHttps bool
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool
 	// TLSConfig specifies the transport layer security config
 	TLSConfig *restclient.TLSClientConfig
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
@@ -215,6 +228,7 @@ type HostPriority struct {
 	Score int
 }
 
+// HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
 
 func (h HostPriorityList) Len() int {

@@ -237,6 +237,13 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
+	if err := checkAlphaNodeAffinity(pv, nodeLabels); err != nil {
+		return err
+	}
+	return checkVolumeNodeAffinity(pv, nodeLabels)
+}
+
+func checkAlphaNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
 	affinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
 	if err != nil {
 		return fmt.Errorf("Error getting storage node affinity: %v", err)
@@ -248,6 +255,27 @@ func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) er
 	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 		terms := affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 		glog.V(10).Infof("Match for RequiredDuringSchedulingIgnoredDuringExecution node selector terms %+v", terms)
+		for _, term := range terms {
+			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
+			if err != nil {
+				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
+			}
+			if !selector.Matches(labels.Set(nodeLabels)) {
+				return fmt.Errorf("NodeSelectorTerm %+v does not match node labels", term.MatchExpressions)
+			}
+		}
+	}
+	return nil
+}
+
+func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
+	if pv.Spec.NodeAffinity == nil {
+		return nil
+	}
+
+	if pv.Spec.NodeAffinity.Required != nil {
+		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
+		glog.V(10).Infof("Match for Required node selector terms %+v", terms)
 		for _, term := range terms {
 			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
 			if err != nil {
@@ -321,7 +349,7 @@ type BlockVolumePathHandler interface {
 	UnmapDevice(mapPath string, linkName string) error
 	// RemovePath removes a file or directory on specified map path
 	RemoveMapPath(mapPath string) error
-	// IsSymlinkExist retruns true if specified symbolic link exists
+	// IsSymlinkExist returns true if specified symbolic link exists
 	IsSymlinkExist(mapPath string) (bool, error)
 	// GetDeviceSymlinkRefs searches symbolic links under global map path
 	GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error)
@@ -380,7 +408,7 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	}
 	// Remove old symbolic link(or file) then create new one.
 	// This should be done because current symbolic link is
-	// stale accross node reboot.
+	// stale across node reboot.
 	linkPath := path.Join(mapPath, string(linkName))
 	if err = os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
 		return err

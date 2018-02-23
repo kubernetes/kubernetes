@@ -54,14 +54,11 @@ var _ = utils.SIGDescribe("Volume Disk Size [Feature:vsphere]", func() {
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		scParameters = make(map[string]string)
 		datastore = GetAndExpectStringEnvVar(StorageClassDatastoreName)
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
 	})
 
 	It("verify dynamically provisioned pv using storageclass with an invalid disk size fails", func() {

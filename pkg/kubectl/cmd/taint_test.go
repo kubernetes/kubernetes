@@ -29,8 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1.Node, *v1.Node) {
@@ -237,7 +239,9 @@ func TestTaint(t *testing.T) {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
 		new_node := &v1.Node{}
 		tainted := false
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		f, tf := cmdtesting.NewAPIFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
 
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,

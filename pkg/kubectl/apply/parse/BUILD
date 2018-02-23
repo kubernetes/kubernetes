@@ -29,7 +29,6 @@ go_test(
     data = [
         "//api/openapi-spec:swagger-spec",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/parse_test",
     deps = [
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

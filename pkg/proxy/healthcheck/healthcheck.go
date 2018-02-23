@@ -73,7 +73,7 @@ type HTTPServerFactory interface {
 
 // HTTPServer allows for testing of Server.
 type HTTPServer interface {
-	// Server is designed so that http.Server satifies this interface,
+	// Server is designed so that http.Server satisfies this interface,
 	Serve(listener net.Listener) error
 }
 

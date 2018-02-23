@@ -17,7 +17,6 @@ go_test(
     name = "go_default_test",
     srcs = ["mount_pod_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/mountpod",
     deps = [
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/pod:go_default_library",

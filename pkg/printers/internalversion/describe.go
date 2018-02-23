@@ -87,7 +87,7 @@ type PrefixWriter interface {
 	Write(level int, format string, a ...interface{})
 	// WriteLine writes an entire line with no indentation level.
 	WriteLine(a ...interface{})
-	// Flush forces indendation to be reset.
+	// Flush forces indentation to be reset.
 	Flush()
 }
 
@@ -2588,8 +2588,9 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 		}
 		printLabelsMultiline(w, "Labels", node.Labels)
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
-		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
+		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
+		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
@@ -2917,10 +2918,18 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
-	fractionCpuReqs := float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	fractionCpuLimits := float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
-	fractionMemoryReqs := float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
-	fractionMemoryLimits := float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
+	fractionCpuReqs := float64(0)
+	fractionCpuLimits := float64(0)
+	if allocatable.Cpu().MilliValue() != 0 {
+		fractionCpuReqs = float64(cpuReqs.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
+		fractionCpuLimits = float64(cpuLimits.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
+	}
+	fractionMemoryReqs := float64(0)
+	fractionMemoryLimits := float64(0)
+	if allocatable.Memory().Value() != 0 {
+		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
+		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
+	}
 	w.Write(LEVEL_1, "%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
 		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits),
 		memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
@@ -3275,6 +3284,7 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
 		w.Write(LEVEL_0, "Provisioner:\t%s\n", sc.Provisioner)
 		w.Write(LEVEL_0, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
+		w.Write(LEVEL_0, "AllowVolumeExpansion:\t%s\n", printBoolPtr(sc.AllowVolumeExpansion))
 		if sc.ReclaimPolicy != nil {
 			w.Write(LEVEL_0, "ReclaimPolicy:\t%s\n", *sc.ReclaimPolicy)
 		}
@@ -3360,8 +3370,8 @@ func describePriorityClass(pc *scheduling.PriorityClass, events *api.EventList) 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
-		w.Write(LEVEL_0, "Value:\t%s\n", pc.Value)
-		w.Write(LEVEL_0, "GlobalDefault:\t%s\n", pc.GlobalDefault)
+		w.Write(LEVEL_0, "Value:\t%v\n", pc.Value)
+		w.Write(LEVEL_0, "GlobalDefault:\t%v\n", pc.GlobalDefault)
 		w.Write(LEVEL_0, "Description:\t%s\n", pc.Description)
 
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(pc.Annotations))

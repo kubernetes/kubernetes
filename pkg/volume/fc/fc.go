@@ -82,11 +82,7 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
-	if (spec.Volume != nil && spec.Volume.FC == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC == nil) {
-		return false
-	}
-
-	return true
+	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
 }
 
 func (plugin *fcPlugin) RequiresRemount() bool {
@@ -293,7 +289,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 }
 
 // ConstructBlockVolumeSpec creates a new volume.Spec with following steps.
-//   - Searchs a file whose name is {pod uuid} under volume plugin directory.
+//   - Searches a file whose name is {pod uuid} under volume plugin directory.
 //   - If a file is found, then retreives volumePluginDependentPath from globalMapPathUUID.
 //   - Once volumePluginDependentPath is obtained, store volume information to VolumeSource
 // examples:
@@ -308,13 +304,13 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 	}
 	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 
-	// Retreive volumePluginDependentPath from globalMapPathUUID
+	// Retrieve volumePluginDependentPath from globalMapPathUUID
 	// globalMapPathUUID examples:
 	//   wwn+lun: plugins/kubernetes.io/fc/volumeDevices/50060e801049cfd1-lun-0/{pod uuid}
 	//   wwid: plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000/{pod uuid}
 	arr := strings.Split(globalMapPathUUID, "/")
 	if len(arr) < 2 {
-		return nil, fmt.Errorf("Fail to retreive volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
+		return nil, fmt.Errorf("Fail to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 	l := len(arr) - 2
 	volumeInfo := arr[l]

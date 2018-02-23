@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -31,6 +30,7 @@ import (
 	"github.com/golang/glog"
 
 	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,7 +39,7 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
@@ -110,7 +110,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 		framework.ExpectNoError(err)
 		newCfg := oldCfg.DeepCopy()
 		updateFunction(newCfg)
-		if reflect.DeepEqual(*newCfg, *oldCfg) {
+		if apiequality.Semantic.DeepEqual(*newCfg, *oldCfg) {
 			return
 		}
 
@@ -185,7 +185,7 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		if err != nil {
 			return fmt.Errorf("failed trying to get current Kubelet config, will retry, error: %v", err)
 		}
-		if !reflect.DeepEqual(*kubeCfg, *newKubeCfg) {
+		if !apiequality.Semantic.DeepEqual(*kubeCfg, *newKubeCfg) {
 			return fmt.Errorf("still waiting for new configuration to take effect, will continue to watch /configz")
 		}
 		glog.Infof("new configuration has taken effect")
@@ -219,11 +219,11 @@ func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource)
 	return nil
 }
 
-// getConfigOK returns the first NodeCondition in `cs` with Type == apiv1.NodeConfigOK,
+// getKubeletConfigOkCondition returns the first NodeCondition in `cs` with Type == apiv1.NodeKubeletConfigOk,
 // or if no such condition exists, returns nil.
-func getConfigOKCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
+func getKubeletConfigOkCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
 	for i := range cs {
-		if cs[i].Type == apiv1.NodeConfigOK {
+		if cs[i].Type == apiv1.NodeKubeletConfigOk {
 			return &cs[i]
 		}
 	}
@@ -232,7 +232,7 @@ func getConfigOKCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
 func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Response {
-	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/proxy/nodes/%s/configz", framework.TestContext.NodeName)
+	endpoint := fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	framework.ExpectNoError(err)
@@ -257,9 +257,9 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 // Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
 func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
 	// This hack because /configz reports the following structure:
-	// {"kubeletconfig": {the JSON representation of kubeletconfigv1alpha1.KubeletConfiguration}}
+	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
 	type configzWrapper struct {
-		ComponentConfig kubeletconfigv1alpha1.KubeletConfiguration `json:"kubeletconfig"`
+		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
 	}
 
 	configz := configzWrapper{}
@@ -298,7 +298,7 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	framework.ExpectNoError(err)
 
-	versioned := &kubeletconfigv1alpha1.KubeletConfiguration{}
+	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
 	err = scheme.Convert(internalKC, versioned, nil)
 	framework.ExpectNoError(err)
 
@@ -360,7 +360,7 @@ func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1alpha1.SchemeGroupVersion), nil
+	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1beta1.SchemeGroupVersion), nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an

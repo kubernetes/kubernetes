@@ -7,6 +7,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "service_port.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -47,8 +48,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/util",
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
@@ -109,7 +112,13 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "service_port_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util",
+    deps = [
+        "//pkg/apis/core:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+    ],
 )

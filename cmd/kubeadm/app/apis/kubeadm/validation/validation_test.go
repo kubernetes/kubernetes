@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -568,12 +568,11 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(true),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 			SystemCgroups:               "",
 			CgroupRoot:                  "",
-			CAdvisorPort:                utilpointer.Int32Ptr(0),
 			EventBurst:                  10,
 			EventRecordQPS:              utilpointer.Int32Ptr(5),
 			HealthzPort:                 utilpointer.Int32Ptr(10248),
@@ -588,7 +587,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			OOMScoreAdj:                 utilpointer.Int32Ptr(-999),
 			PodsPerCore:                 100,
 			Port:                        65535,
-			ReadOnlyPort:                utilpointer.Int32Ptr(0),
+			ReadOnlyPort:                0,
 			RegistryBurst:               10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(5),
 			HairpinMode:                 "promiscuous-bridge",
@@ -599,12 +598,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}
 
 	errorCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(false),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 			SystemCgroups:               "/",
 			CgroupRoot:                  "",
-			CAdvisorPort:                utilpointer.Int32Ptr(-10),
 			EventBurst:                  -10,
 			EventRecordQPS:              utilpointer.Int32Ptr(-10),
 			HealthzPort:                 utilpointer.Int32Ptr(-10),
@@ -619,7 +617,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			OOMScoreAdj:                 utilpointer.Int32Ptr(-1001),
 			PodsPerCore:                 -10,
 			Port:                        0,
-			ReadOnlyPort:                utilpointer.Int32Ptr(-10),
+			ReadOnlyPort:                -10,
 			RegistryBurst:               -10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(-10),
 		},

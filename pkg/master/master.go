@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	endpointsstorage "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
 	"github.com/golang/glog"
@@ -109,7 +110,6 @@ type ExtraConfig struct {
 
 	// Used to start and monitor tunneling
 	Tunneler          tunneler.Tunneler
-	EnableUISupport   bool
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
 
@@ -156,6 +156,8 @@ type ExtraConfig struct {
 
 	// Selects which reconciler to use
 	EndpointReconcilerType reconcilers.Type
+
+	ServiceAccountIssuer serviceaccount.TokenGenerator
 }
 
 type Config struct {
@@ -269,9 +271,6 @@ func (cfg *Config) Complete(informers informers.SharedInformerFactory) Completed
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
 	}
 
-	// enable swagger UI only if general UI support is on
-	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.ExtraConfig.EnableUISupport
-
 	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
 		c.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
@@ -304,9 +303,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	if c.ExtraConfig.EnableUISupport {
-		routes.UIRedirect{}.Install(s.Handler.NonGoRestfulMux)
-	}
 	if c.ExtraConfig.EnableLogsSupport {
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
@@ -325,6 +321,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			ServiceIPRange:       c.ExtraConfig.ServiceIPRange,
 			ServiceNodePortRange: c.ExtraConfig.ServiceNodePortRange,
 			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer: c.ExtraConfig.ServiceAccountIssuer,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
@@ -337,15 +334,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator},
-		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
+		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
+		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
-		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer},
+		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},

@@ -52,12 +52,12 @@ go_test(
         "tokens_controller_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/serviceaccount",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

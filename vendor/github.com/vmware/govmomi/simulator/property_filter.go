@@ -32,7 +32,7 @@ type PropertyFilter struct {
 func (f *PropertyFilter) DestroyPropertyFilter(c *types.DestroyPropertyFilter) soap.HasFault {
 	body := &methods.DestroyPropertyFilterBody{}
 
-	f.pc.Filter = RemoveReference(c.This, f.pc.Filter)
+	RemoveReference(&f.pc.Filter, c.This)
 
 	Map.Remove(c.This)
 

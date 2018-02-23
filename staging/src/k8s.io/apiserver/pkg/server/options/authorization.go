@@ -74,7 +74,7 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
-func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.Config) error {
+func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) error {
 	if s == nil {
 		c.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 		return nil

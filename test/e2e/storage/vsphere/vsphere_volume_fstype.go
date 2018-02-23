@@ -24,9 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -72,10 +70,10 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		Expect(len(nodeList.Items)).NotTo(BeZero(), "Unable to find ready and schedulable Node")
+		Expect(GetReadySchedulableNodeInfos()).NotTo(BeEmpty())
 	})
 
 	It("verify fstype - ext3 formatted volume", func() {
@@ -98,28 +96,25 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	framework.Logf("Invoking Test for fstype: %s", fstype)
 	scParameters := make(map[string]string)
 	scParameters["fstype"] = fstype
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
 
 	// Create Persistent Volume
 	By("Creating Storage Class With Fstype")
 	pvclaim, persistentvolumes := createVolume(client, namespace, scParameters)
 
 	// Create Pod and verify the persistent volume is accessible
-	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes, vsp)
-	_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
+	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes)
+	_, err := framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Detach and delete volume
-	detachVolume(f, client, vsp, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
-	deleteVolume(client, pvclaim.Name, namespace)
+	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
+	err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	Expect(err).To(BeNil())
 }
 
 func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string) {
 	scParameters := make(map[string]string)
 	scParameters["fstype"] = fstype
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
 
 	// Create Persistent Volume
 	By("Creating Storage Class With Invalid Fstype")
@@ -135,8 +130,9 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
 
 	// Detach and delete volume
-	detachVolume(f, client, vsp, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
-	deleteVolume(client, pvclaim.Name, namespace)
+	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
+	err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	Expect(err).To(BeNil())
 
 	Expect(eventList.Items).NotTo(BeEmpty())
 	errorMsg := `MountVolume.MountDevice failed for volume "` + persistentvolumes[0].Name + `" : executable file not found`
@@ -166,7 +162,7 @@ func createVolume(client clientset.Interface, namespace string, scParameters map
 	return pvclaim, persistentvolumes
 }
 
-func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace string, pvclaim *v1.PersistentVolumeClaim, persistentvolumes []*v1.PersistentVolume, vsp *vsphere.VSphere) *v1.Pod {
+func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace string, pvclaim *v1.PersistentVolumeClaim, persistentvolumes []*v1.PersistentVolume) *v1.Pod {
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Creating pod to attach PV to the node")
@@ -176,18 +172,18 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 
 	// Asserts: Right disk is attached to the pod
 	By("Verify the volume is accessible and available in the pod")
-	verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
+	verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 	return pod
 }
 
-func detachVolume(f *framework.Framework, client clientset.Interface, vsp *vsphere.VSphere, pod *v1.Pod, volPath string) {
+// detachVolume delete the volume passed in the argument and wait until volume is detached from the node,
+func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Pod, volPath string) {
+	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	Expect(err).To(BeNil())
+	nodeName := pod.Spec.NodeName
 	By("Deleting pod")
 	framework.DeletePodWithWait(f, client, pod)
 
 	By("Waiting for volumes to be detached from the node")
-	waitForVSphereDiskToDetach(client, vsp, volPath, k8stype.NodeName(pod.Spec.NodeName))
-}
-
-func deleteVolume(client clientset.Interface, pvclaimName string, namespace string) {
-	framework.DeletePersistentVolumeClaim(client, pvclaimName, namespace)
+	waitForVSphereDiskToDetach(volPath, nodeName)
 }

@@ -38,7 +38,6 @@ go_test(
         "aws_ebs_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/aws_ebs",
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/util/mount:go_default_library",

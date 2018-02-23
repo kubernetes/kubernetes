@@ -43,7 +43,7 @@ spec:
     spec:
       containers:
       - name: node-problem-detector
-        image: gcr.io/google_containers/node-problem-detector:v0.4.1
+        image: k8s.gcr.io/node-problem-detector:v0.4.1
         command:
         - "/bin/sh"
         - "-c"

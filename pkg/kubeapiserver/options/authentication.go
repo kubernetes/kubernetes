@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -34,7 +35,6 @@ type BuiltInAuthenticationOptions struct {
 	Anonymous       *AnonymousAuthenticationOptions
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
-	Keystone        *KeystoneAuthenticationOptions
 	OIDC            *OIDCAuthenticationOptions
 	PasswordFile    *PasswordFileAuthenticationOptions
 	RequestHeader   *genericoptions.RequestHeaderAuthenticationOptions
@@ -54,11 +54,6 @@ type BootstrapTokenAuthenticationOptions struct {
 	Enable bool
 }
 
-type KeystoneAuthenticationOptions struct {
-	URL    string
-	CAFile string
-}
-
 type OIDCAuthenticationOptions struct {
 	CAFile         string
 	ClientID       string
@@ -67,6 +62,7 @@ type OIDCAuthenticationOptions struct {
 	UsernamePrefix string
 	GroupsClaim    string
 	GroupsPrefix   string
+	SigningAlgs    []string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -76,6 +72,7 @@ type PasswordFileAuthenticationOptions struct {
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles []string
 	Lookup   bool
+	Issuer   string
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -99,7 +96,6 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithAnonymous().
 		WithBootstrapToken().
 		WithClientCert().
-		WithKeystone().
 		WithOIDC().
 		WithPasswordFile().
 		WithRequestHeader().
@@ -120,11 +116,6 @@ func (s *BuiltInAuthenticationOptions) WithBootstrapToken() *BuiltInAuthenticati
 
 func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOptions {
 	s.ClientCert = &genericoptions.ClientCertAuthenticationOptions{}
-	return s
-}
-
-func (s *BuiltInAuthenticationOptions) WithKeystone() *BuiltInAuthenticationOptions {
-	s.Keystone = &KeystoneAuthenticationOptions{}
 	return s
 }
 
@@ -168,6 +159,12 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id should be specified together"))
 	}
 
+	if s.ServiceAccounts != nil && len(s.ServiceAccounts.Issuer) > 0 && strings.Contains(s.ServiceAccounts.Issuer, ":") {
+		if _, err := url.Parse(s.ServiceAccounts.Issuer); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
+		}
+	}
+
 	return allErrors
 }
 
@@ -187,15 +184,6 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	if s.ClientCert != nil {
 		s.ClientCert.AddFlags(fs)
-	}
-
-	if s.Keystone != nil {
-		fs.StringVar(&s.Keystone.URL, "experimental-keystone-url", s.Keystone.URL,
-			"If passed, activates the keystone authentication plugin.")
-
-		fs.StringVar(&s.Keystone.CAFile, "experimental-keystone-ca-file", s.Keystone.CAFile, ""+
-			"If set, the Keystone server's certificate will be verified by one of the authorities "+
-			"in the experimental-keystone-ca-file, otherwise the host's root CA set will be used.")
 	}
 
 	if s.OIDC != nil {
@@ -229,6 +217,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"If provided, all groups will be prefixed with this value to prevent conflicts with "+
 			"other authentication strategies.")
 
+		fs.StringSliceVar(&s.OIDC.SigningAlgs, "oidc-signing-algs", []string{"RS256"}, ""+
+			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
+			"'alg' header value not in this list will be rejected. "+
+			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
 	}
 
 	if s.PasswordFile != nil {
@@ -249,6 +241,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.BoolVar(&s.ServiceAccounts.Lookup, "service-account-lookup", s.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
+
+		fs.StringVar(&s.ServiceAccounts.Issuer, "service-account-issuer", s.ServiceAccounts.Issuer, ""+
+			"Identifier of the service account token issuer. The issuer will assert this identifier "+
+			"in \"iss\" claim of issued tokens. This value is a string or URI.")
 	}
 
 	if s.TokenFile != nil {
@@ -285,11 +281,6 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.ClientCAFile = s.ClientCert.ClientCA
 	}
 
-	if s.Keystone != nil {
-		ret.KeystoneURL = s.Keystone.URL
-		ret.KeystoneCAFile = s.Keystone.CAFile
-	}
-
 	if s.OIDC != nil {
 		ret.OIDCCAFile = s.OIDC.CAFile
 		ret.OIDCClientID = s.OIDC.ClientID
@@ -298,6 +289,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCIssuerURL = s.OIDC.IssuerURL
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
+		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
 	}
 
 	if s.PasswordFile != nil {
@@ -341,19 +333,17 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 
 	var err error
 	if o.ClientCert != nil {
-		c, err = c.ApplyClientCert(o.ClientCert.ClientCA)
-		if err != nil {
+		if err = c.Authentication.ApplyClientCert(o.ClientCert.ClientCA, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 	if o.RequestHeader != nil {
-		c, err = c.ApplyClientCert(o.RequestHeader.ClientCAFile)
-		if err != nil {
+		if err = c.Authentication.ApplyClientCert(o.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 
-	c.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
 
 	return nil
 }

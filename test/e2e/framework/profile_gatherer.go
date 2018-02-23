@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -61,10 +63,6 @@ func checkProfileGatheringPrerequisites() error {
 }
 
 func gatherProfileOfKind(profileBaseName, kind string) error {
-	// Check some prerequisites before gathering the profile.
-	if err := checkProfileGatheringPrerequisites(); err != nil {
-		return err
-	}
 	// Get the profile data over SSH.
 	getCommand := fmt.Sprintf("curl -s localhost:8080/debug/pprof/%s", kind)
 	sshResult, err := SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
@@ -90,10 +88,10 @@ func gatherProfileOfKind(profileBaseName, kind string) error {
 	switch {
 	// TODO: Support other profile kinds if needed (e.g inuse_space, alloc_objects, mutex, etc)
 	case kind == "heap":
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", "--alloc_space", tmpfile.Name())
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", "--alloc_space", tmpfile.Name())
 		profilePrefix = "ApiserverMemoryProfile_"
 	case strings.HasPrefix(kind, "profile"):
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", tmpfile.Name())
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", tmpfile.Name())
 		profilePrefix = "ApiserverCPUProfile_"
 	default:
 		return fmt.Errorf("Unknown profile kind provided: %s", kind)
@@ -106,8 +104,10 @@ func gatherProfileOfKind(profileBaseName, kind string) error {
 	}
 	defer outfile.Close()
 	cmd.Stdout = outfile
+	stderr := bytes.NewBuffer(nil)
+	cmd.Stderr = stderr
 	if err := cmd.Run(); nil != err {
-		return fmt.Errorf("Failed to run 'go tool pprof': %v", err)
+		return fmt.Errorf("Failed to run 'go tool pprof': %v, stderr: %#v", err, stderr.String())
 	}
 	return nil
 }
@@ -140,6 +140,13 @@ func GatherApiserverCPUProfileForNSeconds(wg *sync.WaitGroup, profileBaseName st
 	if wg != nil {
 		defer wg.Done()
 	}
+	if err := checkProfileGatheringPrerequisites(); err != nil {
+		Logf("Profile gathering pre-requisite failed: %v", err)
+		return
+	}
+	if profileBaseName == "" {
+		profileBaseName = time.Now().Format(time.RFC3339)
+	}
 	if err := gatherProfileOfKind(profileBaseName, fmt.Sprintf("profile?seconds=%v", n)); err != nil {
 		Logf("Failed to gather apiserver CPU profile: %v", err)
 	}
@@ -149,7 +156,32 @@ func GatherApiserverMemoryProfile(wg *sync.WaitGroup, profileBaseName string) {
 	if wg != nil {
 		defer wg.Done()
 	}
+	if err := checkProfileGatheringPrerequisites(); err != nil {
+		Logf("Profile gathering pre-requisite failed: %v", err)
+		return
+	}
+	if profileBaseName == "" {
+		profileBaseName = time.Now().Format(time.RFC3339)
+	}
 	if err := gatherProfileOfKind(profileBaseName, "heap"); err != nil {
 		Logf("Failed to gather apiserver memory profile: %v", err)
 	}
+}
+
+// StartApiserverCPUProfileGatherer is a polling-based gatherer of the apiserver's
+// CPU profile. It takes the delay b/w consecutive gatherings as an argument and
+// starts the gathering goroutine. To stop the gatherer, close the returned channel.
+func StartApiserverCPUProfileGatherer(delay time.Duration) chan struct{} {
+	stopCh := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-time.After(delay):
+				GatherApiserverCPUProfile(nil, "")
+			case <-stopCh:
+				return
+			}
+		}
+	}()
+	return stopCh
 }

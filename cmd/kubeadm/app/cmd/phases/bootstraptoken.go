@@ -34,11 +34,9 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
@@ -137,7 +135,7 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			// Creates the bootstap token
-			err = createBootstrapToken(client, cfgPath, cfg, description, usages, extraGroups, skipTokenPrint)
+			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, description, usages, extraGroups, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
 
 			// Create the cluster-info ConfigMap or update if it already exists
@@ -194,7 +192,7 @@ func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = createBootstrapToken(client, cfgPath, cfg, description, usages, extraGroups, skipTokenPrint)
+			err = createBootstrapToken(*kubeConfigFile, client, cfgPath, cfg, description, usages, extraGroups, skipTokenPrint)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -289,10 +287,6 @@ func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiext.MasterCon
 		"Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)",
 	)
 	flagSet.StringVar(
-		&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir,
-		"The path where certificates are stored",
-	)
-	flagSet.StringVar(
 		&cfg.Token, "token", cfg.Token,
 		"The token to use for establishing bidirectional trust between nodes and masters",
 	)
@@ -318,7 +312,7 @@ func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiext.MasterCon
 	)
 }
 
-func createBootstrapToken(client clientset.Interface, cfgPath string, cfg *kubeadmapiext.MasterConfiguration, description string, usages, extraGroups []string, skipTokenPrint bool) error {
+func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiext.MasterConfiguration, description string, usages, extraGroups []string, skipTokenPrint bool) error {
 	// adding groups only makes sense for authentication
 	usagesSet := sets.NewString(usages...)
 	usageAuthentication := strings.TrimPrefix(bootstrapapi.BootstrapTokenUsageAuthentication, bootstrapapi.BootstrapTokenUsagePrefix)
@@ -337,23 +331,19 @@ func createBootstrapToken(client clientset.Interface, cfgPath string, cfg *kubea
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	kubeadmutil.CheckErr(err)
 
-	// Load the CA certificate from so we can pin its public key
-	caCert, err := pkiutil.TryLoadCertFromDisk(internalcfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
-	if err != nil {
-		return fmt.Errorf("error loading ca cert from disk: %v", err)
-	}
-
 	// Creates or updates the token
 	if err := node.UpdateOrCreateToken(client, internalcfg.Token, false, internalcfg.TokenTTL.Duration, usages, extraGroups, description); err != nil {
 		return err
 	}
 
 	fmt.Println("[bootstraptoken] Bootstrap token Created")
-	if skipTokenPrint {
-		internalcfg.Token = "{token}"
-	}
 	fmt.Println("[bootstraptoken] You can now join any number of machines by running:")
-	fmt.Printf("[bootstraptoken]   kubeadm join {master} --token %s --discovery-token-ca-cert-hash %s \n", internalcfg.Token, pubkeypin.Hash(caCert))
+
+	joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.Token, skipTokenPrint)
+	if err != nil {
+		return fmt.Errorf("failed to get join command: %v", err)
+	}
+	fmt.Println(joinCommand)
 
 	return nil
 }

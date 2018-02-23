@@ -29,10 +29,10 @@ rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 # The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
 kube::util::go_install_from_commit \
     github.com/kubernetes/repo-infra/kazel \
-    ae4e9a3906ace4ba657b7a09242610c6266e832c
+    97099dccc8807e9159dc28f374a8f0602cab07e1
 kube::util::go_install_from_commit \
     github.com/bazelbuild/bazel-gazelle/cmd/gazelle \
-    31ce76e3acc34a22434d1a783bb9b3cae790d108  # 0.8.0
+    39e8257565d3917c1674bf37d6538c10cdac2260
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 

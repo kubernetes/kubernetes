@@ -310,8 +310,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		return PrintTable(table, output, h.options)
 	}
 
-	// check if the object is unstructured.  If so, let's attempt to convert it to a type we can understand before
-	// trying to print, since the printers are keyed by type.  This is extremely expensive.
+	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand before
+	// trying to print, since the printers are keyed by type. This is extremely expensive.
 	if h.encoder != nil && h.decoder != nil {
 		obj, _ = decodeUnknownObject(obj, h.encoder, h.decoder)
 	}
@@ -351,7 +351,7 @@ func hasCondition(conditions []metav1beta1.TableRowCondition, t metav1beta1.RowC
 }
 
 // PrintTable prints a table to the provided output respecting the filtering rules for options
-// for wide columns and filetred rows. It filters out rows that are Completed. You should call
+// for wide columns and filtered rows. It filters out rows that are Completed. You should call
 // DecorateTable if you receive a table from a remote server before calling PrintTable.
 func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions) error {
 	if !options.NoHeaders {

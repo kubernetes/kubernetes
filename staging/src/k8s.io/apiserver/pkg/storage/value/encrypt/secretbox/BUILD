@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["secretbox_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/secretbox",
     deps = ["//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library"],
 )
 

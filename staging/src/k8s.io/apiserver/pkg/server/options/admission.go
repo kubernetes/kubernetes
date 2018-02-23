@@ -79,7 +79,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
 		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName},
-		DefaultOffPlugins:      sets.NewString(initialization.PluginName, mutatingwebhook.PluginName, validatingwebhook.PluginName),
+		DefaultOffPlugins:      sets.NewString(initialization.PluginName),
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
@@ -136,12 +136,12 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer := initializer.New(clientset, informers, c.Authorizer, scheme)
+	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, scheme)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admissionmetrics.WithControllerMetrics)
+	admissionChain, err := a.Plugins.NewFromPlugins(pluginNames, pluginsConfigProvider, initializersChain, admission.DecoratorFunc(admissionmetrics.WithControllerMetrics))
 	if err != nil {
 		return err
 	}

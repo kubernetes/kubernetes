@@ -32,7 +32,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -270,7 +269,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
-				NewCmdScale(f, out),
+				NewCmdScale(f, out, err),
 				NewCmdAutoscale(f, out),
 			},
 		},
@@ -290,7 +289,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
 				NewCmdDescribe(f, out, err),
-				NewCmdLogs(f, out),
+				NewCmdLogs(f, out, err),
 				NewCmdAttach(f, in, out, err),
 				NewCmdExec(f, in, out, err),
 				NewCmdPortForward(f, out, err),
@@ -355,8 +354,8 @@ func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
 }
 
-func printDeprecationWarning(command, alias string) {
-	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
+func printDeprecationWarning(errOut io.Writer, command, alias string) {
+	fmt.Fprintf(errOut, "%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
 }
 
 // deprecatedAlias is intended to be used to create a "wrapper" command around

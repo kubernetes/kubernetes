@@ -13,7 +13,6 @@ go_test(
         "root_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/endpoints/discovery",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",

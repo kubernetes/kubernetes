@@ -316,7 +316,7 @@ func (obj InfoObject) Merged() (map[string]interface{}, error) {
 	}
 
 	if live == nil || last == nil {
-		return local, nil // We probably don't have a live verison, merged is local.
+		return local, nil // We probably don't have a live version, merged is local.
 	}
 
 	elmt, err := obj.Parser.CreateElement(last, local, live)
@@ -439,7 +439,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 		obj := InfoObject{
 			Info:    info,
 			Parser:  parser,
-			Encoder: f.JSONEncoder(),
+			Encoder: cmdutil.InternalVersionJSONEncoder(),
 		}
 
 		return differ.Diff(obj, printer)

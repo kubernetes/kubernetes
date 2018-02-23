@@ -84,6 +84,7 @@ var (
 		v1.NodeOutOfDisk:          algorithm.TaintNodeOutOfDisk,
 		v1.NodeDiskPressure:       algorithm.TaintNodeDiskPressure,
 		v1.NodeNetworkUnavailable: algorithm.TaintNodeNetworkUnavailable,
+		v1.NodePIDPressure:        algorithm.TaintNodePIDPressure,
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
@@ -91,6 +92,7 @@ var (
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
 		algorithm.TaintNodeDiskPressure:       v1.NodeDiskPressure,
+		algorithm.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
 )
 

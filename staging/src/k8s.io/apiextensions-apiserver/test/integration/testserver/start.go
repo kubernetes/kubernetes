@@ -32,6 +32,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 )
 
 func DefaultServerConfig() (*extensionsapiserver.Config, error) {
@@ -87,11 +88,11 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 	return config, nil
 }
 
-func StartServer(config *extensionsapiserver.Config) (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
+func StartServer(config *extensionsapiserver.Config) (chan struct{}, *rest.Config, error) {
 	stopCh := make(chan struct{})
 	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	go func() {
 		err := server.GenericAPIServer.PrepareRun().Run(stopCh)
@@ -123,26 +124,32 @@ func StartServer(config *extensionsapiserver.Config) (chan struct{}, clientset.I
 	})
 	if err != nil {
 		close(stopCh)
+		return nil, nil, err
+	}
+
+	return stopCh, config.GenericConfig.LoopbackClientConfig, nil
+}
+
+func StartDefaultServer() (chan struct{}, *rest.Config, error) {
+	config, err := DefaultServerConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return StartServer(config)
+}
+
+func StartDefaultServerWithClients() (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
+	stopCh, config, err := StartDefaultServer()
+	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	apiExtensionsClient, err := clientset.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
+	apiExtensionsClient, err := clientset.NewForConfig(config)
 	if err != nil {
 		close(stopCh)
 		return nil, nil, nil, err
 	}
 
-	bytes, _ := apiExtensionsClient.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1beta1").DoRaw()
-	fmt.Print(string(bytes))
-
-	return stopCh, apiExtensionsClient, dynamic.NewDynamicClientPool(server.GenericAPIServer.LoopbackClientConfig), nil
-}
-
-func StartDefaultServer() (chan struct{}, clientset.Interface, dynamic.ClientPool, error) {
-	config, err := DefaultServerConfig()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return StartServer(config)
+	return stopCh, apiExtensionsClient, dynamic.NewDynamicClientPool(config), nil
 }

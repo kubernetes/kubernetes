@@ -14,7 +14,6 @@ go_test(
         "timeout_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/nodeipam/ipam",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/nodeipam/ipam/cidrset:go_default_library",

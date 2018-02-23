@@ -70,7 +70,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -232,7 +232,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -341,7 +341,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -717,7 +717,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -836,7 +836,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -939,7 +939,7 @@
         "type": "integer",
         "paramType": "query",
         "name": "timeoutSeconds",
-        "description": "Timeout for the list/watch call.",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
         "required": false,
         "allowMultiple": false
        },
@@ -1146,6 +1146,700 @@
        "application/json-patch+json",
        "application/merge-patch+json",
        "application/strategic-merge-patch+json"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/policy/v1beta1/podsecuritypolicies",
+    "description": "API at /apis/policy/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PodSecurityPolicyList",
+      "method": "GET",
+      "summary": "list or watch objects of kind PodSecurityPolicy",
+      "nickname": "listPodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "limit",
+        "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "continue",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PodSecurityPolicyList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.PodSecurityPolicy",
+      "method": "POST",
+      "summary": "create a PodSecurityPolicy",
+      "nickname": "createPodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PodSecurityPolicy",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete collection of PodSecurityPolicy",
+      "nickname": "deletecollectionPodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "limit",
+        "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "continue",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/policy/v1beta1/watch/podsecuritypolicies",
+    "description": "API at /apis/policy/v1beta1",
+    "operations": [
+     {
+      "type": "v1.WatchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of PodSecurityPolicy",
+      "nickname": "watchPodSecurityPolicyList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "limit",
+        "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "continue",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/policy/v1beta1/podsecuritypolicies/{name}",
+    "description": "API at /apis/policy/v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PodSecurityPolicy",
+      "method": "GET",
+      "summary": "read the specified PodSecurityPolicy",
+      "nickname": "readPodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodSecurityPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.PodSecurityPolicy",
+      "method": "PUT",
+      "summary": "replace the specified PodSecurityPolicy",
+      "nickname": "replacePodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PodSecurityPolicy",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodSecurityPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.PodSecurityPolicy",
+      "method": "PATCH",
+      "summary": "partially update the specified PodSecurityPolicy",
+      "nickname": "patchPodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodSecurityPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "v1.Status",
+      "method": "DELETE",
+      "summary": "delete a PodSecurityPolicy",
+      "nickname": "deletePodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "gracePeriodSeconds",
+        "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "orphanDependents",
+        "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "propagationPolicy",
+        "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy. Acceptable values are: 'Orphan' - orphan the dependents; 'Background' - allow the garbage collector to delete the dependents in the background; 'Foreground' - a cascading policy that deletes all dependents in the foreground.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodSecurityPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/apis/policy/v1beta1/watch/podsecuritypolicies/{name}",
+    "description": "API at /apis/policy/v1beta1",
+    "operations": [
+     {
+      "type": "v1.WatchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind PodSecurityPolicy",
+      "nickname": "watchPodSecurityPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "includeUninitialized",
+        "description": "If true, partially initialized resources are included in the response.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "limit",
+        "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "continue",
+        "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodSecurityPolicy",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
       ]
      }
     ]
@@ -1652,6 +2346,325 @@
    "v1.DeletionPropagation": {
     "id": "v1.DeletionPropagation",
     "properties": {}
+   },
+   "v1beta1.PodSecurityPolicyList": {
+    "id": "v1beta1.PodSecurityPolicyList",
+    "description": "Pod Security Policy List is a list of PodSecurityPolicy objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ListMeta",
+      "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.PodSecurityPolicy"
+      },
+      "description": "Items is a list of schema objects."
+     }
+    }
+   },
+   "v1beta1.PodSecurityPolicy": {
+    "id": "v1beta1.PodSecurityPolicy",
+    "description": "Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata"
+     },
+     "spec": {
+      "$ref": "v1beta1.PodSecurityPolicySpec",
+      "description": "spec defines the policy enforced."
+     }
+    }
+   },
+   "v1beta1.PodSecurityPolicySpec": {
+    "id": "v1beta1.PodSecurityPolicySpec",
+    "description": "Pod Security Policy Spec defines the policy enforced.",
+    "required": [
+     "seLinux",
+     "runAsUser",
+     "supplementalGroups",
+     "fsGroup"
+    ],
+    "properties": {
+     "privileged": {
+      "type": "boolean",
+      "description": "privileged determines if a pod can request to be run as privileged."
+     },
+     "defaultAddCapabilities": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Capability"
+      },
+      "description": "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the AllowedCapabilities list."
+     },
+     "requiredDropCapabilities": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Capability"
+      },
+      "description": "RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added."
+     },
+     "allowedCapabilities": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Capability"
+      },
+      "description": "AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities."
+     },
+     "volumes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.FSType"
+      },
+      "description": "volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used."
+     },
+     "hostNetwork": {
+      "type": "boolean",
+      "description": "hostNetwork determines if the policy allows the use of HostNetwork in the pod spec."
+     },
+     "hostPorts": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.HostPortRange"
+      },
+      "description": "hostPorts determines which host port ranges are allowed to be exposed."
+     },
+     "hostPID": {
+      "type": "boolean",
+      "description": "hostPID determines if the policy allows the use of HostPID in the pod spec."
+     },
+     "hostIPC": {
+      "type": "boolean",
+      "description": "hostIPC determines if the policy allows the use of HostIPC in the pod spec."
+     },
+     "seLinux": {
+      "$ref": "v1beta1.SELinuxStrategyOptions",
+      "description": "seLinux is the strategy that will dictate the allowable labels that may be set."
+     },
+     "runAsUser": {
+      "$ref": "v1beta1.RunAsUserStrategyOptions",
+      "description": "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set."
+     },
+     "supplementalGroups": {
+      "$ref": "v1beta1.SupplementalGroupsStrategyOptions",
+      "description": "SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext."
+     },
+     "fsGroup": {
+      "$ref": "v1beta1.FSGroupStrategyOptions",
+      "description": "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext."
+     },
+     "readOnlyRootFilesystem": {
+      "type": "boolean",
+      "description": "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to."
+     },
+     "defaultAllowPrivilegeEscalation": {
+      "type": "boolean",
+      "description": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process."
+     },
+     "allowPrivilegeEscalation": {
+      "type": "boolean",
+      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true."
+     },
+     "allowedHostPaths": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AllowedHostPath"
+      },
+      "description": "is a white list of allowed host paths. Empty indicates that all host paths may be used."
+     },
+     "allowedFlexVolumes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AllowedFlexVolume"
+      },
+      "description": "AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"Volumes\" field."
+     }
+    }
+   },
+   "v1.Capability": {
+    "id": "v1.Capability",
+    "properties": {}
+   },
+   "v1beta1.FSType": {
+    "id": "v1beta1.FSType",
+    "properties": {}
+   },
+   "v1beta1.HostPortRange": {
+    "id": "v1beta1.HostPortRange",
+    "description": "Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+    "required": [
+     "min",
+     "max"
+    ],
+    "properties": {
+     "min": {
+      "type": "integer",
+      "format": "int32",
+      "description": "min is the start of the range, inclusive."
+     },
+     "max": {
+      "type": "integer",
+      "format": "int32",
+      "description": "max is the end of the range, inclusive."
+     }
+    }
+   },
+   "v1beta1.SELinuxStrategyOptions": {
+    "id": "v1beta1.SELinuxStrategyOptions",
+    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "rule": {
+      "type": "string",
+      "description": "type is the strategy that will dictate the allowable labels that may be set."
+     },
+     "seLinuxOptions": {
+      "$ref": "v1.SELinuxOptions",
+      "description": "seLinuxOptions required to run as; required for MustRunAs More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
+     }
+    }
+   },
+   "v1.SELinuxOptions": {
+    "id": "v1.SELinuxOptions",
+    "description": "SELinuxOptions are the labels to be applied to the container",
+    "properties": {
+     "user": {
+      "type": "string",
+      "description": "User is a SELinux user label that applies to the container."
+     },
+     "role": {
+      "type": "string",
+      "description": "Role is a SELinux role label that applies to the container."
+     },
+     "type": {
+      "type": "string",
+      "description": "Type is a SELinux type label that applies to the container."
+     },
+     "level": {
+      "type": "string",
+      "description": "Level is SELinux level label that applies to the container."
+     }
+    }
+   },
+   "v1beta1.RunAsUserStrategyOptions": {
+    "id": "v1beta1.RunAsUserStrategyOptions",
+    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "required": [
+     "rule"
+    ],
+    "properties": {
+     "rule": {
+      "type": "string",
+      "description": "Rule is the strategy that will dictate the allowable RunAsUser values that may be set."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IDRange"
+      },
+      "description": "Ranges are the allowed ranges of uids that may be used."
+     }
+    }
+   },
+   "v1beta1.IDRange": {
+    "id": "v1beta1.IDRange",
+    "description": "ID Range provides a min/max of an allowed range of IDs.",
+    "required": [
+     "min",
+     "max"
+    ],
+    "properties": {
+     "min": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Min is the start of the range, inclusive."
+     },
+     "max": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Max is the end of the range, inclusive."
+     }
+    }
+   },
+   "v1beta1.SupplementalGroupsStrategyOptions": {
+    "id": "v1beta1.SupplementalGroupsStrategyOptions",
+    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+    "properties": {
+     "rule": {
+      "type": "string",
+      "description": "Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IDRange"
+      },
+      "description": "Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end."
+     }
+    }
+   },
+   "v1beta1.FSGroupStrategyOptions": {
+    "id": "v1beta1.FSGroupStrategyOptions",
+    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+    "properties": {
+     "rule": {
+      "type": "string",
+      "description": "Rule is the strategy that will dictate what FSGroup is used in the SecurityContext."
+     },
+     "ranges": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.IDRange"
+      },
+      "description": "Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end."
+     }
+    }
+   },
+   "v1beta1.AllowedHostPath": {
+    "id": "v1beta1.AllowedHostPath",
+    "description": "defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "properties": {
+     "pathPrefix": {
+      "type": "string",
+      "description": "is the path prefix that the host volume must match. It does not support `*`. Trailing slashes are trimmed when validating the path prefix with a host path.\n\nExamples: `/foo` would allow `/foo`, `/foo/` and `/foo/bar` `/foo` would not allow `/food` or `/etc/foo`"
+     }
+    }
+   },
+   "v1beta1.AllowedFlexVolume": {
+    "id": "v1beta1.AllowedFlexVolume",
+    "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string",
+      "description": "Driver is the name of the Flexvolume driver."
+     }
+    }
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",

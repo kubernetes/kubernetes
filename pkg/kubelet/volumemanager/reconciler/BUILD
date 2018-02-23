@@ -37,7 +37,6 @@ go_test(
     name = "go_default_test",
     srcs = ["reconciler_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler",
     deps = [
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/mount:go_default_library",

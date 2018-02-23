@@ -64,6 +64,8 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
+const csiDriverNameRexpErrMsg string = "must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character"
+const csiDriverNameRexpFmt string = `^[a-zA-Z0-9][-a-zA-Z0-9_.]{0,61}[a-zA-Z-0-9]$`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -74,6 +76,8 @@ var BannedOwners = apimachineryvalidation.BannedOwners
 var iscsiInitiatorIqnRegex = regexp.MustCompile(`iqn\.\d{4}-\d{2}\.([[:alnum:]-.]+)(:[^,;*&$|\s]+)$`)
 var iscsiInitiatorEuiRegex = regexp.MustCompile(`^eui.[[:alnum:]]{16}$`)
 var iscsiInitiatorNaaRegex = regexp.MustCompile(`^naa.[[:alnum:]]{32}$`)
+
+var csiDriverNameRexp = regexp.MustCompile(csiDriverNameRexpFmt)
 
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
@@ -1379,6 +1383,9 @@ func validateLocalVolumeSource(ls *core.LocalVolumeSource, fldPath *field.Path) 
 		return allErrs
 	}
 
+	if !path.IsAbs(ls.Path) {
+		allErrs = append(allErrs, field.Invalid(fldPath, ls.Path, "must be an absolute path"))
+	}
 	allErrs = append(allErrs, validatePathNoBacksteps(ls.Path, fldPath.Child("path"))...)
 	return allErrs
 }
@@ -1433,6 +1440,14 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		allErrs = append(allErrs, field.Required(fldPath.Child("driver"), ""))
 	}
 
+	if len(csi.Driver) > 63 {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("driver"), csi.Driver, 63))
+	}
+
+	if !csiDriverNameRexp.MatchString(csi.Driver) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("driver"), csi.Driver, validation.RegexError(csiDriverNameRexpErrMsg, csiDriverNameRexpFmt, "csi-hostpath")))
+	}
+
 	if len(csi.VolumeHandle) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volumeHandle"), ""))
 	}
@@ -1484,6 +1499,15 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 
 	nodeAffinitySpecified, errs := validateStorageNodeAffinityAnnotation(pv.ObjectMeta.Annotations, metaPath.Child("annotations"))
 	allErrs = append(allErrs, errs...)
+
+	volumeNodeAffinitySpecified, errs := validateVolumeNodeAffinity(pv.Spec.NodeAffinity, specPath.Child("nodeAffinity"))
+	allErrs = append(allErrs, errs...)
+
+	if nodeAffinitySpecified && volumeNodeAffinitySpecified {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("nodeAffinity"), "may not specify both alpha nodeAffinity annotation and nodeAffinity field"))
+	}
+
+	nodeAffinitySpecified = nodeAffinitySpecified || volumeNodeAffinitySpecified
 
 	numVolumes := 0
 	if pv.Spec.HostPath != nil {
@@ -1711,6 +1735,13 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		// Allow setting NodeAffinity if oldPv NodeAffinity was not set
+		if oldPv.Spec.NodeAffinity != nil {
+			allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
+		}
 	}
 
 	return allErrs
@@ -2905,17 +2936,11 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(spec.PriorityClassName) > 0 {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("priorityClassName"), "Pod priority is disabled by feature-gate"))
-		} else {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 			for _, msg := range ValidatePriorityClassName(spec.PriorityClassName, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
 			}
 		}
-	}
-
-	if spec.Priority != nil && !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("priority"), "Pod priority is disabled by feature-gate"))
 	}
 
 	return allErrs
@@ -3237,6 +3262,13 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 		for g, gid := range securityContext.SupplementalGroups {
 			for _, msg := range validation.IsValidGroupID(gid) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
+			}
+		}
+		if securityContext.ShareProcessNamespace != nil {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "Process Namespace Sharing is disabled by PodShareProcessNamespace feature-gate"))
+			} else if securityContext.HostPID && *securityContext.ShareProcessNamespace {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("shareProcessNamespace"), *securityContext.ShareProcessNamespace, "ShareProcessNamespace and HostPID cannot both be enabled"))
 			}
 		}
 	}
@@ -4059,6 +4091,10 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
+	} else if !helper.IsDefaultNamespaceResource(core.ResourceName(value)) {
+		if !helper.IsExtendedResourceName(core.ResourceName(value)) {
+			return append(allErrs, field.Invalid(fldPath, value, "doesn't follow extended resource name standard"))
+		}
 	}
 	return allErrs
 }
@@ -4240,7 +4276,8 @@ func ValidateLimitRange(limitRange *core.LimitRange) field.ErrorList {
 				}
 			}
 
-			// for GPU and hugepages, the default value and defaultRequest value must match if both are specified
+			// for GPU, hugepages and other resources that are not allowed to overcommit,
+			// the default value and defaultRequest value must match if both are specified
 			if !helper.IsOvercommitAllowed(core.ResourceName(k)) && defaultQuantityFound && defaultRequestQuantityFound && defaultQuantity.Cmp(defaultRequestQuantity) != 0 {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("defaultRequest").Key(string(k)), defaultRequestQuantity, fmt.Sprintf("default value %s must equal to defaultRequest value %s in %s", defaultQuantity.String(), defaultRequestQuantity.String(), k)))
 			}
@@ -4930,7 +4967,7 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 		return false, allErrs
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "Storage node affinity is disabled by feature-gate"))
 	}
 
@@ -4946,6 +4983,30 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 	return policySpecified, allErrs
 }
 
+// validateVolumeNodeAffinity tests that the PersistentVolume.NodeAffinity has valid data
+// returns:
+// - true if volumeNodeAffinity is set
+// - errorList if there are validation errors
+func validateVolumeNodeAffinity(nodeAffinity *core.VolumeNodeAffinity, fldPath *field.Path) (bool, field.ErrorList) {
+	allErrs := field.ErrorList{}
+
+	if nodeAffinity == nil {
+		return false, allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "Volume node affinity is disabled by feature-gate"))
+	}
+
+	if nodeAffinity.Required != nil {
+		allErrs = append(allErrs, ValidateNodeSelector(nodeAffinity.Required, fldPath.Child("required"))...)
+	} else {
+		allErrs = append(allErrs, field.Required(fldPath.Child("required"), "must specify required node constraints"))
+	}
+
+	return true, allErrs
+}
+
 // ValidateCIDR validates whether a CIDR matches the conventions expected by net.ParseCIDR
 func ValidateCIDR(cidr string) (*net.IPNet, error) {
 	_, net, err := net.ParseCIDR(cidr)
@@ -4953,4 +5014,14 @@ func ValidateCIDR(cidr string) (*net.IPNet, error) {
 		return nil, err
 	}
 	return net, nil
+}
+
+func IsDecremented(update, old *int32) bool {
+	if update == nil && old != nil {
+		return true
+	}
+	if update == nil || old == nil {
+		return false
+	}
+	return *update < *old
 }

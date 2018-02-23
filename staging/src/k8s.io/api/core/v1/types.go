@@ -446,7 +446,7 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
-	// CSI represents storage that handled by an external CSI driver
+	// CSI represents storage that handled by an external CSI driver (Beta feature).
 	// +optional
 	CSI *CSIPersistentVolumeSource `json:"csi,omitempty" protobuf:"bytes,22,opt,name=csi"`
 }
@@ -530,6 +530,16 @@ type PersistentVolumeSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+	// This field influences the scheduling of pods that use this volume.
+	// +optional
+	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+type VolumeNodeAffinity struct {
+	// Required specifies hard node constraints that must be met.
+	Required *NodeSelector `json:"required,omitempty" protobuf:"bytes,1,opt,name=required"`
 }
 
 // PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes.
@@ -657,6 +667,8 @@ type PersistentVolumeClaimConditionType string
 const (
 	// PersistentVolumeClaimResizing - a user trigger resize of pvc has been started
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
+	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
+	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
 )
 
 // PersistentVolumeClaimCondition contails details about state of pvc
@@ -1715,7 +1727,7 @@ type LocalVolumeSource struct {
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 type CSIPersistentVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	// Required.
@@ -1736,6 +1748,10 @@ type CSIPersistentVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+
+	// Attributes of the volume to publish.
+	// +optional
+	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty" protobuf:"bytes,5,rep,name=volumeAttributes"`
 }
 
 // ContainerPort represents a network port in a single container.
@@ -1899,7 +1915,7 @@ type SecretKeySelector struct {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 type EnvFromSource struct {
-	// An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
 	// +optional
 	Prefix string `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
 	// The ConfigMap to select from
@@ -2849,6 +2865,15 @@ type PodSpec struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostIPC bool `json:"hostIPC,omitempty" protobuf:"varint,13,opt,name=hostIPC"`
+	// Share a single process namespace between all of the containers in a pod.
+	// When this is set containers will be able to view and signal processes from other containers
+	// in the same pod, and the first process in each container will not be assigned PID 1.
+	// HostPID and ShareProcessNamespace cannot both be set.
+	// Optional: Default to false.
+	// This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+	// +k8s:conversion-gen=false
+	// +optional
+	ShareProcessNamespace *bool `json:"shareProcessNamespace,omitempty" protobuf:"varint,27,opt,name=shareProcessNamespace"`
 	// SecurityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
@@ -2885,9 +2910,10 @@ type PodSpec struct {
 	// +patchMergeKey=ip
 	// +patchStrategy=merge
 	HostAliases []HostAlias `json:"hostAliases,omitempty" patchStrategy:"merge" patchMergeKey:"ip" protobuf:"bytes,23,rep,name=hostAliases"`
-	// If specified, indicates the pod's priority. "SYSTEM" is a special keyword
-	// which indicates the highest priority. Any other name must be defined by
-	// creating a PriorityClass object with that name.
+	// If specified, indicates the pod's priority. "system-node-critical" and
+	// "system-cluster-critical" are two special keywords which indicate the
+	// highest priorities with the former being the highest priority. Any other
+	// name must be defined by creating a PriorityClass object with that name.
 	// If not specified, the pod priority will be default or zero if there is no
 	// default.
 	// +optional
@@ -3925,7 +3951,7 @@ type PodSignature struct {
 // Describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
-	// e.g. ["gcr.io/google_containers/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
+	// e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
 	Names []string `json:"names" protobuf:"bytes,1,rep,name=names"`
 	// The size of the image in bytes.
 	// +optional
@@ -3959,10 +3985,12 @@ const (
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
 	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
 	NodeDiskPressure NodeConditionType = "DiskPressure"
+	// NodePIDPressure means the kubelet is under pressure due to insufficient available PID.
+	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
-	// NodeConfigOK indicates whether the kubelet is correctly configured
-	NodeConfigOK NodeConditionType = "ConfigOK"
+	// NodeKubeletConfigOk indicates whether the kubelet is correctly configured
+	NodeKubeletConfigOk NodeConditionType = "KubeletConfigOk"
 )
 
 // NodeCondition contains condition information for a node.
@@ -4580,11 +4608,11 @@ type Event struct {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32 `json:"count,omitempty" protobuf:"varint,1,name=count"`
-	// Time of the last occurence observed
+	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
 	// State of this Series: Ongoing or Finished
 	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`
@@ -4730,6 +4758,8 @@ const (
 	// HugePages request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	// As burst is not supported for HugePages, we would only quota its request, and ignore the limit.
 	ResourceRequestsHugePagesPrefix = "requests.hugepages-"
+	// Default resource requests prefix
+	DefaultResourceRequestsPrefix = "requests."
 )
 
 // A ResourceQuotaScope defines a filter that must match each object tracked by a quota

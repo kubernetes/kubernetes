@@ -192,7 +192,7 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 		t.Fatalf("failed to get a token source: %+v", err)
 	}
 	if ts == nil {
-		t.Fatal("returned nil token soruce")
+		t.Fatal("returned nil token source")
 	}
 }
 

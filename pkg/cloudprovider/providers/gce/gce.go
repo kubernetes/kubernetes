@@ -843,7 +843,13 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 		glog.Infof("Using existing Token Source %#v", tokenSource)
 	}
 
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+	backoff := wait.Backoff{
+		// These values will add up to about a minute. See #56293 for background.
+		Duration: time.Second,
+		Factor:   1.4,
+		Steps:    10,
+	}
+	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		if _, err := tokenSource.Token(); err != nil {
 			glog.Errorf("error fetching initial token: %v", err)
 			return false, nil

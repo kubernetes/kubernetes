@@ -15,6 +15,7 @@ go_library(
         "recommended.go",
         "server_run_options.go",
         "serving.go",
+        "serving_with_loopback.go",
     ],
     importpath = "k8s.io/apiserver/pkg/server/options",
     visibility = ["//visibility:public"],
@@ -64,6 +65,7 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
@@ -75,7 +77,6 @@ go_test(
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/server/options",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

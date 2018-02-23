@@ -48,7 +48,7 @@ def report_status():
 
 
 def messaging():
-    ''' Probe our relations to determine the propper messaging to the
+    ''' Probe our relations to determine the proper messaging to the
     end user '''
 
     missing_services = []

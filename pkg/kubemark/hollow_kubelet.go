@@ -110,6 +110,7 @@ func GetHollowKubeletConfig(
 
 	// Flags struct
 	f := options.NewKubeletFlags()
+	f.EnableServer = true
 	f.RootDirectory = testRootDir
 	f.HostnameOverride = nodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
@@ -144,7 +145,6 @@ func GetHollowKubeletConfig(
 	c.CPUCFSQuota = true
 	c.EnableControllerAttachDetach = false
 	c.EnableDebuggingHandlers = true
-	c.EnableServer = true
 	c.CgroupsPerQOS = false
 	// hairpin-veth is used to allow hairpin packets. Note that this deviates from
 	// what the "real" kubelet currently does, because there's no way to

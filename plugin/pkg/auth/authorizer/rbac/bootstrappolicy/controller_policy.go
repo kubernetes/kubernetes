@@ -265,7 +265,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcequota-controller"},
 		Rules: []rbac.PolicyRule{
-			// quota can count quota on anything for reconcilation, so it needs full viewing powers
+			// quota can count quota on anything for reconciliation, so it needs full viewing powers
 			rbac.NewRule("list", "watch").Groups("*").Resources("*").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("resourcequotas/status").RuleOrDie(),
 			eventsRule(),
@@ -324,7 +324,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 			Rules: []rbac.PolicyRule{
@@ -334,7 +334,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			},
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pv-protection-controller"},
 			Rules: []rbac.PolicyRule{

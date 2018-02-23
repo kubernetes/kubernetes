@@ -56,7 +56,6 @@ go_test(
         "replica_calculator_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",

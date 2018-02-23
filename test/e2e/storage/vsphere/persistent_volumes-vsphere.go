@@ -24,9 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -42,11 +40,11 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		clientPod  *v1.Pod
 		pvConfig   framework.PersistentVolumeConfig
 		pvcConfig  framework.PersistentVolumeClaimConfig
-		vsp        *vsphere.VSphere
 		err        error
-		node       types.NodeName
+		node       string
 		volLabel   labels.Set
 		selector   *metav1.LabelSelector
+		nodeInfo   *NodeInfo
 	)
 
 	f := framework.NewDefaultFramework("pv")
@@ -66,16 +64,17 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		clientPod = nil
 		pvc = nil
 		pv = nil
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
+		if len(nodes.Items) < 1 {
+			framework.Skipf("Requires at least %d node", 1)
+		}
+		nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
 
 		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 
-		if vsp == nil {
-			vsp, err = getVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
-		}
 		if volumePath == "" {
-			volumePath, err = createVSphereVolume(vsp, nil)
+			volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 			Expect(err).NotTo(HaveOccurred())
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "vspherepv-",
@@ -103,10 +102,10 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		By("Creating the Client Pod")
 		clientPod, err = framework.CreateClientPod(c, ns, pvc)
 		Expect(err).NotTo(HaveOccurred())
-		node = types.NodeName(clientPod.Spec.NodeName)
+		node = clientPod.Spec.NodeName
 
 		By("Verify disk should be attached to the node")
-		isAttached, err := verifyVSphereDiskAttached(c, vsp, volumePath, node)
+		isAttached, err := diskIsAttached(volumePath, node)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
 	})
@@ -134,12 +133,8 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	framework.AddCleanupAction(func() {
 		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
 		if len(ns) > 0 && len(volumePath) > 0 {
-			client, err := framework.LoadClientset()
-			if err != nil {
-				return
-			}
-			framework.ExpectNoError(waitForVSphereDiskToDetach(client, vsp, volumePath, node))
-			vsp.DeleteVolume(volumePath)
+			framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node))
+			nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 		}
 	})
 
@@ -218,6 +213,6 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verifying Persistent Disk detaches")
-		waitForVSphereDiskToDetach(c, vsp, volumePath, node)
+		waitForVSphereDiskToDetach(volumePath, node)
 	})
 })

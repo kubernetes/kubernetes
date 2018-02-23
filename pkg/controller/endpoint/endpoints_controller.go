@@ -269,7 +269,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 
 	podChangedFlag := podChanged(oldPod, newPod)
 
-	// Check if the pod labels have changed, indicating a possibe
+	// Check if the pod labels have changed, indicating a possible
 	// change in the service membership
 	labelsChanged := false
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||

@@ -80,9 +80,8 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 			}
 
 			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
-			printer, err := f.PrinterForOptions(printOpts)
+			printer, err := cmdutil.PrinterForOptions(printOpts)
 			cmdutil.CheckErr(err)
-			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 
 			cmdutil.CheckErr(options.Run(out, printer))
 		},
@@ -120,7 +119,12 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 		clientcmdapi.ShortenConfig(config)
 	}
 
-	err = printer.PrintObj(config, out)
+	convertedObj, err := latest.Scheme.ConvertToVersion(config, latest.ExternalVersion)
+	if err != nil {
+		return err
+	}
+
+	err = printer.PrintObj(convertedObj, out)
 	if err != nil {
 		return err
 	}

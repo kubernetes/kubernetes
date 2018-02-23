@@ -18,7 +18,6 @@ go_test(
         "requestinfo_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/endpoints/filters",
     deps = [
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",

@@ -52,7 +52,7 @@ go_library(
         "//plugin/pkg/admission/security/podsecuritypolicy:go_default_library",
         "//plugin/pkg/admission/securitycontext/scdeny:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
-        "//plugin/pkg/admission/storage/storageprotection:go_default_library",
+        "//plugin/pkg/admission/storage/storageobjectinuseprotection:go_default_library",
         "//plugin/pkg/admission/storageclass/setdefault:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
@@ -93,6 +93,5 @@ go_test(
         "storage_versions_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
     deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )

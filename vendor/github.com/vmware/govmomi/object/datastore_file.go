@@ -172,7 +172,7 @@ func (f *DatastoreFile) Stat() (os.FileInfo, error) {
 		return nil, err
 	}
 
-	res, err := f.d.Client().DownloadRequest(u, p)
+	res, err := f.d.Client().DownloadRequest(f.ctx, u, p)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +202,7 @@ func (f *DatastoreFile) get() (io.Reader, error) {
 		}
 	}
 
-	res, err := f.d.Client().DownloadRequest(u, p)
+	res, err := f.d.Client().DownloadRequest(f.ctx, u, p)
 	if err != nil {
 		return nil, err
 	}

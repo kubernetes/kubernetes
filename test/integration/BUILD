@@ -37,6 +37,7 @@ filegroup(
         ":package-srcs",
         "//test/integration/apiserver:all-srcs",
         "//test/integration/auth:all-srcs",
+        "//test/integration/benchmark/jsonify:all-srcs",
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",
         "//test/integration/daemonset:all-srcs",

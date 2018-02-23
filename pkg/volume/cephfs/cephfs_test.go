@@ -77,13 +77,13 @@ func TestPlugin(t *testing.T) {
 	}
 
 	mounter, err := plug.(*cephfsPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &mount.FakeMounter{}, "secrets")
-	volumePath := mounter.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
+	volumePath := mounter.GetPath()
 	volpath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cephfs/vol1")
 	if volumePath != volpath {
 		t.Errorf("Got unexpected path: %s", volumePath)

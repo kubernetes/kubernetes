@@ -13,7 +13,6 @@ go_test(
         "controller_utils_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

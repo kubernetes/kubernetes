@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -27,7 +28,105 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
+func TestDeleteRoute(t *testing.T) {
+	fakeRoutes := newFakeRoutesClient()
+
+	cloud := &Cloud{
+		RoutesClient: fakeRoutes,
+		Config: Config{
+			ResourceGroup:  "foo",
+			RouteTableName: "bar",
+			Location:       "location",
+		},
+	}
+	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
+	routeName := mapNodeNameToRouteName(route.TargetNode)
+
+	fakeRoutes.FakeStore = map[string]map[string]network.Route{
+		cloud.RouteTableName: {
+			routeName: {},
+		},
+	}
+
+	err := cloud.DeleteRoute(context.TODO(), "cluster", &route)
+	if err != nil {
+		t.Errorf("unexpected error deleting route: %v", err)
+		t.FailNow()
+	}
+
+	mp, found := fakeRoutes.FakeStore[cloud.RouteTableName]
+	if !found {
+		t.Errorf("unexpected missing item for %s", cloud.RouteTableName)
+		t.FailNow()
+	}
+	ob, found := mp[routeName]
+	if found {
+		t.Errorf("unexpectedly found: %v that should have been deleted.", ob)
+	}
+}
+
 func TestCreateRoute(t *testing.T) {
+	fakeTable := newFakeRouteTablesClient()
+	fakeVM := &fakeVMSet{}
+	fakeRoutes := newFakeRoutesClient()
+
+	cloud := &Cloud{
+		RouteTablesClient: fakeTable,
+		RoutesClient:      fakeRoutes,
+		vmSet:             fakeVM,
+		Config: Config{
+			ResourceGroup:  "foo",
+			RouteTableName: "bar",
+			Location:       "location",
+		},
+	}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+
+	expectedTable := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+	}
+	fakeTable.FakeStore = map[string]map[string]network.RouteTable{}
+	fakeTable.FakeStore[cloud.ResourceGroup] = map[string]network.RouteTable{
+		cloud.RouteTableName: expectedTable,
+	}
+	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
+
+	nodeIP := "2.4.6.8"
+	fakeVM.NodeToIP = map[string]map[string]string{
+		"": {
+			"node": nodeIP,
+		},
+	}
+
+	err := cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
+	if err != nil {
+		t.Errorf("unexpected error create if not exists route table: %v", err)
+		t.FailNow()
+	}
+	if len(fakeTable.Calls) != 1 || fakeTable.Calls[0] != "Get" {
+		t.Errorf("unexpected calls create if not exists, exists: %v", fakeTable.Calls)
+	}
+
+	routeName := mapNodeNameToRouteName(route.TargetNode)
+	routeInfo, found := fakeRoutes.FakeStore[cloud.RouteTableName][routeName]
+	if !found {
+		t.Errorf("could not find route: %v in %v", routeName, fakeRoutes.FakeStore)
+		t.FailNow()
+	}
+	if *routeInfo.AddressPrefix != route.DestinationCIDR {
+		t.Errorf("Expected cidr: %s, saw %s", *routeInfo.AddressPrefix, route.DestinationCIDR)
+	}
+	if routeInfo.NextHopType != network.RouteNextHopTypeVirtualAppliance {
+		t.Errorf("Expected next hop: %v, saw %v", network.RouteNextHopTypeVirtualAppliance, routeInfo.NextHopType)
+	}
+	if *routeInfo.NextHopIPAddress != nodeIP {
+		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
+	}
+}
+
+func TestCreateRouteTableIfNotExists_Exists(t *testing.T) {
 	fake := newFakeRouteTablesClient()
 	cloud := &Cloud{
 		RouteTablesClient: fake,
@@ -37,6 +136,76 @@ func TestCreateRoute(t *testing.T) {
 			Location:       "location",
 		},
 	}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+
+	expectedTable := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+	}
+	fake.FakeStore = map[string]map[string]network.RouteTable{}
+	fake.FakeStore[cloud.ResourceGroup] = map[string]network.RouteTable{
+		cloud.RouteTableName: expectedTable,
+	}
+	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
+	if err != nil {
+		t.Errorf("unexpected error create if not exists route table: %v", err)
+		t.FailNow()
+	}
+	if len(fake.Calls) != 1 || fake.Calls[0] != "Get" {
+		t.Errorf("unexpected calls create if not exists, exists: %v", fake.Calls)
+	}
+}
+
+func TestCreateRouteTableIfNotExists_NotExists(t *testing.T) {
+	fake := newFakeRouteTablesClient()
+	cloud := &Cloud{
+		RouteTablesClient: fake,
+		Config: Config{
+			ResourceGroup:  "foo",
+			RouteTableName: "bar",
+			Location:       "location",
+		},
+	}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+
+	expectedTable := network.RouteTable{
+		Name:     &cloud.RouteTableName,
+		Location: &cloud.Location,
+	}
+
+	err := cloud.createRouteTableIfNotExists("clusterName", &cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/16"})
+	if err != nil {
+		t.Errorf("unexpected error create if not exists route table: %v", err)
+		t.FailNow()
+	}
+
+	table := fake.FakeStore[cloud.ResourceGroup][cloud.RouteTableName]
+	if *table.Location != *expectedTable.Location {
+		t.Errorf("mismatch: %s vs %s", *table.Location, *expectedTable.Location)
+	}
+	if *table.Name != *expectedTable.Name {
+		t.Errorf("mismatch: %s vs %s", *table.Name, *expectedTable.Name)
+	}
+	if len(fake.Calls) != 2 || fake.Calls[0] != "Get" || fake.Calls[1] != "CreateOrUpdate" {
+		t.Errorf("unexpected calls create if not exists, exists: %v", fake.Calls)
+	}
+}
+
+func TestCreateRouteTable(t *testing.T) {
+	fake := newFakeRouteTablesClient()
+	cloud := &Cloud{
+		RouteTablesClient: fake,
+		Config: Config{
+			ResourceGroup:  "foo",
+			RouteTableName: "bar",
+			Location:       "location",
+		},
+	}
+	cache, _ := cloud.newRouteTableCache()
+	cloud.rtCache = cache
+
 	expectedTable := network.RouteTable{
 		Name:     &cloud.RouteTableName,
 		Location: &cloud.Location,

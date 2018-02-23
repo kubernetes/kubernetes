@@ -206,8 +206,7 @@ func TestEdit(t *testing.T) {
 				t.Fatalf("%s: %v", name, err)
 			}
 
-			f, tf, _, _ := cmdtesting.NewAPIFactory()
-			tf.Printer = &testPrinter{}
+			f, tf := cmdtesting.NewAPIFactory()
 			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 				versionedAPIPath := ""
 				if mapping.GroupVersionKind.Group == "" {

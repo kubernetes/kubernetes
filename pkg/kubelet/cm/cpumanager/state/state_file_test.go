@@ -45,7 +45,7 @@ func stateEqual(t *testing.T, sf State, sm State) {
 	cpuassignmentSf := sf.GetCPUAssignments()
 	cpuassignmentSm := sm.GetCPUAssignments()
 	if !reflect.DeepEqual(cpuassignmentSf, cpuassignmentSm) {
-		t.Errorf("State CPU assigments mismatch. Have %s, want %s", cpuassignmentSf, cpuassignmentSm)
+		t.Errorf("State CPU assignments mismatch. Have %s, want %s", cpuassignmentSf, cpuassignmentSm)
 	}
 }
 
@@ -426,7 +426,7 @@ func TestHelpersStateFile(t *testing.T) {
 			for containerName, containerCPUs := range tc.containers {
 				state.SetCPUSet(containerName, containerCPUs)
 				if cpus, _ := state.GetCPUSet(containerName); !cpus.Equals(containerCPUs) {
-					t.Errorf("state is inconsistant. Wants = %q Have = %q", containerCPUs, cpus)
+					t.Errorf("state is inconsistent. Wants = %q Have = %q", containerCPUs, cpus)
 				}
 				state.Delete(containerName)
 				if cpus := state.GetCPUSetOrDefault(containerName); !cpus.Equals(tc.defaultCPUset) {

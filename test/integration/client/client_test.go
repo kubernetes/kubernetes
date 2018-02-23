@@ -563,7 +563,7 @@ func TestSingleWatch(t *testing.T) {
 
 func TestMultiWatch(t *testing.T) {
 	// Disable this test as long as it demonstrates a problem.
-	// TODO: Reenable this test when we get #6059 resolved.
+	// TODO: Re-enable this test when we get #6059 resolved.
 	t.Skip()
 
 	const watcherCount = 50

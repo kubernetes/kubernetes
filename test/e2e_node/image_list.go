@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -43,10 +43,10 @@ const (
 // before test running so that the image pulling won't fail in actual test.
 var NodeImageWhiteList = sets.NewString(
 	"google/cadvisor:latest",
-	"gcr.io/google-containers/stress:v1",
+	"k8s.gcr.io/stress:v1",
 	busyboxImage,
-	"gcr.io/google_containers/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
-	"gcr.io/google_containers/node-problem-detector:v0.4.1",
+	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
+	"k8s.gcr.io/node-problem-detector:v0.4.1",
 	imageutils.GetE2EImage(imageutils.NginxSlim),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),

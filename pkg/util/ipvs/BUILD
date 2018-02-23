@@ -17,7 +17,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/ipvs",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/docker/libnetwork/ipvs:go_default_library",

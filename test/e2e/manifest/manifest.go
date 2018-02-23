@@ -17,12 +17,16 @@ limitations under the License.
 package manifest
 
 import (
+	"fmt"
+	"io/ioutil"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/e2e/generated"
 )
@@ -85,6 +89,20 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 		return nil, err
 	}
 	return &ing, nil
+}
+
+// IngressToManifest generates a yaml file in the given path with the given ingress.
+// Assumes that a directory exists at the given path.
+func IngressToManifest(ing *extensions.Ingress, path string) error {
+	serialized, err := util.MarshalToYaml(ing, extensions.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
+	}
+
+	if err := ioutil.WriteFile(path, serialized, 0600); err != nil {
+		return fmt.Errorf("error in writing ingress to file: %s", err)
+	}
+	return nil
 }
 
 // StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.

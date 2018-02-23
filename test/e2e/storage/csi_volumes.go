@@ -34,12 +34,12 @@ import (
 )
 
 const (
-	csiExternalAttacherImage    string = "docker.io/k8scsi/csi-attacher:0.1"
-	csiExternalProvisionerImage string = "docker.io/k8scsi/csi-provisioner:0.1"
-	csiDriverRegistrarImage     string = "docker.io/k8scsi/driver-registrar"
+	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
+	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.0"
+	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
 )
 
-func externalAttacherServiceAccount(
+func csiServiceAccount(
 	client clientset.Interface,
 	config framework.VolumeTestConfig,
 	teardown bool,
@@ -71,7 +71,7 @@ func externalAttacherServiceAccount(
 	return ret
 }
 
-func externalAttacherClusterRole(
+func csiClusterRole(
 	client clientset.Interface,
 	config framework.VolumeTestConfig,
 	teardown bool,
@@ -89,7 +89,7 @@ func externalAttacherClusterRole(
 			},
 			{
 				APIGroups: []string{""},
-				Resources: []string{"persistentvolumesclaims"},
+				Resources: []string{"persistentvolumeclaims"},
 				Verbs:     []string{"get", "list", "watch", "update"},
 			},
 			{
@@ -129,7 +129,7 @@ func externalAttacherClusterRole(
 	return ret
 }
 
-func externalAttacherClusterRoleBinding(
+func csiClusterRoleBinding(
 	client clientset.Interface,
 	config framework.VolumeTestConfig,
 	teardown bool,
@@ -211,18 +211,18 @@ var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
 
 		BeforeEach(func() {
 			By("deploying csi hostpath driver")
-			clusterRole = externalAttacherClusterRole(cs, config, false)
-			serviceAccount = externalAttacherServiceAccount(cs, config, false)
-			externalAttacherClusterRoleBinding(cs, config, false, serviceAccount, clusterRole)
+			clusterRole = csiClusterRole(cs, config, false)
+			serviceAccount = csiServiceAccount(cs, config, false)
+			csiClusterRoleBinding(cs, config, false, serviceAccount, clusterRole)
 			csiHostPathPod(cs, config, false, f, serviceAccount)
 		})
 
 		AfterEach(func() {
 			By("uninstalling csi hostpath driver")
 			csiHostPathPod(cs, config, true, f, serviceAccount)
-			externalAttacherClusterRoleBinding(cs, config, true, serviceAccount, clusterRole)
-			serviceAccount = externalAttacherServiceAccount(cs, config, true)
-			clusterRole = externalAttacherClusterRole(cs, config, true)
+			csiClusterRoleBinding(cs, config, true, serviceAccount, clusterRole)
+			serviceAccount = csiServiceAccount(cs, config, true)
+			clusterRole = csiClusterRole(cs, config, true)
 		})
 
 		It("should provision storage with a hostPath CSI driver", func() {
@@ -237,6 +237,7 @@ var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
 
 			claim := newClaim(t, ns.GetName(), "")
 			class := newStorageClass(t, ns.GetName(), "")
+			claim.Spec.StorageClassName = &class.ObjectMeta.Name
 			testDynamicProvisioning(t, cs, claim, class)
 		})
 	})

@@ -179,7 +179,7 @@ func TestGetListener(t *testing.T) {
 			t.Errorf("Test case #%d failed: Listener does not listen on expected address: asked '%v' got '%v'", i, testCase.ExpectedListenerAddress, host)
 		}
 		if port != expectedListenerPort {
-			t.Errorf("Test case #%d failed: Listener does not listen on exepected port: asked %v got %v", i, expectedListenerPort, port)
+			t.Errorf("Test case #%d failed: Listener does not listen on expected port: asked %v got %v", i, expectedListenerPort, port)
 
 		}
 		listener.Close()

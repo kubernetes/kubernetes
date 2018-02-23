@@ -38,7 +38,6 @@ go_library(
 go_binary(
     name = "sample-controller",
     embed = [":go_default_library"],
-    importpath = "k8s.io/sample-controller",
     visibility = ["//visibility:public"],
 )
 

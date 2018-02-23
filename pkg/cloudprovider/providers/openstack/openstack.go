@@ -17,11 +17,13 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -510,7 +512,7 @@ func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) 
 	return nodeAddresses(srv)
 }
 
-func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (string, error) {
+func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName, needIPv6 bool) (string, error) {
 	addrs, err := getAddressesByName(client, name)
 	if err != nil {
 		return "", err
@@ -519,12 +521,20 @@ func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (s
 	}
 
 	for _, addr := range addrs {
-		if addr.Type == v1.NodeInternalIP {
+		isIPv6 := net.ParseIP(addr.Address).To4() == nil
+		if (addr.Type == v1.NodeInternalIP) && (isIPv6 == needIPv6) {
 			return addr.Address, nil
 		}
 	}
 
-	return addrs[0].Address, nil
+	for _, addr := range addrs {
+		isIPv6 := net.ParseIP(addr.Address).To4() == nil
+		if (addr.Type == v1.NodeExternalIP) && (isIPv6 == needIPv6) {
+			return addr.Address, nil
+		}
+	}
+	// It should never return an address from a different IP Address family than the one needed
+	return "", ErrNoAddressFound
 }
 
 // getAttachedInterfacesByID returns the node interfaces of the specified instance.
@@ -606,7 +616,7 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 }
 
 // GetZone returns the current zone
-func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
+func (os *OpenStack) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	md, err := getMetadata(os.metadataOpts.SearchOrder)
 	if err != nil {
 		return cloudprovider.Zone{}, err
@@ -623,7 +633,7 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+func (os *OpenStack) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
@@ -650,7 +660,7 @@ func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone,
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (os *OpenStack) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	compute, err := os.NewComputeV2()
 	if err != nil {
 		return cloudprovider.Zone{}, err

@@ -17,10 +17,13 @@ limitations under the License.
 package azure
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -123,7 +126,7 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -176,7 +179,7 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -239,7 +242,7 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		lbMode := fmt.Sprintf("%s,%s", selectedAvailabilitySetName1, selectedAvailabilitySetName2)
 		setLoadBalancerModeAnnotation(&svc, lbMode)
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -277,7 +280,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -303,7 +306,7 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 	} else {
 		svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 	}
-	_, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+	_, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 	if err == nil {
 		t.Errorf("Expect any new service to fail as max limit in lb has reached")
 	} else {
@@ -334,7 +337,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			svc = getTestService(svcName, v1.ProtocolTCP, 8081)
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
-		lbStatus, err := az.EnsureLoadBalancer(testClusterName, &svc, clusterResources.nodes)
+		lbStatus, err := az.EnsureLoadBalancer(context.TODO(), testClusterName, &svc, clusterResources.nodes)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -363,7 +366,7 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 			t.Errorf("Unexpected number of LB's: Expected (%d) Found (%d)", expectedNumOfLB, lbCount)
 		}
 
-		err := az.EnsureLoadBalancerDeleted(testClusterName, &svc)
+		err := az.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, &svc)
 		if err != nil {
 			t.Errorf("Unexpected error: %q", err)
 		}
@@ -875,6 +878,10 @@ func getTestCloud() (az *Cloud) {
 	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
 	az.vmSet = newAvailabilitySet(az)
+	az.vmCache, _ = az.newVMCache()
+	az.lbCache, _ = az.newLBCache()
+	az.nsgCache, _ = az.newNSGCache()
+	az.rtCache, _ = az.newRouteTableCache()
 
 	return az
 }
@@ -1240,7 +1247,7 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 	}
 	// We cannot use service.Spec.LoadBalancerIP to compare with
 	// Public IP's IPAddress
-	// Becuase service properties are updated outside of cloudprovider code
+	// Because service properties are updated outside of cloudprovider code
 }
 
 func contains(ruleValues []string, targetValue string) bool {
@@ -1673,6 +1680,73 @@ func TestGetNodeNameByProviderID(t *testing.T) {
 			t.Errorf("Expected %v, but got %v", test.name, name)
 		}
 
+	}
+}
+
+func TestMetadataURLGeneration(t *testing.T) {
+	metadata := NewInstanceMetadata()
+	fullPath := metadata.makeMetadataURL("some/path")
+	if fullPath != "http://169.254.169.254/metadata/some/path" {
+		t.Errorf("Expected http://169.254.169.254/metadata/some/path saw %s", fullPath)
+	}
+}
+
+func TestMetadataParsing(t *testing.T) {
+	data := `
+{
+    "interface": [
+      {
+        "ipv4": {
+          "ipAddress": [
+            {
+              "privateIpAddress": "10.0.1.4",
+              "publicIpAddress": "X.X.X.X"
+            }
+          ],
+          "subnet": [
+            {
+              "address": "10.0.1.0",
+              "prefix": "24"
+            }
+          ]
+        },
+        "ipv6": {
+          "ipAddress": [
+
+          ]
+        },
+        "macAddress": "002248020E1E"
+      }
+    ]
+}
+`
+
+	network := NetworkMetadata{}
+	if err := json.Unmarshal([]byte(data), &network); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	ip := network.Interface[0].IPV4.IPAddress[0].PrivateIP
+	if ip != "10.0.1.4" {
+		t.Errorf("Unexpected value: %s, expected 10.0.1.4", ip)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, data)
+	}))
+	defer server.Close()
+
+	metadata := &InstanceMetadata{
+		baseURL: server.URL,
+	}
+
+	networkJSON := NetworkMetadata{}
+	if err := metadata.Object("/some/path", &networkJSON); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(network, networkJSON) {
+		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
 	}
 }
 

@@ -179,6 +179,7 @@ func NewVolumeManager(
 		podManager,
 		podStatusProvider,
 		vm.desiredStateOfWorld,
+		vm.actualStateOfWorld,
 		kubeContainerRuntime,
 		keepTerminatedPodVolumes)
 	vm.reconciler = reconciler.NewReconciler(
@@ -345,7 +346,6 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	// Remount plugins for which this is true. (Atomically updating volumes,
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
-	vm.actualStateOfWorld.MarkRemountRequired(uniquePodName)
 
 	err := wait.Poll(
 		podAttachAndMountRetryInterval,

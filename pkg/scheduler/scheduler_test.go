@@ -65,11 +65,11 @@ func (fp fakePodPreemptor) DeletePod(pod *v1.Pod) error {
 	return nil
 }
 
-func (fp fakePodPreemptor) UpdatePodAnnotations(pod *v1.Pod, annots map[string]string) error {
+func (fp fakePodPreemptor) SetNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
 	return nil
 }
 
-func (fp fakePodPreemptor) RemoveNominatedNodeAnnotation(pod *v1.Pod) error {
+func (fp fakePodPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
 	return nil
 }
 
@@ -207,7 +207,8 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Recorder: eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
+				Recorder:     eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
+				VolumeBinder: volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 			},
 		}
 
@@ -555,6 +556,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 			Recorder:            &record.FakeRecorder{},
 			PodConditionUpdater: fakePodConditionUpdater{},
 			PodPreemptor:        fakePodPreemptor{},
+			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 		},
 	}
 
@@ -604,6 +606,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			PodConditionUpdater: fakePodConditionUpdater{},
 			PodPreemptor:        fakePodPreemptor{},
 			StopEverything:      stop,
+			VolumeBinder:        volumebinder.NewFakeVolumeBinder(&persistentvolume.FakeVolumeBinderConfig{AllBound: true}),
 		},
 	}
 

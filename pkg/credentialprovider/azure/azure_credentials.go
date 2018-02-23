@@ -173,7 +173,7 @@ func getLoginServer(registry containerregistry.Registry) string {
 }
 
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
-	armAccessToken := a.servicePrincipalToken.AccessToken
+	armAccessToken := a.servicePrincipalToken.OAuthToken()
 
 	glog.V(4).Infof("discovering auth redirects for: %s", loginServer)
 	directive, err := receiveChallengeFromLoginServer(loginServer)

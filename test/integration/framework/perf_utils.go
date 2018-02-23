@@ -73,7 +73,14 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		},
 	}
 	for i := 0; i < numNodes; i++ {
-		if _, err := p.client.CoreV1().Nodes().Create(baseNode); err != nil {
+		var err error
+		for retry := 0; retry < retries; retry++ {
+			_, err = p.client.CoreV1().Nodes().Create(baseNode)
+			if err == nil || !e2eframework.IsRetryableAPIError(err) {
+				break
+			}
+		}
+		if err != nil {
 			glog.Fatalf("Error creating node: %v", err)
 		}
 	}

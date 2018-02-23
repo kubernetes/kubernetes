@@ -23,14 +23,16 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/serviceaccount"
+	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 type REST struct {
 	*genericregistry.Store
+	Token *TokenREST
 }
 
 // NewREST returns a RESTStorage object that will work against service accounts.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, podStorage, secretStorage *genericregistry.Store) *REST {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceAccountList{} },
@@ -45,7 +47,21 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
-	return &REST{store}
+
+	var trest *TokenREST
+	if issuer != nil && podStorage != nil && secretStorage != nil {
+		trest = &TokenREST{
+			svcaccts: store,
+			issuer:   issuer,
+			pods:     podStorage,
+			secrets:  secretStorage,
+		}
+	}
+
+	return &REST{
+		Store: store,
+		Token: trest,
+	}
 }
 
 // Implement ShortNamesProvider

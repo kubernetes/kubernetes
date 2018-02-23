@@ -625,6 +625,15 @@ func (f *Finder) ClusterComputeResourceList(ctx context.Context, path string) ([
 	return ccrs, nil
 }
 
+func (f *Finder) DefaultClusterComputeResource(ctx context.Context) (*object.ClusterComputeResource, error) {
+	cr, err := f.ClusterComputeResource(ctx, "*")
+	if err != nil {
+		return nil, toDefaultError(err)
+	}
+
+	return cr, nil
+}
+
 func (f *Finder) ClusterComputeResource(ctx context.Context, path string) (*object.ClusterComputeResource, error) {
 	ccrs, err := f.ClusterComputeResourceList(ctx, path)
 	if err != nil {
@@ -636,6 +645,18 @@ func (f *Finder) ClusterComputeResource(ctx context.Context, path string) (*obje
 	}
 
 	return ccrs[0], nil
+}
+
+func (f *Finder) ClusterComputeResourceOrDefault(ctx context.Context, path string) (*object.ClusterComputeResource, error) {
+	if path != "" {
+		cr, err := f.ClusterComputeResource(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+		return cr, nil
+	}
+
+	return f.DefaultClusterComputeResource(ctx)
 }
 
 func (f *Finder) HostSystemList(ctx context.Context, path string) ([]*object.HostSystem, error) {

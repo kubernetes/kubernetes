@@ -62,7 +62,7 @@ TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 ETCD_COMPACTION_INTERVAL_SEC="${KUBEMARK_ETCD_COMPACTION_INTERVAL_SEC:-}"
 
-# Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.1.10) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.1.10) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"
@@ -89,7 +89,7 @@ TEST_CLUSTER_API_CONTENT_TYPE="${TEST_CLUSTER_API_CONTENT_TYPE:-}"
 
 KUBEMARK_MASTER_COMPONENTS_QPS_LIMITS="${KUBEMARK_MASTER_COMPONENTS_QPS_LIMITS:-}"
 
-CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,ResourceQuota}"
+CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota}"
 
 # Master components' test arguments.
 APISERVER_TEST_ARGS="${KUBEMARK_APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1 ${API_SERVER_TEST_LOG_LEVEL} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT} ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS}"

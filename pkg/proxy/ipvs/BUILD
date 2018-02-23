@@ -13,7 +13,6 @@ go_test(
         "proxier_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
@@ -25,7 +24,6 @@ go_test(
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/ipvs/testing:go_default_library",
-        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",

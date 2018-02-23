@@ -45,6 +45,7 @@ QUICK_PATTERNS+=(
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
@@ -87,7 +88,7 @@ function run-cmd {
   return ${tr}
 }
 
-# Collect Failed tests in this Array , initalize it to nil
+# Collect Failed tests in this Array , initialize it to nil
 FAILED_TESTS=()
 
 function print-failed-tests {

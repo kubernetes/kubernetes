@@ -261,8 +261,9 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 func TestGetAltNames(t *testing.T) {
 	hostname := "valid-hostname"
 	advertiseIP := "1.2.3.4"
+	controlPlaneEndpoint := "api.k8s.io"
 	cfg := &kubeadmapi.MasterConfiguration{
-		API:               kubeadmapi.API{AdvertiseAddress: advertiseIP},
+		API:               kubeadmapi.API{AdvertiseAddress: advertiseIP, ControlPlaneEndpoint: controlPlaneEndpoint},
 		Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 		NodeName:          hostname,
 		APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95"},
@@ -273,7 +274,7 @@ func TestGetAltNames(t *testing.T) {
 		t.Fatalf("failed calling getAltNames: %v", err)
 	}
 
-	expectedDNSNames := []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"}
+	expectedDNSNames := []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", controlPlaneEndpoint}
 	for _, DNSName := range expectedDNSNames {
 		found := false
 		for _, val := range altNames.DNSNames {

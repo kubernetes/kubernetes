@@ -18,6 +18,7 @@ package discovery
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -108,6 +109,7 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 				plural := gv.WithResource(resource.Name)
 				singular := gv.WithResource(resource.SingularName)
 				versionMapper.AddSpecific(gv.WithKind(resource.Kind), plural, singular, scope)
+				versionMapper.AddSpecific(gv.WithKind(strings.ToLower(resource.Kind)), plural, singular, scope)
 				// TODO this is producing unsafe guesses that don't actually work, but it matches previous behavior
 				versionMapper.Add(gv.WithKind(resource.Kind+"List"), scope)
 			}

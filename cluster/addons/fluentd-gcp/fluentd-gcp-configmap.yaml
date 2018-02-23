@@ -102,6 +102,7 @@ data:
     # Examples:
     # time="2016-02-04T06:51:03.053580605Z" level=info msg="GET /containers/json"
     # time="2016-02-04T07:53:57.505612354Z" level=error msg="HTTP Error" err="No such image: -f" statusCode=404
+    # TODO(random-liu): Remove this after cri container runtime rolls out.
     <source>
       type tail
       format /^time="(?<time>[^)]*)" level=(?<severity>[^ ]*) msg="(?<message>[^"]*)"( err="(?<error>[^"]*)")?( statusCode=($<status_code>\d+))?/
@@ -239,12 +240,22 @@ data:
     </source>
 
     # Logs from systemd-journal for interesting services.
+    # TODO(random-liu): Keep this for compatibility, remove this after
+    # cri container runtime rolls out.
     <source>
       type systemd
       filters [{ "_SYSTEMD_UNIT": "docker.service" }]
       pos_file /var/log/gcp-journald-docker.pos
       read_from_head true
       tag docker
+    </source>
+
+    <source>
+      type systemd
+      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      pos_file /var/log/gcp-journald-container-runtime.pos
+      read_from_head true
+      tag container-runtime
     </source>
 
     <source>
@@ -387,7 +398,7 @@ data:
       num_threads 2
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.3
+  name: fluentd-gcp-config-v1.2.4
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

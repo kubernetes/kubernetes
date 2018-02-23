@@ -136,14 +136,14 @@ func TestValidate(t *testing.T) {
 			},
 			pass: true,
 		},
-		"in range boundry min": {
+		"in range boundary min": {
 			groups: []int64{1},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},
 			},
 			pass: true,
 		},
-		"in range boundry max": {
+		"in range boundary max": {
 			groups: []int64{3},
 			ranges: []extensions.GroupIDRange{
 				{Min: 1, Max: 3},

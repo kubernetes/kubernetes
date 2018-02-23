@@ -45,7 +45,7 @@ func (m *VirtualDiskManager) names(name string) []string {
 	}
 }
 
-func (m *VirtualDiskManager) createVirtualDisk(req *types.CreateVirtualDisk_Task) types.BaseMethodFault {
+func (m *VirtualDiskManager) createVirtualDisk(op types.VirtualDeviceConfigSpecFileOperation, req *types.CreateVirtualDisk_Task) types.BaseMethodFault {
 	fm := Map.FileManager()
 
 	file, fault := fm.resolve(req.Datacenter, req.Name)
@@ -53,10 +53,23 @@ func (m *VirtualDiskManager) createVirtualDisk(req *types.CreateVirtualDisk_Task
 		return fault
 	}
 
+	shouldReplace := op == types.VirtualDeviceConfigSpecFileOperationReplace
+	shouldExist := op == ""
 	for _, name := range m.names(file) {
 		_, err := os.Stat(name)
 		if err == nil {
+			if shouldExist {
+				return nil
+			}
+			if shouldReplace {
+				if err = os.Truncate(file, 0); err != nil {
+					return fm.fault(name, err, new(types.CannotCreateFile))
+				}
+				return nil
+			}
 			return fm.fault(name, nil, new(types.FileAlreadyExists))
+		} else if shouldExist {
+			return fm.fault(name, nil, new(types.FileNotFound))
 		}
 
 		f, err := os.Create(name)
@@ -72,7 +85,7 @@ func (m *VirtualDiskManager) createVirtualDisk(req *types.CreateVirtualDisk_Task
 
 func (m *VirtualDiskManager) CreateVirtualDiskTask(req *types.CreateVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "createVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
-		return nil, m.createVirtualDisk(req)
+		return nil, m.createVirtualDisk(types.VirtualDeviceConfigSpecFileOperationCreate, req)
 	})
 
 	return &methods.CreateVirtualDisk_TaskBody{
@@ -139,6 +152,12 @@ func (m *VirtualDiskManager) MoveVirtualDiskTask(req *types.MoveVirtualDisk_Task
 
 func (m *VirtualDiskManager) CopyVirtualDiskTask(req *types.CopyVirtualDisk_Task) soap.HasFault {
 	task := CreateTask(m, "copyVirtualDisk", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		if req.DestSpec != nil {
+			if Map.IsVPX() {
+				return nil, new(types.NotImplemented)
+			}
+		}
+
 		fm := Map.FileManager()
 
 		dest := m.names(req.DestName)

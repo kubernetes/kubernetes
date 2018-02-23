@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
-// SetInitDynamicDefaults checks and sets conifugration values for Master node
+// SetInitDynamicDefaults checks and sets configuration values for Master node
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used

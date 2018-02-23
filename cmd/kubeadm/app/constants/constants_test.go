@@ -121,44 +121,47 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		expectedError     error
 	}{
 		{
-			kubernetesVersion: "1.8.0",
-			expectedVersion:   version.MustParseSemantic("3.0.17"),
-			expectedError:     nil,
-		},
-		{
-			kubernetesVersion: "1.80.0",
+			kubernetesVersion: "1.99.0",
 			expectedVersion:   nil,
 			expectedError:     fmt.Errorf("Unsupported or unknown kubernetes version"),
 		},
 		{
 			kubernetesVersion: "1.9.0",
-			expectedVersion:   version.MustParseSemantic("3.1.10"),
+			expectedVersion:   version.MustParseSemantic("3.1.11"),
+			expectedError:     nil,
+		},
+		{
+			kubernetesVersion: "1.9.2",
+			expectedVersion:   version.MustParseSemantic("3.1.11"),
 			expectedError:     nil,
 		},
 		{
 			kubernetesVersion: "1.10.0",
-			expectedVersion:   version.MustParseSemantic("3.1.10"),
+			expectedVersion:   version.MustParseSemantic("3.2.14"),
 			expectedError:     nil,
 		},
 		{
-			kubernetesVersion: "1.8.6",
-			expectedVersion:   version.MustParseSemantic("3.0.17"),
+			kubernetesVersion: "1.10.1",
+			expectedVersion:   version.MustParseSemantic("3.2.14"),
 			expectedError:     nil,
 		},
 	}
 	for _, rt := range tests {
 		actualVersion, actualError := EtcdSupportedVersion(rt.kubernetesVersion)
 		if actualError != nil {
-			if actualError.Error() != rt.expectedError.Error() {
+			if rt.expectedError == nil {
+				t.Errorf("failed EtcdSupportedVersion:\n\texpected no error, but got: %v", actualError)
+			} else if actualError.Error() != rt.expectedError.Error() {
 				t.Errorf(
 					"failed EtcdSupportedVersion:\n\texpected error: %v\n\t  actual error: %v",
 					rt.expectedError,
 					actualError,
 				)
 			}
-
 		} else {
-			if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
+			if rt.expectedError != nil {
+				t.Errorf("failed EtcdSupportedVersion:\n\texpected error: %v, but got no error", rt.expectedError)
+			} else if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
 				t.Errorf(
 					"failed EtcdSupportedVersion:\n\texpected version: %s\n\t  actual version: %s",
 					rt.expectedVersion.String(),

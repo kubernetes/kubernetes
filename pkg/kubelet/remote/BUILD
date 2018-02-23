@@ -17,7 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
@@ -46,7 +46,6 @@ go_test(
     name = "go_default_test",
     srcs = ["remote_runtime_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     tags = ["automanaged"],
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",

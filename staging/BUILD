@@ -1,11 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
-    "go_library",
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -172,7 +166,6 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/storage/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/storage/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/pkg/version:all-srcs",
-        "//staging/src/k8s.io/client-go/plugin/pkg/auth/authenticator/token/oidc/testing:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:all-srcs",
         "//staging/src/k8s.io/client-go/rest:all-srcs",
         "//staging/src/k8s.io/client-go/scale:all-srcs",
@@ -212,6 +205,7 @@ filegroup(
         "//staging/src/k8s.io/code-generator/cmd/lister-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/openapi-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/set-gen:all-srcs",
+        "//staging/src/k8s.io/code-generator/hack:all-srcs",
         "//staging/src/k8s.io/code-generator/pkg/util:all-srcs",
         "//staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:all-srcs",
         "//staging/src/k8s.io/kube-aggregator:all-srcs",

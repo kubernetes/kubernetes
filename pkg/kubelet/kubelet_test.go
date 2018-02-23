@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/gpu"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -127,12 +128,12 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 	imageList := []kubecontainer.Image{
 		{
 			ID:       "abc",
-			RepoTags: []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+			RepoTags: []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
 			Size:     123,
 		},
 		{
 			ID:       "efg",
-			RepoTags: []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+			RepoTags: []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
 			Size:     456,
 		},
 	}
@@ -262,6 +263,7 @@ func newTestKubeletWithImageList(
 		fakeImageService: fakeRuntime,
 		ImageGCManager:   imageGCManager,
 	}
+	kubelet.containerLogManager = logs.NewStubContainerLogManager()
 	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
@@ -731,7 +733,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 						Running: &v1.ContainerStateRunning{},
 					},
 					LastTerminationState: v1.ContainerState{
-						Terminated: &v1.ContainerStateTerminated{},
+						Terminated: &v1.ContainerStateTerminated{ContainerID: "docker://fakeid"},
 					},
 				},
 			},
@@ -759,8 +761,50 @@ func TestValidateContainerLogStatus(t *testing.T) {
 					},
 				},
 			},
+			success:  false,
+			pSuccess: false,
+		},
+		{
+			statuses: []v1.ContainerStatus{
+				{
+					Name: containerName,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{ContainerID: "docker://fakeid"},
+					},
+				},
+			},
 			success:  true,
 			pSuccess: false,
+		},
+		{
+			statuses: []v1.ContainerStatus{
+				{
+					Name: containerName,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+					LastTerminationState: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+				},
+			},
+			success:  false,
+			pSuccess: false,
+		},
+		{
+			statuses: []v1.ContainerStatus{
+				{
+					Name: containerName,
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+					LastTerminationState: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{ContainerID: "docker://fakeid"},
+					},
+				},
+			},
+			success:  true,
+			pSuccess: true,
 		},
 		{
 			statuses: []v1.ContainerStatus{

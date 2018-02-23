@@ -39,7 +39,6 @@ go_test(
         "vsphere_volume_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/vsphere_volume",
     deps = [
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/util/mount:go_default_library",

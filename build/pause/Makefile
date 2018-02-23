@@ -16,7 +16,7 @@
 
 include ../../hack/make-rules/Makefile.manifest
 
-REGISTRY ?= gcr.io/google_containers
+REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
 
@@ -29,7 +29,7 @@ ARCH ?= amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
+KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause

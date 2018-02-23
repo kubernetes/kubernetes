@@ -7,8 +7,8 @@ args:
 namespace: default
 expectedStdout:
 - "service \"kubernetes\" edited"
-- "bar \"test\" edited"
-- "bar \"test2\" edited"
+- "bar.company.com \"test\" edited"
+- "bar.company.com \"test2\" edited"
 expectedExitCode: 0
 steps:
 - type: request

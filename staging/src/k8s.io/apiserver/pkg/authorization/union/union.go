@@ -20,7 +20,7 @@ limitations under the License.
 // subauthorizer returns a NoOpinion, then the union authorizer moves onto the
 // next authorizer or, if the subauthorizer was the last authorizer, returns
 // NoOpinion as the aggregate decision. I.e. union authorizer creates an
-// aggregate decision and supports short-circut allows and denies from
+// aggregate decision and supports short-circuit allows and denies from
 // subauthorizers.
 package union
 

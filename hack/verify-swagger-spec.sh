@@ -44,7 +44,7 @@ if [[ $ret -eq 0 ]]
 then
   echo "${SPECROOT} up to date."
 else
-  echo "${SPECROOT} is out of date. Please run hack/update-swagger-spec.sh"
+  echo "${SPECROOT} is out of date. Please run hack/update-swagger-spec.sh" >&2
   exit 1
 fi
 

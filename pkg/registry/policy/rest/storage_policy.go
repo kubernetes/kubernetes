@@ -24,6 +24,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	pspstore "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage"
 	poddisruptionbudgetstore "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage"
 )
 
@@ -47,6 +48,8 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetstore.NewREST(restOptionsGetter)
 	storage["poddisruptionbudgets"] = poddisruptionbudgetStorage
 	storage["poddisruptionbudgets/status"] = poddisruptionbudgetStatusStorage
+
+	storage["podsecuritypolicies"] = pspstore.NewREST(restOptionsGetter)
 
 	return storage
 }

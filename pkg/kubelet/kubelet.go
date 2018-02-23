@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -73,7 +74,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
@@ -278,9 +281,11 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// Restore from the checkpoint path
 	// NOTE: This MUST happen before creating the apiserver source
 	// below, or the checkpoint would override the source of truth.
-	updatechannel := cfg.Channel(kubetypes.ApiserverSource)
+
+	var updatechannel chan<- interface{}
 	if bootstrapCheckpointPath != "" {
 		glog.Infof("Adding checkpoint path: %v", bootstrapCheckpointPath)
+		updatechannel = cfg.Channel(kubetypes.ApiserverSource)
 		err := cfg.Restore(bootstrapCheckpointPath, updatechannel)
 		if err != nil {
 			return nil, err
@@ -289,6 +294,9 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 
 	if kubeDeps.KubeClient != nil {
 		glog.Infof("Watching apiserver")
+		if updatechannel == nil {
+			updatechannel = cfg.Channel(kubetypes.ApiserverSource)
+		}
 		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, updatechannel)
 	}
 	return cfg, nil
@@ -369,7 +377,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
 
-		nodeName, err = instances.CurrentNodeName(hostname)
+		nodeName, err = instances.CurrentNodeName(context.TODO(), hostname)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
 		}
@@ -377,7 +385,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			nodeAddresses, err := instances.NodeAddresses(nodeName)
+			nodeAddresses, err := instances.NodeAddresses(context.TODO(), nodeName)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get the addresses of the current instance from the cloud provider: %v", err)
 			}
@@ -688,7 +696,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 				klet.podManager,
 				klet.runtimeCache,
 				runtimeService,
-				imageService)
+				imageService,
+				stats.NewLogMetricsService())
 		}
 	} else {
 		// rkt uses the legacy, non-CRI, integration. Configure it the old way.
@@ -749,6 +758,21 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	klet.imageManager = imageManager
+
+	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
+		// setup containerLogManager for CRI container runtime
+		containerLogManager, err := logs.NewContainerLogManager(
+			klet.runtimeService,
+			kubeCfg.ContainerLogMaxSize,
+			int(kubeCfg.ContainerLogMaxFiles),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
+		}
+		klet.containerLogManager = containerLogManager
+	} else {
+		klet.containerLogManager = logs.NewStubContainerLogManager()
+	}
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
@@ -984,6 +1008,9 @@ type Kubelet struct {
 
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager
+
+	// Manager for container logs.
+	containerLogManager logs.ContainerLogManager
 
 	// Secret manager.
 	secretManager secret.Manager
@@ -1265,7 +1292,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 // Note that the modules here must not depend on modules that are not initialized here.
 func (kl *Kubelet) initializeModules() error {
 	// Prometheus metrics.
-	metrics.Register(kl.runtimeCache)
+	metrics.Register(kl.runtimeCache, collectors.NewVolumeStatsCollector(kl))
 
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
@@ -1285,16 +1312,6 @@ func (kl *Kubelet) initializeModules() error {
 	// Start the certificate manager.
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		kl.serverCertificateManager.Start()
-	}
-
-	// Start container manager.
-	node, err := kl.getNodeAnyWay()
-	if err != nil {
-		return fmt.Errorf("Kubelet failed to get node info: %v", err)
-	}
-
-	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService); err != nil {
-		return fmt.Errorf("Failed to start ContainerManager %v", err)
 	}
 
 	// Start out of memory watcher.
@@ -1321,7 +1338,25 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		glog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, kl.containerManager, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, evictionMonitoringPeriod)
+
+	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
+	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
+	kl.StatsProvider.GetCgroupStats("/", true)
+	// Start container manager.
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		// Fail kubelet and rely on the babysitter to retry starting kubelet.
+		glog.Fatalf("Kubelet failed to get node info: %v", err)
+	}
+	// containerManager must start after cAdvisor because it needs filesystem capacity information
+	if err := kl.containerManager.Start(node, kl.GetActivePods, kl.sourcesReady, kl.statusManager, kl.runtimeService); err != nil {
+		// Fail kubelet and rely on the babysitter to retry starting kubelet.
+		glog.Fatalf("Failed to start ContainerManager %v", err)
+	}
+	// container log manager must start after container runtime is up to retrieve information from container runtime
+	// and inform container to reopen log file after log rotation.
+	kl.containerLogManager.Start()
 }
 
 // Run starts the kubelet reacting to config updates

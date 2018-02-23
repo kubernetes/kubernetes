@@ -21,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["i18n_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/i18n",
 )
 
 filegroup(

@@ -19,7 +19,6 @@ package scheduler
 // This file tests the VolumeScheduling feature.
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -82,7 +80,7 @@ func TestLocalPVNegativeAffinity(t *testing.T) {
 		}
 		// Give time to shceduler to attempt to schedule pod
 		if err := waitForPodToSchedule(config.client, pod); err == nil {
-			t.Errorf("Failed as Pod %s was scheduled sucessfully but expected to fail", pod.Name)
+			t.Errorf("Failed as Pod %s was scheduled successfully but expected to fail", pod.Name)
 		}
 		// Deleting test pod
 		p, err := config.client.CoreV1().Pods(config.ns).Get(podName, metav1.GetOptions{})
@@ -136,6 +134,7 @@ func setupNodes(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),
+		PodInformer:               informers.Core().V1().Pods(),
 		EventRecorder:             nil, // TODO: add one so we can test PV events
 		EnableDynamicProvisioning: true,
 	}
@@ -253,31 +252,26 @@ func makeHostBoundPV(t *testing.T, name, scName, pvcName, ns string, node string
 					Path: "/tmp/" + node + "/test-path",
 				},
 			},
-		},
-	}
-
-	if pvcName != "" {
-		pv.Spec.ClaimRef = &v1.ObjectReference{Name: pvcName, Namespace: ns}
-	}
-
-	testNodeAffinity := &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
+			NodeAffinity: &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
-							Key:      affinityLabelKey,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{node},
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      affinityLabelKey,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{node},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 	}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, testNodeAffinity)
-	if err != nil {
-		t.Fatalf("Setting storage node affinity failed: %v", err)
+
+	if pvcName != "" {
+		pv.Spec.ClaimRef = &v1.ObjectReference{Name: pvcName, Namespace: ns}
 	}
 
 	return pv
@@ -309,14 +303,4 @@ func markNodeSelector(pod *v1.Pod, node string) {
 		"kubernetes.io/hostname": node,
 	}
 	pod.Spec.NodeSelector = ns
-}
-
-func printIndentedJson(data interface{}) string {
-	var indentedJSON []byte
-
-	indentedJSON, err := json.MarshalIndent(data, "", "\t")
-	if err != nil {
-		return fmt.Sprintf("JSON parse error: %v", err)
-	}
-	return string(indentedJSON)
 }

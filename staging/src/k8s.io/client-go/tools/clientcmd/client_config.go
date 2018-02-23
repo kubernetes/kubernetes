@@ -107,7 +107,7 @@ func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 // ClientConfig implements ClientConfig
 func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	// check that getAuthInfo, getContext, and getCluster do not return an error.
-	// Do this before checking if the curent config is usable in the event that an
+	// Do this before checking if the current config is usable in the event that an
 	// AuthInfo, Context, or Cluster config with user-defined names are not found.
 	// This provides a user with the immediate cause for error if one is found
 	configAuthInfo, err := config.getAuthInfo()

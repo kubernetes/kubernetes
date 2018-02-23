@@ -120,7 +120,7 @@ function get-local-disk-num() {
 function safe-block-symlink(){
   local device="${1}"
   local symdir="${2}"
-  
+
   mkdir -p "${symdir}"
 
   get-or-generate-uuid "${device}"
@@ -194,11 +194,11 @@ function unique-uuid-bind-mount(){
   # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
   udevadm control --reload-rules
   udevadm trigger
-  udevadm settle 
+  udevadm settle
 
   # grep the exact match of actual device, prevents substring matching
   local myuuid=$(ls -l /dev/disk/by-uuid/ | grep "/${actual_device}$" | tr -s ' ' | cut -d ' ' -f 9)
-  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/ 
+  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
   if [[ -z "${myuuid}" ]]; then
     echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
     exit 2
@@ -230,7 +230,7 @@ function mount-ext(){
   local devicenum="${2}"
   local interface="${3}"
   local format="${4}"
-  
+
 
   if [[ -z "${devicenum}" ]]; then
     echo "Failed to get the local disk number for device ${ssd}" >&2
@@ -1288,7 +1288,7 @@ function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
   local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
-  local kube_docker_registry="gcr.io/google_containers"
+  local kube_docker_registry="k8s.gcr.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
@@ -1297,6 +1297,9 @@ function prepare-kube-proxy-manifest-variables {
   local params="${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
+  fi
+  if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
+    params+=" --proxy-mode=ipvs --feature-gates=SupportIPVSProxyMode=true"
   fi
   params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
@@ -1462,7 +1465,7 @@ function compute-master-manifest-variables {
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
-  DOCKER_REGISTRY="gcr.io/google_containers"
+  DOCKER_REGISTRY="k8s.gcr.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
@@ -1934,7 +1937,7 @@ function start-cluster-autoscaler {
 #
 # $1: addon category under /etc/kubernetes
 # $2: manifest source dir
-# $3: (optional) auxilary manifest source dir
+# $3: (optional) auxiliary manifest source dir
 function setup-addon-manifests {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/$1/$2"
@@ -1979,50 +1982,63 @@ function copy-manifests {
   chmod 644 "${dst_dir}"/*
 }
 
-# Fluentd manifest is modified using kubectl, which may not be available at
-# this point. Run this as a background process.
+# Fluentd resources are modified using ScalingPolicy CR, which may not be
+# available at this point. Run this as a background process.
 function wait-for-apiserver-and-update-fluentd {
-  local -r fluentd_gcp_yaml="${1}"
-
-  local modifying_flags=""
+  local any_overrides=false
   if [[ -n "${FLUENTD_GCP_MEMORY_LIMIT:-}" ]]; then
-    modifying_flags="${modifying_flags} --limits=memory=${FLUENTD_GCP_MEMORY_LIMIT}"
+    any_overrides=true
   fi
-  local request_resources=""
   if [[ -n "${FLUENTD_GCP_CPU_REQUEST:-}" ]]; then
-    request_resources="cpu=${FLUENTD_GCP_CPU_REQUEST}"
+    any_overrides=true
   fi
   if [[ -n "${FLUENTD_GCP_MEMORY_REQUEST:-}" ]]; then
-    if [[ -n "${request_resources}" ]]; then
-      request_resources="${request_resources},"
-    fi
-    request_resources="memory=${FLUENTD_GCP_MEMORY_REQUEST}"
+    any_overrides=true
   fi
-  if [[ -n "${request_resources}" ]]; then
-    modifying_flags="${modifying_flags} --requests=${request_resources}"
+  if ! $any_overrides; then
+    # Nothing to do here.
+    exit
   fi
 
-  until kubectl get nodes
+  # Wait until ScalingPolicy CRD is in place.
+  until kubectl get scalingpolicies.scalingpolicy.kope.io
   do
     sleep 10
   done
 
-  local -r temp_fluentd_gcp_yaml="${fluentd_gcp_yaml}.tmp"
-  if kubectl set resources --dry-run --local -f ${fluentd_gcp_yaml} ${modifying_flags} \
-      --containers=fluentd-gcp -o yaml > ${temp_fluentd_gcp_yaml}; then
-    mv ${temp_fluentd_gcp_yaml} ${fluentd_gcp_yaml}
-  else
-    (echo "Failed to update fluentd resources. Used manifest:" && cat ${temp_fluentd_gcp_yaml}) >&2
-    rm ${temp_fluentd_gcp_yaml}
-  fi
+  # Single-shot, not managed by addon manager. Can be later modified or removed
+  # at will.
+  cat <<EOF | kubectl apply -f -
+apiVersion: scalingpolicy.kope.io/v1alpha1
+kind: ScalingPolicy
+metadata:
+  name: fluentd-gcp-scaling-policy
+  namespace: kube-system
+spec:
+  containers:
+  - name: fluentd-gcp
+    resources:
+      requests:
+      - resource: cpu
+        base: ${FLUENTD_GCP_CPU_REQUEST:-}
+      - resource: memory
+        base: ${FLUENTD_GCP_MEMORY_REQUEST:-}
+      limits:
+      - resource: memory
+        base: ${FLUENTD_GCP_MEMORY_LIMIT:-}
+EOF
 }
 
 # Trigger background process that will ultimately update fluentd resource
 # requirements.
 function start-fluentd-resource-update {
-  local -r fluentd_gcp_yaml="${1}"
+  wait-for-apiserver-and-update-fluentd &
+}
 
-  wait-for-apiserver-and-update-fluentd ${fluentd_gcp_yaml} &
+# Update {{ container-runtime }} with actual container runtime name.
+function update-container-runtime {
+  local -r configmap_yaml="$1"
+  sed -i -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" "${configmap_yaml}"
 }
 
 # Updates parameters in yaml file for prometheus-to-sd configuration, or
@@ -2177,15 +2193,19 @@ EOF
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
     setup-addon-manifests "addons" "fluentd-elasticsearch"
+    local -r fluentd_es_configmap_yaml="${dst_dir}/fluentd-elasticsearch/fluentd-es-configmap.yaml"
+    update-container-runtime ${fluentd_es_configmap_yaml}
   fi
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     setup-addon-manifests "addons" "fluentd-gcp"
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
     local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
+    local -r fluentd_gcp_configmap_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-configmap.yaml"
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
     start-fluentd-resource-update ${fluentd_gcp_yaml}
+    update-container-runtime ${fluentd_gcp_configmap_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
@@ -2218,6 +2238,13 @@ EOF
     local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
     update-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
+  if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
+    if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+      setup-addon-manifests "addons" "istio/auth"
+    else
+      setup-addon-manifests "addons" "istio/noauth"
+    fi
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
@@ -2230,8 +2257,11 @@ function start-image-puller {
     /etc/kubernetes/manifests/
 }
 
-# Starts a l7 loadbalancing controller for ingress.
+# Setups manifests for ingress controller and gce-specific policies for service controller.
 function start-lb-controller {
+  setup-addon-manifests "addons" "loadbalancing"
+
+  # Starts a l7 loadbalancing controller for ingress.
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
@@ -2325,7 +2355,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: gcr.io/google_containers/busybox:1.27
+    image: k8s.gcr.io/busybox:1.27
     command:
     - /bin/sh
     args:

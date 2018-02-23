@@ -67,6 +67,11 @@ func getZone(n *v1.Node) string {
 	return zone
 }
 
+func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
+	host = canonicalizeInstanceName(host)
+	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
+}
+
 // ToInstanceReferences returns instance references by links
 func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (refs []*compute.InstanceReference) {
 	for _, ins := range instanceNames {
@@ -77,7 +82,7 @@ func (gce *GCECloud) ToInstanceReferences(zone string, instanceNames []string) (
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
+func (gce *GCECloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.NodeAddress, error) {
 	internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get internal IP: %v", err)
@@ -94,7 +99,7 @@ func (gce *GCECloud) NodeAddresses(_ types.NodeName) ([]v1.NodeAddress, error) {
 
 // NodeAddressesByProviderID will not be called from the node that is requesting this ID.
 // i.e. metadata service and other local methods cannot be used here
-func (gce *GCECloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (gce *GCECloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	_, zone, name, err := splitProviderID(providerID)
 	if err != nil {
 		return []v1.NodeAddress{}, err
@@ -141,7 +146,7 @@ func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, erro
 // with the specified unique providerID This method will not be called from the
 // node that is requesting this ID. i.e. metadata service and other local
 // methods cannot be used here
-func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error) {
+func (gce *GCECloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	instance, err := gce.instanceByProviderID(providerID)
 	if err != nil {
 		return "", err
@@ -151,7 +156,7 @@ func (gce *GCECloud) InstanceTypeByProviderID(providerID string) (string, error)
 }
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
-func (gce *GCECloud) ExternalID(nodeName types.NodeName) (string, error) {
+func (gce *GCECloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
@@ -173,7 +178,7 @@ func (gce *GCECloud) ExternalID(nodeName types.NodeName) (string, error) {
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-func (gce *GCECloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (gce *GCECloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	_, err := gce.instanceByProviderID(providerID)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
@@ -186,7 +191,7 @@ func (gce *GCECloud) InstanceExistsByProviderID(providerID string) (bool, error)
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
-func (gce *GCECloud) InstanceID(nodeName types.NodeName) (string, error) {
+func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
@@ -205,7 +210,7 @@ func (gce *GCECloud) InstanceID(nodeName types.NodeName) (string, error) {
 }
 
 // InstanceType returns the type of the specified node with the specified NodeName.
-func (gce *GCECloud) InstanceType(nodeName types.NodeName) (string, error) {
+func (gce *GCECloud) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
@@ -223,7 +228,7 @@ func (gce *GCECloud) InstanceType(nodeName types.NodeName) (string, error) {
 	return instance.Type, nil
 }
 
-func (gce *GCECloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (gce *GCECloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return wait.Poll(2*time.Second, 30*time.Second, func() (bool, error) {
 		project, err := gce.c.Projects().Get(context.Background(), gce.projectID)
 		if err != nil {
@@ -336,7 +341,7 @@ func (gce *GCECloud) DeleteInstance(project, zone, name string) error {
 }
 
 // Implementation of Instances.CurrentNodeName
-func (gce *GCECloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (gce *GCECloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
@@ -386,7 +391,9 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 			nodeName, instance.NetworkInterfaces)
 	}
 
-	iface := instance.NetworkInterfaces[0]
+	iface := &computebeta.NetworkInterface{}
+	iface.Name = instance.NetworkInterfaces[0].Name
+	iface.Fingerprint = instance.NetworkInterfaces[0].Fingerprint
 	iface.AliasIpRanges = append(iface.AliasIpRanges, &computebeta.AliasIpRange{
 		IpCidrRange:         alias.String(),
 		SubnetworkRangeName: gce.secondaryRangeName,

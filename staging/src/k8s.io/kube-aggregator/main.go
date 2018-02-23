@@ -44,7 +44,8 @@ func main() {
 	}
 
 	stopCh := genericapiserver.SetupSignalHandler()
-	cmd := server.NewCommandStartAggregator(os.Stdout, os.Stderr, stopCh)
+	options := server.NewDefaultOptions(os.Stdout, os.Stderr)
+	cmd := server.NewCommandStartAggregator(options, stopCh)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		glog.Fatal(err)

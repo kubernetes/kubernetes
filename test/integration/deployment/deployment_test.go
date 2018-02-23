@@ -1379,3 +1379,122 @@ func TestDeploymentScaleSubresource(t *testing.T) {
 	// Use the scale subresource to scale the deployment down to 0
 	testScalingUsingScaleSubresource(t, tester, 0)
 }
+
+// This test verifies that the Deployment does orphan a ReplicaSet when the ReplicaSet's
+// .Labels field is changed to no longer match the Deployment's selector. It also partially
+// verifies that collision avoidance mechanism is triggered when a Deployment's new ReplicaSet
+// is orphaned, even without PodTemplateSpec change. Refer comment below for more info:
+// https://github.com/kubernetes/kubernetes/pull/59212#discussion_r166465113
+func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-replicaset-orphaning-and-adoption-when-labels-change"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	deploymentName := "deployment"
+	replicas := int32(1)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Wait for the Deployment to be updated to revision 1
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Ensure the deployment completes while marking its pods as ready simultaneously
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Orphaning: deployment should remove OwnerReference from a RS when the RS's labels change to not match its labels
+
+	// Get replicaset of the deployment
+	rs, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed to get replicaset of deployment %q: %v", deploymentName, err)
+	}
+	if rs == nil {
+		t.Fatalf("unable to find replicaset of deployment %q", deploymentName)
+	}
+
+	// Verify controllerRef of the replicaset is not nil and pointing to the deployment
+	controllerRef := metav1.GetControllerOf(rs)
+	if controllerRef == nil {
+		t.Fatalf("controllerRef of replicaset %q is nil", rs.Name)
+	}
+	if controllerRef.UID != tester.deployment.UID {
+		t.Fatalf("controllerRef of replicaset %q has a different UID: Expected %v, got %v", rs.Name, tester.deployment.UID, controllerRef.UID)
+	}
+
+	// Change the replicaset's labels to not match the deployment's labels
+	labelMap := map[string]string{"new-name": "new-test"}
+	rs, err = tester.updateReplicaSet(rs.Name, func(update *v1beta1.ReplicaSet) {
+		update.Labels = labelMap
+	})
+	if err != nil {
+		t.Fatalf("failed to update replicaset %q: %v", rs.Name, err)
+	}
+
+	// Wait for the controllerRef of the replicaset to become nil
+	rsClient := tester.c.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		rs, err = rsClient.Get(rs.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return metav1.GetControllerOf(rs) == nil, nil
+	}); err != nil {
+		t.Fatalf("failed to wait for controllerRef of replicaset %q to become nil: %v", rs.Name, err)
+	}
+
+	// Wait for the deployment to create a new replicaset
+	// This will trigger collision avoidance due to deterministic nature of replicaset name
+	// i.e., the new replicaset will have a name with different hash to preserve name uniqueness
+	var newRS *v1beta1.ReplicaSet
+	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		newRS, err = deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+		if err != nil {
+			return false, fmt.Errorf("failed to get new replicaset of deployment %q after orphaning: %v", deploymentName, err)
+		}
+		return newRS != nil, nil
+	}); err != nil {
+		t.Fatalf("failed to wait for deployment %q to create a new replicaset after orphaning: %v", deploymentName, err)
+	}
+	if newRS.UID == rs.UID {
+		t.Fatalf("expect deployment %q to create a new replicaset different from the orphaned one, but it isn't", deploymentName)
+	}
+
+	// Adoption: deployment should add controllerRef to a RS when the RS's labels change to match its labels
+
+	// Change the old replicaset's labels to match the deployment's labels
+	rs, err = tester.updateReplicaSet(rs.Name, func(update *v1beta1.ReplicaSet) {
+		update.Labels = testLabels()
+	})
+	if err != nil {
+		t.Fatalf("failed to update replicaset %q: %v", rs.Name, err)
+	}
+
+	// Wait for the deployment to adopt the old replicaset
+	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		rs, err := rsClient.Get(rs.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		controllerRef = metav1.GetControllerOf(rs)
+		return controllerRef != nil && controllerRef.UID == tester.deployment.UID, nil
+	}); err != nil {
+		t.Fatalf("failed waiting for replicaset adoption by deployment %q to complete: %v", deploymentName, err)
+	}
+}

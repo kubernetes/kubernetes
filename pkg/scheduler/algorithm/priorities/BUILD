@@ -61,7 +61,6 @@ go_test(
         "taint_toleration_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities",
     deps = [
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",

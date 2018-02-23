@@ -119,6 +119,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                       {},
 		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:                                        {},
 		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicyList"}:                                    {},
+		{Group: "policy", Version: "v1beta1", Kind: "PodSecurityPolicy"}:                                        {},
+		{Group: "policy", Version: "v1beta1", Kind: "PodSecurityPolicyList"}:                                    {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                   {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:               {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                          {},
@@ -143,6 +145,7 @@ func TestDefaulting(t *testing.T) {
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                 {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                          {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                      {},
+		{Group: "authentication.k8s.io", Version: "v1", Kind: "TokenRequest"}:                                   {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))

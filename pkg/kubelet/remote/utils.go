@@ -22,7 +22,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
 // getContextWithTimeout returns a context with timeout.

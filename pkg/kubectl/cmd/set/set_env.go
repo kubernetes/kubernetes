@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -80,6 +79,9 @@ var (
 	  # Import environment from a config map with a prefix
 	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
 
+          # Import specific keys from a config map
+          kubectl set env --keys=my-example-key --from=configmap/myconfigmap deployment/myapp
+
 	  # Remove the environment variable ENV from container 'c1' in all deployment configs
 	  kubectl set env deployments --all --containers="c1" ENV-
 
@@ -115,16 +117,14 @@ type EnvOptions struct {
 	Output            string
 	From              string
 	Prefix            string
+	Keys              []string
 
-	Mapper  meta.RESTMapper
 	Builder *resource.Builder
 	Infos   []*resource.Info
-	Encoder runtime.Encoder
 
 	Cmd *cobra.Command
 
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
-	PrintObject            func(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 }
 
 // NewCmdEnv implements the OpenShift cli env command
@@ -141,7 +141,8 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 		Long:    envLong,
 		Example: fmt.Sprintf(envExample),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
+			options.Complete(f, cmd)
+			cmdutil.CheckErr(options.Validate(args))
 			cmdutil.CheckErr(options.RunEnv(f))
 		},
 	}
@@ -151,10 +152,11 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().StringP("from", "", "", "The name of a resource from which to inject environment variables")
 	cmd.Flags().StringP("prefix", "", "", "Prefix to append to variable names")
 	cmd.Flags().StringArrayVarP(&options.EnvParams, "env", "e", options.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
+	cmd.Flags().StringSliceVarP(&options.Keys, "keys", "", options.Keys, "Comma-separated list of keys to import from specified resource")
 	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set env will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
@@ -177,18 +179,21 @@ func keyToEnvName(key string) string {
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
-func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
-	if !ok {
-		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
-	}
-	if len(o.Filenames) == 0 && len(resources) < 1 {
-		return cmdutil.UsageErrorf(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
+func contains(key string, keyList []string) bool {
+	if len(keyList) == 0 {
+		return true
 	}
 
-	o.Mapper, _ = f.Object()
+	for _, k := range keyList {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
+func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) {
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.Encoder = f.JSONEncoder()
 	o.ContainerSelector = cmdutil.GetFlagString(cmd, "containers")
 	o.List = cmdutil.GetFlagBool(cmd, "list")
 	o.Resolve = cmdutil.GetFlagBool(cmd, "resolve")
@@ -198,19 +203,38 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.From = cmdutil.GetFlagString(cmd, "from")
 	o.Prefix = cmdutil.GetFlagString(cmd, "prefix")
+	o.Keys = cmdutil.GetFlagStringSlice(cmd, "keys")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.PrintObject = f.PrintObject
 
-	o.EnvArgs = envArgs
-	o.Resources = resources
 	o.Cmd = cmd
 
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
+
+}
+
+func (o *EnvOptions) Validate(args []string) error {
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
+	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
+	if !ok {
+		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
+	}
+
+	if len(o.Filenames) == 0 && len(resources) == 0 {
+		return cmdutil.UsageErrorf(o.Cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	}
 
 	if o.List && len(o.Output) > 0 {
 		return cmdutil.UsageErrorf(o.Cmd, "--list and --output may not be specified together")
 	}
 
+	if len(o.Keys) > 0 && len(o.From) == 0 {
+		return cmdutil.UsageErrorf(o.Cmd, "when specifying --keys, a configmap or secret must be provided with --from")
+	}
+
+	o.EnvArgs = envArgs
+	o.Resources = resources
 	return nil
 }
 
@@ -275,7 +299,9 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 							},
 						},
 					}
-					env = append(env, envVar)
+					if contains(key, o.Keys) {
+						env = append(env, envVar)
+					}
 				}
 			case *v1.ConfigMap:
 				for key := range from.Data {
@@ -290,7 +316,9 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 							},
 						},
 					}
-					env = append(env, envVar)
+					if contains(key, o.Keys) {
+						env = append(env, envVar)
+					}
 				}
 			default:
 				return fmt.Errorf("unsupported resource specified in --from")
@@ -322,7 +350,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 	if err != nil {
 		return err
 	}
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		info.Object = info.AsVersioned()
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
@@ -390,7 +418,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		})
 
 		if err == nil {
-			return runtime.Encode(o.Encoder, info.Object)
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		}
 		return nil, err
 	})
@@ -413,8 +441,8 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			continue
 		}
 
-		if o.PrintObject != nil && (o.Local || o.DryRun) {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, patch.Info.AsVersioned(), o.Out); err != nil {
+		if o.Local || o.DryRun {
+			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -434,13 +462,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if len(o.Output) > 0 {
-			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.AsVersioned(), o.Out); err != nil {
+			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		f.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "env updated")
+		cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

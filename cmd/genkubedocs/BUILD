@@ -10,7 +10,6 @@ load(
 go_binary(
     name = "genkubedocs",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genkubedocs",
 )
 
 go_library(
@@ -52,5 +51,4 @@ go_test(
     name = "go_default_test",
     srcs = ["postprocessing_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/genkubedocs",
 )

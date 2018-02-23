@@ -75,6 +75,10 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
+	} else if !v1helper.IsDefaultNamespaceResource(v1.ResourceName(value)) {
+		if !v1helper.IsExtendedResourceName(v1.ResourceName(value)) {
+			return append(allErrs, field.Invalid(fldPath, value, "doesn't follow extended resource name standard"))
+		}
 	}
 	return allErrs
 }

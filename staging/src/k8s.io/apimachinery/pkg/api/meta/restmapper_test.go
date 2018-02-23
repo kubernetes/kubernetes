@@ -507,7 +507,7 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
 		// TODO this test is broken.  This updates to reflect actual behavior.  Kinds are expected to be singular
-		// old (incorrect), coment: Don't add extra s if the original object is already plural
+		// old (incorrect), comment: Don't add extra s if the original object is already plural
 		{Kind: "lowercases", Plural: "lowercaseses", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {

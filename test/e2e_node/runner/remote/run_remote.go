@@ -147,7 +147,7 @@ type GCEImage struct {
 	Project    string `json:"project"`
 	Metadata   string `json:"metadata"`
 	ImageRegex string `json:"image_regex, omitempty"`
-	// Defaults to using only the latest image. Acceptible values are [0, # of images that match the regex).
+	// Defaults to using only the latest image. Acceptable values are [0, # of images that match the regex).
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images, omitempty"`
 

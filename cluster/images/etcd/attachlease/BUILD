@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "attachlease",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cluster/images/etcd/attachlease",
 )
 
 go_library(

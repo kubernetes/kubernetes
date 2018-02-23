@@ -21,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["exec_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/probe/exec",
     deps = ["//pkg/probe:go_default_library"],
 )
 

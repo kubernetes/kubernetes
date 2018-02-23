@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "gcr.io/google_containers/node-problem-detector:v0.4.1"
+		image          = "k8s.gcr.io/node-problem-detector:v0.4.1"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 	framework.KubeDescribe("SystemLogMonitor", func() {
 		const (
 			// Use test condition to avoid changing the real node condition in use.
-			// TODO(random-liu): Now node condition could be arbitrary string, consider wether we need to
+			// TODO(random-liu): Now node condition could be arbitrary string, consider whether we need to
 			// add TestCondition when switching to predefined condition list.
 			condition = v1.NodeConditionType("TestCondition")
 

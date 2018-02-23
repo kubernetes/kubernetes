@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -115,7 +117,7 @@ func notRunning(statuses []v1.ContainerStatus) bool {
 }
 
 // SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
-// the fromat plugin_name/volume_name and the plugin name must be namespaced as descibed by the plugin interface,
+// the fromat plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
 // i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
 // plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
 // description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
@@ -156,4 +158,19 @@ func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.Per
 		return *claim.Spec.VolumeMode, nil
 	}
 	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
+}
+
+// CheckVolumeModeFilesystem checks VolumeMode.
+// If the mode is Filesystem, return true otherwise return false.
+func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode, err := GetVolumeMode(volumeSpec)
+		if err != nil {
+			return true, err
+		}
+		if volumeMode == v1.PersistentVolumeBlock {
+			return false, nil
+		}
+	}
+	return true, nil
 }

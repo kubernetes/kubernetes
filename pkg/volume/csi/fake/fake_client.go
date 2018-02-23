@@ -53,6 +53,7 @@ func (f *IdentityClient) GetSupportedVersions(ctx grpctx.Context, req *csipb.Get
 		SupportedVersions: []*csipb.Version{
 			{Major: 0, Minor: 0, Patch: 1},
 			{Major: 0, Minor: 1, Patch: 0},
+			{Major: 0, Minor: 2, Patch: 0},
 			{Major: 1, Minor: 0, Patch: 0},
 			{Major: 1, Minor: 0, Patch: 1},
 			{Major: 1, Minor: 1, Patch: 1},
@@ -103,7 +104,7 @@ func (f *NodeClient) NodePublishVolume(ctx grpctx.Context, req *csipb.NodePublis
 	fsTypes := "ext4|xfs|zfs"
 	fsType := req.GetVolumeCapability().GetMount().GetFsType()
 	if !strings.Contains(fsTypes, fsType) {
-		return nil, errors.New("invlid fstype")
+		return nil, errors.New("invalid fstype")
 	}
 	f.nodePublishedVolumes[req.GetVolumeId()] = req.GetTargetPath()
 	return &csipb.NodePublishVolumeResponse{}, nil
@@ -136,8 +137,8 @@ func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnp
 	return &csipb.NodeUnpublishVolumeResponse{}, nil
 }
 
-// GetNodeID implements method
-func (f *NodeClient) GetNodeID(ctx context.Context, in *csipb.GetNodeIDRequest, opts ...grpc.CallOption) (*csipb.GetNodeIDResponse, error) {
+// NodeGetId implements method
+func (f *NodeClient) NodeGetId(ctx context.Context, in *csipb.NodeGetIdRequest, opts ...grpc.CallOption) (*csipb.NodeGetIdResponse, error) {
 	return nil, nil
 }
 

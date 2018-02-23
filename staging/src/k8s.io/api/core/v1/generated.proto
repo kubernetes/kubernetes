@@ -170,7 +170,7 @@ message Binding {
   optional ObjectReference target = 2;
 }
 
-// Represents storage that is managed by an external CSI volume driver
+// Represents storage that is managed by an external CSI volume driver (Beta feature)
 message CSIPersistentVolumeSource {
   // Driver is the name of the driver to use for this volume.
   // Required.
@@ -191,6 +191,10 @@ message CSIPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 4;
+
+  // Attributes of the volume to publish.
+  // +optional
+  map<string, string> volumeAttributes = 5;
 }
 
 // Adds and removes POSIX capabilities from running containers.
@@ -637,7 +641,7 @@ message Container {
 // Describe a container image
 message ContainerImage {
   // Names by which this image is known.
-  // e.g. ["gcr.io/google_containers/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
+  // e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
   repeated string names = 1;
 
   // The size of the image in bytes.
@@ -992,7 +996,7 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps
 message EnvFromSource {
-  // An optional identifer to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
+  // An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
   // +optional
   optional string prefix = 1;
 
@@ -1124,12 +1128,12 @@ message EventList {
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
-// continously for some time.
+// continuously for some time.
 message EventSeries {
   // Number of occurrences in this series up to the last heartbeat time
   optional int32 count = 1;
 
-  // Time of the last occurence observed
+  // Time of the last occurrence observed
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 
   // State of this Series: Ongoing or Finished
@@ -2528,7 +2532,7 @@ message PersistentVolumeSource {
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
-  // CSI represents storage that handled by an external CSI driver
+  // CSI represents storage that handled by an external CSI driver (Beta feature).
   // +optional
   optional CSIPersistentVolumeSource csi = 22;
 }
@@ -2578,6 +2582,11 @@ message PersistentVolumeSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 8;
+
+  // NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+  // This field influences the scheduling of pods that use this volume.
+  // +optional
+  optional VolumeNodeAffinity nodeAffinity = 9;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -3078,6 +3087,16 @@ message PodSpec {
   // +optional
   optional bool hostIPC = 13;
 
+  // Share a single process namespace between all of the containers in a pod.
+  // When this is set containers will be able to view and signal processes from other containers
+  // in the same pod, and the first process in each container will not be assigned PID 1.
+  // HostPID and ShareProcessNamespace cannot both be set.
+  // Optional: Default to false.
+  // This field is alpha-level and is honored only by servers that enable the PodShareProcessNamespace feature.
+  // +k8s:conversion-gen=false
+  // +optional
+  optional bool shareProcessNamespace = 27;
+
   // SecurityContext holds pod-level security attributes and common container settings.
   // Optional: Defaults to empty.  See type description for default values of each field.
   // +optional
@@ -3122,9 +3141,10 @@ message PodSpec {
   // +patchStrategy=merge
   repeated HostAlias hostAliases = 23;
 
-  // If specified, indicates the pod's priority. "SYSTEM" is a special keyword
-  // which indicates the highest priority. Any other name must be defined by
-  // creating a PriorityClass object with that name.
+  // If specified, indicates the pod's priority. "system-node-critical" and
+  // "system-cluster-critical" are two special keywords which indicate the
+  // highest priorities with the former being the highest priority. Any other
+  // name must be defined by creating a PriorityClass object with that name.
   // If not specified, the pod priority will be default or zero if there is no
   // default.
   // +optional
@@ -4454,6 +4474,12 @@ message VolumeMount {
   // release.
   // +optional
   optional string mountPropagation = 5;
+}
+
+// VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
+message VolumeNodeAffinity {
+  // Required specifies hard node constraints that must be met.
+  optional NodeSelector required = 1;
 }
 
 // Projection that may be projected along with other supported volume types

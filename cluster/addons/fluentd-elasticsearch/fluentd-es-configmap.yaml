@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: fluentd-es-config-v0.1.3
+  name: fluentd-es-config-v0.1.4
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
@@ -160,6 +160,7 @@ data:
     # Examples:
     # time="2016-02-04T06:51:03.053580605Z" level=info msg="GET /containers/json"
     # time="2016-02-04T07:53:57.505612354Z" level=error msg="HTTP Error" err="No such image: -f" statusCode=404
+    # TODO(random-liu): Remove this after cri container runtime rolls out.
     <source>
       @id docker.log
       @type tail
@@ -307,6 +308,7 @@ data:
     </source>
 
     # Logs from systemd-journal for interesting services.
+    # TODO(random-liu): Remove this after cri container runtime rolls out.
     <source>
       @id journald-docker
       @type systemd
@@ -317,6 +319,18 @@ data:
       </storage>
       read_from_head true
       tag docker
+    </source>
+
+    <source>
+      @id journald-container-runtime
+      @type systemd
+      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      <storage>
+        @type local
+        persistent true
+      </storage>
+      read_from_head true
+      tag container-runtime
     </source>
 
     <source>

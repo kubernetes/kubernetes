@@ -33,7 +33,7 @@ func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
 	}
 
 	opts := &jose.SignerOptions{
-		// Since this is a symetric key, go-jose doesn't automatically include
+		// Since this is a symmetric key, go-jose doesn't automatically include
 		// the KeyID as part of the protected header. We have to pass it here
 		// explicitly.
 		ExtraHeaders: map[jose.HeaderKey]interface{}{
@@ -60,7 +60,7 @@ func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
 
 // stripContent will remove the content part of a compact JWS
 //
-// The `go-jose` library doesn't support generating signatures with "detatched"
+// The `go-jose` library doesn't support generating signatures with "detached"
 // content. To make up for this we take the full compact signature, break it
 // apart and put it back together without the content section.
 func stripContent(fullSig string) (string, error) {

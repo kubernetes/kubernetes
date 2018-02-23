@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"reflect"
 	goruntime "runtime"
@@ -38,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -64,6 +65,7 @@ import (
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/pkg/util/configz"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
@@ -108,7 +110,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	// All flags below here are deprecated and will eventually be removed.
 
 	fs.Int32Var(&o.healthzPort, "port", ports.SchedulerPort, "The port that the scheduler's http service runs on")
-	fs.StringVar(&o.healthzAddress, "address", o.healthzAddress, "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.StringVar(&o.healthzAddress, "address", o.healthzAddress, "The IP address to serve on (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	fs.StringVar(&o.algorithmProvider, "algorithm-provider", o.algorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
 	fs.StringVar(&o.policyConfigFile, "policy-config-file", o.policyConfigFile, "File with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config==true")
 	usage := fmt.Sprintf("Name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config==false. The config must be provided as the value of an element in 'Data' map with the key='%v'", componentconfig.SchedulerPolicyConfigMapKey)
@@ -331,6 +333,8 @@ interference, deadlines, and so on. Workload-specific requirements will be expos
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
+			utilflag.PrintFlags(cmd.Flags())
+
 			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
@@ -467,17 +471,14 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
 func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
-	mux := http.NewServeMux()
+	mux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(mux)
 	if config.HealthzBindAddress == config.MetricsBindAddress {
 		configz.InstallHandler(mux)
 		mux.Handle("/metrics", prometheus.Handler())
 	}
 	if config.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		routes.Profiling{}.Install(mux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
@@ -490,14 +491,11 @@ func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http
 
 // makeMetricsServer builds a metrics server from the config.
 func makeMetricsServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
-	mux := http.NewServeMux()
+	mux := mux.NewPathRecorderMux("kube-scheduler")
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
 	if config.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		routes.Profiling{}.Install(mux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}

@@ -10,7 +10,6 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "hyperkube",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/hyperkube",
     x_defs = version_x_defs(),
 )
 

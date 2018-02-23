@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/authentication/serviceaccount",
 )
 
 go_library(

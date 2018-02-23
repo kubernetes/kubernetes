@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	goruntime "runtime"
 	"strings"
@@ -38,7 +37,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/flag"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -63,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -128,8 +131,8 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.Var(componentconfig.IPVar{Val: &options.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.Int32Var(&options.healthzPort, "healthz-port", options.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.Var(componentconfig.IPVar{Val: &options.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
-	fs.Var(componentconfig.IPVar{Val: &options.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
+	fs.Var(componentconfig.IPPortVar{Val: &options.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
+	fs.Var(componentconfig.IPPortVar{Val: &options.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Int32Var(options.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(options.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&options.config.ResourceContainer, "resource-container", options.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
@@ -166,7 +169,8 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
 	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 	fs.StringVar(&options.config.IPVS.Scheduler, "ipvs-scheduler", options.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	fs.Var(flag.NewMapStringBool(&options.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 }
 
 func NewOptions() *Options {
@@ -192,9 +196,12 @@ func (o *Options) Complete() error {
 			return err
 		} else {
 			o.config = c
-			// Make sure we apply the feature gate settings in the config file.
-			utilfeature.DefaultFeatureGate.Set(o.config.FeatureGates)
 		}
+	}
+
+	err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -333,6 +340,8 @@ addon that provides cluster DNS for these cluster IPs. The user must create a se
 with the apiserver API to configure the proxy.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
+			utilflag.PrintFlags(cmd.Flags())
+
 			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
@@ -464,17 +473,14 @@ func (s *ProxyServer) Run() error {
 
 	// Start up a metrics server if requested
 	if len(s.MetricsBindAddress) > 0 {
-		mux := http.NewServeMux()
+		mux := mux.NewPathRecorderMux("kube-proxy")
 		healthz.InstallHandler(mux)
 		mux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
 		mux.Handle("/metrics", prometheus.Handler())
 		if s.EnableProfiling {
-			mux.HandleFunc("/debug/pprof/", pprof.Index)
-			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			routes.Profiling{}.Install(mux)
 		}
 		configz.InstallHandler(mux)
 		go wait.Until(func() {

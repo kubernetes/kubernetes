@@ -42,7 +42,6 @@ go_test(
     name = "go_default_test",
     srcs = ["token_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/discovery/token",
     deps = [
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",

@@ -89,6 +89,10 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	return set
 }
 
+func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
+	return entry.Validate(&set.IPSet)
+}
+
 func (set *IPSet) isEmpty() bool {
 	return len(set.activeEntries.UnsortedList()) == 0
 }
@@ -123,7 +127,7 @@ func (set *IPSet) syncIPSetEntries() {
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
-			if err := set.handle.AddEntry(entry, set.Name, true); err != nil {
+			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
 				glog.Errorf("Failed to add entry: %v to ip set: %s, error: %v", entry, set.Name, err)
 			} else {
 				glog.V(3).Infof("Successfully add entry: %v to ip set: %s", entry, set.Name)

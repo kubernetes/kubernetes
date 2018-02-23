@@ -222,7 +222,7 @@ var _ = SIGDescribe("CronJob", func() {
 		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, true)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Ensuring MissingJob event has occured")
+		By("Ensuring MissingJob event has occurred")
 		err = checkNoEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
 		Expect(err).To(HaveOccurred())
 
@@ -430,7 +430,7 @@ func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 	})
 }
 
-// checkNoEventWithReason checks no events with a reason within a list has occured
+// checkNoEventWithReason checks no events with a reason within a list has occurred
 func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
 	sj, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
 	if err != nil {

@@ -33,7 +33,6 @@ import (
 	tokencache "k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
-	"k8s.io/apiserver/plugin/pkg/authenticator/password/keystone"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
@@ -59,10 +58,9 @@ type AuthenticatorConfig struct {
 	OIDCUsernamePrefix          string
 	OIDCGroupsClaim             string
 	OIDCGroupsPrefix            string
+	OIDCSigningAlgs             []string
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
-	KeystoneURL                 string
-	KeystoneCAFile              string
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
 
@@ -108,14 +106,6 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		authenticators = append(authenticators, basicAuth)
 		hasBasicAuth = true
 	}
-	if len(config.KeystoneURL) > 0 {
-		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL, config.KeystoneCAFile)
-		if err != nil {
-			return nil, nil, err
-		}
-		authenticators = append(authenticators, keystoneAuth)
-		hasBasicAuth = true
-	}
 
 	// X509 methods
 	if len(config.ClientCAFile) > 0 {
@@ -154,7 +144,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix)
+		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix, config.OIDCSigningAlgs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -246,7 +236,7 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Token or an error.
-func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string) (authenticator.Token, error) {
+func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string, signingAlgs []string) (authenticator.Token, error) {
 	const noUsernamePrefix = "-"
 
 	if usernamePrefix == "" && usernameClaim != "email" {
@@ -262,14 +252,15 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		usernamePrefix = ""
 	}
 
-	tokenAuthenticator, err := oidc.New(oidc.OIDCOptions{
-		IssuerURL:      issuerURL,
-		ClientID:       clientID,
-		CAFile:         caFile,
-		UsernameClaim:  usernameClaim,
-		UsernamePrefix: usernamePrefix,
-		GroupsClaim:    groupsClaim,
-		GroupsPrefix:   groupsPrefix,
+	tokenAuthenticator, err := oidc.New(oidc.Options{
+		IssuerURL:            issuerURL,
+		ClientID:             clientID,
+		CAFile:               caFile,
+		UsernameClaim:        usernameClaim,
+		UsernamePrefix:       usernamePrefix,
+		GroupsClaim:          groupsClaim,
+		GroupsPrefix:         groupsPrefix,
+		SupportedSigningAlgs: signingAlgs,
 	})
 	if err != nil {
 		return nil, err
@@ -289,7 +280,7 @@ func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccou
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, allPublicKeys, lookup, serviceAccountGetter)
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, allPublicKeys, serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter))
 	return tokenAuthenticator, nil
 }
 
@@ -304,16 +295,6 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	opts.Roots = roots
 
 	return x509.New(opts, x509.CommonNameUserConversion), nil
-}
-
-// newAuthenticatorFromKeystoneURL returns an authenticator.Request or an error
-func newAuthenticatorFromKeystoneURL(keystoneURL string, keystoneCAFile string) (authenticator.Request, error) {
-	keystoneAuthenticator, err := keystone.NewKeystoneAuthenticator(keystoneURL, keystoneCAFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return basicauth.New(keystoneAuthenticator), nil
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration) (authenticator.Token, error) {

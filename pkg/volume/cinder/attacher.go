@@ -17,6 +17,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -401,7 +402,7 @@ func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (str
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceID, err := instances.InstanceID(nodeName)
+	instanceID, err := instances.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		return "", err
 	}

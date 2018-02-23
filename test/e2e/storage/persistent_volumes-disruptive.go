@@ -223,6 +223,10 @@ var _ = utils.SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 				testItStmt: "Should test that a volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns.",
 				runTest:    utils.TestVolumeUnmountsFromDeletedPod,
 			},
+			{
+				testItStmt: "Should test that a volume mounted to a pod that is force deleted while the kubelet is down unmounts when the kubelet returns.",
+				runTest:    utils.TestVolumeUnmountsFromForceDeletedPod,
+			},
 		}
 
 		// Test loop executes each disruptiveTest iteratively.
