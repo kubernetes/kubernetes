@@ -240,6 +240,10 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
+	ContainerLogMaxSize string
+	// Maximum number of container log files that can be present for a container.
+	ContainerLogMaxFiles int32
 
 	/* following flags are meant for Node Allocatable */
 

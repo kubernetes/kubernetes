@@ -3739,7 +3739,9 @@ type RuntimeServiceClient interface {
 	UpdateContainerResources(ctx context.Context, in *UpdateContainerResourcesRequest, opts ...grpc.CallOption) (*UpdateContainerResourcesResponse, error)
 	// ReopenContainerLog asks runtime to reopen the stdout/stderr log file
 	// for the container. This is often called after the log file has been
-	// rotated.
+	// rotated. If the container is not running, container runtime can choose
+	// to either create a new log file and return nil, or return an error.
+	// Once it returns error, new container log file MUST NOT be created.
 	ReopenContainerLog(ctx context.Context, in *ReopenContainerLogRequest, opts ...grpc.CallOption) (*ReopenContainerLogResponse, error)
 	// ExecSync runs a command in a container synchronously.
 	ExecSync(ctx context.Context, in *ExecSyncRequest, opts ...grpc.CallOption) (*ExecSyncResponse, error)
@@ -4017,7 +4019,9 @@ type RuntimeServiceServer interface {
 	UpdateContainerResources(context.Context, *UpdateContainerResourcesRequest) (*UpdateContainerResourcesResponse, error)
 	// ReopenContainerLog asks runtime to reopen the stdout/stderr log file
 	// for the container. This is often called after the log file has been
-	// rotated.
+	// rotated. If the container is not running, container runtime can choose
+	// to either create a new log file and return nil, or return an error.
+	// Once it returns error, new container log file MUST NOT be created.
 	ReopenContainerLog(context.Context, *ReopenContainerLogRequest) (*ReopenContainerLogResponse, error)
 	// ExecSync runs a command in a container synchronously.
 	ExecSync(context.Context, *ExecSyncRequest) (*ExecSyncResponse, error)

@@ -152,6 +152,8 @@ var (
 		"CgroupsPerQOS",
 		"ClusterDNS[*]",
 		"ClusterDomain",
+		"ContainerLogMaxFiles",
+		"ContainerLogMaxSize",
 		"ContentType",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",

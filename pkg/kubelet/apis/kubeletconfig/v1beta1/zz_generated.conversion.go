@@ -244,6 +244,10 @@ func autoConvert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfigurat
 	if err := v1.Convert_Pointer_bool_To_bool(&in.FailSwapOn, &out.FailSwapOn, s); err != nil {
 		return err
 	}
+	out.ContainerLogMaxSize = in.ContainerLogMaxSize
+	if err := v1.Convert_Pointer_int32_To_int32(&in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles, s); err != nil {
+		return err
+	}
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
@@ -359,6 +363,10 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfigurat
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	if err := v1.Convert_bool_To_Pointer_bool(&in.FailSwapOn, &out.FailSwapOn, s); err != nil {
+		return err
+	}
+	out.ContainerLogMaxSize = in.ContainerLogMaxSize
+	if err := v1.Convert_int32_To_Pointer_int32(&in.ContainerLogMaxFiles, &out.ContainerLogMaxFiles, s); err != nil {
 		return err
 	}
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))

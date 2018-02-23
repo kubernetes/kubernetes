@@ -90,6 +90,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CgroupDriver = "cgroupfs"
 			obj.EnforceNodeAllocatable = v1beta1.DefaultNodeAllocatableEnforcement
 			obj.ManifestURLHeader = make(map[string][]string)
+			obj.ContainerLogMaxFiles = 5
+			obj.ContainerLogMaxSize = "10Mi"
 		},
 	}
 }
