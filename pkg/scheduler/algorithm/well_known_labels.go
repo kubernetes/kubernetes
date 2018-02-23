@@ -66,4 +66,13 @@ const (
 	// from the cloud-controller-manager intitializes this node, and then removes
 	// the taint
 	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
+
+	// AnnotationNamespaceNodeSelector is an annotation key used for assigning
+	// node selectors labels to namespaces.
+	// This is enforced by the PodNodeSelector admission controller.
+	AnnotationNamespaceNodeSelector = "scheduler.kubernetes.io/node-selector"
+
+	// DeprecatedAnnotationNamespaceNodeSelector is the deprecated version of AnnotationNamespaceNodeSelector.
+	// It is deprecated since 1.10
+	DeprecatedAnnotationNamespaceNodeSelector = "scheduler.alpha.kubernetes.io/node-selector"
 )

@@ -34,11 +34,13 @@ import (
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
-// The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
-// node selectors labels to namespaces
-var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+// NamespaceNodeSelectors is the list of Namespace annotation keys from which to read
+// node selector values. These are used by the plugin to implement defaults
+// and a whitelist for pods deployed in the Namespace.
+var NamespaceNodeSelectors = []string{algorithm.AnnotationNamespaceNodeSelector, algorithm.DeprecatedAnnotationNamespaceNodeSelector}
 
 const PluginName = "PodNodeSelector"
 
