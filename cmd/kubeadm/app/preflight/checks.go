@@ -111,13 +111,13 @@ func (criCheck CRICheck) Check() (warnings, errors []error) {
 	return warnings, errors
 }
 
-// ServiceCheck verifies that the given service is enabled and active. If we do not
+// ServiceCheck verifies that the given service is enabled and its 'active' status is what is wanted. If we do not
 // detect a supported init system however, all checks are skipped and a warning is
 // returned.
 type ServiceCheck struct {
-	Service       string
-	CheckIfActive bool
-	Label         string
+	Service    string
+	WantActive bool
+	Label      string
 }
 
 // Name returns label for ServiceCheck. If not provided, will return based on the service parameter
@@ -148,10 +148,16 @@ func (sc ServiceCheck) Check() (warnings, errors []error) {
 				sc.Service, sc.Service))
 	}
 
-	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
+	if sc.WantActive != initSystem.ServiceIsActive(sc.Service) {
+		status := [2]string{"active", "not active"}
+		command := [2]string{"stop", "start"}
+		index := 0
+		if sc.WantActive {
+			index = 1
+		}
 		errors = append(errors,
-			fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'",
-				sc.Service, sc.Service))
+			fmt.Errorf("%s service is %s, please run 'systemctl %s %s.service'",
+				sc.Service, status[index], command[index], sc.Service))
 	}
 
 	return warnings, errors
@@ -869,12 +875,12 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		SystemVerificationCheck{CRISocket: cfg.CRISocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
 		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion, exec: execer},
-		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		ServiceCheck{Service: "docker", CheckIfActive: true}, // assume docker
+		ServiceCheck{Service: "kubelet", WantActive: false},
+		ServiceCheck{Service: "docker", WantActive: true}, // assume docker
+		SystemVerificationCheck{CRISocket: cfg.CRISocket},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 10250},
@@ -970,7 +976,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
 		KubeletVersionCheck{exec: execer},
-		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "kubelet", WantActive: false},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
@@ -981,7 +987,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 		checks = append(checks, CRICheck{socket: cfg.CRISocket, exec: execer})
 	} else {
 		// assume docker
-		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+		checks = append(checks, ServiceCheck{Service: "docker", WantActive: true})
 	}
 	//non-windows checks
 	if runtime.GOOS == "linux" {
