@@ -3285,6 +3285,14 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		w.Write(LEVEL_0, "Provisioner:\t%s\n", sc.Provisioner)
 		w.Write(LEVEL_0, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
 		w.Write(LEVEL_0, "AllowVolumeExpansion:\t%s\n", printBoolPtr(sc.AllowVolumeExpansion))
+		if len(sc.MountOptions) == 0 {
+			w.Write(LEVEL_0, "MountOptions:\t<none>\n")
+		} else {
+			w.Write(LEVEL_0, "MountOptions:\n")
+			for _, option := range sc.MountOptions {
+				w.Write(LEVEL_1, "%s\n", option)
+			}
+		}
 		if sc.ReclaimPolicy != nil {
 			w.Write(LEVEL_0, "ReclaimPolicy:\t%s\n", *sc.ReclaimPolicy)
 		}
