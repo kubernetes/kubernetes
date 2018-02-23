@@ -164,7 +164,7 @@ type Etcd struct {
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
-	// Image specifies which container image to use for running etcd.
+	// Image specifies which container image to be used for running etcd.
 	// If empty, automatically populated by kubeadm using the image
 	// repository and default etcd version.
 	Image string `json:"image"`
