@@ -108,6 +108,9 @@ func (f fakeAPI) VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error {
 func (f fakeAPI) VolumeDelete(opts storageostypes.DeleteOptions) error {
 	return nil
 }
+func (f fakeAPI) Controller(ref string) (*storageostypes.Controller, error) {
+	return &storageostypes.Controller{}, nil
+}
 
 func TestCreateVolume(t *testing.T) {
 
@@ -224,7 +227,7 @@ func TestAttachVolume(t *testing.T) {
 			mounter:      &mount.FakeMounter{},
 			plugin:       plug.(*storageosPlugin),
 		},
-		devicePath: tmpDir,
+		deviceDir: tmpDir,
 	}
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

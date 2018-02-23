@@ -131,6 +131,10 @@ func (fake *fakePDManager) DeleteVolume(d *storageosDeleter) error {
 	return nil
 }
 
+func (fake *fakePDManager) DeviceDir(mounter *storageosMounter) string {
+	return defaultDeviceDir
+}
+
 func TestPlugin(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("storageos_test")
 	if err != nil {
@@ -249,6 +253,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	fakeManager = &fakePDManager{}
+	mountOptions := []string{"sync", "noatime"}
 	options := volume.VolumeOptions{
 		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		// PVName: "test-volume-name",
@@ -257,6 +262,7 @@ func TestPlugin(t *testing.T) {
 			"VolumeNamespace": "test-volume-namespace",
 			"adminSecretName": secretName,
 		},
+		MountOptions: mountOptions,
 	}
 	provisioner, err := plug.(*storageosPlugin).newProvisionerInternal(options, fakeManager)
 	if err != nil {
@@ -281,6 +287,9 @@ func TestPlugin(t *testing.T) {
 	}
 	if persistentSpec.Spec.PersistentVolumeSource.StorageOS.FSType != "ext2" {
 		t.Errorf("Provision() returned unexpected volume FSType: %s", persistentSpec.Spec.PersistentVolumeSource.StorageOS.FSType)
+	}
+	if len(persistentSpec.Spec.MountOptions) != 2 {
+		t.Errorf("Provision() returned unexpected volume mount options: %v", persistentSpec.Spec.MountOptions)
 	}
 	if persistentSpec.Labels["fakepdmanager"] != "yes" {
 		t.Errorf("Provision() returned unexpected labels: %v", persistentSpec.Labels)

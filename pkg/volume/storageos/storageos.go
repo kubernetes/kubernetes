@@ -54,7 +54,7 @@ var _ volume.ProvisionableVolumePlugin = &storageosPlugin{}
 
 const (
 	storageosPluginName = "kubernetes.io/storageos"
-	storageosDevicePath = "/var/lib/storageos/volumes"
+	defaultDeviceDir    = "/var/lib/storageos/volumes"
 	defaultAPIAddress   = "tcp://localhost:5705"
 	defaultAPIUser      = "storageos"
 	defaultAPIPassword  = "storageos"
@@ -136,8 +136,8 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, volNamespace, volName, spec.Name(), plugin.host)),
 		},
-		devicePath:  storageosDevicePath,
-		diskMounter: &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		diskMounter:  &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -249,7 +249,7 @@ func (plugin *storageosPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 }
 
 func (plugin *storageosPlugin) SupportsMountOption() bool {
-	return false
+	return true
 }
 
 func (plugin *storageosPlugin) SupportsBulkVolumeVerification() bool {
@@ -286,6 +286,8 @@ type storageosManager interface {
 	UnmountVolume(unounter *storageosUnmounter) error
 	// Deletes the storageos volume.  All data will be lost.
 	DeleteVolume(deleter *storageosDeleter) error
+	// Gets the node's device path.
+	DeviceDir(mounter *storageosMounter) string
 }
 
 // storageos volumes represent a bare host directory mount of an StorageOS export.
@@ -312,9 +314,13 @@ type storageos struct {
 
 type storageosMounter struct {
 	*storageos
-	devicePath string
+
+	// The directory containing the StorageOS devices
+	deviceDir string
+
 	// Interface used to mount the file or block device
-	diskMounter *mount.SafeFormatAndMount
+	diskMounter  *mount.SafeFormatAndMount
+	mountOptions []string
 }
 
 var _ volume.Mounter = &storageosMounter{}
@@ -383,11 +389,12 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if b.readOnly {
 		options = append(options, "ro")
 	}
+	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
 
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
 	glog.V(4).Infof("Attempting to bind mount to pod volume at %s", dir)
 
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
@@ -636,6 +643,7 @@ func (c *storageosProvisioner) Provision() (*v1.PersistentVolume, error) {
 					},
 				},
 			},
+			MountOptions: c.options.MountOptions,
 		},
 	}
 	if len(c.options.PVC.Spec.AccessModes) == 0 {

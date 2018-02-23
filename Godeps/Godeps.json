@@ -2579,11 +2579,23 @@
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api",
-			"Rev": "74f9beb613cacf0cc282facc2e1550a3231e126f"
+			"Comment": "0.3.4",
+			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+		},
+		{
+			"ImportPath": "github.com/storageos/go-api/netutil",
+			"Comment": "0.3.4",
+			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
+		},
+		{
+			"ImportPath": "github.com/storageos/go-api/serror",
+			"Comment": "0.3.4",
+			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
 		},
 		{
 			"ImportPath": "github.com/storageos/go-api/types",
-			"Rev": "74f9beb613cacf0cc282facc2e1550a3231e126f"
+			"Comment": "0.3.4",
+			"Rev": "3a4032328d99c1b43fbda3d85bd3c80fa06e1707"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
