@@ -33,6 +33,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -67,25 +68,35 @@ var (
 )
 
 const (
-	node1            = "node-1"
-	podLimit         = 100
-	volsPerPod       = 5
-	affinityLabelKey = "kubernetes.io/hostname"
+	node1                = "node-1"
+	node2                = "node-2"
+	podLimit             = 100
+	volsPerPod           = 5
+	nodeAffinityLabelKey = "kubernetes.io/hostname"
 )
 
 func TestVolumeBinding(t *testing.T) {
-	config := setupNodes(t, "volume-scheduling", 2)
+	config := setupCluster(t, "volume-scheduling", 2)
 	defer config.teardown()
 
 	cases := map[string]struct {
 		pod  *v1.Pod
 		pvs  []*v1.PersistentVolume
 		pvcs []*v1.PersistentVolumeClaim
+		// Create these, but they should not be bound in the end
+		unboundPvcs []*v1.PersistentVolumeClaim
+		unboundPvs  []*v1.PersistentVolume
+		shouldFail  bool
 	}{
 		"immediate can bind": {
 			pod:  makePod("pod-i-canbind", config.ns, []string{"pvc-i-canbind"}),
 			pvs:  []*v1.PersistentVolume{makePV(t, "pv-i-canbind", classImmediate, "", "", node1)},
 			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-i-canbind", config.ns, &classImmediate, "")},
+		},
+		"immediate cannot bind": {
+			pod:         makePod("pod-i-cannotbind", config.ns, []string{"pvc-i-cannotbind"}),
+			unboundPvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-i-cannotbind", config.ns, &classImmediate, "")},
+			shouldFail:  true,
 		},
 		"immediate pvc prebound": {
 			pod:  makePod("pod-i-pvc-prebound", config.ns, []string{"pvc-i-prebound"}),
@@ -102,6 +113,11 @@ func TestVolumeBinding(t *testing.T) {
 			pvs:  []*v1.PersistentVolume{makePV(t, "pv-w-canbind", classWait, "", "", node1)},
 			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-w-canbind", config.ns, &classWait, "")},
 		},
+		"wait cannot bind": {
+			pod:         makePod("pod-w-cannotbind", config.ns, []string{"pvc-w-cannotbind"}),
+			unboundPvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-w-cannotbind", config.ns, &classWait, "")},
+			shouldFail:  true,
+		},
 		"wait pvc prebound": {
 			pod:  makePod("pod-w-pvc-prebound", config.ns, []string{"pvc-w-prebound"}),
 			pvs:  []*v1.PersistentVolume{makePV(t, "pv-w-pvc-prebound", classWait, "", "", node1)},
@@ -115,13 +131,28 @@ func TestVolumeBinding(t *testing.T) {
 		"wait can bind two": {
 			pod: makePod("pod-w-canbind-2", config.ns, []string{"pvc-w-canbind-2", "pvc-w-canbind-3"}),
 			pvs: []*v1.PersistentVolume{
-				makePV(t, "pv-w-canbind-2", classWait, "", "", node1),
-				makePV(t, "pv-w-canbind-3", classWait, "", "", node1),
+				makePV(t, "pv-w-canbind-2", classWait, "", "", node2),
+				makePV(t, "pv-w-canbind-3", classWait, "", "", node2),
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
 				makePVC("pvc-w-canbind-2", config.ns, &classWait, ""),
 				makePVC("pvc-w-canbind-3", config.ns, &classWait, ""),
 			},
+			unboundPvs: []*v1.PersistentVolume{
+				makePV(t, "pv-w-canbind-5", classWait, "", "", node1),
+			},
+		},
+		"wait cannot bind two": {
+			pod: makePod("pod-w-cannotbind-2", config.ns, []string{"pvc-w-cannotbind-1", "pvc-w-cannotbind-2"}),
+			unboundPvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-w-cannotbind-1", config.ns, &classWait, ""),
+				makePVC("pvc-w-cannotbind-2", config.ns, &classWait, ""),
+			},
+			unboundPvs: []*v1.PersistentVolume{
+				makePV(t, "pv-w-cannotbind-1", classWait, "", "", node2),
+				makePV(t, "pv-w-cannotbind-2", classWait, "", "", node1),
+			},
+			shouldFail: true,
 		},
 		"mix immediate and wait": {
 			pod: makePod("pod-mix-bound", config.ns, []string{"pvc-w-canbind-4", "pvc-i-canbind-2"}),
@@ -134,11 +165,6 @@ func TestVolumeBinding(t *testing.T) {
 				makePVC("pvc-i-canbind-2", config.ns, &classImmediate, ""),
 			},
 		},
-		// TODO:
-		// immediate mode - PVC cannot bound
-		// wait mode - PVC cannot bind
-		// wait mode - 2 PVCs, 1 cannot bind
-		// wait mode - 2 pvcs, multiple nodes
 	}
 
 	for name, test := range cases {
@@ -151,8 +177,19 @@ func TestVolumeBinding(t *testing.T) {
 			}
 		}
 
+		for _, pv := range test.unboundPvs {
+			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
+				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
+			}
+		}
+
 		// Create PVCs
 		for _, pvc := range test.pvcs {
+			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
+				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
+			}
+		}
+		for _, pvc := range test.unboundPvcs {
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
@@ -162,16 +199,28 @@ func TestVolumeBinding(t *testing.T) {
 		if _, err := config.client.CoreV1().Pods(config.ns).Create(test.pod); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 		}
-		if err := waitForPodToSchedule(config.client, test.pod); err != nil {
-			t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+		if test.shouldFail {
+			if err := waitForPodUnschedulable(config.client, test.pod); err != nil {
+				t.Errorf("Pod %q was not unschedulable: %v", test.pod.Name, err)
+			}
+		} else {
+			if err := waitForPodToSchedule(config.client, test.pod); err != nil {
+				t.Errorf("Failed to schedule Pod %q: %v", test.pod.Name, err)
+			}
 		}
 
 		// Validate PVC/PV binding
 		for _, pvc := range test.pvcs {
 			validatePVCPhase(t, config.client, pvc, v1.ClaimBound)
 		}
+		for _, pvc := range test.unboundPvcs {
+			validatePVCPhase(t, config.client, pvc, v1.ClaimPending)
+		}
 		for _, pv := range test.pvs {
 			validatePVPhase(t, config.client, pv, v1.VolumeBound)
+		}
+		for _, pv := range test.unboundPvs {
+			validatePVPhase(t, config.client, pv, v1.VolumeAvailable)
 		}
 
 		// TODO: validate events on Pods and PVCs
@@ -184,7 +233,7 @@ func TestVolumeBinding(t *testing.T) {
 
 // TestVolumeBindingStress creates <podLimit> pods, each with <volsPerPod> unbound PVCs.
 func TestVolumeBindingStress(t *testing.T) {
-	config := setupNodes(t, "volume-binding-stress", 1)
+	config := setupCluster(t, "volume-binding-stress", 1)
 	defer config.teardown()
 
 	// Create enough PVs and PVCs for all the pods
@@ -239,7 +288,7 @@ func TestVolumeBindingStress(t *testing.T) {
 }
 
 func TestPVAffinityConflict(t *testing.T) {
-	config := setupNodes(t, "volume-scheduling", 3)
+	config := setupCluster(t, "volume-scheduling", 3)
 	defer config.teardown()
 
 	pv := makePV(t, "local-pv", classImmediate, "", "", node1)
@@ -255,6 +304,11 @@ func TestPVAffinityConflict(t *testing.T) {
 		t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 	}
 
+	// Wait for PVC bound
+	if err := waitForPVCBound(config.client, pvc); err != nil {
+		t.Fatalf("PVC %q failed to bind: %v", pvc.Name, err)
+	}
+
 	nodeMarkers := []interface{}{
 		markNodeAffinity,
 		markNodeSelector,
@@ -268,10 +322,10 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
 		// Give time to shceduler to attempt to schedule pod
-		if err := waitForPodToSchedule(config.client, pod); err == nil {
-			t.Errorf("Failed as Pod %s was scheduled successfully but expected to fail", pod.Name)
+		if err := waitForPodUnschedulable(config.client, pod); err != nil {
+			t.Errorf("Failed as Pod %s was not unschedulable: %v", pod.Name, err)
 		}
-		// Deleting test pod
+		// Check pod conditions
 		p, err := config.client.CoreV1().Pods(config.ns).Get(podName, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to access Pod %s status: %v", podName, err)
@@ -283,15 +337,16 @@ func TestPVAffinityConflict(t *testing.T) {
 			t.Fatalf("Failed as Pod %s reason was: %s but expected: Unschedulable", podName, p.Status.Conditions[0].Reason)
 		}
 		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match node selector") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
-			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict", podName)
+			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
 		}
+		// Deleting test pod
 		if err := config.client.CoreV1().Pods(config.ns).Delete(podName, &metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete Pod %s: %v", podName, err)
 		}
 	}
 }
 
-func setupNodes(t *testing.T, nsName string, numberOfNodes int) *testConfig {
+func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
@@ -373,7 +428,7 @@ func setupNodes(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		testNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   fmt.Sprintf("node-%d", i+1),
-				Labels: map[string]string{affinityLabelKey: fmt.Sprintf("node-%d", i+1)},
+				Labels: map[string]string{nodeAffinityLabelKey: fmt.Sprintf("node-%d", i+1)},
 			},
 			Spec: v1.NodeSpec{Unschedulable: false},
 			Status: v1.NodeStatus{
@@ -458,7 +513,7 @@ func makePV(t *testing.T, name, scName, pvcName, ns, node string) *v1.Persistent
 						{
 							MatchExpressions: []v1.NodeSelectorRequirement{
 								{
-									Key:      affinityLabelKey,
+									Key:      nodeAffinityLabelKey,
 									Operator: v1.NodeSelectorOpIn,
 									Values:   []string{node},
 								},
@@ -552,6 +607,19 @@ func validatePVPhase(t *testing.T, client clientset.Interface, pv *v1.Persistent
 	}
 }
 
+func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) error {
+	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+		claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if claim.Status.Phase == v1.ClaimBound {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
 func markNodeAffinity(pod *v1.Pod, node string) {
 	affinity := &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
@@ -560,7 +628,7 @@ func markNodeAffinity(pod *v1.Pod, node string) {
 					{
 						MatchExpressions: []v1.NodeSelectorRequirement{
 							{
-								Key:      affinityLabelKey,
+								Key:      nodeAffinityLabelKey,
 								Operator: v1.NodeSelectorOpIn,
 								Values:   []string{node},
 							},
@@ -575,7 +643,7 @@ func markNodeAffinity(pod *v1.Pod, node string) {
 
 func markNodeSelector(pod *v1.Pod, node string) {
 	ns := map[string]string{
-		affinityLabelKey: node,
+		nodeAffinityLabelKey: node,
 	}
 	pod.Spec.NodeSelector = ns
 }
