@@ -110,7 +110,7 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 	all := cmdutil.GetFlagBool(cmd, "all")
 
 	r := f.NewBuilder().
-		Internal().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -173,7 +173,7 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 				return err
 			}
 			mapping := info.ResourceMapping()
-			client, err := f.ClientForMapping(mapping)
+			client, err := f.UnstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
