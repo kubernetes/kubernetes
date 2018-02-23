@@ -2381,6 +2381,7 @@ type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector
+	// Deprecated: please use the NamespaceSelector, this field will be removed in future.
 	// namespaces specifies which namespaces the labelSelector applies to (matches against);
 	// null or empty list means "this pod's namespace"
 	// +optional
@@ -2391,6 +2392,13 @@ type PodAffinityTerm struct {
 	// selected pods is running.
 	// Empty topologyKey is not allowed.
 	TopologyKey string
+	// Selects Namespaces using cluster scoped-labels.  This
+	// matches namespaces selected by this label selector.
+	// This field follows standard label selector semantics.
+	// If present but empty, this selector selects all namespaces,
+	// if this selector is not provided (nil), the Pod's namespace will be used.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector
 }
 
 // Node affinity is a group of node affinity scheduling rules.

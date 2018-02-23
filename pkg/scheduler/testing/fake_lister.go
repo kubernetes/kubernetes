@@ -215,3 +215,23 @@ func (f *fakePersistentVolumeClaimNamespaceLister) Get(name string) (*v1.Persist
 func (f fakePersistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+// NamespaceLister the interface of namespace lister
+type NamespaceLister interface {
+	List(s labels.Selector) (selected []*v1.Namespace, err error)
+}
+
+var _ NamespaceLister = &FakeNamespaceLister{}
+
+// FakeNamespaceLister implements NamespaceLister on an []v1.Namespace for test purposes.
+type FakeNamespaceLister []*v1.Namespace
+
+// List returns []*v1.Namespace matching a query.
+func (f FakeNamespaceLister) List(s labels.Selector) (selected []*v1.Namespace, err error) {
+	for _, ns := range f {
+		if s.Matches(labels.Set(ns.Labels)) {
+			selected = append(selected, ns)
+		}
+	}
+	return selected, nil
+}

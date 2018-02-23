@@ -19,6 +19,7 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",
