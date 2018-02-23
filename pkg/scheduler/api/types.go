@@ -178,6 +178,11 @@ type ExtenderConfig struct {
 	// so the scheduler should only send minimal information about the eligible nodes
 	// assuming that the extender already cached full details of all nodes in the cluster
 	NodeCacheCapable bool
+	// InterestedResources is a pod filter based on pods' requested resources.
+	// If it's empty, every pod will be sent to extender for filter/prioritize/bind operations if FilterVerb/PrioritizeVerb/BindVerb isn't empty.
+	// Otherwise, only pods that requests for one of the resources will be.
+	// +optional
+	InterestedResources []string
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize

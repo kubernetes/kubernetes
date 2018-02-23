@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -713,8 +714,12 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 
 	var podRequest *schedulercache.Resource
+	scalaResourcesHandleByExtenders := sets.NewString()
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podRequest = predicateMeta.podRequest
+		if predicateMeta.scalaResourcesHandleByExtenders != nil {
+			scalaResourcesHandleByExtenders = predicateMeta.scalaResourcesHandleByExtenders
+		}
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = GetResourceRequest(pod)
@@ -743,6 +748,9 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
+		if scalaResourcesHandleByExtenders.Has(string(rName)) {
+			continue
+		}
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
 		}
@@ -1591,4 +1599,11 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 	// All volumes bound or matching PVs found for all unbound PVCs
 	glog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
+}
+
+// RegisterPodFitsResourcesPredicateMetadataProducer registers a PredicateMetadataProducer used by PodFitsResources
+func RegisterPodFitsResourcesPredicateMetadataProducer(scalaResourcesHandleByExtenders sets.String) {
+	RegisterPredicateMetadataProducer("PodFitsResources", func(pm *predicateMetadata) {
+		pm.scalaResourcesHandleByExtenders = scalaResourcesHandleByExtenders
+	})
 }

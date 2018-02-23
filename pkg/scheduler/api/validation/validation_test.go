@@ -69,6 +69,14 @@ func TestValidatePolicy(t *testing.T) {
 				}},
 			expected: errors.New("Only one extender can implement bind, found 2"),
 		},
+		{
+			policy: api.Policy{
+				ExtenderConfigs: []api.ExtenderConfig{
+					{URLPrefix: "http://127.0.0.1:8081/extender", InterestedResources: []string{"foo.io/overlay"}},
+					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", InterestedResources: []string{"foo.io/overlay"}},
+				}},
+			expected: errors.New("Duplicate interested resource name foo.io/overlay"),
+		},
 	}
 
 	for _, test := range tests {

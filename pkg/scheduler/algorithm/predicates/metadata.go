@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -53,6 +54,7 @@ type predicateMetadata struct {
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
+	scalaResourcesHandleByExtenders    sets.String
 }
 
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
@@ -90,11 +92,12 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		return nil
 	}
 	predicateMetadata := &predicateMetadata{
-		pod:                       pod,
-		podBestEffort:             isPodBestEffort(pod),
-		podRequest:                GetResourceRequest(pod),
-		podPorts:                  schedutil.GetContainerPorts(pod),
-		matchingAntiAffinityTerms: matchingTerms,
+		pod:                             pod,
+		podBestEffort:                   isPodBestEffort(pod),
+		podRequest:                      GetResourceRequest(pod),
+		podPorts:                        schedutil.GetContainerPorts(pod),
+		matchingAntiAffinityTerms:       matchingTerms,
+		scalaResourcesHandleByExtenders: sets.NewString(),
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		glog.V(10).Infof("Precompute: %v", predicateName)

@@ -109,6 +109,11 @@ func (in *ExtenderConfig) DeepCopyInto(out *ExtenderConfig) {
 			(*in).DeepCopyInto(*out)
 		}
 	}
+	if in.InterestedResources != nil {
+		in, out := &in.InterestedResources, &out.InterestedResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

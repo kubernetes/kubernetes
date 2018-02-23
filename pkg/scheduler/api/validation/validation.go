@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -35,12 +36,19 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 	}
 
 	binders := 0
+	interestedResources := sets.NewString()
 	for _, extender := range policy.ExtenderConfigs {
 		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a positive weight applied to it", extender.URLPrefix))
 		}
 		if extender.BindVerb != "" {
 			binders++
+		}
+		for _, resource := range extender.InterestedResources {
+			if interestedResources.Has(resource) {
+				validationErrors = append(validationErrors, fmt.Errorf("Duplicate interested resource name %s", resource))
+			}
+			interestedResources.Insert(resource)
 		}
 	}
 	if binders > 1 {
