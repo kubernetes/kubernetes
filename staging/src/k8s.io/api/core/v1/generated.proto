@@ -191,6 +191,10 @@ message CSIPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
   optional string fsType = 4;
+
+  // Attributes of the volume to publish.
+  // +optional
+  map<string, string> volumeAttributes = 5;
 }
 
 // Adds and removes POSIX capabilities from running containers.
