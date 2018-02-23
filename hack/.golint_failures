@@ -91,6 +91,8 @@ pkg/cloudprovider/providers/ovirt
 pkg/cloudprovider/providers/photon
 pkg/cloudprovider/providers/vsphere
 pkg/controller
+pkg/controller/apis/controllerconfig
+pkg/controller/apis/controllerconfig/v1alpha1
 pkg/controller/bootstrap
 pkg/controller/certificates
 pkg/controller/certificates/approver
