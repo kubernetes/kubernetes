@@ -5,7 +5,7 @@ metadata:
   name: restricted-psp-user
 rules:
 - apiGroups:
-  - extensions
+  - policy
   resources:
   - podsecuritypolicies
   resourceNames:
@@ -20,7 +20,7 @@ metadata:
   name: privileged-psp-user
 rules:
 - apiGroups:
-  - extensions
+  - policy
   resources:
   - podsecuritypolicies
   resourceNames:
