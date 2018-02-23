@@ -22,7 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 const (
@@ -168,7 +168,7 @@ func IsCriticalPodBasedOnPriority(ns string, priority int32) bool {
 	if ns != kubeapi.NamespaceSystem {
 		return false
 	}
-	if priority >= schedulerapi.SystemCriticalPriority {
+	if priority >= scheduling.SystemCriticalPriority {
 		return true
 	}
 	return false

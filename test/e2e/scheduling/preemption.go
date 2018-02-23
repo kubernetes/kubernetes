@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -168,7 +168,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 		// Create a critical pod and make sure it is scheduled.
 		runPausePod(f, pausePodConfig{
 			Name:              "critical-pod",
-			PriorityClassName: schedulerapi.SystemClusterCritical,
+			PriorityClassName: scheduling.SystemClusterCritical,
 			Resources: &v1.ResourceRequirements{
 				Requests: podRes,
 			},
@@ -308,6 +308,43 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			Expect(livePod.DeletionTimestamp).To(BeNil())
+		}
+	})
+})
+
+var _ = SIGDescribe("PodPriorityResolution [Serial] [Feature:PodPreemption]", func() {
+	var cs clientset.Interface
+	var ns string
+	f := framework.NewDefaultFramework("sched-pod-priority")
+
+	BeforeEach(func() {
+		cs = f.ClientSet
+		ns = f.Namespace.Name
+
+		err := framework.CheckTestingNSDeletedExcept(cs, ns)
+		framework.ExpectNoError(err)
+	})
+
+	// This test verifies that when a higher priority pod is created and no node with
+	// enough resources is found, scheduler preempts a lower priority pod to schedule
+	// the high priority pod.
+	It("validates critical system priorities are created and resolved", func() {
+		var podRes v1.ResourceList
+		// Create pods that use system critical priorities and
+		By("Create pods that use critical system priorities.")
+		systemPriorityClasses := []string{
+			scheduling.SystemNodeCritical, scheduling.SystemClusterCritical,
+		}
+		for i, spc := range systemPriorityClasses {
+			pod := createPausePod(f, pausePodConfig{
+				Name:              fmt.Sprintf("pod%d-%v", i, spc),
+				PriorityClassName: spc,
+				Resources: &v1.ResourceRequirements{
+					Requests: podRes,
+				},
+			})
+			Expect(pod.Spec.Priority).NotTo(BeNil())
+			framework.Logf("Created pod: %v", pod.Name)
 		}
 	})
 })
