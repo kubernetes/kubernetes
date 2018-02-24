@@ -32,48 +32,51 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-// EndpointInfoCommon contains common endpoint information.
-type EndpointInfoCommon struct {
+// BaseEndpointInfo contains base information that defines an endpoint.
+// This could be used directly by proxier while processing endpoints,
+// or can be used for constructing a more specific EndpointInfo struct
+// defined by the proxier if needed.
+type BaseEndpointInfo struct {
 	Endpoint string // TODO: should be an endpointString type
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
 	IsLocal bool
 }
 
-var _ Endpoint = &EndpointInfoCommon{}
+var _ Endpoint = &BaseEndpointInfo{}
 
 // String is part of proxy.Endpoint interface.
-func (info *EndpointInfoCommon) String() string {
+func (info *BaseEndpointInfo) String() string {
 	return info.Endpoint
 }
 
-// IsLocal is part of proxy.Endpoint interface.
-func (info *EndpointInfoCommon) GetIsLocal() bool {
+// GetIsLocal is part of proxy.Endpoint interface.
+func (info *BaseEndpointInfo) GetIsLocal() bool {
 	return info.IsLocal
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
-func (info *EndpointInfoCommon) IP() string {
+func (info *BaseEndpointInfo) IP() string {
 	return utilproxy.IPPart(info.Endpoint)
 }
 
 // Port returns just the Port part of the endpoint.
-func (info *EndpointInfoCommon) Port() (int, error) {
+func (info *BaseEndpointInfo) Port() (int, error) {
 	return utilproxy.PortPart(info.Endpoint)
 }
 
 // Equal is part of proxy.Endpoint interface.
-func (info *EndpointInfoCommon) Equal(other Endpoint) bool {
+func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newEndpointInfoCommon(IP string, port int, isLocal bool) *EndpointInfoCommon {
-	return &EndpointInfoCommon{
+func newBaseEndpointInfo(IP string, port int, isLocal bool) *BaseEndpointInfo {
+	return &BaseEndpointInfo{
 		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
 		IsLocal:  isLocal,
 	}
 }
 
-type customizeEndpointInfoFunc func(IP string, port int, isLocal bool, info *EndpointInfoCommon) Endpoint
+type makeEndpointFunc func(info *BaseEndpointInfo) Endpoint
 
 // EndpointChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
@@ -84,21 +87,21 @@ type EndpointChangeTracker struct {
 	hostname string
 	// items maps a service to is endpointsChange.
 	items map[types.NamespacedName]*endpointsChange
-	// customizeEndpointInfo allows proxier to inject customized infomation when processing endpoint.
-	customizeEndpointInfo customizeEndpointInfoFunc
+	// makeEndpointInfo allows proxier to inject customized information when processing endpoint.
+	makeEndpointInfo makeEndpointFunc
 	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
 	isIPv6Mode *bool
 	recorder   record.EventRecorder
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string, customizeEndpointInfo customizeEndpointInfoFunc, isIPv6Mode *bool, recorder record.EventRecorder) *EndpointChangeTracker {
+func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, isIPv6Mode *bool, recorder record.EventRecorder) *EndpointChangeTracker {
 	return &EndpointChangeTracker{
-		hostname: hostname,
-		items:    make(map[types.NamespacedName]*endpointsChange),
-		customizeEndpointInfo: customizeEndpointInfo,
-		isIPv6Mode:            isIPv6Mode,
-		recorder:              recorder,
+		hostname:         hostname,
+		items:            make(map[types.NamespacedName]*endpointsChange),
+		makeEndpointInfo: makeEndpointInfo,
+		isIPv6Mode:       isIPv6Mode,
+		recorder:         recorder,
 	}
 }
 
@@ -174,7 +177,7 @@ func UpdateEndpointsMap(endpointsMap EndpointsMap, changes *EndpointChangeTracke
 	return result
 }
 
-// EndpointsMap maps a service to one of its Endpoint.
+// EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
 
 // endpointsToEndpointsMap translates single Endpoints object to EndpointsMap.
@@ -208,6 +211,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoin
 					continue
 				}
 				// Filter out the incorrect IP version case.
+				// Any endpoint port that contains incorrect IP version will be ignored.
 				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
 					// Emit event on the corresponding service which had a different
 					// IP version than the endpoint.
@@ -215,11 +219,11 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *api.Endpoin
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				epInfoCommon := newEndpointInfoCommon(addr.IP, int(port.Port), isLocal)
-				if ect.customizeEndpointInfo != nil {
-					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.customizeEndpointInfo(addr.IP, int(port.Port), isLocal, epInfoCommon))
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal)
+				if ect.makeEndpointInfo != nil {
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {
-					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], epInfoCommon)
+					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], baseEndpointInfo)
 				}
 			}
 			if glog.V(3) {

@@ -31,8 +31,8 @@ import (
 
 const testHostname = "test-hostname"
 
-func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*ServiceInfoCommon)) *ServiceInfoCommon {
-	info := &ServiceInfoCommon{
+func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServiceInfo)) *BaseServiceInfo {
+	info := &BaseServiceInfo{
 		ClusterIP: net.ParseIP(clusterIP),
 		Port:      port,
 		Protocol:  api.Protocol(protocol),
@@ -97,13 +97,13 @@ func TestServiceToServiceMap(t *testing.T) {
 	testCases := []struct {
 		desc       string
 		service    *api.Service
-		expected   map[ServicePortName]*ServiceInfoCommon
+		expected   map[ServicePortName]*BaseServiceInfo
 		isIPv6Mode *bool
 	}{
 		{
 			desc:     "nothing",
 			service:  nil,
-			expected: map[ServicePortName]*ServiceInfoCommon{},
+			expected: map[ServicePortName]*BaseServiceInfo{},
 		},
 		{
 			desc: "headless service",
@@ -112,7 +112,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.ClusterIP = api.ClusterIPNone
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "rpc", "UDP", 1234, 0, 0)
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{},
+			expected: map[ServicePortName]*BaseServiceInfo{},
 		},
 		{
 			desc: "headless service without port",
@@ -120,7 +120,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Type = api.ServiceTypeClusterIP
 				svc.Spec.ClusterIP = api.ClusterIPNone
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{},
+			expected: map[ServicePortName]*BaseServiceInfo{},
 		},
 		{
 			desc: "cluster ip service",
@@ -130,7 +130,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p2", "UDP", 1235, 5321, 0)
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{
+			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns2", "cluster-ip", "p1"): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0),
 				makeServicePortName("ns2", "cluster-ip", "p2"): makeTestServiceInfo("172.16.55.4", 1235, "UDP", 0),
 			},
@@ -143,7 +143,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port1", "UDP", 345, 678, 0)
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port2", "TCP", 344, 677, 0)
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{
+			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns2", "node-port", "port1"): makeTestServiceInfo("172.16.55.10", 345, "UDP", 0),
 				makeServicePortName("ns2", "node-port", "port2"): makeTestServiceInfo("172.16.55.10", 344, "TCP", 0),
 			},
@@ -162,7 +162,7 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{
+			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns1", "load-balancer", "port3"): makeTestServiceInfo("172.16.55.11", 8675, "UDP", 0),
 				makeServicePortName("ns1", "load-balancer", "port4"): makeTestServiceInfo("172.16.55.11", 8676, "UDP", 0),
 			},
@@ -183,7 +183,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
 				svc.Spec.HealthCheckNodePort = 345
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{
+			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns1", "only-local-load-balancer", "portx"): makeTestServiceInfo("172.16.55.12", 8677, "UDP", 345),
 				makeServicePortName("ns1", "only-local-load-balancer", "porty"): makeTestServiceInfo("172.16.55.12", 8678, "UDP", 345),
 			},
@@ -196,7 +196,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				svc.Spec.ExternalName = "foo2.bar.com"
 				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "portz", "UDP", 1235, 5321, 0)
 			}),
-			expected: map[ServicePortName]*ServiceInfoCommon{},
+			expected: map[ServicePortName]*BaseServiceInfo{},
 		},
 		{
 			desc: "service with ipv6 clusterIP under ipv4 mode, service should be filtered",
@@ -258,8 +258,8 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*ServiceInfoCommon{
-				makeServicePortName("test", "validIPv4", "testPort"): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *ServiceInfoCommon) {
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("test", "validIPv4", "testPort"): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
 					info.ExternalIPs = []string{testExternalIPv4}
 					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv4}
 				}),
@@ -286,8 +286,8 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*ServiceInfoCommon{
-				makeServicePortName("test", "validIPv6", "testPort"): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *ServiceInfoCommon) {
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("test", "validIPv6", "testPort"): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *BaseServiceInfo) {
 					info.ExternalIPs = []string{testExternalIPv6}
 					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv6}
 				}),
@@ -314,8 +314,8 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*ServiceInfoCommon{
-				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort"): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *ServiceInfoCommon) {
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort"): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
 					info.ExternalIPs = []string{testExternalIPv4}
 					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv4}
 				}),
@@ -342,8 +342,8 @@ func TestServiceToServiceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[ServicePortName]*ServiceInfoCommon{
-				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort"): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *ServiceInfoCommon) {
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort"): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *BaseServiceInfo) {
 					info.ExternalIPs = []string{testExternalIPv6}
 					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv6}
 				}),
@@ -361,7 +361,7 @@ func TestServiceToServiceMap(t *testing.T) {
 			t.Errorf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newServices), spew.Sdump(newServices))
 		}
 		for svcKey, expectedInfo := range tc.expected {
-			svcInfo := newServices[svcKey].(*ServiceInfoCommon)
+			svcInfo := newServices[svcKey].(*BaseServiceInfo)
 			if !svcInfo.ClusterIP.Equal(expectedInfo.ClusterIP) ||
 				svcInfo.Port != expectedInfo.Port ||
 				svcInfo.Protocol != expectedInfo.Protocol ||

@@ -48,8 +48,8 @@ func (spn ServicePortName) String() string {
 type ServicePort interface {
 	// String returns service string.  An example format can be: `IP:Port/Protocol`.
 	String() string
-	// GetClusterIP returns service cluster IP.
-	GetClusterIP() string
+	// ClusterIPString returns service cluster IP in string format.
+	ClusterIPString() string
 	// GetProtocol returns service protocol.
 	GetProtocol() api.Protocol
 	// GetHealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.

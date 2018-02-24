@@ -35,8 +35,11 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-// ServiceInfoCommon contains common service information.
-type ServiceInfoCommon struct {
+// BaseServiceInfo contains base information that defines a service.
+// This could be used directly by proxier while processing services,
+// or can be used for constructing a more specific ServiceInfo struct
+// defined by the proxier if needed.
+type BaseServiceInfo struct {
 	ClusterIP                net.IP
 	Port                     int
 	Protocol                 api.Protocol
@@ -50,29 +53,29 @@ type ServiceInfoCommon struct {
 	OnlyNodeLocalEndpoints   bool
 }
 
-var _ ServicePort = &ServiceInfoCommon{}
+var _ ServicePort = &BaseServiceInfo{}
 
 // String is part of ServicePort interface.
-func (info *ServiceInfoCommon) String() string {
+func (info *BaseServiceInfo) String() string {
 	return fmt.Sprintf("%s:%d/%s", info.ClusterIP, info.Port, info.Protocol)
 }
 
-// GetClusterIP is part of ServicePort interface.
-func (info *ServiceInfoCommon) GetClusterIP() string {
+// ClusterIPString is part of ServicePort interface.
+func (info *BaseServiceInfo) ClusterIPString() string {
 	return info.ClusterIP.String()
 }
 
 // GetProtocol is part of ServicePort interface.
-func (info *ServiceInfoCommon) GetProtocol() api.Protocol {
+func (info *BaseServiceInfo) GetProtocol() api.Protocol {
 	return info.Protocol
 }
 
 // GetHealthCheckNodePort is part of ServicePort interface.
-func (info *ServiceInfoCommon) GetHealthCheckNodePort() int {
+func (info *BaseServiceInfo) GetHealthCheckNodePort() int {
 	return info.HealthCheckNodePort
 }
 
-func (sct *ServiceChangeTracker) newServiceInfoCommon(port *api.ServicePort, service *api.Service) *ServiceInfoCommon {
+func (sct *ServiceChangeTracker) newBaseServiceInfo(port *api.ServicePort, service *api.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
@@ -82,7 +85,7 @@ func (sct *ServiceChangeTracker) newServiceInfoCommon(port *api.ServicePort, ser
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
-	info := &ServiceInfoCommon{
+	info := &BaseServiceInfo{
 		ClusterIP: net.ParseIP(service.Spec.ClusterIP),
 		Port:      int(port.Port),
 		Protocol:  port.Protocol,
@@ -101,6 +104,8 @@ func (sct *ServiceChangeTracker) newServiceInfoCommon(port *api.ServicePort, ser
 		copy(info.ExternalIPs, service.Spec.ExternalIPs)
 	} else {
 		// Filter out the incorrect IP version case.
+		// If ExternalIPs and LoadBalancerSourceRanges on service contains incorrect IP versions,
+		// only filter out the incorrect ones.
 		var incorrectIPs []string
 		info.ExternalIPs, incorrectIPs = utilnet.FilterIncorrectIPVersion(service.Spec.ExternalIPs, *sct.isIPv6Mode)
 		if len(incorrectIPs) > 0 {
@@ -124,7 +129,7 @@ func (sct *ServiceChangeTracker) newServiceInfoCommon(port *api.ServicePort, ser
 	return info
 }
 
-type customizeServiceInfoFunc func(*api.ServicePort, *api.Service, *ServiceInfoCommon) ServicePort
+type makeServicePortFunc func(*api.ServicePort, *api.Service, *BaseServiceInfo) ServicePort
 
 // serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
 // changes are accumulated, i.e. previous is state from before applying the changes,
@@ -141,20 +146,20 @@ type ServiceChangeTracker struct {
 	lock sync.Mutex
 	// items maps a service to its serviceChange.
 	items map[types.NamespacedName]*serviceChange
-	// customizeServiceInfo allows proxier to inject customized infomation when processing service.
-	customizeServiceInfo customizeServiceInfoFunc
+	// makeServiceInfo allows proxier to inject customized information when processing service.
+	makeServiceInfo makeServicePortFunc
 	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
 	isIPv6Mode *bool
 	recorder   record.EventRecorder
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
-func NewServiceChangeTracker(customizeServiceInfo customizeServiceInfoFunc, isIPv6Mode *bool, recorder record.EventRecorder) *ServiceChangeTracker {
+func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, isIPv6Mode *bool, recorder record.EventRecorder) *ServiceChangeTracker {
 	return &ServiceChangeTracker{
-		items:                make(map[types.NamespacedName]*serviceChange),
-		customizeServiceInfo: customizeServiceInfo,
-		isIPv6Mode:           isIPv6Mode,
-		recorder:             recorder,
+		items:           make(map[types.NamespacedName]*serviceChange),
+		makeServiceInfo: makeServiceInfo,
+		isIPv6Mode:      isIPv6Mode,
+		recorder:        recorder,
 	}
 }
 
@@ -238,6 +243,7 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *api.Service) Servi
 
 	if len(service.Spec.ClusterIP) != 0 {
 		// Filter out the incorrect IP version case.
+		// If ClusterIP on service has incorrect IP version, service itself will be ignored.
 		if sct.isIPv6Mode != nil && utilnet.IsIPv6String(service.Spec.ClusterIP) != *sct.isIPv6Mode {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "clusterIP", service.Spec.ClusterIP, service.Namespace, service.Name, service.UID)
 			return nil
@@ -248,11 +254,11 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *api.Service) Servi
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
-		svcInfoCommon := sct.newServiceInfoCommon(servicePort, service)
-		if sct.customizeServiceInfo != nil {
-			serviceMap[svcPortName] = sct.customizeServiceInfo(servicePort, service, svcInfoCommon)
+		baseSvcInfo := sct.newBaseServiceInfo(servicePort, service)
+		if sct.makeServiceInfo != nil {
+			serviceMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
 		} else {
-			serviceMap[svcPortName] = svcInfoCommon
+			serviceMap[svcPortName] = baseSvcInfo
 		}
 	}
 	return serviceMap
@@ -328,7 +334,7 @@ func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
 		if exists {
 			glog.V(1).Infof("Removing service port %q", svcPortName)
 			if info.GetProtocol() == api.ProtocolUDP {
-				UDPStaleClusterIP.Insert(info.GetClusterIP())
+				UDPStaleClusterIP.Insert(info.ClusterIPString())
 			}
 			delete(*sm, svcPortName)
 		} else {

@@ -52,7 +52,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		// Case[1]: unnamed port
 		endpointsMap: EndpointsMap{
 			makeServicePortName("ns1", "ep1", ""): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "1.1.1.1:11", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{},
@@ -60,7 +60,7 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		// Case[2]: unnamed port local
 		endpointsMap: EndpointsMap{
 			makeServicePortName("ns1", "ep1", ""): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "1.1.1.1:11", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{
@@ -70,12 +70,12 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		// Case[3]: named local and non-local ports for the same IP.
 		endpointsMap: EndpointsMap{
 			makeServicePortName("ns1", "ep1", "p11"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "1.1.1.1:11", IsLocal: false},
-				&EndpointInfoCommon{Endpoint: "1.1.1.2:11", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "1.1.1.2:11", IsLocal: true},
 			},
 			makeServicePortName("ns1", "ep1", "p12"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "1.1.1.1:12", IsLocal: false},
-				&EndpointInfoCommon{Endpoint: "1.1.1.2:12", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:12", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{
@@ -85,21 +85,21 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 		// Case[4]: named local and non-local ports for different IPs.
 		endpointsMap: EndpointsMap{
 			makeServicePortName("ns1", "ep1", "p11"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "1.1.1.1:11", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 			makeServicePortName("ns2", "ep2", "p22"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "2.2.2.2:22", IsLocal: true},
-				&EndpointInfoCommon{Endpoint: "2.2.2.22:22", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "2.2.2.22:22", IsLocal: true},
 			},
 			makeServicePortName("ns2", "ep2", "p23"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "2.2.2.3:23", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "2.2.2.3:23", IsLocal: true},
 			},
 			makeServicePortName("ns4", "ep4", "p44"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "4.4.4.4:44", IsLocal: true},
-				&EndpointInfoCommon{Endpoint: "4.4.4.5:44", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "4.4.4.4:44", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "4.4.4.5:44", IsLocal: false},
 			},
 			makeServicePortName("ns4", "ep4", "p45"): []Endpoint{
-				&EndpointInfoCommon{Endpoint: "4.4.4.6:45", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true},
 			},
 		},
 		expected: map[types.NamespacedName]sets.String{
@@ -139,13 +139,13 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 	testCases := []struct {
 		desc         string
 		newEndpoints *api.Endpoints
-		expected     map[ServicePortName][]*EndpointInfoCommon
+		expected     map[ServicePortName][]*BaseEndpointInfo
 		isIPv6Mode   *bool
 	}{
 		{
 			desc:         "nothing",
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-			expected:     map[ServicePortName][]*EndpointInfoCommon{},
+			expected:     map[ServicePortName][]*BaseEndpointInfo{},
 		},
 		{
 			desc: "no changes, unnamed port",
@@ -162,7 +162,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", ""): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
@@ -183,7 +183,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "port"): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
@@ -203,7 +203,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", ""): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
@@ -212,7 +212,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 		{
 			desc:         "remove port",
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *api.Endpoints) {}),
-			expected:     map[ServicePortName][]*EndpointInfoCommon{},
+			expected:     map[ServicePortName][]*BaseEndpointInfo{},
 		},
 		{
 			desc: "new IP and port",
@@ -234,7 +234,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1"): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 					{Endpoint: "2.2.2.2:11", IsLocal: false},
@@ -260,7 +260,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1"): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
@@ -281,7 +281,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p2"): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
@@ -302,7 +302,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1"): {
 					{Endpoint: "1.1.1.1:22", IsLocal: false},
 				},
@@ -328,7 +328,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1"): {
 					{Endpoint: "1.1.1.1:11", IsLocal: false},
 				},
@@ -358,7 +358,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					},
 				}
 			}),
-			expected: map[ServicePortName][]*EndpointInfoCommon{
+			expected: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "ep1", "p1"): {
 					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:11", IsLocal: false},
 				},
@@ -383,7 +383,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 				t.Errorf("[%s] expected %d endpoints for %v, got %d", tc.desc, len(tc.expected[x]), x, len(newEndpoints[x]))
 			} else {
 				for i := range newEndpoints[x] {
-					ep := newEndpoints[x][i].(*EndpointInfoCommon)
+					ep := newEndpoints[x][i].(*BaseEndpointInfo)
 					if *ep != *(tc.expected[x][i]) {
 						t.Errorf("[%s] expected new[%v][%d] to be %v, got %v", tc.desc, x, i, tc.expected[x][i], *ep)
 					}
@@ -705,15 +705,15 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		// or non-nil) and must be of equal length.
 		previousEndpoints         []*api.Endpoints
 		currentEndpoints          []*api.Endpoints
-		oldEndpoints              map[ServicePortName][]*EndpointInfoCommon
-		expectedResult            map[ServicePortName][]*EndpointInfoCommon
+		oldEndpoints              map[ServicePortName][]*BaseEndpointInfo
+		expectedResult            map[ServicePortName][]*BaseEndpointInfo
 		expectedStaleEndpoints    []ServiceEndpoint
 		expectedStaleServiceNames map[ServicePortName]bool
 		expectedHealthchecks      map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
-		oldEndpoints:              map[ServicePortName][]*EndpointInfoCommon{},
-		expectedResult:            map[ServicePortName][]*EndpointInfoCommon{},
+		oldEndpoints:              map[ServicePortName][]*BaseEndpointInfo{},
+		expectedResult:            map[ServicePortName][]*BaseEndpointInfo{},
 		expectedStaleEndpoints:    []ServiceEndpoint{},
 		expectedStaleServiceNames: map[ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
@@ -725,12 +725,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", unnamedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -746,12 +746,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPortLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
@@ -769,7 +769,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsets),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -777,7 +777,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.2:12", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -796,7 +796,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
@@ -807,7 +807,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.3:13", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
@@ -833,7 +833,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsIPsPorts1),
 			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
@@ -859,7 +859,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "2.2.2.2:22", IsLocal: true},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
@@ -899,8 +899,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", unnamedPortLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
@@ -920,12 +920,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			nil,
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{},
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{},
 		expectedStaleEndpoints: []ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
 			ServicePortName: makeServicePortName("ns1", "ep1", ""),
@@ -940,12 +940,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
@@ -970,7 +970,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
@@ -980,7 +980,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1005,12 +1005,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsWithLocal),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1033,7 +1033,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1041,7 +1041,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "1.1.1.2:12", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1060,12 +1060,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPortRenamed),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11-2"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1086,12 +1086,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", namedPortRenumbered),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:22", IsLocal: false},
 			},
@@ -1116,7 +1116,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns3", "ep3", complexAfter3),
 			makeTestEndpoints("ns4", "ep4", complexAfter4),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1135,7 +1135,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				{Endpoint: "4.4.4.6:45", IsLocal: true},
 			},
 		},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11"): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.11:11", IsLocal: false},
@@ -1185,8 +1185,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		currentEndpoints: []*api.Endpoints{
 			makeTestEndpoints("ns1", "ep1", unnamedPort),
 		},
-		oldEndpoints: map[ServicePortName][]*EndpointInfoCommon{},
-		expectedResult: map[ServicePortName][]*EndpointInfoCommon{
+		oldEndpoints: map[ServicePortName][]*BaseEndpointInfo{},
+		expectedResult: map[ServicePortName][]*BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", ""): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
@@ -1268,7 +1268,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	}
 }
 
-func compareEndpointsMaps(t *testing.T, tci int, newMap EndpointsMap, expected map[ServicePortName][]*EndpointInfoCommon) {
+func compareEndpointsMaps(t *testing.T, tci int, newMap EndpointsMap, expected map[ServicePortName][]*BaseEndpointInfo) {
 	if len(newMap) != len(expected) {
 		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
 	}
@@ -1277,7 +1277,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap EndpointsMap, expected m
 			t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(expected[x]), x, len(newMap[x]))
 		} else {
 			for i := range expected[x] {
-				newEp, ok := newMap[x][i].(*EndpointInfoCommon)
+				newEp, ok := newMap[x][i].(*BaseEndpointInfo)
 				if !ok {
 					t.Errorf("Failed to cast endpointsInfo")
 					continue

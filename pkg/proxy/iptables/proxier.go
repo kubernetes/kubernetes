@@ -140,7 +140,7 @@ const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
 // internal struct for string service information
 type serviceInfo struct {
-	*proxy.ServiceInfoCommon
+	*proxy.BaseServiceInfo
 	// The following fields are computed and stored for performance reasons.
 	serviceNameString        string
 	servicePortChainName     utiliptables.Chain
@@ -149,8 +149,8 @@ type serviceInfo struct {
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func customizeServiceInfo(port *api.ServicePort, service *api.Service, infoCommon *proxy.ServiceInfoCommon) proxy.ServicePort {
-	info := &serviceInfo{ServiceInfoCommon: infoCommon}
+func newServiceInfo(port *api.ServicePort, service *api.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
+	info := &serviceInfo{BaseServiceInfo: baseInfo}
 
 	// Store the following for performance reasons.
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
@@ -166,7 +166,7 @@ func customizeServiceInfo(port *api.ServicePort, service *api.Service, infoCommo
 
 // internal struct for endpoints information
 type endpointsInfo struct {
-	*proxy.EndpointInfoCommon
+	*proxy.BaseEndpointInfo
 	// The following fields we lazily compute and store here for performance
 	// reasons. If the protocol is the same as you expect it to be, then the
 	// chainName can be reused, otherwise it should be recomputed.
@@ -175,11 +175,11 @@ type endpointsInfo struct {
 }
 
 // returns a new proxy.Endpoint which abstracts a endpointsInfo
-func customizeEndpointInfo(IP string, port int, isLocal bool, infoCommon *proxy.EndpointInfoCommon) proxy.Endpoint {
-	return &endpointsInfo{EndpointInfoCommon: infoCommon}
+func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.Endpoint {
+	return &endpointsInfo{BaseEndpointInfo: baseInfo}
 }
 
-// Equal overrides the Equal() function imlemented by proxy.EndpointInfoCommon.
+// Equal overrides the Equal() function imlemented by proxy.BaseEndpointInfo.
 func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	o, ok := other.(*endpointsInfo)
 	if !ok {
@@ -319,9 +319,9 @@ func NewProxier(ipt utiliptables.Interface,
 	proxier := &Proxier{
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:               make(proxy.ServiceMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(customizeServiceInfo, &isIPv6, recorder),
+		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, customizeEndpointInfo, &isIPv6, recorder),
+		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder),
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
@@ -502,9 +502,7 @@ func (proxier *Proxier) isInitialized() bool {
 }
 
 func (proxier *Proxier) OnServiceAdd(service *api.Service) {
-	if proxier.serviceChanges.Update(nil, service) && proxier.isInitialized() {
-		proxier.syncRunner.Run()
-	}
+	proxier.OnServiceUpdate(nil, service)
 }
 
 func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
@@ -514,9 +512,8 @@ func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
 }
 
 func (proxier *Proxier) OnServiceDelete(service *api.Service) {
-	if proxier.serviceChanges.Update(service, nil) && proxier.isInitialized() {
-		proxier.syncRunner.Run()
-	}
+	proxier.OnServiceUpdate(service, nil)
+
 }
 
 func (proxier *Proxier) OnServiceSynced() {
@@ -530,9 +527,7 @@ func (proxier *Proxier) OnServiceSynced() {
 }
 
 func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
-	if proxier.endpointsChanges.Update(nil, endpoints) && proxier.isInitialized() {
-		proxier.syncRunner.Run()
-	}
+	proxier.OnEndpointsUpdate(nil, endpoints)
 }
 
 func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
@@ -542,9 +537,7 @@ func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints
 }
 
 func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
-	if proxier.endpointsChanges.Update(endpoints, nil) && proxier.isInitialized() {
-		proxier.syncRunner.Run()
-	}
+	proxier.OnEndpointsUpdate(endpoints, nil)
 }
 
 func (proxier *Proxier) OnEndpointsSynced() {
@@ -605,7 +598,7 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	for _, epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && svcInfo.GetProtocol() == api.ProtocolUDP {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
-			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.GetClusterIP(), endpointIP, v1.ProtocolUDP)
+			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIPString(), endpointIP, v1.ProtocolUDP)
 			if err != nil {
 				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}
@@ -641,8 +634,8 @@ func (proxier *Proxier) syncProxyRules() {
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == api.ProtocolUDP {
-			glog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.GetClusterIP())
-			staleServices.Insert(svcInfo.GetClusterIP())
+			glog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
+			staleServices.Insert(svcInfo.ClusterIPString())
 		}
 	}
 
