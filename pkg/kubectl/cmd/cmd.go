@@ -165,6 +165,92 @@ __kubectl_require_pod_and_container()
     return 0
 }
 
+# Complete remote files with kubectl exec for kubectl cp
+__kubectl_cp_remote_files()
+{
+    # remove backslash escape from the first colon
+    cur=${cur/\\:/:}
+
+    local namespacepod="${cur%%?(\\):*}"
+    local pathname=${cur#*:}
+
+    local pathname_esc='[][(){}<>",:;^&!$=?` + "`" + `|\\'"'"'[:space:]]'
+
+    # unescape
+    pathname=$(sed -e 's/\\\\\\\('$pathname_esc'\)/\\\1/g' <<<"$pathname")
+
+    local namespace pod
+    if [[ "$namespacepod" == */* ]]; then
+        namespace="${namespacepod%%/*}"
+        pod="${namespacepod#*/}"
+    else
+        pod="${namespacepod}"
+    fi
+
+    local kubectl_flags
+    if [[ -n "$namespace" ]]; then
+        kubectl_flags="--namespace=$namespace"
+    fi
+
+    local kubectl_out
+    if kubectl_out=$(kubectl $(__kubectl_override_flags) $kubectl_flags exec $pod -- sh -c "ls -aF1dL ${pathname}*" 2>/dev/null | sed -e 's/'$pathname_esc'/\\\\&/g' -e 's/[*@|=]$//g'); then
+        local IFS=$'\n'
+        COMPREPLY=( $(compgen -W "${kubectl_out[*]}" -- ${cur#*:}) )
+
+        if [ -n "${ZSH_VERSION}" ]; then
+            # zsh completion needs [<namespace>/]<pod-name>: prefix
+            COMPREPLY=( "${COMPREPLY[@]/#/${namespacepod}:}" )
+        fi
+    fi
+}
+
+# Complete <namespace>/<pod-name> for kubectl cp
+__kubectl_cp_namespacepods()
+{
+    local namespace="${cur%%/*}"
+    local pod="${cur#*/}"
+
+    local template="{{ range .items }}{{.metadata.namespace}}/{{.metadata.name}}: {{ end }}"
+    local kubectl_out
+    if kubectl_out=$(kubectl $(__kubectl_override_flags) --namespace="${namespace}" get pods -o template --template "${template}" 2>/dev/null); then
+        COMPREPLY=( $(compgen -W "${kubectl_out[*]}" -- $cur) )
+    fi
+}
+
+# Complete namespaces and pods for kubectl cp
+__kubectl_cp_namespaces_and_pods()
+{
+    local template kubectl_out
+
+    template="{{ range .items }}{{.metadata.name}}/ {{ end }}"
+    if kubectl_out=$(kubectl $(__kubectl_override_flags) get namespaces -o template --template "${template}" 2>/dev/null); then
+        COMPREPLY+=( $(compgen -W "${kubectl_out[*]}" -- $cur) )
+    fi
+
+    template="{{ range .items }}{{.metadata.name}}: {{ end }}"
+    if kubectl_out=$(kubectl $(__kubectl_override_flags) get pods -o template --template "${template}" 2>/dev/null); then
+        COMPREPLY+=( $(compgen -W "${kubectl_out[*]}" -- $cur) )
+    fi
+}
+
+__kubectl_cp()
+{
+    local cur
+    _get_comp_words_by_ref -n : cur
+
+    if [[ $(type -t compopt) = "builtin" ]]; then
+        compopt -o nospace
+    fi
+
+    case $cur in
+        /*|[.~]*) _filedir ;; # looks like a path
+        *:*) __kubectl_cp_remote_files ;;
+        */*) __kubectl_cp_namespacepods; _filedir ;;
+        *) __kubectl_cp_namespaces_and_pods; _filedir ;;
+    esac
+}
+
+
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
@@ -194,6 +280,10 @@ __custom_func() {
             ;;
         kubectl_config_delete-cluster)
             __kubectl_config_get_clusters
+            return
+            ;;
+        kubectl_cp)
+            __kubectl_cp
             return
             ;;
         *)
