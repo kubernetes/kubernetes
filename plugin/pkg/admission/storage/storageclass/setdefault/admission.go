@@ -35,6 +35,7 @@ import (
 )
 
 const (
+	// PluginName is the name of this admission controller plugin
 	PluginName = "DefaultStorageClass"
 )
 
@@ -84,16 +85,16 @@ func (a *claimDefaulterPlugin) ValidateInitialization() error {
 // 1.  Find available StorageClasses.
 // 2.  Figure which is the default
 // 3.  Write to the PVClaim
-func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
-	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
+func (a *claimDefaulterPlugin) Admit(attr admission.Attributes) error {
+	if attr.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}
 
-	if len(a.GetSubresource()) != 0 {
+	if len(attr.GetSubresource()) != 0 {
 		return nil
 	}
 
-	pvc, ok := a.GetObject().(*api.PersistentVolumeClaim)
+	pvc, ok := attr.GetObject().(*api.PersistentVolumeClaim)
 	// if we can't convert then we don't handle this object so just return
 	if !ok {
 		return nil
@@ -106,9 +107,9 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 
 	glog.V(4).Infof("no storage class for claim %s (generate: %s)", pvc.Name, pvc.GenerateName)
 
-	def, err := getDefaultClass(c.lister)
+	def, err := getDefaultClass(a.lister)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return admission.NewForbidden(attr, err)
 	}
 	if def == nil {
 		// No default class selected, do nothing about the PVC.
