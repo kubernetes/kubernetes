@@ -41,11 +41,13 @@ const (
 	diskPartitionSuffix  = "-part"
 	diskSDPath           = "/dev/sd"
 	diskSDPattern        = "/dev/sd*"
-	regionalPDZonesAuto  = "auto" // "replica-zones: auto" means Kubernetes will select zones for RePD
-	maxChecks            = 60
 	maxRetries           = 10
 	checkSleepDuration   = time.Second
 	maxRegionalPDZones   = 2
+
+	// Replication type constants must be lower case.
+	replicationTypeNone       = "none"
+	replicationTypeRegionalPD = "regional-pd"
 )
 
 // These variables are modified only in unit tests and should be constant
@@ -85,15 +87,16 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	// GCE PDs are allocated in chunks of GBs (not GiBs)
 	requestGB := volume.RoundUpToGB(capacity)
 
-	// Apply Parameters (case-insensitive). We leave validation of
-	// the values to the cloud provider.
+	// Apply Parameters.
+	// Values for parameter "replication-type" are canonicalized to lower case.
+	// Values for other parameters are case-insensitive, and we leave validation of these values
+	// to the cloud provider.
 	diskType := ""
 	configuredZone := ""
 	configuredZones := ""
-	configuredReplicaZones := ""
 	zonePresent := false
 	zonesPresent := false
-	replicaZonesPresent := false
+	replicationType := replicationTypeNone
 	fstype := ""
 	for k, v := range c.options.Parameters {
 		switch strings.ToLower(k) {
@@ -105,9 +108,8 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		case "zones":
 			zonesPresent = true
 			configuredZones = v
-		case "replica-zones":
-			replicaZonesPresent = true
-			configuredReplicaZones = v
+		case "replication-type":
+			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
 			fstype = v
 		default:
@@ -115,10 +117,14 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		}
 	}
 
-	if ((zonePresent || zonesPresent) && replicaZonesPresent) ||
-		(zonePresent && zonesPresent) {
-		// 011, 101, 111, 110
-		return "", 0, nil, "", fmt.Errorf("a combination of zone, zones, and replica-zones StorageClass parameters must not be used at the same time")
+	if zonePresent && zonesPresent {
+		return "", 0, nil, "", fmt.Errorf("the 'zone' and 'zones' StorageClass parameters must not be used at the same time")
+	}
+
+	if replicationType == replicationTypeRegionalPD && zonePresent {
+		// If a user accidentally types 'zone' instead of 'zones', we want to throw an error
+		// instead of assuming that 'zones' is empty and proceed by randomly selecting zones.
+		return "", 0, nil, "", fmt.Errorf("the '%s' replication type does not support the 'zone' parameter; use 'zones' instead", replicationTypeRegionalPD)
 	}
 
 	// TODO: implement PVC.Selector parsing
@@ -126,18 +132,13 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		return "", 0, nil, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on GCE")
 	}
 
-	if !zonePresent && !zonesPresent && replicaZonesPresent {
-		// 001 - "replica-zones" specified
-		replicaZones, err := volumeutil.ZonesToSet(configuredReplicaZones)
-		if err != nil {
-			return "", 0, nil, "", err
-		}
-
+	switch replicationType {
+	case replicationTypeRegionalPD:
 		err = createRegionalPD(
 			name,
 			c.options.PVC.Name,
 			diskType,
-			replicaZones,
+			configuredZones,
 			requestGB,
 			c.options.CloudTags,
 			cloud)
@@ -147,10 +148,11 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		}
 
 		glog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
-	} else {
+
+	case replicationTypeNone:
 		var zones sets.String
 		if !zonePresent && !zonesPresent {
-			// 000 - neither "zone", "zones", or "replica-zones" specified
+			// 00 - neither "zone" or "zones" specified
 			// Pick a zone randomly selected from all active zones where
 			// Kubernetes cluster has a node.
 			zones, err = cloud.GetAllCurrentZones()
@@ -159,13 +161,13 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 				return "", 0, nil, "", err
 			}
 		} else if !zonePresent && zonesPresent {
-			// 010 - "zones" specified
+			// 01 - "zones" specified
 			// Pick a zone randomly selected from specified set.
 			if zones, err = volumeutil.ZonesToSet(configuredZones); err != nil {
 				return "", 0, nil, "", err
 			}
 		} else if zonePresent && !zonesPresent {
-			// 100 - "zone" specified
+			// 10 - "zone" specified
 			// Use specified zone
 			if err := volume.ValidateZone(configuredZone); err != nil {
 				return "", 0, nil, "", err
@@ -186,6 +188,9 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		}
 
 		glog.V(2).Infof("Successfully created single-zone GCE PD volume %s", name)
+
+	default:
+		return "", 0, nil, "", fmt.Errorf("replication-type of '%s' is not supported", replicationType)
 	}
 
 	labels, err := cloud.GetAutoLabelsForPD(name, "" /* zone */)
@@ -202,32 +207,41 @@ func createRegionalPD(
 	diskName string,
 	pvcName string,
 	diskType string,
-	replicaZones sets.String,
+	zonesString string,
 	requestGB int64,
 	cloudTags *map[string]string,
 	cloud *gcecloud.GCECloud) error {
 
-	autoZoneSelection := false
-	if replicaZones.Len() != maxRegionalPDZones {
-		replicaZonesList := replicaZones.UnsortedList()
-		if replicaZones.Len() == 1 && replicaZonesList[0] == regionalPDZonesAuto {
-			// User requested automatic zone selection.
-			autoZoneSelection = true
-		} else {
-			return fmt.Errorf(
-				"replica-zones specifies %d zones. It must specify %d zones or the keyword \"auto\" to let Kubernetes select zones.",
-				replicaZones.Len(),
-				maxRegionalPDZones)
+	var replicaZones sets.String
+	var err error
+
+	if zonesString == "" {
+		// Consider all zones
+		replicaZones, err = cloud.GetAllCurrentZones()
+		if err != nil {
+			glog.V(2).Infof("error getting zone information from GCE: %v", err)
+			return err
+		}
+	} else {
+		replicaZones, err = volumeutil.ZonesToSet(zonesString)
+		if err != nil {
+			return err
 		}
 	}
 
-	selectedReplicaZones := replicaZones
-	if autoZoneSelection {
+	zoneCount := replicaZones.Len()
+	var selectedReplicaZones sets.String
+	if zoneCount < maxRegionalPDZones {
+		return fmt.Errorf("cannot specify only %d zone(s) for Regional PDs.", zoneCount)
+	} else if zoneCount == maxRegionalPDZones {
+		selectedReplicaZones = replicaZones
+	} else {
+		// Must randomly select zones
 		selectedReplicaZones = volume.ChooseZonesForVolume(
 			replicaZones, pvcName, maxRegionalPDZones)
 	}
 
-	if err := cloud.CreateRegionalDisk(
+	if err = cloud.CreateRegionalDisk(
 		diskName,
 		diskType,
 		selectedReplicaZones,
