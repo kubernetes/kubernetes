@@ -434,68 +434,68 @@
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/auth",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/certdb",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/config",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/crypto/pkcs7",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/csr",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/errors",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/helpers",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/helpers/derhelpers",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/info",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/log",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/ocsp/config",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/signer",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/cloudflare/cfssl/signer/local",
-			"Comment": "1.2.0",
-			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+			"Comment": "1.3.1",
+			"Rev": "4e2dcbde500472449917533851bf4bae9bdff562"
 		},
 		{
 			"ImportPath": "github.com/clusterhq/flocker-go",
@@ -1757,24 +1757,36 @@
 			"Rev": "74cdd4597b07203ae9e268fc59f96f66f8afdc11"
 		},
 		{
-			"ImportPath": "github.com/google/certificate-transparency/go",
-			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+			"ImportPath": "github.com/google/certificate-transparency-go",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
-			"ImportPath": "github.com/google/certificate-transparency/go/asn1",
-			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+			"ImportPath": "github.com/google/certificate-transparency-go/asn1",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
-			"ImportPath": "github.com/google/certificate-transparency/go/client",
-			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+			"ImportPath": "github.com/google/certificate-transparency-go/client",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
-			"ImportPath": "github.com/google/certificate-transparency/go/x509",
-			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+			"ImportPath": "github.com/google/certificate-transparency-go/client/configpb",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
-			"ImportPath": "github.com/google/certificate-transparency/go/x509/pkix",
-			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+			"ImportPath": "github.com/google/certificate-transparency-go/jsonclient",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency-go/tls",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency-go/x509",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency-go/x509/pkix",
+			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
@@ -2032,7 +2044,6 @@
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
-			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
@@ -2203,10 +2214,6 @@
 		{
 			"ImportPath": "github.com/mohae/deepcopy",
 			"Rev": "491d3605edfb866af34a48075bd4355ac1bf46ca"
-		},
-		{
-			"ImportPath": "github.com/mreiferson/go-httpclient",
-			"Rev": "31f0106b4474f14bc441575c19d3a5fa21aa1f6c"
 		},
 		{
 			"ImportPath": "github.com/mrunalp/fileutils",
@@ -2528,6 +2535,10 @@
 		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Rev": "ca53cad383cad2479bbba7f7a1a05797ec1386e4"
+		},
+		{
+			"ImportPath": "github.com/pelletier/go-buffruneio",
+			"Rev": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d"
 		},
 		{
 			"ImportPath": "github.com/pelletier/go-toml",
@@ -2876,7 +2887,6 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
-			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{
@@ -2890,51 +2900,67 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/blowfish",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/cryptobyte",
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/cryptobyte/asn1",
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/curve25519",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ed25519",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ed25519/internal/edwards25519",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/internal/chacha20",
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/nacl/secretbox",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ocsp",
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pkcs12",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pkcs12/internal/rc2",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/poly1305",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/exp/inotify",

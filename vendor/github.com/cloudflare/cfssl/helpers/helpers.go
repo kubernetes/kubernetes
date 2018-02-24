@@ -6,13 +6,23 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/binary"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"io"
 	"io/ioutil"
-	"math/big"
+	"os"
+
+	"github.com/google/certificate-transparency-go"
+	cttls "github.com/google/certificate-transparency-go/tls"
+	"golang.org/x/crypto/ocsp"
 
 	"strings"
 	"time"
@@ -310,9 +320,21 @@ func ParseOneCertificateFromPEM(certsPEM []byte) ([]*x509.Certificate, []byte, e
 
 // LoadPEMCertPool loads a pool of PEM certificates from file.
 func LoadPEMCertPool(certsFile string) (*x509.CertPool, error) {
+	if certsFile == "" {
+		return nil, nil
+	}
 	pemCerts, err := ioutil.ReadFile(certsFile)
 	if err != nil {
 		return nil, err
+	}
+
+	return PEMToCertPool(pemCerts)
+}
+
+// PEMToCertPool concerts PEM certificates to a CertPool.
+func PEMToCertPool(pemCerts []byte) (*x509.CertPool, error) {
+	if len(pemCerts) == 0 {
+		return nil, nil
 	}
 
 	certPool := x509.NewCertPool()
@@ -360,57 +382,12 @@ func GetKeyDERFromPEM(in []byte, password []byte) ([]byte, error) {
 	return nil, cferr.New(cferr.PrivateKeyError, cferr.DecodeFailed)
 }
 
-// CheckSignature verifies a signature made by the key on a CSR, such
-// as on the CSR itself.
-func CheckSignature(csr *x509.CertificateRequest, algo x509.SignatureAlgorithm, signed, signature []byte) error {
-	var hashType crypto.Hash
-
-	switch algo {
-	case x509.SHA1WithRSA, x509.ECDSAWithSHA1:
-		hashType = crypto.SHA1
-	case x509.SHA256WithRSA, x509.ECDSAWithSHA256:
-		hashType = crypto.SHA256
-	case x509.SHA384WithRSA, x509.ECDSAWithSHA384:
-		hashType = crypto.SHA384
-	case x509.SHA512WithRSA, x509.ECDSAWithSHA512:
-		hashType = crypto.SHA512
-	default:
-		return x509.ErrUnsupportedAlgorithm
-	}
-
-	if !hashType.Available() {
-		return x509.ErrUnsupportedAlgorithm
-	}
-	h := hashType.New()
-
-	h.Write(signed)
-	digest := h.Sum(nil)
-
-	switch pub := csr.PublicKey.(type) {
-	case *rsa.PublicKey:
-		return rsa.VerifyPKCS1v15(pub, hashType, digest, signature)
-	case *ecdsa.PublicKey:
-		ecdsaSig := new(struct{ R, S *big.Int })
-		if _, err := asn1.Unmarshal(signature, ecdsaSig); err != nil {
-			return err
-		}
-		if ecdsaSig.R.Sign() <= 0 || ecdsaSig.S.Sign() <= 0 {
-			return errors.New("x509: ECDSA signature contained zero or negative values")
-		}
-		if !ecdsa.Verify(pub, digest, ecdsaSig.R, ecdsaSig.S) {
-			return errors.New("x509: ECDSA verification failure")
-		}
-		return nil
-	}
-	return x509.ErrUnsupportedAlgorithm
-}
-
 // ParseCSR parses a PEM- or DER-encoded PKCS #10 certificate signing request.
 func ParseCSR(in []byte) (csr *x509.CertificateRequest, rest []byte, err error) {
 	in = bytes.TrimSpace(in)
 	p, rest := pem.Decode(in)
 	if p != nil {
-		if p.Type != "CERTIFICATE REQUEST" {
+		if p.Type != "NEW CERTIFICATE REQUEST" && p.Type != "CERTIFICATE REQUEST" {
 			return nil, rest, cferr.New(cferr.CSRError, cferr.BadRequest)
 		}
 
@@ -423,7 +400,7 @@ func ParseCSR(in []byte) (csr *x509.CertificateRequest, rest []byte, err error) 
 		return nil, rest, err
 	}
 
-	err = CheckSignature(csr, csr.SignatureAlgorithm, csr.RawTBSCertificateRequest, csr.Signature)
+	err = csr.CheckSignature()
 	if err != nil {
 		return nil, rest, err
 	}
@@ -436,8 +413,10 @@ func ParseCSR(in []byte) (csr *x509.CertificateRequest, rest []byte, err error) 
 // locally.
 func ParseCSRPEM(csrPEM []byte) (*x509.CertificateRequest, error) {
 	block, _ := pem.Decode([]byte(csrPEM))
-	der := block.Bytes
-	csrObject, err := x509.ParseCertificateRequest(der)
+	if block == nil {
+		return nil, cferr.New(cferr.CSRError, cferr.DecodeFailed)
+	}
+	csrObject, err := x509.ParseCertificateRequest(block.Bytes)
 
 	if err != nil {
 		return nil, err
@@ -446,33 +425,179 @@ func ParseCSRPEM(csrPEM []byte) (*x509.CertificateRequest, error) {
 	return csrObject, nil
 }
 
-// SignerAlgo returns an X.509 signature algorithm corresponding to
-// the crypto.Hash provided from a crypto.Signer.
-func SignerAlgo(priv crypto.Signer, h crypto.Hash) x509.SignatureAlgorithm {
-	switch priv.Public().(type) {
+// SignerAlgo returns an X.509 signature algorithm from a crypto.Signer.
+func SignerAlgo(priv crypto.Signer) x509.SignatureAlgorithm {
+	switch pub := priv.Public().(type) {
 	case *rsa.PublicKey:
-		switch h {
-		case crypto.SHA512:
+		bitLength := pub.N.BitLen()
+		switch {
+		case bitLength >= 4096:
 			return x509.SHA512WithRSA
-		case crypto.SHA384:
+		case bitLength >= 3072:
 			return x509.SHA384WithRSA
-		case crypto.SHA256:
+		case bitLength >= 2048:
 			return x509.SHA256WithRSA
 		default:
 			return x509.SHA1WithRSA
 		}
 	case *ecdsa.PublicKey:
-		switch h {
-		case crypto.SHA512:
+		switch pub.Curve {
+		case elliptic.P521():
 			return x509.ECDSAWithSHA512
-		case crypto.SHA384:
+		case elliptic.P384():
 			return x509.ECDSAWithSHA384
-		case crypto.SHA256:
+		case elliptic.P256():
 			return x509.ECDSAWithSHA256
 		default:
 			return x509.ECDSAWithSHA1
 		}
 	default:
 		return x509.UnknownSignatureAlgorithm
+	}
+}
+
+// LoadClientCertificate load key/certificate from pem files
+func LoadClientCertificate(certFile string, keyFile string) (*tls.Certificate, error) {
+	if certFile != "" && keyFile != "" {
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			log.Critical("Unable to read client certificate from file: %s or key from file: %s", certFile, keyFile)
+			return nil, err
+		}
+		log.Debug("Client certificate loaded ")
+		return &cert, nil
+	}
+	return nil, nil
+}
+
+// CreateTLSConfig creates a tls.Config object from certs and roots
+func CreateTLSConfig(remoteCAs *x509.CertPool, cert *tls.Certificate) *tls.Config {
+	var certs []tls.Certificate
+	if cert != nil {
+		certs = []tls.Certificate{*cert}
+	}
+	return &tls.Config{
+		Certificates: certs,
+		RootCAs:      remoteCAs,
+	}
+}
+
+// SerializeSCTList serializes a list of SCTs.
+func SerializeSCTList(sctList []ct.SignedCertificateTimestamp) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, sct := range sctList {
+		sct, err := cttls.Marshal(sct)
+		if err != nil {
+			return nil, err
+		}
+		binary.Write(&buf, binary.BigEndian, uint16(len(sct)))
+		buf.Write(sct)
+	}
+
+	var sctListLengthField = make([]byte, 2)
+	binary.BigEndian.PutUint16(sctListLengthField, uint16(buf.Len()))
+	return bytes.Join([][]byte{sctListLengthField, buf.Bytes()}, nil), nil
+}
+
+// DeserializeSCTList deserializes a list of SCTs.
+func DeserializeSCTList(serializedSCTList []byte) (*[]ct.SignedCertificateTimestamp, error) {
+	sctList := new([]ct.SignedCertificateTimestamp)
+	sctReader := bytes.NewBuffer(serializedSCTList)
+
+	var sctListLen uint16
+	err := binary.Read(sctReader, binary.BigEndian, &sctListLen)
+	if err != nil {
+		if err == io.EOF {
+			return sctList, cferr.Wrap(cferr.CTError, cferr.Unknown,
+				errors.New("serialized SCT list could not be read"))
+		}
+		return sctList, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+	}
+	if sctReader.Len() != int(sctListLen) {
+		return sctList, errors.New("SCT length field and SCT length don't match")
+	}
+
+	for err != io.EOF {
+		var sctLen uint16
+		err = binary.Read(sctReader, binary.BigEndian, &sctLen)
+		if err != nil {
+			if err == io.EOF {
+				return sctList, nil
+			}
+			return sctList, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+		}
+
+		if sctReader.Len() < int(sctLen) {
+			return sctList, errors.New("SCT length field and SCT length don't match")
+		}
+
+		serializedSCT := sctReader.Next(int(sctLen))
+		var sct ct.SignedCertificateTimestamp
+		if _, err := cttls.Unmarshal(serializedSCT, &sct); err != nil {
+			return sctList, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+		}
+
+		temp := append(*sctList, sct)
+		sctList = &temp
+	}
+
+	return sctList, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+}
+
+// SCTListFromOCSPResponse extracts the SCTList from an ocsp.Response,
+// returning an empty list if the SCT extension was not found or could not be
+// unmarshalled.
+func SCTListFromOCSPResponse(response *ocsp.Response) ([]ct.SignedCertificateTimestamp, error) {
+	// This loop finds the SCTListExtension in the OCSP response.
+	var SCTListExtension, ext pkix.Extension
+	for _, ext = range response.Extensions {
+		// sctExtOid is the ObjectIdentifier of a Signed Certificate Timestamp.
+		sctExtOid := asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 5}
+		if ext.Id.Equal(sctExtOid) {
+			SCTListExtension = ext
+			break
+		}
+	}
+
+	// This code block extracts the sctList from the SCT extension.
+	var emptySCTList []ct.SignedCertificateTimestamp
+	sctList := &emptySCTList
+	var err error
+	if numBytes := len(SCTListExtension.Value); numBytes != 0 {
+		serializedSCTList := new([]byte)
+		rest := make([]byte, numBytes)
+		copy(rest, SCTListExtension.Value)
+		for len(rest) != 0 {
+			rest, err = asn1.Unmarshal(rest, serializedSCTList)
+			if err != nil {
+				return nil, cferr.Wrap(cferr.CTError, cferr.Unknown, err)
+			}
+		}
+		sctList, err = DeserializeSCTList(*serializedSCTList)
+	}
+	return *sctList, err
+}
+
+// ReadBytes reads a []byte either from a file or an environment variable.
+// If valFile has a prefix of 'env:', the []byte is read from the environment
+// using the subsequent name. If the prefix is 'file:' the []byte is read from
+// the subsequent file. If no prefix is provided, valFile is assumed to be a
+// file path.
+func ReadBytes(valFile string) ([]byte, error) {
+	switch splitVal := strings.SplitN(valFile, ":", 2); len(splitVal) {
+	case 1:
+		return ioutil.ReadFile(valFile)
+	case 2:
+		switch splitVal[0] {
+		case "env":
+			return []byte(os.Getenv(splitVal[1])), nil
+		case "file":
+			return ioutil.ReadFile(splitVal[1])
+		default:
+			return nil, fmt.Errorf("unknown prefix: %s", splitVal[0])
+		}
+	default:
+		return nil, fmt.Errorf("multiple prefixes: %s",
+			strings.Join(splitVal[:len(splitVal)-1], ", "))
 	}
 }

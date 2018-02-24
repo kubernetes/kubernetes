@@ -24,11 +24,21 @@ const (
 	serviceSSH      = "ssh-connection"
 )
 
-// supportedCiphers specifies the supported ciphers in preference order.
+// supportedCiphers lists ciphers we support but might not recommend.
 var supportedCiphers = []string{
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
 	"aes128-gcm@openssh.com",
-	"arcfour256", "arcfour128",
+	chacha20Poly1305ID,
+	"arcfour256", "arcfour128", "arcfour",
+	aes128cbcID,
+	tripledescbcID,
+}
+
+// preferredCiphers specifies the default preference for ciphers.
+var preferredCiphers = []string{
+	"aes128-gcm@openssh.com",
+	chacha20Poly1305ID,
+	"aes128-ctr", "aes192-ctr", "aes256-ctr",
 }
 
 // supportedKexAlgos specifies the supported key-exchange algorithms in
@@ -211,7 +221,7 @@ func (c *Config) SetDefaults() {
 		c.Rand = rand.Reader
 	}
 	if c.Ciphers == nil {
-		c.Ciphers = supportedCiphers
+		c.Ciphers = preferredCiphers
 	}
 	var ciphers []string
 	for _, c := range c.Ciphers {
@@ -242,7 +252,7 @@ func (c *Config) SetDefaults() {
 
 // buildDataSignedForAuth returns the data that is signed in order to prove
 // possession of a private key. See RFC 4252, section 7.
-func buildDataSignedForAuth(sessionId []byte, req userAuthRequestMsg, algo, pubKey []byte) []byte {
+func buildDataSignedForAuth(sessionID []byte, req userAuthRequestMsg, algo, pubKey []byte) []byte {
 	data := struct {
 		Session []byte
 		Type    byte
@@ -253,7 +263,7 @@ func buildDataSignedForAuth(sessionId []byte, req userAuthRequestMsg, algo, pubK
 		Algo    []byte
 		PubKey  []byte
 	}{
-		sessionId,
+		sessionID,
 		msgUserAuthRequest,
 		req.User,
 		req.Service,

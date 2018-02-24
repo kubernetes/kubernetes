@@ -29,6 +29,8 @@ go_library(
     deps = [
         "//vendor/golang.org/x/crypto/curve25519:go_default_library",
         "//vendor/golang.org/x/crypto/ed25519:go_default_library",
+        "//vendor/golang.org/x/crypto/internal/chacha20:go_default_library",
+        "//vendor/golang.org/x/crypto/poly1305:go_default_library",
     ],
 )
 

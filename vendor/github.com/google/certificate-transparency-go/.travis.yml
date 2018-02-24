@@ -1,0 +1,66 @@
+sudo: false
+language: go
+os: linux
+go: 1.9
+
+env:
+  - GOFLAGS=
+  - GOFLAGS=-race
+  - GOFLAGS=      WITH_ETCD=true
+  - GOFLAGS=-race WITH_ETCD=true
+
+matrix:
+  fast_finish: true
+
+install:
+  - |
+    if [ ! -d $HOME/gopath/src/github.com/google ]; then
+      mkdir -p $HOME/gopath/src/github.com/google
+      ln -s $TRAVIS_BUILD_DIR $HOME/gopath/src/github.com/google/certificate-transparency-go
+    fi
+  - mkdir ../protoc
+  - |
+    (
+      cd ../protoc
+      wget https://github.com/google/protobuf/releases/download/v3.2.0/protoc-3.2.0-${TRAVIS_OS_NAME}-x86_64.zip
+      unzip protoc-3.2.0-${TRAVIS_OS_NAME}-x86_64.zip
+    )
+  - export PATH=$(pwd)/../protoc/bin:$PATH
+  - go get -d -t ./...
+  - go get github.com/alecthomas/gometalinter
+  - gometalinter --install
+  - go get -u github.com/golang/protobuf/proto
+  - go get -u github.com/golang/protobuf/protoc-gen-go
+  - go install github.com/golang/mock/mockgen
+  # install vendored etcd binary
+  - go install ./vendor/github.com/coreos/etcd/cmd/etcd
+  - go install ./vendor/github.com/coreos/etcd/cmd/etcdctl
+  - pushd ${GOPATH}/src/github.com/google/trillian
+  - go get -d -t ./...
+  - popd
+
+script:
+  - set -e
+  - export TRILLIAN_SQL_DRIVER=mysql
+  - cd $HOME/gopath/src/github.com/google/certificate-transparency-go
+  - ./scripts/presubmit.sh ${PRESUBMIT_OPTS}
+  - |
+      # Check re-generation didn't change anything
+      status=$(git status --porcelain | grep -v coverage) || :
+      if [[ -n ${status} ]]; then
+        echo "Regenerated files differ from checked-in versions: ${status}"
+        git status
+        git diff
+        exit 1
+      fi
+  - |
+      if [[ "${WITH_ETCD}" == "true" ]]; then
+        export ETCD_DIR="${GOPATH}/bin"
+      fi
+  - ./trillian/integration/integration_test.sh
+  - HAMMER_OPTS="--operations=1500" ./trillian/integration/ct_hammer_test.sh
+  - set +e
+
+after_success:
+  - cp /tmp/coverage.txt .
+  - bash <(curl -s https://codecov.io/bash)
