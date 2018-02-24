@@ -123,12 +123,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	nodeName := string(c.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
-	// ensure version is supported
-	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Error(log("mounter.SetUpAt failed to assert version: %v", err))
-		return err
-	}
-
 	// probe driver
 	// TODO (vladimirvivien) move probe call where it is done only when it is needed.
 	if err := csi.NodeProbe(ctx, csiVersion); err != nil {
@@ -266,12 +260,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	defer cancel()
 
 	csi := c.csiClient
-
-	// TODO make all assertion calls private within the client itself
-	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Errorf(log("mounter.TearDownAt failed to assert version: %v", err))
-		return err
-	}
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
 		glog.Errorf(log("mounter.TearDownAt failed: %v", err))

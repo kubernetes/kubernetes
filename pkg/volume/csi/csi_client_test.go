@@ -61,7 +61,7 @@ func TestClientAssertSupportedVersion(t *testing.T) {
 		t.Logf("test case: %s", tc.testName)
 		client := setupClient(t)
 		client.idClient.(*fake.IdentityClient).SetNextError(tc.err)
-		err := client.AssertSupportedVersion(grpctx.Background(), tc.ver)
+		err := client.assertSupportedVersion(grpctx.Background(), tc.ver)
 		if tc.mustFail && err == nil {
 			t.Error("test must fail, but err = nil")
 		}
