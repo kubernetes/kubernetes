@@ -24,7 +24,7 @@ container: explorer
 	docker build --pull -t staging-k8s.gcr.io/explorer:$(TAG) .
 
 push: container
-	gcloud docker -- push staging-k8s.gcr.io/explorer:$(TAG)
+	docker push staging-k8s.gcr.io/explorer:$(TAG)
 
 clean:
 	rm -f explorer

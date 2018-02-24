@@ -41,7 +41,7 @@ container:
 
 push: container
 	$(if $(TAG),,$(error TAG is not defined. Use 'make tag' to see a suggestion))
-	gcloud docker -- push staging-k8s.gcr.io/kubectl:$(TAG)
+	docker push staging-k8s.gcr.io/kubectl:$(TAG)
 
 clean:
 	rm -f kubectl

@@ -40,7 +40,7 @@ build:
 	docker build -t $(IMAGE) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(IMAGE)
+	docker push $(IMAGE)
 
 all: build
 

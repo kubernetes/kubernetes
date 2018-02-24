@@ -29,7 +29,7 @@ build:
 
 # push the image to an registry
 push:
-	gcloud docker -- push ${REGISTRY}/guestbook:${VERSION}
+	docker push ${REGISTRY}/guestbook:${VERSION}
 
 # remove previous images and containers
 clean:

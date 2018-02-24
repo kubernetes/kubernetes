@@ -35,7 +35,7 @@ container-dev:
 build: container container-dev
 
 push: build
-	gcloud docker -- push ${PROJECT}/cassandra:${VERSION}
-	gcloud docker -- push ${PROJECT}/cassandra:${VERSION}-dev
+	docker push ${PROJECT}/cassandra:${VERSION}
+	docker push ${PROJECT}/cassandra:${VERSION}-dev
 
 .PHONY: all build push
