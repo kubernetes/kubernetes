@@ -48,7 +48,7 @@ func (tm *tryMutex) Unlock() {
 	case <-tm.ch:
 		return
 	default:
-		glog.Fatalln("unlock of unlocked mutex")
+		panic("unlock of unlocked mutex")
 	}
 }
 
