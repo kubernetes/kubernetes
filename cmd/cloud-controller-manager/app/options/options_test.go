@@ -127,7 +127,7 @@ func TestAddFlags(t *testing.T) {
 				ContentType:               "application/vnd.kubernetes.protobuf",
 				ClusterSigningCertFile:    "/etc/kubernetes/ca/ca.pem",
 				ClusterSigningKeyFile:     "/etc/kubernetes/ca/ca.key",
-				EnableContentionProfiling: true,
+				EnableContentionProfiling: false,
 				KubeAPIQPS:                50.0,
 				KubeAPIBurst:              100,
 				LeaderElection: componentconfig.LeaderElectionConfiguration{
@@ -157,6 +157,10 @@ func TestAddFlags(t *testing.T) {
 				BindAddress: net.ParseIP("192.168.4.10"),
 				BindPort:    int(10000),
 				BindNetwork: "tcp",
+			},
+			Debugging: &cmoptions.DebuggingOptions{
+				EnableProfiling:           false,
+				EnableContentionProfiling: true,
 			},
 			Kubeconfig: "/kubeconfig",
 			Master:     "192.168.4.20",

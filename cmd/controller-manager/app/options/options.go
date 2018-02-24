@@ -51,6 +51,8 @@ type GenericControllerManagerOptions struct {
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
+	Debugging *DebuggingOptions
+
 	Master     string
 	Kubeconfig string
 }
@@ -79,6 +81,7 @@ func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeCont
 		},
 		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
 		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Debugging:      &DebuggingOptions{},
 	}
 
 	// disable secure serving for now
@@ -162,8 +165,6 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.ComponentConfig.MinResyncPeriod.Duration, "min-resync-period", o.ComponentConfig.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
 	fs.DurationVar(&o.ComponentConfig.NodeMonitorPeriod.Duration, "node-monitor-period", o.ComponentConfig.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeController.")
-	fs.BoolVar(&o.ComponentConfig.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&o.ComponentConfig.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled.")
 	fs.StringVar(&o.ComponentConfig.ClusterName, "cluster-name", o.ComponentConfig.ClusterName, "The instance prefix for the cluster.")
 	fs.StringVar(&o.ComponentConfig.ClusterCIDR, "cluster-cidr", o.ComponentConfig.ClusterCIDR, "CIDR Range for Pods in cluster. Requires --allocate-node-cidrs to be true")
 	fs.BoolVar(&o.ComponentConfig.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
@@ -181,12 +182,16 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.InsecureServing.AddDeprecatedFlags(fs)
 	o.Authentication.AddFlags(fs)
 	o.Authorization.AddFlags(fs)
+	o.Debugging.AddFlags(fs)
 }
 
 // ApplyTo fills up controller manager config with options and userAgent
 func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Config, userAgent string) error {
 	c.ComponentConfig = o.ComponentConfig
 
+	if err := o.Debugging.ApplyTo(c); err != nil {
+		return err
+	}
 	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
@@ -224,6 +229,7 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 // Validate checks GenericControllerManagerOptions and return a slice of found errors.
 func (o *GenericControllerManagerOptions) Validate() []error {
 	errors := []error{}
+	errors = append(errors, o.Debugging.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
 	errors = append(errors, o.InsecureServing.Validate()...)
 	errors = append(errors, o.Authentication.Validate()...)

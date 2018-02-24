@@ -46,6 +46,9 @@ type Config struct {
 
 	// the event sink
 	EventRecorder record.EventRecorder
+
+	EnableProfiling           bool
+	EnableContentionProfiling bool
 }
 
 type completedConfig struct {
