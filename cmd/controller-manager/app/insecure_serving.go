@@ -30,6 +30,8 @@ import (
 type InsecureServingInfo struct {
 	// Listener is the secure server network listener.
 	Listener net.Listener
+	// optional server name for log messages
+	Name string
 }
 
 // Serve starts an insecure http server with the given handler. It fails only if
@@ -41,6 +43,10 @@ func (s *InsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.D
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	glog.Infof("Serving insecurely on %s", s.Listener.Addr())
+	if len(s.Name) > 0 {
+		glog.Infof("Serving %s insecurely on %s", s.Name, s.Listener.Addr())
+	} else {
+		glog.Infof("Serving insecurely on %s", s.Listener.Addr())
+	}
 	return server.RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
 }

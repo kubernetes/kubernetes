@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
+	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -181,7 +182,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		eventBroadcaster := record.NewBroadcaster()
 		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
-		ss := &schedulerapp.SchedulerServer{
+		ss := &schedulerappconfig.Config{
 			SchedulerName: v1.DefaultSchedulerName,
 			AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
 				Policy: &componentconfig.SchedulerPolicySource{
@@ -200,7 +201,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			Broadcaster:     eventBroadcaster,
 		}
 
-		config, err := ss.SchedulerConfig()
+		config, err := schedulerapp.NewSchedulerConfig(ss.Complete())
 		if err != nil {
 			t.Fatalf("couldn't make scheduler config: %v", err)
 		}
@@ -240,7 +241,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
-	ss := &schedulerapp.SchedulerServer{
+	ss := &schedulerappconfig.Config{
 		SchedulerName: v1.DefaultSchedulerName,
 		AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
 			Policy: &componentconfig.SchedulerPolicySource{
@@ -259,7 +260,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		Broadcaster:     eventBroadcaster,
 	}
 
-	_, err := ss.SchedulerConfig()
+	_, err := schedulerapp.NewSchedulerConfig(ss.Complete())
 	if err == nil {
 		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
 	}
