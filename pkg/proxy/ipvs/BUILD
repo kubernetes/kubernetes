@@ -85,6 +85,7 @@ go_library(
         "//pkg/proxy/metrics:go_default_library",
         "//pkg/proxy/util:go_default_library",
         "//pkg/util/async:go_default_library",
+        "//pkg/util/conntrack:go_default_library",
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/ipvs:go_default_library",

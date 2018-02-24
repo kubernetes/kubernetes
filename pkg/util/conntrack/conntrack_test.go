@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package conntrack
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -61,7 +62,7 @@ func TestExecConntrackTool(t *testing.T) {
 	expectErr := []bool{false, false, true}
 
 	for i := range testCases {
-		err := ExecConntrackTool(&fexec, testCases[i]...)
+		err := Exec(&fexec, testCases[i]...)
 
 		if expectErr[i] {
 			if err == nil {
@@ -115,7 +116,7 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 
 	svcCount := 0
 	for _, tc := range testCases {
-		if err := ClearUDPConntrackForIP(&fexec, tc.ip); err != nil {
+		if err := ClearEntriesForIP(&fexec, tc.ip, v1.ProtocolUDP); err != nil {
 			t.Errorf("%s test case:, Unexpected error: %v", tc.name, err)
 		}
 		expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", tc.ip) + familyParamStr(IsIPv6String(tc.ip))
@@ -160,7 +161,7 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 	}
 	svcCount := 0
 	for _, tc := range testCases {
-		err := ClearUDPConntrackForPort(&fexec, tc.port, tc.isIPv6)
+		err := ClearEntriesForPort(&fexec, tc.port, tc.isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: Unexpected error: %v", tc.name, err)
 		}
@@ -218,7 +219,7 @@ func TestDeleteUDPConnections(t *testing.T) {
 	}
 	svcCount := 0
 	for i, tc := range testCases {
-		err := ClearUDPConntrackForPeers(&fexec, tc.origin, tc.dest)
+		err := ClearEntriesForNAT(&fexec, tc.origin, tc.dest, v1.ProtocolUDP)
 		if err != nil {
 			t.Errorf("%s test case: unexpected error: %v", tc.name, err)
 		}

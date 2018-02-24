@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/utils/exec"
 )
 
 func TestHostportManager(t *testing.T) {
@@ -34,6 +35,7 @@ func TestHostportManager(t *testing.T) {
 		hostPortMap: make(map[hostport]closeable),
 		iptables:    iptables,
 		portOpener:  portOpener.openFakeSocket,
+		execer:      exec.New(),
 	}
 
 	testCases := []struct {
