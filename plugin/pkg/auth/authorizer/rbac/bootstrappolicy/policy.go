@@ -64,7 +64,9 @@ func addDefaultMetadata(obj runtime.Object) {
 		labels = map[string]string{}
 	}
 	for k, v := range Label {
-		labels[k] = v
+		if _, found := labels[k]; !found {
+			labels[k] = v
+		}
 	}
 	metadata.SetLabels(labels)
 
@@ -73,7 +75,9 @@ func addDefaultMetadata(obj runtime.Object) {
 		annotations = map[string]string{}
 	}
 	for k, v := range Annotation {
-		annotations[k] = v
+		if _, found := annotations[k]; !found {
+			annotations[k] = v
+		}
 	}
 	metadata.SetAnnotations(annotations)
 }
