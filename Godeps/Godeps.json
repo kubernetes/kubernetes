@@ -2882,47 +2882,47 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.alpha",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.beta",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/gensupport",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi/internal/uritemplates",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/logging/v2beta1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/monitoring/v3",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/api/pubsub/v1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
+			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
 		},
 		{
 			"ImportPath": "google.golang.org/genproto/googleapis/rpc/status",

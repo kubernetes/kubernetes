@@ -145,11 +145,9 @@ func TestNodeSyncUpdate(t *testing.T) {
 			events: []fakeEvent{{"node1", "CloudCIDRAllocatorMismatch"}},
 		},
 		{
-			desc:      "update alias from node",
-			mode:      SyncFromCloud,
-			node:      nodeWithCIDRRange,
-			events:    []fakeEvent{{"node1", "CloudCIDRAllocatorInvalidMode"}},
-			wantError: true,
+			desc: "update alias from node",
+			mode: SyncFromCloud,
+			node: nodeWithCIDRRange,
 		},
 		{
 			desc: "update alias from node",
@@ -165,12 +163,10 @@ func TestNodeSyncUpdate(t *testing.T) {
 			// XXX/bowei -- validation
 		},
 		{
-			desc:      "update node from alias",
-			mode:      SyncFromCluster,
-			node:      nodeWithoutCIDRRange,
-			fake:      fakeAPIs{aliasRange: test.MustParseCIDR("10.1.2.3/16")},
-			events:    []fakeEvent{{"node1", "CloudCIDRAllocatorInvalidMode"}},
-			wantError: true,
+			desc: "update node from alias",
+			mode: SyncFromCluster,
+			node: nodeWithoutCIDRRange,
+			fake: fakeAPIs{aliasRange: test.MustParseCIDR("10.1.2.3/16")},
 		},
 		{
 			desc:      "allocate range",

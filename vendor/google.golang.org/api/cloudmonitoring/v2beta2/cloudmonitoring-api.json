@@ -21,7 +21,7 @@
  "basePath": "/cloudmonitoring/v2beta2/projects/",
  "rootUrl": "https://www.googleapis.com/",
  "servicePath": "cloudmonitoring/v2beta2/projects/",
- "batchPath": "batch",
+ "batchPath": "batch/cloudmonitoring/v2beta2",
  "parameters": {
   "alt": {
    "type": "string",
