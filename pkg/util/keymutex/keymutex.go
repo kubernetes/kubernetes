@@ -44,7 +44,12 @@ func (tm *tryMutex) TryLock() bool {
 }
 
 func (tm *tryMutex) Unlock() {
-	<-tm.ch
+	select {
+	case <-tm.ch:
+		return
+	default:
+		glog.Fatalln("unlock of unlocked mutex")
+	}
 }
 
 // KeyMutex is a thread-safe interface for acquiring locks on arbitrary strings.
