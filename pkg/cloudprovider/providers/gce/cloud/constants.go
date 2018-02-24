@@ -20,7 +20,10 @@ import (
 	"strings"
 )
 
+// NetworkTier represents the Network Service Tier used by a resource
 type NetworkTier string
+
+// LbScheme represents the possible types of load balancers
 type LbScheme string
 
 const (
@@ -33,7 +36,7 @@ const (
 )
 
 // ToGCEValue converts NetworkTier to a string that we can populate the
-// NetworkTier field of GCE objects.
+// NetworkTier field of GCE objects, including ForwardingRules and Addresses.
 func (n NetworkTier) ToGCEValue() string {
 	return strings.ToUpper(string(n))
 }
