@@ -30,6 +30,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
@@ -42,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
@@ -149,7 +152,8 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 
 	// Start up the healthz server.
 	if c.InsecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, c.InsecureMetricsServing != nil))
+		separateMetrics := c.InsecureMetricsServing != nil
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, separateMetrics), nil, nil)
 		// TODO: fail early as all other Kubernetes binaries
 		go wait.Until(func() {
 			if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -158,13 +162,20 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 		}, 5*time.Second, stopCh)
 	}
 	if c.InsecureServing != nil {
-		handler := buildHandlerChain(newMetricsHandler(&c.ComponentConfig))
+		handler := buildHandlerChain(newMetricsHandler(&c.ComponentConfig), nil, nil)
 		// TODO: fail early as all other Kubernetes binaries
 		go wait.Until(func() {
 			if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to start metrics server: %v", err))
 			}
 		}, 5*time.Second, stopCh)
+	}
+	if c.SecureServing != nil {
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false), c.Authentication.Authenticator, c.Authorization.Authorizer)
+		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+			// fail early for secure handlers, removing the old error loop from above
+			return fmt.Errorf("failed to start healthz server: %v", err)
+		}
 	}
 
 	// Start all informers.
@@ -205,9 +216,13 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 }
 
 // buildHandlerChain wraps the given handler with the standard filters.
-func buildHandlerChain(handler http.Handler) http.Handler {
+func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
+	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
+	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 
