@@ -20,10 +20,21 @@ limitations under the License.
 package fake
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/testing"
 )
+
+// NewFakeClientPool returns an instance of FakeClientPool which respects manipulations
+// on resources and put them into fake storage.
+func NewFakeClientPool(objects ...runtime.Object) *FakeClientPool {
+	fakeClientset := fake.NewSimpleClientset(objects...)
+	return &FakeClientPool{
+		fakeClientset.Fake,
+	}
+}
 
 // FakeClientPool provides a fake implementation of dynamic.ClientPool.
 // It assumes resource GroupVersions are the same as their corresponding kind GroupVersions.
