@@ -61,7 +61,7 @@ go_library(
         "//pkg/util/taints:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
-        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
