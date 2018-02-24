@@ -24,7 +24,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/volume"
 
@@ -119,8 +118,6 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 				Namespace: s.pod.GetNamespace(),
 			}
 			fsStats = append(fsStats, s.parsePodVolumeStats(name, &pvcRef, metric))
-			// Set the PVC's prometheus metrics
-			s.setPVCMetrics(&pvcRef, metric)
 		} else {
 			fsStats = append(fsStats, s.parsePodVolumeStats(name, nil, metric))
 		}
@@ -144,14 +141,4 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
-}
-
-// setPVCMetrics sets the given PVC's prometheus metrics to match the given volume.Metrics
-func (s *volumeStatCalculator) setPVCMetrics(pvcRef *stats.PVCReference, metric *volume.Metrics) {
-	metrics.VolumeStatsAvailableBytes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Available.Value()))
-	metrics.VolumeStatsCapacityBytes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Capacity.Value()))
-	metrics.VolumeStatsUsedBytes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Used.Value()))
-	metrics.VolumeStatsInodes.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.Inodes.Value()))
-	metrics.VolumeStatsInodesFree.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.InodesFree.Value()))
-	metrics.VolumeStatsInodesUsed.WithLabelValues(pvcRef.Namespace, pvcRef.Name).Set(float64(metric.InodesUsed.Value()))
 }
