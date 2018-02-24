@@ -623,6 +623,9 @@ func autoConvert_v1_CSIPersistentVolumeSource_To_core_CSIPersistentVolumeSource(
 	out.ReadOnly = in.ReadOnly
 	out.FSType = in.FSType
 	out.VolumeAttributes = *(*map[string]string)(unsafe.Pointer(&in.VolumeAttributes))
+	out.ControllerPublishSecretRef = (*core.SecretReference)(unsafe.Pointer(in.ControllerPublishSecretRef))
+	out.NodeStageSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
+	out.NodePublishSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	return nil
 }
 
@@ -637,6 +640,9 @@ func autoConvert_core_CSIPersistentVolumeSource_To_v1_CSIPersistentVolumeSource(
 	out.ReadOnly = in.ReadOnly
 	out.FSType = in.FSType
 	out.VolumeAttributes = *(*map[string]string)(unsafe.Pointer(&in.VolumeAttributes))
+	out.ControllerPublishSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.ControllerPublishSecretRef))
+	out.NodeStageSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
+	out.NodePublishSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	return nil
 }
 

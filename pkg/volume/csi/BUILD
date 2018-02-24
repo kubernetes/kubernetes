@@ -7,6 +7,7 @@ go_library(
         "csi_client.go",
         "csi_mounter.go",
         "csi_plugin.go",
+        "csi_util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/csi",
     visibility = ["//visibility:public"],
