@@ -72,7 +72,10 @@ func setupProviderConfig() error {
 			managedZones = []string{zone}
 		}
 
-		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{gcecloud.AlphaFeatureNetworkEndpointGroup})
+		gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{
+			gcecloud.AlphaFeatureNetworkEndpointGroup,
+			gcecloud.AlphaFeatureGCEDisk,
+		})
 		if err != nil {
 			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
 		}

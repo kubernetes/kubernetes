@@ -124,3 +124,33 @@ func LogClusterImageSources() {
 		Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }
+
+func CreateManagedInstanceGroup(size int64, zone, template string) error {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud.
+	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"create",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", zone),
+		TestContext.CloudConfig.NodeInstanceGroup,
+		fmt.Sprintf("--size=%d", size),
+		fmt.Sprintf("--template=%s", template))
+	if err != nil {
+		return fmt.Errorf("gcloud compute instance-groups managed create call failed with err: %v", err)
+	}
+	return nil
+}
+
+func DeleteManagedInstanceGroup(zone string) error {
+	// TODO(verult): make this hit the compute API directly instead of
+	// shelling out to gcloud.
+	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
+		"delete",
+		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
+		fmt.Sprintf("--zone=%s", zone),
+		TestContext.CloudConfig.NodeInstanceGroup)
+	if err != nil {
+		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
+	}
+	return nil
+}
