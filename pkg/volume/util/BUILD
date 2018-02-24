@@ -16,6 +16,7 @@ go_library(
         "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
+        "nested_volumes.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [
@@ -56,6 +57,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "nested_volumes_test.go",
         "util_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
@@ -71,6 +73,7 @@ go_test(
         "//pkg/util/mount:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],
