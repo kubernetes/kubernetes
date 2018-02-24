@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -95,9 +94,6 @@ type ClientAccessFactory interface {
 	// KubernetesClientSet gives you back an external clientset
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
-	// MetricsClientSet gives you back an external clientset for the metrics API
-	MetricsClientSet() (metricsclientset.Interface, error)
-
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
@@ -105,11 +101,6 @@ type ClientAccessFactory interface {
 	// BareClientConfig returns a client.Config that has NOT been negotiated. It's
 	// just directions to the server. People use this to build RESTMappers on top of
 	BareClientConfig() (*restclient.Config, error)
-
-	// TODO remove.  This should be rolled into `ClientSet`
-	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
-	// TODO remove.  This should be rolled into `ClientConfig`
-	ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error)
 
 	// UpdatePodSpecForObject will call the provided function on the pod spec this object supports,
 	// return false if no pod spec is supported, or return an error.

@@ -32,7 +32,7 @@ import (
 func TestCreateService(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-service"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	negSer := legacyscheme.Codecs
 
@@ -51,7 +51,7 @@ func TestCreateService(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceClusterIP(f, buf)
+	cmd := NewCmdCreateServiceClusterIP(tf, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "8080:8000")
 	cmd.Run(cmd, []string{service.Name})
@@ -64,7 +64,7 @@ func TestCreateService(t *testing.T) {
 func TestCreateServiceNodePort(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-node-port-service"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	negSer := legacyscheme.Codecs
 
@@ -83,7 +83,7 @@ func TestCreateServiceNodePort(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceNodePort(f, buf)
+	cmd := NewCmdCreateServiceNodePort(tf, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "30000:8000")
 	cmd.Run(cmd, []string{service.Name})
@@ -96,7 +96,7 @@ func TestCreateServiceNodePort(t *testing.T) {
 func TestCreateServiceExternalName(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-external-name-service"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	negSer := legacyscheme.Codecs
 
@@ -115,7 +115,7 @@ func TestCreateServiceExternalName(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceExternalName(f, buf)
+	cmd := NewCmdCreateServiceExternalName(tf, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("external-name", "name")
 	cmd.Run(cmd, []string{service.Name})

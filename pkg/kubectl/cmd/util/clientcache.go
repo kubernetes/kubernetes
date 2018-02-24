@@ -24,10 +24,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/version"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
 func NewClientCache(loader clientcmd.ClientConfig, discoveryClientFactory DiscoveryClientFactory) *ClientCache {
@@ -59,7 +58,6 @@ type ClientCache struct {
 	discoveryClient        discovery.DiscoveryInterface
 
 	kubernetesClientCache kubernetesClientCache
-	metricsClientCache    metricsClientCache
 }
 
 // kubernetesClientCache creates a new kubernetes.Clientset one time
@@ -69,17 +67,6 @@ type kubernetesClientCache struct {
 	once sync.Once
 	// client is the cached client value
 	client *kubernetes.Clientset
-	// err is the cached error value
-	err error
-}
-
-// metricsClientCache creates a new metricsclientset.Clientset one time
-// and then returns the result for all future requests
-type metricsClientCache struct {
-	// once makes sure the client is only initialized once
-	once sync.Once
-	// client is the cached client value
-	client *metricsclientset.Clientset
 	// err is the cached error value
 	err error
 }
@@ -98,22 +85,6 @@ func (c *ClientCache) KubernetesClientSetForVersion(requiredVersion *schema.Grou
 		c.kubernetesClientCache.client, c.kubernetesClientCache.err = kubernetes.NewForConfig(config)
 	})
 	return c.kubernetesClientCache.client, c.kubernetesClientCache.err
-}
-
-// MetricsClientSetForVersion returns a new kubernetes.Clientset.  It will cache the value
-// the first time it is called and return the cached value on subsequent calls.
-// If an error is encountered the first time MetircsClientSetForVersion is called,
-// the error will be cached.
-func (c *ClientCache) MetricsClientSetForVersion(requiredVersion *schema.GroupVersion) (*metricsclientset.Clientset, error) {
-	c.metricsClientCache.once.Do(func() {
-		config, err := c.ClientConfigForVersion(requiredVersion)
-		if err != nil {
-			c.kubernetesClientCache.err = err
-			return
-		}
-		c.metricsClientCache.client, c.metricsClientCache.err = metricsclientset.NewForConfig(config)
-	})
-	return c.metricsClientCache.client, c.metricsClientCache.err
 }
 
 // also looks up the discovery client.  We can't do this during init because the flags won't have been set
@@ -179,7 +150,7 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 	}
 
 	// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
-	oldclient.SetKubernetesDefaults(&config)
+	setKubernetesDefaults(&config)
 
 	if requiredVersion != nil {
 		c.configs[*requiredVersion] = copyConfig(&config)
@@ -192,6 +163,22 @@ func (c *ClientCache) clientConfigForVersion(requiredVersion *schema.GroupVersio
 	c.configs[*config.GroupVersion] = copyConfig(&config)
 
 	return copyConfig(&config), nil
+}
+
+// setKubernetesDefaults sets default values on the provided client config for accessing the
+// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
+func setKubernetesDefaults(config *restclient.Config) error {
+	if config.APIPath == "" {
+		config.APIPath = "/api"
+	}
+	// TODO chase down uses and tolerate nil
+	if config.GroupVersion == nil {
+		config.GroupVersion = &schema.GroupVersion{}
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = legacyscheme.Codecs
+	}
+	return restclient.SetKubernetesDefaults(config)
 }
 
 func copyConfig(in *restclient.Config) *restclient.Config {

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
+	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/exec"
@@ -222,7 +223,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			svcPort:      80,
 			protocol:     UDP,
 			endpoint:     "10.240.0.3:80",
-			simulatedErr: utilproxy.NoConnectionToDelete,
+			simulatedErr: conntrack.NoConnectionToDelete,
 		}, {
 			description:  "V4 UDP, unexpected error, should be glogged",
 			svcName:      "v4-udp-simulated-error",
@@ -328,7 +329,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 		// Check the number of new glog errors
 		var expGlogErrs int64
-		if tc.simulatedErr != "" && tc.simulatedErr != utilproxy.NoConnectionToDelete {
+		if tc.simulatedErr != "" && tc.simulatedErr != conntrack.NoConnectionToDelete {
 			expGlogErrs = 1
 		}
 		glogErrs := glog.Stats.Error.Lines() - priorGlogErrs
@@ -807,7 +808,7 @@ func TestExternalIPsReject(t *testing.T) {
 
 	fp.syncProxyRules()
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules := ipt.GetRules(string(kubeExternalServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcExternalIPs, svcPort) {
 		errorf(fmt.Sprintf("Failed to a %v rule for externalIP %v with no endpoints", iptablestest.Reject, svcPortName), kubeSvcRules, t)
 	}
@@ -840,7 +841,7 @@ func TestNodePortReject(t *testing.T) {
 
 	fp.syncProxyRules()
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules := ipt.GetRules(string(kubeExternalServicesChain))
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP, svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcPortName), kubeSvcRules, t)
 	}

@@ -1954,6 +1954,33 @@ function setup-addon-manifests {
   fi
 }
 
+# A function that downloads extra addons from a URL and puts them in the GCI
+# manifests directory.
+function download-extra-addons {
+  local -r out_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gce-extras"
+
+  mkdir -p "${out_dir}"
+
+  local curl_cmd=(
+    "curl"
+    "--fail"
+    "--retry" "5"
+    "--retry-delay" "3"
+    "--silent"
+    "--show-error"
+  )
+  if [[ -n "${CURL_RETRY_CONNREFUSED:-}" ]]; then
+    curl_cmd+=("${CURL_RETRY_CONNREFUSED}")
+  fi
+  if [[ -n "${EXTRA_ADDONS_HEADER:-}" ]]; then
+    curl_cmd+=("-H" "${EXTRA_ADDONS_HEADER}")
+  fi
+  curl_cmd+=("-o" "${out_dir}/extras.json")
+  curl_cmd+=("${EXTRA_ADDONS_URL}")
+
+  "${curl_cmd[@]}"
+}
+
 # A helper function for copying manifests and setting dir/files
 # permissions.
 #
@@ -2051,6 +2078,11 @@ function update-prometheus-to-sd-parameters {
     # Removes all lines between two patterns (throws away prometheus-to-sd)
     sed -i -e "/# BEGIN_PROMETHEUS_TO_SD/,/# END_PROMETHEUS_TO_SD/d" "$1"
    fi
+}
+
+# Updates parameters in yaml file for event-exporter configuration
+function update-event-exporter {
+    sed -i -e "s@{{ *event_exporter_zone *}}@${ZONE:-}@g" "$1"
 }
 
 # Sets up the manifests of coreDNS for k8s addons.
@@ -2202,6 +2234,7 @@ EOF
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
     local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
     local -r fluentd_gcp_configmap_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-configmap.yaml"
+    update-event-exporter ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
     start-fluentd-resource-update ${fluentd_gcp_yaml}
@@ -2244,6 +2277,10 @@ EOF
     else
       setup-addon-manifests "addons" "istio/noauth"
     fi
+  fi
+  if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
+    download-extra-addons
+    setup-addon-manifests "addons" "gce-extras"
   fi
 
   # Place addon manager pod manifest.

@@ -32,7 +32,7 @@ import (
 func TestCreateQuota(t *testing.T) {
 	resourceQuotaObject := &v1.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 
@@ -74,7 +74,7 @@ func TestCreateQuota(t *testing.T) {
 	}
 	for name, test := range tests {
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdCreateQuota(f, buf)
+		cmd := NewCmdCreateQuota(tf, buf)
 		cmd.Flags().Parse(test.flags)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{resourceQuotaObject.Name})

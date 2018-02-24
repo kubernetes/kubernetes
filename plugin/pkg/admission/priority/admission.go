@@ -31,25 +31,14 @@ import (
 	schedulinglisters "k8s.io/kubernetes/pkg/client/listers/scheduling/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
 	// PluginName indicates name of admission plugin.
 	PluginName = "Priority"
-
-	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
-	HighestUserDefinablePriority = 1000000000
-	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
-	SystemCriticalPriority = 2 * HighestUserDefinablePriority
 )
-
-// SystemPriorityClasses defines special priority classes which are used by system critical pods that should not be preempted by workload pods.
-// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
-// start with scheduling.SystemPriorityClassPrefix which is by default "system-".
-var SystemPriorityClasses = map[string]int32{
-	"system-cluster-critical": SystemCriticalPriority,
-	"system-node-critical":    SystemCriticalPriority + 1000,
-}
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -166,6 +155,13 @@ func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		var priority int32
+		// TODO: @ravig - This is for backwards compatibility to ensure that critical pods with annotations just work fine.
+		// Remove when no longer needed.
+		if len(pod.Spec.PriorityClassName) == 0 &&
+			utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+			kubelettypes.IsCritical(a.GetNamespace(), pod.Annotations) {
+			pod.Spec.PriorityClassName = schedulerapi.SystemClusterCritical
+		}
 		if len(pod.Spec.PriorityClassName) == 0 {
 			var err error
 			priority, err = p.getDefaultPriority()
@@ -174,7 +170,7 @@ func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 			}
 		} else {
 			// First try to resolve by system priority classes.
-			priority, ok = SystemPriorityClasses[pod.Spec.PriorityClassName]
+			priority, ok = schedulerapi.SystemPriorityClasses[pod.Spec.PriorityClassName]
 			if !ok {
 				// Now that we didn't find any system priority, try resolving by user defined priority classes.
 				pc, err := p.lister.Get(pod.Spec.PriorityClassName)
@@ -202,10 +198,10 @@ func (p *PriorityPlugin) validatePriorityClass(a admission.Attributes) error {
 	if !ok {
 		return errors.NewBadRequest("resource was marked with kind PriorityClass but was unable to be converted")
 	}
-	if pc.Value > HighestUserDefinablePriority {
-		return admission.NewForbidden(a, fmt.Errorf("maximum allowed value of a user defined priority is %v", HighestUserDefinablePriority))
+	if pc.Value > schedulerapi.HighestUserDefinablePriority {
+		return admission.NewForbidden(a, fmt.Errorf("maximum allowed value of a user defined priority is %v", schedulerapi.HighestUserDefinablePriority))
 	}
-	if _, ok := SystemPriorityClasses[pc.Name]; ok {
+	if _, ok := schedulerapi.SystemPriorityClasses[pc.Name]; ok {
 		return admission.NewForbidden(a, fmt.Errorf("the name of the priority class is a reserved name for system use only: %v", pc.Name))
 	}
 	// If the new PriorityClass tries to be the default priority, make sure that no other priority class is marked as default.

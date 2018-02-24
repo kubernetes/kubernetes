@@ -72,7 +72,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 	}
 	for _, test := range tests {
 		var err error
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -93,16 +93,16 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		ff := &fakePortForwarder{}
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")
 		}
 
 		opts := &PortForwardOptions{}
-		cmd := NewCmdPortForward(f, os.Stdout, os.Stderr)
+		cmd := NewCmdPortForward(tf, os.Stdout, os.Stderr)
 		cmd.Run = func(cmd *cobra.Command, args []string) {
-			if err = opts.Complete(f, cmd, args); err != nil {
+			if err = opts.Complete(tf, cmd, args); err != nil {
 				return
 			}
 			opts.PortForwarder = ff

@@ -622,6 +622,7 @@ func autoConvert_v1_CSIPersistentVolumeSource_To_core_CSIPersistentVolumeSource(
 	out.VolumeHandle = in.VolumeHandle
 	out.ReadOnly = in.ReadOnly
 	out.FSType = in.FSType
+	out.VolumeAttributes = *(*map[string]string)(unsafe.Pointer(&in.VolumeAttributes))
 	return nil
 }
 
@@ -635,6 +636,7 @@ func autoConvert_core_CSIPersistentVolumeSource_To_v1_CSIPersistentVolumeSource(
 	out.VolumeHandle = in.VolumeHandle
 	out.ReadOnly = in.ReadOnly
 	out.FSType = in.FSType
+	out.VolumeAttributes = *(*map[string]string)(unsafe.Pointer(&in.VolumeAttributes))
 	return nil
 }
 

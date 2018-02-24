@@ -108,7 +108,11 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
-	ignoreMetrics := cadvisormetrics.MetricSet{cadvisormetrics.NetworkTcpUsageMetrics: struct{}{}, cadvisormetrics.NetworkUdpUsageMetrics: struct{}{}}
+	ignoreMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.NetworkTcpUsageMetrics: struct{}{},
+		cadvisormetrics.NetworkUdpUsageMetrics: struct{}{},
+		cadvisormetrics.PerCpuUsageMetrics:     struct{}{},
+	}
 	if !usingLegacyStats {
 		ignoreMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}

@@ -18,6 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Unset CDPATH so that path interpolation can work correctly
+# https://github.com/kubernetes/kubernetes/issues/52255
+unset CDPATH
+
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 

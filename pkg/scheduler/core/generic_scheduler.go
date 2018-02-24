@@ -675,13 +675,15 @@ func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulercache.NodeInf
 // 3. Ties are broken by sum of priorities of all victims.
 // 4. If there are still ties, node with the minimum number of victims is picked.
 // 5. If there are still ties, the first such node is picked (sort of randomly).
-//TODO(bsalamat): Try to reuse the "min*Nodes" slices in order to save GC time.
+// The 'minNodes1' and 'minNodes2' are being reused here to save the memory
+// allocation and garbage collection time.
 func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*Victims) *v1.Node {
 	if len(nodesToVictims) == 0 {
 		return nil
 	}
 	minNumPDBViolatingPods := math.MaxInt32
-	var minPDBViolatingNodes []*v1.Node
+	var minNodes1 []*v1.Node
+	lenNodes1 := 0
 	for node, victims := range nodesToVictims {
 		if len(victims.pods) == 0 {
 			// We found a node that doesn't need any preemption. Return it!
@@ -693,42 +695,48 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*Victims) *v1.Node {
 		numPDBViolatingPods := victims.numPDBViolations
 		if numPDBViolatingPods < minNumPDBViolatingPods {
 			minNumPDBViolatingPods = numPDBViolatingPods
-			minPDBViolatingNodes = nil
+			minNodes1 = nil
+			lenNodes1 = 0
 		}
 		if numPDBViolatingPods == minNumPDBViolatingPods {
-			minPDBViolatingNodes = append(minPDBViolatingNodes, node)
+			minNodes1 = append(minNodes1, node)
+			lenNodes1++
 		}
 	}
-	if len(minPDBViolatingNodes) == 1 {
-		return minPDBViolatingNodes[0]
+	if lenNodes1 == 1 {
+		return minNodes1[0]
 	}
 
 	// There are more than one node with minimum number PDB violating pods. Find
 	// the one with minimum highest priority victim.
 	minHighestPriority := int32(math.MaxInt32)
-	var minPriorityNodes []*v1.Node
-	for _, node := range minPDBViolatingNodes {
+	var minNodes2 = make([]*v1.Node, lenNodes1)
+	lenNodes2 := 0
+	for i := 0; i < lenNodes1; i++ {
+		node := minNodes1[i]
 		victims := nodesToVictims[node]
 		// highestPodPriority is the highest priority among the victims on this node.
 		highestPodPriority := util.GetPodPriority(victims.pods[0])
 		if highestPodPriority < minHighestPriority {
 			minHighestPriority = highestPodPriority
-			minPriorityNodes = nil
+			lenNodes2 = 0
 		}
 		if highestPodPriority == minHighestPriority {
-			minPriorityNodes = append(minPriorityNodes, node)
+			minNodes2[lenNodes2] = node
+			lenNodes2++
 		}
 	}
-	if len(minPriorityNodes) == 1 {
-		return minPriorityNodes[0]
+	if lenNodes2 == 1 {
+		return minNodes2[0]
 	}
 
 	// There are a few nodes with minimum highest priority victim. Find the
 	// smallest sum of priorities.
 	minSumPriorities := int64(math.MaxInt64)
-	var minSumPriorityNodes []*v1.Node
-	for _, node := range minPriorityNodes {
+	lenNodes1 = 0
+	for i := 0; i < lenNodes2; i++ {
 		var sumPriorities int64
+		node := minNodes2[i]
 		for _, pod := range nodesToVictims[node].pods {
 			// We add MaxInt32+1 to all priorities to make all of them >= 0. This is
 			// needed so that a node with a few pods with negative priority is not
@@ -738,34 +746,37 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*Victims) *v1.Node {
 		}
 		if sumPriorities < minSumPriorities {
 			minSumPriorities = sumPriorities
-			minSumPriorityNodes = nil
+			lenNodes1 = 0
 		}
 		if sumPriorities == minSumPriorities {
-			minSumPriorityNodes = append(minSumPriorityNodes, node)
+			minNodes1[lenNodes1] = node
+			lenNodes1++
 		}
 	}
-	if len(minSumPriorityNodes) == 1 {
-		return minSumPriorityNodes[0]
+	if lenNodes1 == 1 {
+		return minNodes1[0]
 	}
 
 	// There are a few nodes with minimum highest priority victim and sum of priorities.
 	// Find one with the minimum number of pods.
 	minNumPods := math.MaxInt32
-	var minNumPodNodes []*v1.Node
-	for _, node := range minSumPriorityNodes {
+	lenNodes2 = 0
+	for i := 0; i < lenNodes1; i++ {
+		node := minNodes1[i]
 		numPods := len(nodesToVictims[node].pods)
 		if numPods < minNumPods {
 			minNumPods = numPods
-			minNumPodNodes = nil
+			lenNodes2 = 0
 		}
 		if numPods == minNumPods {
-			minNumPodNodes = append(minNumPodNodes, node)
+			minNodes2[lenNodes2] = node
+			lenNodes2++
 		}
 	}
 	// At this point, even if there are more than one node with the same score,
 	// return the first one.
-	if len(minNumPodNodes) > 0 {
-		return minNumPodNodes[0]
+	if lenNodes2 > 0 {
+		return minNodes2[0]
 	}
 	glog.Errorf("Error in logic of node scoring for preemption. We should never reach here!")
 	return nil

@@ -30,7 +30,6 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/categories:go_default_library",
@@ -81,7 +80,6 @@ go_library(
         "//vendor/k8s.io/client-go/scale:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/util/homedir:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

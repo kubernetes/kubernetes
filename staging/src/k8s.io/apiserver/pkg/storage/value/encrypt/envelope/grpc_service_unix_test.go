@@ -124,7 +124,7 @@ func startTestKMSProvider() (*grpc.Server, error) {
 	}
 
 	server := grpc.NewServer()
-	kmsapi.RegisterKMSServiceServer(server, &base64Server{})
+	kmsapi.RegisterKeyManagementServiceServer(server, &base64Server{})
 	go server.Serve(listener)
 	return server, nil
 }

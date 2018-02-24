@@ -1634,6 +1634,10 @@ type CSIPersistentVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string
+
+	// Attributes of the volume to publish.
+	// +optional
+	VolumeAttributes map[string]string
 }
 
 // ContainerPort represents a network port in a single container

@@ -151,14 +151,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		c.volumeInfo = attachment.Status.AttachmentMetadata
 	}
 
-	// get volume attributes
-	// TODO: for alpha vol attributes are passed via PV.Annotations
-	// Beta will fix that
-	attribs, err := getVolAttribsFromSpec(c.spec)
-	if err != nil {
-		glog.Error(log("mounter.SetUpAt failed to extract volume attributes from PV annotations: %v", err))
-		return err
-	}
+	attribs := csiSource.VolumeAttributes
 
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -293,29 +286,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	glog.V(4).Infof(log("mounte.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
-}
-
-// getVolAttribsFromSpec extracts CSI VolumeAttributes information from PV.Annotations
-// using key csi.kubernetes.io/volume-attributes.  The annotation value is expected
-// to be a JSON-encoded object of form {"key0":"val0",...,"keyN":"valN"}
-func getVolAttribsFromSpec(spec *volume.Spec) (map[string]string, error) {
-	if spec == nil {
-		return nil, errors.New("missing volume spec")
-	}
-	annotations := spec.PersistentVolume.GetAnnotations()
-	if annotations == nil {
-		return nil, nil // no annotations found
-	}
-	jsonAttribs := annotations[csiVolAttribsAnnotationKey]
-	if jsonAttribs == "" {
-		return nil, nil // csi annotation not found
-	}
-	attribs := map[string]string{}
-	if err := json.Unmarshal([]byte(jsonAttribs), &attribs); err != nil {
-		glog.Error(log("error parsing csi PV.Annotation [%s]=%s: %v", csiVolAttribsAnnotationKey, jsonAttribs, err))
-		return nil, err
-	}
-	return attribs, nil
 }
 
 // saveVolumeData persists parameter data as json file using the location

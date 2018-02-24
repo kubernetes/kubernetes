@@ -37,7 +37,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 		},
 	}
 	secretObject.Name = "my-secret"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 
@@ -56,7 +56,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateSecretGeneric(f, buf)
+	cmd := NewCmdCreateSecretGeneric(tf, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("from-literal", "password=includes,comma")
 	cmd.Flags().Set("from-literal", "username=test_user")
@@ -70,7 +70,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 func TestCreateSecretDockerRegistry(t *testing.T) {
 	secretObject := &v1.Secret{}
 	secretObject.Name = "my-secret"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 
@@ -89,7 +89,7 @@ func TestCreateSecretDockerRegistry(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateSecretDockerRegistry(f, buf)
+	cmd := NewCmdCreateSecretDockerRegistry(tf, buf)
 	cmd.Flags().Set("docker-username", "test-user")
 	cmd.Flags().Set("docker-password", "test-pass")
 	cmd.Flags().Set("docker-email", "test-email")

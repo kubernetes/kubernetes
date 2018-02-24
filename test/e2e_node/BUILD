@@ -84,6 +84,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "apparmor_test.go",
+        "container_log_rotation_test.go",
         "cpu_manager_test.go",
         "critical_pod_test.go",
         "docker_test.go",
@@ -132,6 +133,7 @@ go_test(
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kubeletconfig:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
+        "//pkg/kubelet/logs:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",

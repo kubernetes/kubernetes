@@ -31,7 +31,7 @@ import (
 )
 
 func TestForProperValidationErrors(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func newNoxuValidationInstance(namespace, name string) *unstructured.Unstructure
 }
 
 func TestCustomResourceValidation(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestCustomResourceValidation(t *testing.T) {
 }
 
 func TestCustomResourceUpdateValidation(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 }
 
 func TestCustomResourceValidationErrors(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 }
 
 func TestCRValidationOnCRDUpdate(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 }
 
 func TestForbiddenFieldsInSchema(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}

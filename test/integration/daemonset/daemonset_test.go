@@ -22,16 +22,16 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	appstyped "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
-	extensionsv1beta1typed "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -53,8 +53,8 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonS
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
 	metrics.UnregisterMetricAndUntrackRateLimiterUsage("daemon_controller")
 	dc, err := daemon.NewDaemonSetsController(
-		informers.Extensions().V1beta1().DaemonSets(),
-		informers.Apps().V1beta1().ControllerRevisions(),
+		informers.Apps().V1().DaemonSets(),
+		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-controller")),
@@ -70,22 +70,22 @@ func testLabels() map[string]string {
 	return map[string]string{"name": "test"}
 }
 
-func newDaemonSet(name, namespace string) *v1beta1.DaemonSet {
+func newDaemonSet(name, namespace string) *apps.DaemonSet {
 	two := int32(2)
-	return &v1beta1.DaemonSet{
+	return &apps.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
-			APIVersion: "extensions/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: v1beta1.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			RevisionHistoryLimit: &two,
 			Selector:             &metav1.LabelSelector{MatchLabels: testLabels()},
-			UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
-				Type: v1beta1.OnDeleteDaemonSetStrategyType,
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -99,22 +99,22 @@ func newDaemonSet(name, namespace string) *v1beta1.DaemonSet {
 	}
 }
 
-func newRollbackStrategy() *v1beta1.DaemonSetUpdateStrategy {
+func newRollbackStrategy() *apps.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
-	return &v1beta1.DaemonSetUpdateStrategy{
-		Type:          v1beta1.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &v1beta1.RollingUpdateDaemonSet{MaxUnavailable: &one},
+	return &apps.DaemonSetUpdateStrategy{
+		Type:          apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
 	}
 }
 
-func newOnDeleteStrategy() *v1beta1.DaemonSetUpdateStrategy {
-	return &v1beta1.DaemonSetUpdateStrategy{
-		Type: v1beta1.OnDeleteDaemonSetStrategyType,
+func newOnDeleteStrategy() *apps.DaemonSetUpdateStrategy {
+	return &apps.DaemonSetUpdateStrategy{
+		Type: apps.OnDeleteDaemonSetStrategyType,
 	}
 }
 
-func updateStrategies() []*v1beta1.DaemonSetUpdateStrategy {
-	return []*v1beta1.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
+func updateStrategies() []*apps.DaemonSetUpdateStrategy {
+	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
 }
 
 func allocatableResources(memory, cpu string) v1.ResourceList {
@@ -189,9 +189,6 @@ func validateDaemonSetPodsAndMarkReady(
 				return false, fmt.Errorf("Pod %s has %d OwnerReferences, expected only 1", pod.Name, len(ownerReferences))
 			}
 			controllerRef := ownerReferences[0]
-			if got, want := controllerRef.APIVersion, "extensions/v1beta1"; got != want {
-				t.Errorf("controllerRef.APIVersion = %q, want %q", got, want)
-			}
 			if got, want := controllerRef.Kind, "DaemonSet"; got != want {
 				t.Errorf("controllerRef.Kind = %q, want %q", got, want)
 			}
@@ -219,7 +216,7 @@ func validateDaemonSetPodsAndMarkReady(
 }
 
 func validateDaemonSetStatus(
-	dsClient extensionsv1beta1typed.DaemonSetInterface,
+	dsClient appstyped.DaemonSetInterface,
 	dsName string,
 	dsNamespace string,
 	expectedNumberReady int32,
@@ -267,7 +264,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 		ns := framework.CreateTestingNamespace("one-node-daemonset-test", server, t)
 		defer framework.DeleteTestingNamespace(ns, server, t)
 
-		dsClient := clientset.ExtensionsV1beta1().DaemonSets(ns.Name)
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
@@ -300,7 +297,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
 		defer framework.DeleteTestingNamespace(ns, server, t)
 
-		dsClient := clientset.ExtensionsV1beta1().DaemonSets(ns.Name)
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
@@ -330,7 +327,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
 		defer framework.DeleteTestingNamespace(ns, server, t)
 
-		dsClient := clientset.ExtensionsV1beta1().DaemonSets(ns.Name)
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
@@ -367,7 +364,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		ns := framework.CreateTestingNamespace("insufficient-capacity", server, t)
 		defer framework.DeleteTestingNamespace(ns, server, t)
 
-		dsClient := clientset.ExtensionsV1beta1().DaemonSets(ns.Name)
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		eventClient := corev1typed.New(clientset.CoreV1().RESTClient()).Events(ns.Namespace)
 		stopCh := make(chan struct{})

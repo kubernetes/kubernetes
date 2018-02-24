@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -413,7 +414,8 @@ conntrack:
   min: 1
   tcpCloseWaitTimeout: 10s
   tcpEstablishedTimeout: 20s
-featureGates: "all"
+featureGates:
+  SupportIPVSProxyMode: true
 healthzBindAddress: "%s"
 hostnameOverride: "foo"
 iptables:
@@ -524,7 +526,7 @@ udpIdleTimeout: 123ms
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
-			FeatureGates:       "all",
+			FeatureGates:       map[string]bool{string(features.SupportIPVSProxyMode): true},
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{

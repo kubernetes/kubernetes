@@ -48,6 +48,9 @@ func UntilFirstEntryFromLog(log string) IngestionPred {
 	return func(_ string, entries []LogEntry) (bool, error) {
 		for _, e := range entries {
 			if e.LogName == log {
+				if e.Location != framework.TestContext.CloudConfig.Zone {
+					return false, fmt.Errorf("Bad location in logs '%s' != '%d'", e.Location, framework.TestContext.CloudConfig.Zone)
+				}
 				return true, nil
 			}
 		}

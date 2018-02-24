@@ -268,7 +268,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 		return fmt.Errorf("invalid disk to detach: %q", diskURI)
 	}
 
-	_, err := d.cloud.InstanceID(context.TODO(), nodeName)
+	instanceid, err := d.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		glog.Warningf("no instance id for node %q, skip detaching (%v)", nodeName, err)
 		return nil
@@ -280,6 +280,10 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 	if err != nil {
 		return err
 	}
+
+	getLunMutex.LockKey(instanceid)
+	defer getLunMutex.UnlockKey(instanceid)
+
 	err = diskController.DetachDiskByName("", diskURI, nodeName)
 	if err != nil {
 		glog.Errorf("failed to detach azure disk %q, err %v", diskURI, err)

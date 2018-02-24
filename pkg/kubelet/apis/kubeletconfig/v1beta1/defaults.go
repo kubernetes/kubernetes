@@ -192,6 +192,12 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.FailSwapOn == nil {
 		obj.FailSwapOn = utilpointer.BoolPtr(true)
 	}
+	if obj.ContainerLogMaxSize == "" {
+		obj.ContainerLogMaxSize = "10Mi"
+	}
+	if obj.ContainerLogMaxFiles == nil {
+		obj.ContainerLogMaxFiles = utilpointer.Int32Ptr(5)
+	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}

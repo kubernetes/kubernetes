@@ -122,7 +122,7 @@ func TestCreateRoute(t *testing.T) {
 		t.Errorf("Expected next hop: %v, saw %v", network.RouteNextHopTypeVirtualAppliance, routeInfo.NextHopType)
 	}
 	if *routeInfo.NextHopIPAddress != nodeIP {
-		t.Errorf("Expected IP addres: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
+		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
 	}
 }
 

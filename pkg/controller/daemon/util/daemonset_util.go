@@ -18,7 +18,9 @@ package util
 
 import (
 	"fmt"
+	"strconv"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,13 +30,28 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
+
+// GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
+// deprecated annotation. If no annotation is found nil is returned. If the annotation is found and fails to parse
+// nil is returned with an error. If the generation can be parsed from the annotation, a pointer to the parsed int64
+// value is returned.
+func GetTemplateGeneration(ds *apps.DaemonSet) (*int64, error) {
+	annotation, found := ds.Annotations[apps.DeprecatedTemplateGeneration]
+	if !found {
+		return nil, nil
+	}
+	generation, err := strconv.ParseInt(annotation, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &generation, nil
+}
 
 // CreatePodTemplate returns copy of provided template with additional
 // label which contains templateGeneration (for backward compatibility),
 // hash of provided template and sets default daemon tolerations.
-func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash string) v1.PodTemplateSpec {
+func CreatePodTemplate(template v1.PodTemplateSpec, generation *int64, hash string) v1.PodTemplateSpec {
 	newTemplate := *template.DeepCopy()
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
@@ -81,12 +98,12 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 		})
 	}
 
-	templateGenerationStr := fmt.Sprint(generation)
-	newTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
-		template.ObjectMeta.Labels,
-		extensions.DaemonSetTemplateGenerationKey,
-		templateGenerationStr,
-	)
+	if newTemplate.ObjectMeta.Labels == nil {
+		newTemplate.ObjectMeta.Labels = make(map[string]string)
+	}
+	if generation != nil {
+		newTemplate.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey] = fmt.Sprint(*generation)
+	}
 	// TODO: do we need to validate if the DaemonSet is RollingUpdate or not?
 	if len(hash) > 0 {
 		newTemplate.ObjectMeta.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = hash
@@ -95,9 +112,10 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 }
 
 // IsPodUpdated checks if pod contains label value that either matches templateGeneration or hash
-func IsPodUpdated(dsTemplateGeneration int64, pod *v1.Pod, hash string) bool {
+func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
-	templateMatches := pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
+	templateMatches := dsTemplateGeneration != nil &&
+		pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
 	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
 	return hashMatches || templateMatches
 }

@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
-	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -339,7 +338,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, conditions.PodCompleted)
+			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, kubectl.PodCompleted)
 			if err != nil {
 				return err
 			}
@@ -442,8 +441,8 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 }
 
 func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
-	if err != nil && err != conditions.ErrPodCompleted {
+	pod, err := waitForPod(podClient, ns, name, kubectl.PodRunningAndReady)
+	if err != nil && err != kubectl.ErrPodCompleted {
 		return err
 	}
 

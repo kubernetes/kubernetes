@@ -139,7 +139,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -154,13 +154,13 @@ func TestPodAndContainerAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p
 		cmdutil.AddPodRunningTimeoutFlag(cmd, test.timeout)
 
-		err := options.Complete(f, cmd, test.args)
+		err := options.Complete(tf, cmd, test.args)
 		if test.expectError && err == nil {
 			t.Errorf("%s: unexpected non-error", test.name)
 		}
@@ -219,7 +219,7 @@ func TestAttach(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -242,7 +242,7 @@ func TestAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+		tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -262,7 +262,7 @@ func TestAttach(t *testing.T) {
 		}
 		cmd := &cobra.Command{}
 		cmdutil.AddPodRunningTimeoutFlag(cmd, 1000)
-		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
+		if err := params.Complete(tf, cmd, []string{"foo"}); err != nil {
 			t.Fatal(err)
 		}
 		err := params.Run()
@@ -309,7 +309,7 @@ func TestAttachWarnings(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -331,7 +331,7 @@ func TestAttachWarnings(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
+		tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -350,7 +350,7 @@ func TestAttachWarnings(t *testing.T) {
 		}
 		cmd := &cobra.Command{}
 		cmdutil.AddPodRunningTimeoutFlag(cmd, 1000)
-		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
+		if err := params.Complete(tf, cmd, []string{"foo"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := params.Run(); err != nil {

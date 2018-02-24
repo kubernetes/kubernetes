@@ -79,9 +79,6 @@ var (
 	  # Import environment from a config map with a prefix
 	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
 
-          # Import specific keys from a config map
-          kubectl set env --keys=my-example-key --from=configmap/myconfigmap deployment/myapp
-
 	  # Remove the environment variable ENV from container 'c1' in all deployment configs
 	  kubectl set env deployments --all --containers="c1" ENV-
 
@@ -117,7 +114,6 @@ type EnvOptions struct {
 	Output            string
 	From              string
 	Prefix            string
-	Keys              []string
 
 	Builder *resource.Builder
 	Infos   []*resource.Info
@@ -141,8 +137,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 		Long:    envLong,
 		Example: fmt.Sprintf(envExample),
 		Run: func(cmd *cobra.Command, args []string) {
-			options.Complete(f, cmd)
-			cmdutil.CheckErr(options.Validate(args))
+			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunEnv(f))
 		},
 	}
@@ -152,7 +147,6 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().StringP("from", "", "", "The name of a resource from which to inject environment variables")
 	cmd.Flags().StringP("prefix", "", "", "Prefix to append to variable names")
 	cmd.Flags().StringArrayVarP(&options.EnvParams, "env", "e", options.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
-	cmd.Flags().StringSliceVarP(&options.Keys, "keys", "", options.Keys, "Comma-separated list of keys to import from specified resource")
 	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
@@ -179,20 +173,18 @@ func keyToEnvName(key string) string {
 	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
 }
 
-func contains(key string, keyList []string) bool {
-	if len(keyList) == 0 {
-		return true
+func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
+	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
+	if !ok {
+		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
+	}
+	if len(o.Filenames) == 0 && len(resources) < 1 {
+		return cmdutil.UsageErrorf(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 
-	for _, k := range keyList {
-		if k == key {
-			return true
-		}
-	}
-	return false
-}
-
-func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) {
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.ContainerSelector = cmdutil.GetFlagString(cmd, "containers")
 	o.List = cmdutil.GetFlagBool(cmd, "list")
@@ -203,38 +195,18 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) {
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.From = cmdutil.GetFlagString(cmd, "from")
 	o.Prefix = cmdutil.GetFlagString(cmd, "prefix")
-	o.Keys = cmdutil.GetFlagStringSlice(cmd, "keys")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
+	o.EnvArgs = envArgs
+	o.Resources = resources
 	o.Cmd = cmd
 
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-
-}
-
-func (o *EnvOptions) Validate(args []string) error {
-	if o.All && len(o.Selector) > 0 {
-		return fmt.Errorf("cannot set --all and --selector at the same time")
-	}
-	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
-	if !ok {
-		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
-	}
-
-	if len(o.Filenames) == 0 && len(resources) == 0 {
-		return cmdutil.UsageErrorf(o.Cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
-	}
 
 	if o.List && len(o.Output) > 0 {
 		return cmdutil.UsageErrorf(o.Cmd, "--list and --output may not be specified together")
 	}
 
-	if len(o.Keys) > 0 && len(o.From) == 0 {
-		return cmdutil.UsageErrorf(o.Cmd, "when specifying --keys, a configmap or secret must be provided with --from")
-	}
-
-	o.EnvArgs = envArgs
-	o.Resources = resources
 	return nil
 }
 
@@ -299,9 +271,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 							},
 						},
 					}
-					if contains(key, o.Keys) {
-						env = append(env, envVar)
-					}
+					env = append(env, envVar)
 				}
 			case *v1.ConfigMap:
 				for key := range from.Data {
@@ -316,9 +286,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 							},
 						},
 					}
-					if contains(key, o.Keys) {
-						env = append(env, envVar)
-					}
+					env = append(env, envVar)
 				}
 			default:
 				return fmt.Errorf("unsupported resource specified in --from")

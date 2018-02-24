@@ -588,7 +588,7 @@ func (c *reaperCoreFake) Pods(namespace string) coreclient.PodInterface {
 	return pods
 }
 
-func pod() *api.Pod {
+func newPod() *api.Pod {
 	return &api.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"}}
 }
 
@@ -602,7 +602,7 @@ func TestSimpleStop(t *testing.T) {
 	}{
 		{
 			fake: &reaperFake{
-				Clientset: fake.NewSimpleClientset(pod()),
+				Clientset: fake.NewSimpleClientset(newPod()),
 			},
 			kind: api.Kind("Pod"),
 			actions: []testcore.Action{
@@ -624,7 +624,7 @@ func TestSimpleStop(t *testing.T) {
 		},
 		{
 			fake: &reaperFake{
-				Clientset:   fake.NewSimpleClientset(pod()),
+				Clientset:   fake.NewSimpleClientset(newPod()),
 				noDeletePod: true,
 			},
 			kind: api.Kind("Pod"),

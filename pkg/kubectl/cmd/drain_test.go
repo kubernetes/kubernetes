@@ -150,7 +150,7 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -194,10 +194,10 @@ func TestCordon(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
-		cmd := test.cmd(f, buf)
+		cmd := test.cmd(tf, buf)
 
 		saw_fatal := false
 		func() {
@@ -600,7 +600,7 @@ func TestDrain(t *testing.T) {
 			new_node := &corev1.Node{}
 			deleted := false
 			evicted := false
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 			ns := legacyscheme.Codecs
 
@@ -700,11 +700,11 @@ func TestDrain(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfig = defaultClientConfig()
+			tf.ClientConfigVal = defaultClientConfig()
 
 			buf := bytes.NewBuffer([]byte{})
 			errBuf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdDrain(f, buf, errBuf)
+			cmd := NewCmdDrain(tf, buf, errBuf)
 
 			saw_fatal := false
 			fatal_msg := ""
@@ -824,9 +824,9 @@ func TestDeletePods(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, _ := cmdtesting.NewAPIFactory()
-		o := DrainOptions{Factory: f}
-		o.mapper, _ = f.Object()
+		tf := cmdtesting.NewTestFactory()
+		o := DrainOptions{Factory: tf}
+		o.mapper, _ = tf.Object()
 		o.Out = os.Stdout
 		_, pods := createPods(false)
 		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)

@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"reflect"
 	goruntime "runtime"
@@ -38,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/routes"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -470,17 +471,14 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
 func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
-	mux := http.NewServeMux()
+	mux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(mux)
 	if config.HealthzBindAddress == config.MetricsBindAddress {
 		configz.InstallHandler(mux)
 		mux.Handle("/metrics", prometheus.Handler())
 	}
 	if config.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		routes.Profiling{}.Install(mux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
@@ -493,14 +491,11 @@ func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http
 
 // makeMetricsServer builds a metrics server from the config.
 func makeMetricsServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
-	mux := http.NewServeMux()
+	mux := mux.NewPathRecorderMux("kube-scheduler")
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
 	if config.EnableProfiling {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		routes.Profiling{}.Install(mux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}

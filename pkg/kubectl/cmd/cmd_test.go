@@ -177,14 +177,14 @@ func stringBody(body string) io.ReadCloser {
 }
 
 func Example_printMultiContainersReplicationControllerWithWide() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "foo",
@@ -227,14 +227,14 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 }
 
 func Example_printReplicationController() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "foo",
@@ -276,7 +276,7 @@ func Example_printReplicationController() {
 }
 
 func Example_printPodWithWideFormat() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -284,7 +284,7 @@ func Example_printPodWithWideFormat() {
 		Client:               nil,
 	}
 	nodeName := "kubernetes-node-abcd"
-	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
@@ -314,7 +314,7 @@ func Example_printPodWithWideFormat() {
 }
 
 func Example_printPodWithShowLabels() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -322,7 +322,7 @@ func Example_printPodWithShowLabels() {
 		Client:               nil,
 	}
 	nodeName := "kubernetes-node-abcd"
-	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
@@ -447,17 +447,17 @@ func newAllPhasePodList() *api.PodList {
 }
 
 func Example_printPodHideTerminated() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
 	// filter pods
-	filterFuncs := f.DefaultResourceFilterFunc()
+	filterFuncs := tf.DefaultResourceFilterFunc()
 	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
 	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
 	if errs != nil {
@@ -481,14 +481,14 @@ func Example_printPodHideTerminated() {
 }
 
 func Example_printPodShowAll() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
+	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
 	err := cmdutil.PrintObject(cmd, podList, os.Stdout)
 	if err != nil {
@@ -504,14 +504,14 @@ func Example_printPodShowAll() {
 }
 
 func Example_printServiceWithLabels() {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	cmd := resource.NewCmdGet(f, os.Stdout, os.Stderr)
+	cmd := resource.NewCmdGet(tf, os.Stdout, os.Stderr)
 	svc := &api.ServiceList{
 		Items: []api.Service{
 			{

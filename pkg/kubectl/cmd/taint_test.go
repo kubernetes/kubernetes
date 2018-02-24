@@ -239,7 +239,7 @@ func TestTaint(t *testing.T) {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
 		new_node := &v1.Node{}
 		tainted := false
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -298,10 +298,10 @@ func TestTaint(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdTaint(f, buf)
+		cmd := NewCmdTaint(tf, buf)
 
 		saw_fatal := false
 		func() {

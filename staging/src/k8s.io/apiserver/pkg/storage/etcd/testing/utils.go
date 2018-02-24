@@ -155,7 +155,6 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 		if err != nil {
 			t.Fatal(err)
 		}
-		m.AuthToken = "simple"
 	} else {
 		cln := newLocalListener(t)
 		m.ClientListeners = []net.Listener{cln}
@@ -165,6 +164,7 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 		}
 	}
 
+	m.AuthToken = "simple"
 	m.Name = name
 	m.DataDir, err = ioutil.TempDir(baseDir, "etcd")
 	if err != nil {

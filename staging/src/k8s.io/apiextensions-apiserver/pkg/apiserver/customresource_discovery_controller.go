@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
+	autoscaling "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -116,7 +117,28 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			Kind:         crd.Status.AcceptedNames.Kind,
 			Verbs:        verbs,
 			ShortNames:   crd.Status.AcceptedNames.ShortNames,
+			Categories:   crd.Status.AcceptedNames.Categories,
 		})
+
+		if crd.Spec.Subresources != nil && crd.Spec.Subresources.Status != nil {
+			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
+				Name:       crd.Status.AcceptedNames.Plural + "/status",
+				Namespaced: crd.Spec.Scope == apiextensions.NamespaceScoped,
+				Kind:       crd.Status.AcceptedNames.Kind,
+				Verbs:      metav1.Verbs([]string{"get", "patch", "update"}),
+			})
+		}
+
+		if crd.Spec.Subresources != nil && crd.Spec.Subresources.Scale != nil {
+			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
+				Group:      autoscaling.GroupName,
+				Version:    "v1",
+				Kind:       "Scale",
+				Name:       crd.Status.AcceptedNames.Plural + "/scale",
+				Namespaced: crd.Spec.Scope == apiextensions.NamespaceScoped,
+				Verbs:      metav1.Verbs([]string{"get", "patch", "update"}),
+			})
+		}
 	}
 
 	if !foundGroup {

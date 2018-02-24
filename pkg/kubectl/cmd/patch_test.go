@@ -31,7 +31,7 @@ import (
 func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -56,7 +56,7 @@ func TestPatchObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdPatch(f, buf)
+	cmd := NewCmdPatch(tf, buf)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
@@ -71,7 +71,7 @@ func TestPatchObject(t *testing.T) {
 func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -89,7 +89,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdPatch(f, buf)
+	cmd := NewCmdPatch(tf, buf)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
@@ -107,7 +107,7 @@ func TestPatchNoop(t *testing.T) {
 	getObject := &svc.Items[0]
 	patchObject := &svc.Items[0]
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -134,7 +134,7 @@ func TestPatchNoop(t *testing.T) {
 		}
 		patchObject.Annotations["foo"] = "bar"
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdPatch(f, buf)
+		cmd := NewCmdPatch(tf, buf)
 		cmd.Flags().Set("namespace", "test")
 		cmd.Flags().Set("patch", `{"metadata":{"annotations":{"foo":"bar"}}}`)
 		cmd.Run(cmd, []string{"services", "frontend"})
@@ -153,7 +153,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	}
 	svcCopy.Labels["post-patch"] = "post-patch-value"
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -173,7 +173,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdPatch(f, buf)
+	cmd := NewCmdPatch(tf, buf)
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "yaml")

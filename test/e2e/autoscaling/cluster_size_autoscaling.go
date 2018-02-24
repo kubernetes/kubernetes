@@ -1290,7 +1290,6 @@ func waitTillAllNAPNodePoolsAreRemoved() error {
 	return err
 }
 
-// Returns size of the newly added node pool
 func addNodePool(name string, machineType string, numNodes int) {
 	args := []string{"container", "node-pools", "create", name, "--quiet",
 		"--machine-type=" + machineType,
@@ -1330,10 +1329,10 @@ func getPoolInitialSize(poolName string) int {
 	// get initial node count
 	args := []string{"container", "node-pools", "describe", poolName, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
-		"--format=\"value(initialNodeCount)\""}
+		"--format=value(initialNodeCount)"}
 	output, err := execCmd(getGcloudCommand(args)...).CombinedOutput()
 	glog.Infof("Node-pool initial size: %s", output)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, string(output))
 	fields := strings.Fields(string(output))
 	Expect(len(fields)).Should(Equal(1))
 	size, err := strconv.ParseInt(fields[0], 10, 64)
@@ -1342,9 +1341,9 @@ func getPoolInitialSize(poolName string) int {
 	// get number of node pools
 	args = []string{"container", "node-pools", "describe", poolName, "--quiet",
 		"--cluster=" + framework.TestContext.CloudConfig.Cluster,
-		"--format=\"value(instanceGroupUrls)\""}
+		"--format=value(instanceGroupUrls)"}
 	output, err = execCmd(getGcloudCommand(args)...).CombinedOutput()
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, string(output))
 	nodeGroupCount := len(strings.Split(string(output), ";"))
 	return int(size) * nodeGroupCount
 }

@@ -131,7 +131,12 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	}
 
 	o.DiscoveryClient = clientset.DiscoveryClient
-	o.MetricsClient, err = f.MetricsClientSet()
+
+	config, err := f.ClientConfig()
+	if err != nil {
+		return err
+	}
+	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
 		return err
 	}

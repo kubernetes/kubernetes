@@ -36,6 +36,14 @@ const (
 	MaxPriority = 10
 	// MaxWeight defines the max weight value.
 	MaxWeight = MaxInt / MaxPriority
+	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
+	HighestUserDefinablePriority = int32(1000000000)
+	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
+	SystemCriticalPriority = 2 * HighestUserDefinablePriority
+	// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
+	// start with scheduling.SystemPriorityClassPrefix which is by default "system-".
+	SystemClusterCritical = "system-cluster-critical"
+	SystemNodeCritical    = "system-node-critical"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -230,6 +238,12 @@ type HostPriority struct {
 
 // HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
+
+// SystemPriorityClasses defines special priority classes which are used by system critical pods that should not be preempted by workload pods.
+var SystemPriorityClasses = map[string]int32{
+	SystemClusterCritical: SystemCriticalPriority,
+	SystemNodeCritical:    SystemCriticalPriority + 1000,
+}
 
 func (h HostPriorityList) Len() int {
 	return len(h)

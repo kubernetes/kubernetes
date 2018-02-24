@@ -46,6 +46,7 @@ func TestAddFlags(t *testing.T) {
 		"--configure-cloud-routes=false",
 		"--contention-profiling=true",
 		"--controller-start-interval=2m",
+		"--http2-max-streams-per-connection=47",
 		"--min-resync-period=5m",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
@@ -150,6 +151,7 @@ func TestAddFlags(t *testing.T) {
 					CertDirectory: "/a/b/c",
 					PairName:      "cloud-controller-manager",
 				},
+				HTTP2MaxStreamsPerConnection: 47,
 			},
 			InsecureServing: &cmoptions.InsecureServingOptions{
 				BindAddress: net.ParseIP("192.168.4.10"),

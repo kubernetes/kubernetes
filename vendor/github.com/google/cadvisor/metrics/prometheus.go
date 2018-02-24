@@ -150,10 +150,18 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				},
 			}, {
 				name:        "container_cpu_usage_seconds_total",
-				help:        "Cumulative cpu time consumed per cpu in seconds.",
+				help:        "Cumulative cpu time consumed in seconds.",
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"cpu"},
 				getValues: func(s *info.ContainerStats) metricValues {
+					if len(s.Cpu.Usage.PerCpu) == 0 {
+						if s.Cpu.Usage.Total > 0 {
+							return metricValues{{
+								value:  float64(s.Cpu.Usage.Total) / float64(time.Second),
+								labels: []string{"total"},
+							}}
+						}
+					}
 					values := make(metricValues, 0, len(s.Cpu.Usage.PerCpu))
 					for i, value := range s.Cpu.Usage.PerCpu {
 						if value > 0 {
