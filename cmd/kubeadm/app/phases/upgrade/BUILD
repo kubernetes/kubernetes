@@ -8,7 +8,6 @@ go_library(
         "health.go",
         "policy.go",
         "postupgrade.go",
-        "postupgrade_v18_19.go",
         "prepull.go",
         "selfhosted.go",
         "staticpods.go",
@@ -71,7 +70,7 @@ go_test(
     srcs = [
         "compute_test.go",
         "policy_test.go",
-        "postupgrade_v18_19_test.go",
+        "postupgrade_test.go",
         "prepull_test.go",
         "staticpods_test.go",
     ],
