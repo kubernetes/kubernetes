@@ -246,6 +246,7 @@ func TestPreemption(t *testing.T) {
 		t.Fatalf("Adding labels to node didn't succeed: %v", err)
 	}
 
+	glog.Info("TestPreemption begin...")
 	for _, test := range tests {
 		pods := make([]*v1.Pod, len(test.existingPods))
 		// Create and run existingPods.
@@ -283,6 +284,7 @@ func TestPreemption(t *testing.T) {
 		pods = append(pods, preemptor)
 		cleanupPods(cs, t, pods)
 	}
+	glog.Info("TestPreemption over...")
 }
 
 func mkPriorityPodWithGrace(tc *TestContext, name string, priority int32, grace int64) *v1.Pod {
@@ -414,6 +416,7 @@ func TestPreemptionStarvation(t *testing.T) {
 // 5. Check that nominated node name of the high priority pod is set and nominated
 //    node name of the medium priority pod is cleared.
 func TestNominatedNodeCleanUp(t *testing.T) {
+	glog.Info("TestNominatedNodeCleanUp begin...")
 	// Enable PodPriority feature gate.
 	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
 	// Initialize scheduler.
@@ -494,6 +497,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	}); err != nil {
 		t.Errorf("The nominated node name of the medium priority pod was not cleared: %v", err)
 	}
+	glog.Info("TestNominatedNodeCleanUp over...")
 }
 
 func mkMinAvailablePDB(name, namespace string, minAvailable int, matchLabels map[string]string) *policy.PodDisruptionBudget {
@@ -512,6 +516,7 @@ func mkMinAvailablePDB(name, namespace string, minAvailable int, matchLabels map
 
 // TestPDBInPreemption tests PodDisruptionBudget support in preemption.
 func TestPDBInPreemption(t *testing.T) {
+	glog.Info("TestPDBInPreemption begin...")
 	// Enable PodPriority feature gate.
 	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.PodPriority))
 	// Initialize scheduler.
@@ -763,4 +768,5 @@ func TestPDBInPreemption(t *testing.T) {
 		cs.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).DeleteCollection(nil, metav1.ListOptions{})
 		cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	}
+	glog.Info("TestPDBInPreemption over...")
 }
