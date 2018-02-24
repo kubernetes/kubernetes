@@ -81,11 +81,18 @@ type ResourcesOptions struct {
 	Resources              []string
 }
 
-func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &ResourcesOptions{
-		Out: out,
-		Err: errOut,
+// NewResourcesOptions returns a ResourcesOptions indicating all containers in the selected
+// pod templates are selected by default.
+func NewResourcesOptions(out io.Writer, errOut io.Writer) *ResourcesOptions {
+	return &ResourcesOptions{
+		Out:               out,
+		Err:               errOut,
+		ContainerSelector: "*",
 	}
+}
+
+func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+	options := NewResourcesOptions(out, errOut)
 
 	resourceTypesWithPodTemplate := []string{}
 	for _, resource := range f.SuggestedPodTemplateResources() {
@@ -111,8 +118,8 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", options.ContainerSelector, "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
 	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set resources will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)

@@ -123,13 +123,21 @@ type EnvOptions struct {
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 }
 
+// NewEnvOptions returns an EnvOptions indicating all containers in the selected
+// pod templates are selected by default and allowing environment to be overwritten
+func NewEnvOptions(in io.Reader, out, errout io.Writer) *EnvOptions {
+	return &EnvOptions{
+		Out:               out,
+		Err:               errout,
+		In:                in,
+		ContainerSelector: "*",
+		Overwrite:         true,
+	}
+}
+
 // NewCmdEnv implements the OpenShift cli env command
 func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Command {
-	options := &EnvOptions{
-		Out: out,
-		Err: errout,
-		In:  in,
-	}
+	options := NewEnvOptions(in, out, errout)
 	cmd := &cobra.Command{
 		Use: "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
@@ -143,7 +151,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	}
 	usage := "the resource to update the env"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change - may use wildcards")
+	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", options.ContainerSelector, "The names of containers in the selected pod templates to change - may use wildcards")
 	cmd.Flags().StringP("from", "", "", "The name of a resource from which to inject environment variables")
 	cmd.Flags().StringP("prefix", "", "", "Prefix to append to variable names")
 	cmd.Flags().StringArrayVarP(&options.EnvParams, "env", "e", options.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
@@ -152,7 +160,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
-	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
+	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", options.Overwrite, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
