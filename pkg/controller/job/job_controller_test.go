@@ -218,10 +218,15 @@ func TestControllerSyncJob(t *testing.T) {
 			fmt.Errorf("Fake error"), true, 0, 3, 0, 0,
 			0, 1, 3, 0, 0, nil, "",
 		},
-		"failed pod": {
+		"failed + succeed pods: reset backoff delay": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("Fake error"), false, 0, 1, 1, 1,
+			fmt.Errorf("Fake error"), true, 0, 1, 1, 1,
 			1, 0, 1, 1, 1, nil, "",
+		},
+		"only new failed pod": {
+			2, 5, 6, false, 0,
+			fmt.Errorf("Fake error"), false, 0, 1, 0, 1,
+			1, 0, 1, 0, 1, nil, "",
 		},
 		"job finish": {
 			2, 5, 6, false, 0,

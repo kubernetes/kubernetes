@@ -553,6 +553,14 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	}
 
 	forget := false
+	// Check if the number of jobs succeeded increased since the last check. If yes "forget" should be true
+	// This logic is linked to the issue: https://github.com/kubernetes/kubernetes/issues/56853 that aims to
+	// improve the Job backoff policy when parallelism > 1 and few Jobs failed but others succeed.
+	// In this case, we should clear the backoff delay.
+	if job.Status.Succeeded < succeeded {
+		forget = true
+	}
+
 	// no need to update the job if the status hasn't changed since last time
 	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || len(job.Status.Conditions) != conditions {
 		job.Status.Active = active
@@ -560,12 +568,12 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		job.Status.Failed = failed
 
 		if err := jm.updateHandler(&job); err != nil {
-			return false, err
+			return forget, err
 		}
 
 		if jobHaveNewFailure && !IsJobFinished(&job) {
 			// returning an error will re-enqueue Job after the backoff period
-			return false, fmt.Errorf("failed pod(s) detected for job key %q", key)
+			return forget, fmt.Errorf("failed pod(s) detected for job key %q", key)
 		}
 
 		forget = true
