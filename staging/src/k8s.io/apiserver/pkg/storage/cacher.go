@@ -555,6 +555,10 @@ func (c *Cacher) GuaranteedUpdate(
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
 
+func (c *Cacher) Count(pathPrefix string) (int64, error) {
+	return c.storage.Count(pathPrefix)
+}
+
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 	// TODO: Currently we assume that in a given Cacher object, its <c.triggerFunc>
 	// is aware of exactly the same trigger (at most one). Thus calling:

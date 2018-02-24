@@ -62,6 +62,9 @@ type Config struct {
 	// CompactionInterval is an interval of requesting compaction from apiserver.
 	// If the value is 0, no compaction will be issued.
 	CompactionInterval time.Duration
+
+	// CountMetricPollPeriod specifies how often should count metric be updated
+	CountMetricPollPeriod time.Duration
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
