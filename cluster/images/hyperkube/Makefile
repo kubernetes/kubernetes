@@ -45,11 +45,11 @@ endif
 	rm -rf "${TEMP_DIR}"
 
 push: build
-	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
+	docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
 	docker rmi ${REGISTRY}/hyperkube:${VERSION} 2>/dev/null || true
 	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
-	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
+	docker push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
 .PHONY: build push all

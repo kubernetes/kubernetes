@@ -57,4 +57,4 @@ endif
 	rm -rf $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
