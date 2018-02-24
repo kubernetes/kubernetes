@@ -182,8 +182,18 @@ var (
 		$ kubectl drain foo --grace-period=900`))
 )
 
+func NewDrainOptions(f cmdutil.Factory, out, errOut io.Writer) *DrainOptions {
+	return &DrainOptions{
+		Factory:            f,
+		Out:                out,
+		ErrOut:             errOut,
+		backOff:            clockwork.NewRealClock(),
+		GracePeriodSeconds: -1,
+	}
+}
+
 func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &DrainOptions{Factory: f, Out: out, ErrOut: errOut, backOff: clockwork.NewRealClock()}
+	options := NewDrainOptions(f, out, errOut)
 
 	cmd := &cobra.Command{
 		Use: "drain NODE",
@@ -196,11 +206,11 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunDrain())
 		},
 	}
-	cmd.Flags().BoolVar(&options.Force, "force", false, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
-	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", false, "Ignore DaemonSet-managed pods.")
-	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
-	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().BoolVar(&options.Force, "force", options.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
+	cmd.Flags().BoolVar(&options.IgnoreDaemonsets, "ignore-daemonsets", options.IgnoreDaemonsets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", options.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
+	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", options.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
 
@@ -212,7 +222,6 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 // arguments and looks up the node using Builder
 func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	var err error
-	o.Selector = cmdutil.GetFlagString(cmd, "selector")
 
 	if len(args) == 0 && !cmd.Flags().Changed("selector") {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))

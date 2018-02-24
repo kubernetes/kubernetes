@@ -62,7 +62,7 @@ var (
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
 func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ConvertOptions{}
+	options := NewConvertOptions()
 
 	cmd := &cobra.Command{
 		Use: "convert -f FILENAME",
@@ -83,7 +83,7 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddNonDeprecatedPrinterFlags(cmd)
-	cmd.Flags().BoolVar(&options.local, "local", true, "If true, convert will NOT try to contact api-server but run locally.")
+	cmd.Flags().BoolVar(&options.local, "local", options.local, "If true, convert will NOT try to contact api-server but run locally.")
 	cmd.Flags().String("output-version", "", i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"))
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -100,6 +100,10 @@ type ConvertOptions struct {
 	printer printers.ResourcePrinter
 
 	specifiedOutputVersion schema.GroupVersion
+}
+
+func NewConvertOptions() *ConvertOptions {
+	return &ConvertOptions{local: true}
 }
 
 // outputVersion returns the preferred output version for generic content (JSON, YAML, or templates)

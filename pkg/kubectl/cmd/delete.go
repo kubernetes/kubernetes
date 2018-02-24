@@ -112,8 +112,16 @@ type DeleteOptions struct {
 	ErrOut io.Writer
 }
 
+func NewDeleteOptions() *DeleteOptions {
+	return &DeleteOptions{
+		Cascade:         true,
+		GracePeriod:     -1,
+		Include3rdParty: true,
+	}
+}
+
 func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &DeleteOptions{Include3rdParty: true}
+	options := NewDeleteOptions()
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -140,14 +148,14 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 	usage := "containing the resource to delete."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones.")
 	cmd.Flags().BoolVar(&options.DeleteAll, "all", options.DeleteAll, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
-	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
-	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
-	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
-	cmd.Flags().BoolVar(&options.DeleteNow, "now", false, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
-	cmd.Flags().BoolVar(&options.ForceDeletion, "force", false, "Immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
+	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", options.IgnoreNotFound, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
+	cmd.Flags().BoolVar(&options.Cascade, "cascade", options.Cascade, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
+	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", options.GracePeriod, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
+	cmd.Flags().BoolVar(&options.DeleteNow, "now", options.DeleteNow, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
+	cmd.Flags().BoolVar(&options.ForceDeletion, "force", options.ForceDeletion, "Immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputVarFlagsForMutation(cmd, &options.Output)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
