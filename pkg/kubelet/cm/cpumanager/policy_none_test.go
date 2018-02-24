@@ -41,7 +41,7 @@ func TestNonePolicyAdd(t *testing.T) {
 		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
 	}
 
-	testPod := makePod("1000m", "1000m")
+	testPod := makePod("1000m", "1000m", "1Gi", "1Gi")
 
 	container := &testPod.Spec.Containers[0]
 	err := policy.AddContainer(st, testPod, container, "fakeID")
