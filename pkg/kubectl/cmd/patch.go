@@ -107,7 +107,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "identifying the resource to update"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, patch will operate on the content of the file, not the server-side resource.")
+	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 
 	return cmd
 }
