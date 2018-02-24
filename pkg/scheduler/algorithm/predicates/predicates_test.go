@@ -93,11 +93,12 @@ func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) 
 
 func TestPodFitsResources(t *testing.T) {
 	enoughPodsTests := []struct {
-		pod      *v1.Pod
-		nodeInfo *schedulercache.NodeInfo
-		fits     bool
-		test     string
-		reasons  []algorithm.PredicateFailureReason
+		pod                            *v1.Pod
+		nodeInfo                       *schedulercache.NodeInfo
+		fits                           bool
+		test                           string
+		reasons                        []algorithm.PredicateFailureReason
+		ignoreMissingExtendedResources bool
 	}{
 		{
 			pod: &v1.Pod{},
@@ -323,12 +324,24 @@ func TestPodFitsResources(t *testing.T) {
 			test:    "hugepages resource allocatable enforced for multiple containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},
 		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{"extended.com/foo": 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{"hello.com/bar": 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits: true,
+			ignoreMissingExtendedResources: true,
+			test: "missing extended resources are ignored",
+		},
 	}
 
 	for _, test := range enoughPodsTests {
 		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
-		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		RegisterPodFitsResourcesPredicateMetadataProducer(test.ignoreMissingExtendedResources)
+		meta := PredicateMetadata(test.pod, nil)
+		fits, reasons, err := PodFitsResources(test.pod, meta, test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
