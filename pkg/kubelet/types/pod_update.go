@@ -26,11 +26,12 @@ import (
 )
 
 const (
-	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
-	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
-	ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
-	ConfigHashAnnotationKey      = "kubernetes.io/config.hash"
-	CriticalPodAnnotationKey     = "scheduler.alpha.kubernetes.io/critical-pod"
+	ConfigSourceAnnotationKey     = "kubernetes.io/config.source"
+	ConfigMirrorAnnotationKey     = v1.MirrorPodAnnotationKey
+	ConfigFirstSeenAnnotationKey  = "kubernetes.io/config.seen"
+	ConfigHashAnnotationKey       = "kubernetes.io/config.hash"
+	ConfigLegacyHashAnnotationKey = "kubernetes.io/config.legacyhash"
+	CriticalPodAnnotationKey      = "scheduler.alpha.kubernetes.io/critical-pod"
 )
 
 // PodOperation defines what changes will be made on a pod configuration.

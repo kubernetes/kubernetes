@@ -330,7 +330,10 @@ func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
 	if !ok {
 		return false
 	}
-	return hash == getPodHash(pod)
+	if hash == getPodHash(pod) {
+		return true
+	}
+	return hash == getPodLegacyHash(pod)
 }
 
 func podsMapToPods(UIDMap map[kubetypes.ResolvedPodUID]*v1.Pod) []*v1.Pod {

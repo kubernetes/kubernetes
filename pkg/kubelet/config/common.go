@@ -45,7 +45,6 @@ import (
 
 type staticPod struct {
 	nodeName types.NodeName
-	source   string
 	pod      *api.Pod
 }
 
@@ -55,17 +54,35 @@ func generatePodName(name string, nodeName types.NodeName) string {
 }
 
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+
 	if len(pod.UID) == 0 {
 		staticpod := &staticPod{
 			nodeName: nodeName,
-			source:   source,
 			pod:      pod,
 		}
+		// Generate pod UID.
 		hasher := md5.New()
 		hash.DeepHashObject(hasher, staticpod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
 		glog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
+
+		// Generate legacy hash.
+		legacyHasher := md5.New()
+		if isFile {
+			fmt.Fprintf(legacyHasher, "host:%s", nodeName)
+			fmt.Fprintf(legacyHasher, "file:%s", source)
+		} else {
+			fmt.Fprintf(legacyHasher, "url:%s", source)
+		}
+		hash.DeepHashObject(legacyHasher, pod)
+		pod.Annotations[kubetypes.ConfigLegacyHashAnnotationKey] = string(hex.EncodeToString(legacyHasher.Sum(nil)[0:]))
 	}
+
+	// The generated UID is the hash of the file.
+	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
 
 	pod.Name = generatePodName(pod.Name, nodeName)
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
@@ -79,12 +96,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	pod.Spec.NodeName = string(nodeName)
 
 	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
-
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
-	}
-	// The generated UID is the hash of the file.
-	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
 
 	if isFile {
 		// Applying the default Taint tolerations to static pods,

@@ -254,7 +254,6 @@ func TestStaticPodNameGenerate(t *testing.T) {
 func TestApplyDefaults(t *testing.T) {
 	staticpod1 := staticPod{
 		nodeName: "nodefoo",
-		source:   "/etc/kubernetes/manifests",
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "podfoo",
@@ -273,7 +272,6 @@ func TestApplyDefaults(t *testing.T) {
 	// staticpod2 has the same spec but is on another node
 	staticpod2 := staticPod{
 		nodeName: "nodebar",
-		source:   "/etc/kubernetes/manifests",
 		pod: &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "podfoo",
@@ -289,13 +287,13 @@ func TestApplyDefaults(t *testing.T) {
 		},
 	}
 
-	err := applyDefaults(staticpod1.pod, staticpod1.source, true, staticpod1.nodeName)
+	err := applyDefaults(staticpod1.pod, "/etc/kubernetes/manifests", true, staticpod1.nodeName)
 	if err != nil {
 		t.Errorf("applyDefaults error: %v", err)
 	}
 	uid1 := staticpod1.pod.UID
 
-	err = applyDefaults(staticpod1.pod, staticpod1.source, true, staticpod1.nodeName)
+	err = applyDefaults(staticpod1.pod, "/etc/kubernetes/manifests", true, staticpod1.nodeName)
 	if err != nil {
 		t.Errorf("applyDefaults error: %v", err)
 	}
@@ -303,7 +301,7 @@ func TestApplyDefaults(t *testing.T) {
 		t.Error("applyDefaults error: the same pod shouldn't change UID")
 	}
 
-	err = applyDefaults(staticpod2.pod, staticpod2.source, true, staticpod2.nodeName)
+	err = applyDefaults(staticpod2.pod, "/etc/kubernetes/manifests", true, staticpod2.nodeName)
 	if err != nil {
 		t.Errorf("applyDefaults error: %v", err)
 	}
