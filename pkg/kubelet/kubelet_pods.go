@@ -272,6 +272,12 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 // translateMountPropagation transforms v1.MountPropagationMode to
 // runtimeapi.MountPropagation.
 func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
+	if runtime.GOOS == "windows" {
+		// Windows containers doesn't support mount propagation, use private for it.
+		// Refer https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation.
+		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
 		// mount propagation is disabled, use private as in the old versions
 		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
