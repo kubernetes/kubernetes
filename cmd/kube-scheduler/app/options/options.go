@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	controlleroptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -37,7 +38,10 @@ type Options struct {
 	// The default values. These are overridden if ConfigFile is set or by values in InsecureServing.
 	ComponentConfig componentconfig.KubeSchedulerConfiguration
 
+	SecureServing           *apiserveroptions.SecureServingOptions
 	CombinedInsecureServing *CombinedInsecureServingOptions
+	Authentication          *apiserveroptions.DelegatingAuthenticationOptions
+	Authorization           *apiserveroptions.DelegatingAuthorizationOptions
 	Deprecated              *DeprecatedOptions
 
 	// ConfigFile is the location of the scheduler server's configuration file.
@@ -59,6 +63,7 @@ func NewOptions() (*Options, error) {
 
 	o := &Options{
 		ComponentConfig: *cfg,
+		SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
 			Healthz: &controlleroptions.InsecureServingOptions{
 				BindNetwork: "tcp",
@@ -69,7 +74,9 @@ func NewOptions() (*Options, error) {
 			BindPort:    hport,
 			BindAddress: hhost,
 		},
-		Deprecated: &DeprecatedOptions{},
+		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
+		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		Deprecated:     &DeprecatedOptions{},
 	}
 
 	return o, nil
@@ -106,7 +113,10 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file. Flags override values in this file.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 
+	o.SecureServing.AddFlags(fs)
 	o.CombinedInsecureServing.AddFlags(fs)
+	o.Authentication.AddFlags(fs)
+	o.Authorization.AddFlags(fs)
 	o.Deprecated.AddFlags(fs, &o.ComponentConfig)
 
 	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, fs)
@@ -143,14 +153,23 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 
-	return nil
+	if err := o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+		return err
+	}
+	if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+		return err
+	}
+	return o.Authorization.ApplyTo(&c.Authorization)
 }
 
 // Validate validates all the required options.
 func (o *Options) Validate() []error {
 	var errs []error
 
+	errs = append(errs, o.SecureServing.Validate()...)
 	errs = append(errs, o.CombinedInsecureServing.Validate()...)
+	errs = append(errs, o.Authentication.Validate()...)
+	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Deprecated.Validate()...)
 
 	return errs

@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -34,6 +35,9 @@ type Config struct {
 
 	InsecureServing        *app.InsecureServingInfo // nil will disable serving on an insecure port
 	InsecureMetricsServing *app.InsecureServingInfo // non-nil if metrics should be served independently
+	Authentication         apiserver.AuthenticationInfo
+	Authorization          apiserver.AuthorizationInfo
+	SecureServing          *apiserver.SecureServingInfo
 
 	SchedulerName                  string
 	Client                         clientset.Interface
