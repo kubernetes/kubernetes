@@ -19,6 +19,7 @@ package cadvisor
 import (
 	goruntime "runtime"
 
+	"github.com/google/cadvisor/container/crio"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
@@ -27,12 +28,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-)
-
-const (
-	// Please keep this in sync with the one in:
-	// github.com/google/cadvisor/container/crio/client.go
-	CrioSocket = "/var/run/crio/crio.sock"
 )
 
 func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
@@ -77,5 +72,5 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 func UsingLegacyCadvisorStats(runtime, runtimeEndpoint string) bool {
 	return runtime == kubetypes.RktContainerRuntime ||
 		(runtime == kubetypes.DockerContainerRuntime && goruntime.GOOS == "linux") ||
-		runtimeEndpoint == CrioSocket
+		runtimeEndpoint == crio.CrioSocket
 }
