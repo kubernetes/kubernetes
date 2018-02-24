@@ -55,6 +55,10 @@ type SecureServingOptions struct {
 	// MinTLSVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	MinTLSVersion string
+
+	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
+	// A value of zero means to use the default provided by golang's HTTP/2 support.
+	HTTP2MaxStreamsPerConnection int
 }
 
 type CertKey struct {
@@ -148,6 +152,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"--tls-sni-cert-key multiple times. "+
 		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
 
+	fs.IntVar(&s.HTTP2MaxStreamsPerConnection, "http2-max-streams-per-connection", s.HTTP2MaxStreamsPerConnection, ""+
+		"The limit that the server gives to clients for "+
+		"the maximum number of streams in an HTTP/2 connection. "+
+		"Zero means to use golang's default.")
+
 	// TODO remove this flag in 1.11.  The flag had no effect before this will prevent scripts from immediately failing on upgrade.
 	fs.String("tls-ca-file", "", "This flag has no effect.")
 	fs.MarkDeprecated("tls-ca-file", "This flag has no effect.")
@@ -179,7 +188,8 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	*config = &server.SecureServingInfo{
-		Listener: s.Listener,
+		Listener:                     s.Listener,
+		HTTP2MaxStreamsPerConnection: s.HTTP2MaxStreamsPerConnection,
 	}
 	c := *config
 

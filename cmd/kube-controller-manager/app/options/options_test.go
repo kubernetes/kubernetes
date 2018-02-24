@@ -72,6 +72,7 @@ func TestAddFlags(t *testing.T) {
 		"--horizontal-pod-autoscaler-downscale-delay=2m",
 		"--horizontal-pod-autoscaler-sync-period=45s",
 		"--horizontal-pod-autoscaler-upscale-delay=1m",
+		"--http2-max-streams-per-connection=47",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/json",
 		"--kube-api-qps=50.0",
@@ -216,6 +217,7 @@ func TestAddFlags(t *testing.T) {
 					CertDirectory: "/a/b/c",
 					PairName:      "kube-controller-manager",
 				},
+				HTTP2MaxStreamsPerConnection: 47,
 			},
 			InsecureServing: &cmoptions.InsecureServingOptions{
 				BindAddress: net.ParseIP("192.168.4.10"),
