@@ -36,7 +36,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
-			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
@@ -47,6 +46,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Etcd.PeerCertSANs = []string{"foo"}
 			obj.Token = "foo"
 			obj.CRISocket = "foo"
+			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
+			obj.TokenUsages = []string{"foo"}
+			obj.TokenGroups = []string{"foo"}
 			obj.Etcd.Image = "foo"
 			obj.Etcd.DataDir = "foo"
 			obj.ImageRepository = "foo"

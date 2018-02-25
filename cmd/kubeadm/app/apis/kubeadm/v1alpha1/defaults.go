@@ -116,6 +116,14 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.CRISocket = DefaultCRISocket
 	}
 
+	if len(obj.TokenUsages) == 0 {
+		obj.TokenUsages = constants.DefaultTokenUsages
+	}
+
+	if len(obj.TokenGroups) == 0 {
+		obj.TokenGroups = constants.DefaultTokenGroups
+	}
+
 	if obj.ImageRepository == "" {
 		obj.ImageRepository = DefaultImageRepository
 	}
