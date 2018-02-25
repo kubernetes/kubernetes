@@ -37,6 +37,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateCACertAndKeyfiles,
 		CreateAPIServerCertAndKeyFiles,
 		CreateAPIServerKubeletClientCertAndKeyFiles,
+		CreateEtcdCACertAndKeyFiles,
 		CreateEtcdServerCertAndKeyFiles,
 		CreateEtcdPeerCertAndKeyFiles,
 		CreateAPIServerEtcdClientCertAndKeyFiles,
@@ -122,17 +123,36 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 	)
 }
 
-// CreateEtcdServerCertAndKeyFiles create a new certificate and key file for etcd.
-// If the etcd serving certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-// It assumes the cluster CA certificate and key file exist in the CertificatesDir
-func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+// CreateEtcdCACertAndKeyFiles create a self signed etcd CA certificate and key files.
+// The etcd CA and client certs are used to secure communication between etcd peers and connections to etcd from the API server.
+// This is a separate CA, so that kubernetes client identities cannot connect to etcd directly or peer with the etcd cluster.
+// If the etcd CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
+func CreateEtcdCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	etcdCACert, etcdCAKey, err := NewEtcdCACertAndKey()
 	if err != nil {
 		return err
 	}
 
-	etcdServerCert, etcdServerKey, err := NewEtcdServerCertAndKey(cfg, caCert, caKey)
+	return writeCertificateAuthorithyFilesIfNotExist(
+		cfg.CertificatesDir,
+		kubeadmconstants.EtcdCACertAndKeyBaseName,
+		etcdCACert,
+		etcdCAKey,
+	)
+}
+
+// CreateEtcdServerCertAndKeyFiles create a new certificate and key file for etcd.
+// If the etcd serving certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
+// It assumes the etcd CA certificate and key file exist in the CertificatesDir
+func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+
+	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
+	if err != nil {
+		return err
+	}
+
+	etcdServerCert, etcdServerKey, err := NewEtcdServerCertAndKey(cfg, etcdCACert, etcdCAKey)
 	if err != nil {
 		return err
 	}
@@ -140,7 +160,7 @@ func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error 
 	return writeCertificateFilesIfNotExist(
 		cfg.CertificatesDir,
 		kubeadmconstants.EtcdServerCertAndKeyBaseName,
-		caCert,
+		etcdCACert,
 		etcdServerCert,
 		etcdServerKey,
 	)
@@ -148,15 +168,15 @@ func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error 
 
 // CreateEtcdPeerCertAndKeyFiles create a new certificate and key file for etcd peering.
 // If the etcd peer certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-// It assumes the cluster CA certificate and key file exist in the CertificatesDir
+// It assumes the etcd CA certificate and key file exist in the CertificatesDir
 func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
 
-	etcdPeerCert, etcdPeerKey, err := NewEtcdPeerCertAndKey(cfg, caCert, caKey)
+	etcdPeerCert, etcdPeerKey, err := NewEtcdPeerCertAndKey(cfg, etcdCACert, etcdCAKey)
 	if err != nil {
 		return err
 	}
@@ -164,7 +184,7 @@ func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 	return writeCertificateFilesIfNotExist(
 		cfg.CertificatesDir,
 		kubeadmconstants.EtcdPeerCertAndKeyBaseName,
-		caCert,
+		etcdCACert,
 		etcdPeerCert,
 		etcdPeerKey,
 	)
@@ -172,15 +192,15 @@ func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 // CreateAPIServerEtcdClientCertAndKeyFiles create a new client certificate for the apiserver calling etcd
 // If the apiserver-etcd-client certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-// It assumes the cluster CA certificate and key file exist in the CertificatesDir
+// It assumes the etcd CA certificate and key file exist in the CertificatesDir
 func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
 		return err
 	}
 
-	apiEtcdClientCert, apiEtcdClientKey, err := NewAPIServerEtcdClientCertAndKey(caCert, caKey)
+	apiEtcdClientCert, apiEtcdClientKey, err := NewAPIServerEtcdClientCertAndKey(etcdCACert, etcdCAKey)
 	if err != nil {
 		return err
 	}
@@ -188,7 +208,7 @@ func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 	return writeCertificateFilesIfNotExist(
 		cfg.CertificatesDir,
 		kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
-		caCert,
+		etcdCACert,
 		apiEtcdClientCert,
 		apiEtcdClientKey,
 	)
@@ -300,6 +320,17 @@ func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.Pr
 	}
 
 	return apiClientCert, apiClientKey, nil
+}
+
+// NewEtcdCACertAndKey generate a self signed etcd CA.
+func NewEtcdCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
+
+	etcdCACert, etcdCAKey, err := pkiutil.NewCertificateAuthority()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while generating etcd CA certificate and key: %v", err)
+	}
+
+	return etcdCACert, etcdCAKey, nil
 }
 
 // NewEtcdServerCertAndKey generate CA certificate for etcd, signed by the given CA.

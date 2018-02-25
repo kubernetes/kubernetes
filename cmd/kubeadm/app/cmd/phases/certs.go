@@ -52,7 +52,7 @@ var (
 		`)
 
 	caCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the self-signed certificate authority and related key, and saves them into %s and %s files. 
+		Generates the self-signed kubernetes certificate authority and related key, and saves them into %s and %s files. 
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.CACertName, kubeadmconstants.CAKeyName)
@@ -73,6 +73,12 @@ var (
 
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName)
+
+	etcdCaCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+		Generates the self-signed etcd certificate authority and related key and saves them into %s and %s files. 
+
+		If both files already exist, kubeadm skips the generation step and existing files will be used.
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName)
 
 	etcdServerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the etcd serving certificate and key and saves them into %s and %s files.
@@ -166,7 +172,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 		},
 		{
 			use:     "ca",
-			short:   "Generates self-signed CA to provision identities for each component in the cluster",
+			short:   "Generates self-signed kubernetes CA to provision identities for components of the cluster",
 			long:    caCertLongDesc,
 			cmdFunc: certsphase.CreateCACertAndKeyfiles,
 		},
@@ -181,6 +187,12 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 			short:   "Generates client certificate for the API server to connect to the kubelets securely",
 			long:    apiServerKubeletCertLongDesc,
 			cmdFunc: certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
+		},
+		{
+			use:     "etcd-ca",
+			short:   "Generates self-signed CA to provision identities for etcd",
+			long:    etcdCaCertLongDesc,
+			cmdFunc: certsphase.CreateEtcdCACertAndKeyFiles,
 		},
 		{
 			use:     "etcd-server",

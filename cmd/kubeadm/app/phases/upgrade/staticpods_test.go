@@ -324,6 +324,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			certsphase.CreateCACertAndKeyfiles,
 			certsphase.CreateAPIServerCertAndKeyFiles,
 			certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
+			// certsphase.CreateEtcdCACertAndKeyFiles,
 			// certsphase.CreateEtcdServerCertAndKeyFiles,
 			// certsphase.CreateEtcdPeerCertAndKeyFiles,
 			// certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,

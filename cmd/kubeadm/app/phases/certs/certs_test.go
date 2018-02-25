@@ -310,6 +310,15 @@ func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 	certstestutil.AssertCertificateHasOrganizations(t, apiKubeletClientCert, kubeadmconstants.MastersGroup)
 }
 
+func TestNewEtcdCACertAndKey(t *testing.T) {
+	etcdCACert, _, err := NewEtcdCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
+	}
+
+	certstestutil.AssertCertificateIsCa(t, etcdCACert)
+}
+
 func TestNewEtcdServerCertAndKey(t *testing.T) {
 	proxy := "user-etcd-proxy"
 	proxyIP := "10.10.10.100"
@@ -583,6 +592,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
 				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
 				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
+				kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName,
 				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
 				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
 				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
@@ -606,17 +616,21 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 			expectedFiles: []string{kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
 		},
 		{
-			setupFunc:     CreateCACertAndKeyfiles,
+			createFunc:    CreateEtcdCACertAndKeyFiles,
+			expectedFiles: []string{kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName},
+		},
+		{
+			setupFunc:     CreateEtcdCACertAndKeyFiles,
 			createFunc:    CreateEtcdServerCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName},
 		},
 		{
-			setupFunc:     CreateCACertAndKeyfiles,
+			setupFunc:     CreateEtcdCACertAndKeyFiles,
 			createFunc:    CreateEtcdPeerCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName},
 		},
 		{
-			setupFunc:     CreateCACertAndKeyfiles,
+			setupFunc:     CreateEtcdCACertAndKeyFiles,
 			createFunc:    CreateAPIServerEtcdClientCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName},
 		},
