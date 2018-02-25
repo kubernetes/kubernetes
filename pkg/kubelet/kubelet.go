@@ -164,6 +164,9 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// Path to look for static pod manifest files
+	staticPodManifestPath = "/etc/kubernetes/pods"
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -266,7 +269,22 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 
-	// define file config source
+	// define file config sources, where two sources are considered
+
+	// The first one is the path defined by staticPodManifestPath
+	statInfo, err := os.Stat(staticPodManifestPath)
+	if err != nil {
+		glog.Infof("Static pod manifest path %v does not exist, skipping", staticPodManifestPath)
+	} else {
+		if statInfo.IsDir() {
+			glog.Infof("Adding static pod manifest path: %v", staticPodManifestPath)
+			config.NewSourceFile(staticPodManifestPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+		} else {
+			glog.Infof("Static pod manifest path %v is not a directory, skipping", staticPodManifestPath)
+		}
+	}
+
+	// The second one is the path supplied via PodManifestPath
 	if kubeCfg.PodManifestPath != "" {
 		glog.Infof("Adding manifest path: %v", kubeCfg.PodManifestPath)
 		config.NewSourceFile(kubeCfg.PodManifestPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
