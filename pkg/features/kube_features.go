@@ -190,7 +190,7 @@ const (
 	CSIPersistentVolume utilfeature.Feature = "CSIPersistentVolume"
 
 	// owner @MrHohn
-	// alpha: v1.9
+	// beta: v1.10
 	//
 	// Support configurable pod DNS parameters.
 	CustomPodDNS utilfeature.Feature = "CustomPodDNS"
@@ -289,7 +289,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
-	CustomPodDNS:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.Beta},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
