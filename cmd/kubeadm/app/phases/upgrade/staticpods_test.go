@@ -321,7 +321,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 
 		// Initialize PKI minus any etcd certificates to simulate etcd PKI upgrade
 		certActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
-			certsphase.CreateCACertAndKeyfiles,
+			certsphase.CreateCACertAndKeyFiles,
 			certsphase.CreateAPIServerCertAndKeyFiles,
 			certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
 			// certsphase.CreateEtcdCACertAndKeyFiles,

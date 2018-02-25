@@ -34,7 +34,7 @@ import (
 func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 
 	certActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
-		CreateCACertAndKeyfiles,
+		CreateCACertAndKeyFiles,
 		CreateAPIServerCertAndKeyFiles,
 		CreateAPIServerKubeletClientCertAndKeyFiles,
 		CreateEtcdCACertAndKeyFiles,
@@ -58,9 +58,9 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 	return nil
 }
 
-// CreateCACertAndKeyfiles create a new self signed CA certificate and key files.
+// CreateCACertAndKeyFiles create a new self signed cluster CA certificate and key files.
 // If the CA certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-func CreateCACertAndKeyfiles(cfg *kubeadmapi.MasterConfiguration) error {
+func CreateCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 	caCert, caKey, err := NewCACertAndKey()
 	if err != nil {
@@ -77,7 +77,7 @@ func CreateCACertAndKeyfiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 // CreateAPIServerCertAndKeyFiles create a new certificate and key files for the apiserver.
 // If the apiserver certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
-// It assumes the cluster CA certificate and key files should exists into the CertificatesDir
+// It assumes the cluster CA certificate and key files exist in the CertificatesDir.
 func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -99,9 +99,9 @@ func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 	)
 }
 
-// CreateAPIServerKubeletClientCertAndKeyFiles create a new CA certificate for kubelets calling apiserver
+// CreateAPIServerKubeletClientCertAndKeyFiles create a new certificate for kubelets calling apiserver.
 // If the apiserver-kubelet-client certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-// It assumes the cluster CA certificate and key files should exists into the CertificatesDir
+// It assumes the cluster CA certificate and key files exist in the CertificatesDir.
 func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -252,7 +252,7 @@ func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) erro
 
 // CreateFrontProxyClientCertAndKeyFiles create a new certificate for proxy server client.
 // If the front-proxy-client certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
-// It assumes the front proxy CAA certificate and key files should exists into the CertificatesDir
+// It assumes the front proxy CA certificate and key files exist in the CertificatesDir.
 func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
 	frontProxyCACert, frontProxyCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName)
@@ -285,7 +285,7 @@ func NewCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return caCert, caKey, nil
 }
 
-// NewAPIServerCertAndKey generate CA certificate for apiserver, signed by the given CA.
+// NewAPIServerCertAndKey generate certificate for apiserver, signed by the given CA.
 func NewAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	altNames, err := pkiutil.GetAPIServerAltNames(cfg)
@@ -306,7 +306,7 @@ func NewAPIServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Ce
 	return apiCert, apiKey, nil
 }
 
-// NewAPIServerKubeletClientCertAndKey generate CA certificate for the apiservers to connect to the kubelets securely, signed by the given CA.
+// NewAPIServerKubeletClientCertAndKey generate certificate for the apiservers to connect to the kubelets securely, signed by the given CA.
 func NewAPIServerKubeletClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	config := certutil.Config{
@@ -333,7 +333,7 @@ func NewEtcdCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return etcdCACert, etcdCAKey, nil
 }
 
-// NewEtcdServerCertAndKey generate CA certificate for etcd, signed by the given CA.
+// NewEtcdServerCertAndKey generate certificate for etcd, signed by the given CA.
 func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	altNames, err := pkiutil.GetEtcdAltNames(cfg)
@@ -354,7 +354,7 @@ func NewEtcdServerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.C
 	return etcdServerCert, etcdServerKey, nil
 }
 
-// NewEtcdPeerCertAndKey generate CA certificate for etcd peering, signed by the given CA.
+// NewEtcdPeerCertAndKey generate certificate for etcd peering, signed by the given CA.
 func NewEtcdPeerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	altNames, err := pkiutil.GetEtcdPeerAltNames(cfg)
@@ -375,7 +375,7 @@ func NewEtcdPeerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Cer
 	return etcdPeerCert, etcdPeerKey, nil
 }
 
-// NewAPIServerEtcdClientCertAndKey generate CA certificate for the apiservers to connect to etcd securely, signed by the given CA.
+// NewAPIServerEtcdClientCertAndKey generate certificate for the apiservers to connect to etcd securely, signed by the given CA.
 func NewAPIServerEtcdClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	config := certutil.Config{
@@ -414,7 +414,7 @@ func NewFrontProxyCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return frontProxyCACert, frontProxyCAKey, nil
 }
 
-// NewFrontProxyClientCertAndKey generate CA certificate for proxy server client, signed by the given front proxy CA.
+// NewFrontProxyClientCertAndKey generate certificate for proxy server client, signed by the given front proxy CA.
 func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProxyCAKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
 
 	config := certutil.Config{

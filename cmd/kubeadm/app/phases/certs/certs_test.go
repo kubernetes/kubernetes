@@ -490,7 +490,7 @@ func TestValidateMethods(t *testing.T) {
 		{
 			name: "validateCACert",
 			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
-				CreateCACertAndKeyfiles,
+				CreateCACertAndKeyFiles,
 			},
 			validateFunc:    validateCACert,
 			loc:             certKeyLocation{caBaseName: "ca", baseName: "", uxName: "CA"},
@@ -499,7 +499,7 @@ func TestValidateMethods(t *testing.T) {
 		{
 			name: "validateCACertAndKey (files present)",
 			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
-				CreateCACertAndKeyfiles,
+				CreateCACertAndKeyFiles,
 			},
 			validateFunc:    validateCACertAndKey,
 			loc:             certKeyLocation{caBaseName: "ca", baseName: "", uxName: "CA"},
@@ -518,7 +518,7 @@ func TestValidateMethods(t *testing.T) {
 		{
 			name: "validateSignedCert",
 			setupFuncs: []func(cfg *kubeadmapi.MasterConfiguration) error{
-				CreateCACertAndKeyfiles,
+				CreateCACertAndKeyFiles,
 				CreateAPIServerCertAndKeyFiles,
 			},
 			validateFunc:    validateSignedCert,
@@ -602,16 +602,16 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 			},
 		},
 		{
-			createFunc:    CreateCACertAndKeyfiles,
+			createFunc:    CreateCACertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName},
 		},
 		{
-			setupFunc:     CreateCACertAndKeyfiles,
+			setupFunc:     CreateCACertAndKeyFiles,
 			createFunc:    CreateAPIServerCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName},
 		},
 		{
-			setupFunc:     CreateCACertAndKeyfiles,
+			setupFunc:     CreateCACertAndKeyFiles,
 			createFunc:    CreateAPIServerKubeletClientCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
 		},
