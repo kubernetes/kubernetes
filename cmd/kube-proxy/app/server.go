@@ -354,7 +354,7 @@ with the apiserver API to configure the proxy.`,
 		glog.Fatalf("unable to create flag defaults: %v", err)
 	}
 
-	opts.AddFlags(pflag.CommandLine)
+	opts.AddFlags(cmd.Flags())
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
