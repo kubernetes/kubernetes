@@ -64,10 +64,9 @@ const (
 	Accelerators utilfeature.Feature = "Accelerators"
 
 	// owner: @jiayingz
-	// alpha: v1.8
+	// beta: v1.10
 	//
 	// Enables support for Device Plugins
-	// Only Nvidia GPUs are tested as of v1.8.
 	DevicePlugins utilfeature.Feature = "DevicePlugins"
 
 	// owner: @gmarek
@@ -271,7 +270,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha},
+	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
