@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi"
+	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	grpctx "golang.org/x/net/context"
 )
 
@@ -40,26 +40,6 @@ func NewIdentityClient() *IdentityClient {
 // SetNextError injects expected error
 func (f *IdentityClient) SetNextError(err error) {
 	f.nextErr = err
-}
-
-// GetSupportedVersions returns supported version
-func (f *IdentityClient) GetSupportedVersions(ctx grpctx.Context, req *csipb.GetSupportedVersionsRequest, opts ...grpc.CallOption) (*csipb.GetSupportedVersionsResponse, error) {
-	// short circuit with an error
-	if f.nextErr != nil {
-		return nil, f.nextErr
-	}
-
-	rsp := &csipb.GetSupportedVersionsResponse{
-		SupportedVersions: []*csipb.Version{
-			{Major: 0, Minor: 0, Patch: 1},
-			{Major: 0, Minor: 1, Patch: 0},
-			{Major: 0, Minor: 2, Patch: 0},
-			{Major: 1, Minor: 0, Patch: 0},
-			{Major: 1, Minor: 0, Patch: 1},
-			{Major: 1, Minor: 1, Patch: 1},
-		},
-	}
-	return rsp, nil
 }
 
 // GetPluginInfo returns plugin info

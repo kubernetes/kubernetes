@@ -121,12 +121,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	nodeName := string(c.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
-	// ensure version is supported
-	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Error(log("mounter.SetUpAt failed to assert version: %v", err))
-		return err
-	}
-
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	if c.volumeInfo == nil {
 		attachment, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
@@ -179,9 +173,9 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	if len(fsType) == 0 {
 		fsType = defaultFSType
 	}
-	nodePublishCredentials := map[string]string{}
+	nodePublishSecrets := map[string]string{}
 	if csiSource.NodePublishSecretRef != nil {
-		nodePublishCredentials = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
+		nodePublishSecrets = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
 	}
 	err = csi.NodePublishVolume(
 		ctx,
@@ -191,7 +185,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		accessMode,
 		c.volumeInfo,
 		attribs,
-		nodePublishCredentials,
+		nodePublishSecrets,
 		fsType,
 	)
 
@@ -239,7 +233,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return nil
 	}
 
-	csiSource, err := getCSISourceFromSpec(c.spec)
 	if err != nil {
 		glog.Error(log("mounter.TearDownAt failed to get CSI persistent source: %v", err))
 		return err
@@ -268,17 +261,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 
 	csi := c.csiClient
 
-	// TODO make all assertion calls private within the client itself
-	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Errorf(log("mounter.TearDownAt failed to assert version: %v", err))
-		return err
-	}
-
-	nodeUnpublishCredentials := map[string]string{}
-	if csiSource.NodePublishSecretRef != nil {
-		nodeUnpublishCredentials = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
-	}
-	if err := csi.NodeUnpublishVolume(ctx, volID, dir, nodeUnpublishCredentials); err != nil {
+	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
 		glog.Errorf(log("mounter.TearDownAt failed: %v", err))
 		return err
 	}
