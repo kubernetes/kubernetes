@@ -34,7 +34,7 @@ func ObjectMetaFieldsSet(objectMeta *metav1.ObjectMeta, hasNamespaceField bool) 
 	}
 }
 
-// AdObjectMetaField add fields that represent the ObjectMeta to source.
+// AddObjectMetaFieldsSet adds fields that represent the ObjectMeta to source.
 func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, hasNamespaceField bool) fields.Set {
 	source["metadata.name"] = objectMeta.Name
 	if hasNamespaceField {
@@ -49,4 +49,15 @@ func MergeFieldsSets(source fields.Set, fragment fields.Set) fields.Set {
 		source[k] = value
 	}
 	return source
+}
+
+// ResetObjectMetaForStatus forces the meta fields for a status update to match the meta fields
+// for a pre-existing object. Status updates should only update status, not ObjectMeta.
+func ResetObjectMetaForStatus(meta, existingMeta metav1.Object) {
+	meta.SetGeneration(existingMeta.GetGeneration())
+	meta.SetSelfLink(existingMeta.GetSelfLink())
+	meta.SetLabels(existingMeta.GetLabels())
+	meta.SetAnnotations(existingMeta.GetAnnotations())
+	meta.SetFinalizers(existingMeta.GetFinalizers())
+	meta.SetOwnerReferences(existingMeta.GetOwnerReferences())
 }

@@ -134,14 +134,14 @@ func (statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old r
 	newObj := obj.(*apiextensions.CustomResourceDefinition)
 	oldObj := old.(*apiextensions.CustomResourceDefinition)
 	newObj.Spec = oldObj.Spec
+	newFinalizer := newObj.Finalizers
 
-	// Status updates are for only for updating status, not objectmeta.
-	// TODO: Update after ResetObjectMetaForStatus is added to meta/v1.
-	newObj.Labels = oldObj.Labels
-	newObj.Annotations = oldObj.Annotations
-	newObj.OwnerReferences = oldObj.OwnerReferences
-	newObj.Generation = oldObj.Generation
-	newObj.SelfLink = oldObj.SelfLink
+	// Status updates should update only status, not ObjectMeta.
+	generic.ResetObjectMetaForStatus(newObj, oldObj)
+
+	// allow updating finalizers since we need to update
+	// CustomResourceCleanupFinalizer while deleting CRDs.
+	newObj.Finalizers = newFinalizer
 }
 
 func (statusStrategy) AllowCreateOnUpdate() bool {

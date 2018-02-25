@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
 )
 
 type statusStrategy struct {
@@ -48,12 +49,8 @@ func (a statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old
 		delete(newCustomResource, "spec")
 	}
 
-	newCustomResourceObject.SetAnnotations(oldCustomResourceObject.GetAnnotations())
-	newCustomResourceObject.SetFinalizers(oldCustomResourceObject.GetFinalizers())
-	newCustomResourceObject.SetGeneration(oldCustomResourceObject.GetGeneration())
-	newCustomResourceObject.SetLabels(oldCustomResourceObject.GetLabels())
-	newCustomResourceObject.SetOwnerReferences(oldCustomResourceObject.GetOwnerReferences())
-	newCustomResourceObject.SetSelfLink(oldCustomResourceObject.GetSelfLink())
+	// Status updates should update only status, not ObjectMeta.
+	generic.ResetObjectMetaForStatus(newCustomResourceObject, oldCustomResourceObject)
 }
 
 // ValidateUpdate is the default update validation for an end user updating status.

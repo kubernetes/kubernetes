@@ -142,7 +142,7 @@ func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
 	return gv.unmarshal(value)
 }
 
-// UnmarshalTEXT implements the Ugorji's encoding.TextUnmarshaler interface.
+// UnmarshalText implements the Ugorji's encoding.TextUnmarshaler interface.
 func (gv *GroupVersion) UnmarshalText(value []byte) error {
 	return gv.unmarshal(value)
 }

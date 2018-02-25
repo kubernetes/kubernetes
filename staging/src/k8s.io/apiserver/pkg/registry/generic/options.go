@@ -35,7 +35,7 @@ type RESTOptions struct {
 	CountMetricPollPeriod   time.Duration
 }
 
-// Implement RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)
+// GetRESTOptions implements RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)
 func (opts RESTOptions) GetRESTOptions(schema.GroupResource) (RESTOptions, error) {
 	return opts, nil
 }

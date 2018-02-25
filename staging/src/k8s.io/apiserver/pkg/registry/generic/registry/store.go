@@ -843,7 +843,7 @@ func markAsDeleting(obj runtime.Object) (err error) {
 		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
 	objectMeta.SetDeletionTimestamp(&now)
-	var zero int64 = 0
+	var zero int64
 	objectMeta.SetDeletionGracePeriodSeconds(&zero)
 	return nil
 }
@@ -974,7 +974,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	pendingFinalizers := len(accessor.GetFinalizers()) != 0
 	var ignoreNotFound bool
-	var deleteImmediately bool = true
+	var deleteImmediately = true
 	var lastExisting, out runtime.Object
 
 	// Handle combinations of graceful deletion and finalization by issuing
