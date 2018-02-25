@@ -114,20 +114,20 @@ apiVersion: kubelet.config.k8s.io/v1beta1`),
 			"yaml, relative path is resolved",
 			newString(fmt.Sprintf(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
-podManifestPath: %s`, relativePath)),
+staticPodPath: %s`, relativePath)),
 			func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
-				kc.PodManifestPath = filepath.Join(configDir, relativePath)
+				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
 			"",
 		},
 		{
 			"json, relative path is resolved",
-			newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","podManifestPath":"%s"}`, relativePath)),
+			newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
 			func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
-				kc.PodManifestPath = filepath.Join(configDir, relativePath)
+				kc.StaticPodPath = filepath.Join(configDir, relativePath)
 				return kc
 			}(),
 			"",

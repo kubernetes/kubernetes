@@ -129,12 +129,12 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 
-	// Create pod manifest path
-	manifestPath, err := createPodManifestDirectory()
+	// Create pod directory
+	podPath, err := createPodDirectory()
 	if err != nil {
 		return nil, err
 	}
-	e.rmDirs = append(e.rmDirs, manifestPath)
+	e.rmDirs = append(e.rmDirs, podPath)
 	err = createRootDirectory(KubeletRootDirectory)
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	kc.SerializeImagePulls = false
 	kubeletConfigFlags = append(kubeletConfigFlags, "serialize-image-pulls")
 
-	kc.PodManifestPath = manifestPath
+	kc.StaticPodPath = podPath
 	kubeletConfigFlags = append(kubeletConfigFlags, "pod-manifest-path")
 
 	kc.FileCheckFrequency = metav1.Duration{Duration: 10 * time.Second} // Check file frequently so tests won't wait too long
@@ -216,7 +216,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 				"-v", "/var/lib/docker:/var/lib/docker",
 				"-v", "/var/lib/kubelet:/var/lib/kubelet:rw,rslave",
 				"-v", "/var/log:/var/log",
-				"-v", manifestPath+":"+manifestPath+":rw",
+				"-v", podPath+":"+podPath+":rw",
 			)
 
 			// if we will generate a kubelet config file, we need to mount that path into the container too
@@ -400,15 +400,15 @@ func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
 	return kubeletCodecs.EncoderForVersion(info.Serializer, v1beta1.SchemeGroupVersion), nil
 }
 
-// createPodManifestDirectory creates pod manifest directory.
-func createPodManifestDirectory() (string, error) {
+// createPodDirectory creates pod directory.
+func createPodDirectory() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
-	path, err := ioutil.TempDir(cwd, "pod-manifest")
+	path, err := ioutil.TempDir(cwd, "static-pods")
 	if err != nil {
-		return "", fmt.Errorf("failed to create static pod manifest directory: %v", err)
+		return "", fmt.Errorf("failed to create static pod directory: %v", err)
 	}
 	return path, nil
 }
