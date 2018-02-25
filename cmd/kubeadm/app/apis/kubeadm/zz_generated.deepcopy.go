@@ -204,6 +204,16 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 			**out = **in
 		}
 	}
+	if in.TokenUsages != nil {
+		in, out := &in.TokenUsages, &out.TokenUsages
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.TokenGroups != nil {
+		in, out := &in.TokenGroups, &out.TokenGroups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.APIServerExtraArgs != nil {
 		in, out := &in.APIServerExtraArgs, &out.APIServerExtraArgs
 		*out = make(map[string]string, len(*in))

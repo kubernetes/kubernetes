@@ -239,6 +239,8 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
 	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
+	out.TokenUsages = *(*[]string)(unsafe.Pointer(&in.TokenUsages))
+	out.TokenGroups = *(*[]string)(unsafe.Pointer(&in.TokenGroups))
 	out.CRISocket = in.CRISocket
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
@@ -287,6 +289,8 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.PrivilegedPods = in.PrivilegedPods
 	out.Token = in.Token
 	out.TokenTTL = (*v1.Duration)(unsafe.Pointer(in.TokenTTL))
+	out.TokenUsages = *(*[]string)(unsafe.Pointer(&in.TokenUsages))
+	out.TokenGroups = *(*[]string)(unsafe.Pointer(&in.TokenGroups))
 	out.CRISocket = in.CRISocket
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
