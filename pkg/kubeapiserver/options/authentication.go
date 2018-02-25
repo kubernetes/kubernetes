@@ -70,9 +70,10 @@ type PasswordFileAuthenticationOptions struct {
 }
 
 type ServiceAccountAuthenticationOptions struct {
-	KeyFiles []string
-	Lookup   bool
-	Issuer   string
+	KeyFiles     []string
+	Lookup       bool
+	Issuer       string
+	APIAudiences []string
 }
 
 type TokenFileAuthenticationOptions struct {
@@ -236,8 +237,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	if s.ServiceAccounts != nil {
 		fs.StringArrayVar(&s.ServiceAccounts.KeyFiles, "service-account-key-file", s.ServiceAccounts.KeyFiles, ""+
 			"File containing PEM-encoded x509 RSA or ECDSA private or public keys, used to verify "+
-			"ServiceAccount tokens. If unspecified, --tls-private-key-file is used. "+
-			"The specified file can contain multiple keys, and the flag can be specified multiple times with different files.")
+			"ServiceAccount tokens. The specified file can contain multiple keys, and the flag can "+
+			"be specified multiple times with different files. If unspecified, "+
+			"--tls-private-key-file is used. Must be specified when "+
+			"--service-account-signing-key is provided")
 
 		fs.BoolVar(&s.ServiceAccounts.Lookup, "service-account-lookup", s.ServiceAccounts.Lookup,
 			"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
@@ -245,6 +248,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.StringVar(&s.ServiceAccounts.Issuer, "service-account-issuer", s.ServiceAccounts.Issuer, ""+
 			"Identifier of the service account token issuer. The issuer will assert this identifier "+
 			"in \"iss\" claim of issued tokens. This value is a string or URI.")
+
+		fs.StringSliceVar(&s.ServiceAccounts.APIAudiences, "service-account-api-audiences", s.ServiceAccounts.APIAudiences, ""+
+			"Identifiers of the API. The service account token authenticator will validate that "+
+			"tokens used against the API are bound to at least one of these audiences.")
 	}
 
 	if s.TokenFile != nil {
@@ -303,6 +310,8 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	if s.ServiceAccounts != nil {
 		ret.ServiceAccountKeyFiles = s.ServiceAccounts.KeyFiles
 		ret.ServiceAccountLookup = s.ServiceAccounts.Lookup
+		ret.ServiceAccountIssuer = s.ServiceAccounts.Issuer
+		ret.ServiceAccountAPIAudiences = s.ServiceAccounts.APIAudiences
 	}
 
 	if s.TokenFile != nil {

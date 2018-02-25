@@ -35,9 +35,15 @@ type clientGetter struct {
 func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTokenGetter {
 	return clientGetter{c}
 }
+
 func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
 	return c.client.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 }
+
+func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
+	return c.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+}
+
 func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	return c.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 }

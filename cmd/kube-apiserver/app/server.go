@@ -326,18 +326,25 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 	}
 
 	var issuer serviceaccount.TokenGenerator
-	if s.ServiceAccountSigningKeyFile != "" || s.Authentication.ServiceAccounts.Issuer != "" {
+	var apiAudiences []string
+	if s.ServiceAccountSigningKeyFile != "" ||
+		s.Authentication.ServiceAccounts.Issuer != "" ||
+		len(s.Authentication.ServiceAccounts.APIAudiences) > 0 {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
 			return nil, nil, nil, nil, nil, fmt.Errorf("the TokenRequest feature is not enabled but --service-account-signing-key-file and/or --service-account-issuer-id flags were passed")
 		}
-		if s.ServiceAccountSigningKeyFile == "" || s.Authentication.ServiceAccounts.Issuer == "" {
-			return nil, nil, nil, nil, nil, fmt.Errorf("service-account-signing-key-file and service-account-issuer should be specified together")
+		if s.ServiceAccountSigningKeyFile == "" ||
+			s.Authentication.ServiceAccounts.Issuer == "" ||
+			len(s.Authentication.ServiceAccounts.APIAudiences) == 0 ||
+			len(s.Authentication.ServiceAccounts.KeyFiles) == 0 {
+			return nil, nil, nil, nil, nil, fmt.Errorf("service-account-signing-key-file, service-account-issuer, service-account-api-audiences and service-account-key-file should be specified together")
 		}
 		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
 		if err != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
 		}
 		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
 	}
 
 	config := &master.Config{
@@ -371,7 +378,9 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,
-			ServiceAccountIssuer:   issuer,
+
+			ServiceAccountIssuer:       issuer,
+			ServiceAccountAPIAudiences: apiAudiences,
 		},
 	}
 
@@ -672,12 +681,19 @@ func defaultOptions(s *options.ServerRunOptions) error {
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 
-	// Default to the private server key for service account token signing
-	if len(s.Authentication.ServiceAccounts.KeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
-		if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
-			s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
-		} else {
-			glog.Warning("No TLS key provided, service account token authentication disabled")
+	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling
+	// TokenRequest functionality. This defaulting was convenient, but messed up
+	// a lot of people when they rotated their serving cert with no idea it was
+	// connected to their service account keys. We are taking this oppurtunity to
+	// remove this problematic defaulting.
+	if s.ServiceAccountSigningKeyFile == "" {
+		// Default to the private server key for service account token signing
+		if len(s.Authentication.ServiceAccounts.KeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
+			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
+				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
+			} else {
+				glog.Warning("No TLS key provided, service account token authentication disabled")
+			}
 		}
 	}
 
