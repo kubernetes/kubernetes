@@ -81,6 +81,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 				Containers:         []v1.Container{{Name: "test-container", Image: "nginx"}},
 			},
 		}
+		otherpod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other-test-pod",
+				Namespace: sa.Namespace,
+			},
+			Spec: v1.PodSpec{
+				ServiceAccountName: "other-" + sa.Name,
+				Containers:         []v1.Container{{Name: "test-container", Image: "nginx"}},
+			},
+		}
 		secret = &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-secret",
@@ -219,6 +229,29 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+	})
+
+	t.Run("bound to service account and pod running as different service account", func(t *testing.T) {
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &one,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       otherpod.Name,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+		_, del = createDeletePod(t, cs, otherpod)
+		defer del()
+
+		if resp, err := cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err == nil {
+			t.Fatalf("expected err but got: %#v", resp)
+		}
 	})
 }
 

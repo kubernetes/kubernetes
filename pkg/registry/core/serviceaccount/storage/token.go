@@ -74,6 +74,9 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 				return nil, err
 			}
 			pod = podObj.(*api.Pod)
+			if name != pod.Spec.ServiceAccountName {
+				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with serviceaccount %q", name, pod.Spec.ServiceAccountName))
+			}
 			uid = pod.UID
 		case gvk.Group == "" && gvk.Kind == "Secret":
 			secretObj, err := r.secrets.Get(ctx, ref.Name, &metav1.GetOptions{})
