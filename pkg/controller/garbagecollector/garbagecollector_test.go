@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -551,92 +550,6 @@ func TestAbsentUIDCache(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("expected only 1 GET rc1 request, got %d", count)
-	}
-}
-
-func TestDeleteOwnerRefPatch(t *testing.T) {
-	original := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: "100",
-			OwnerReferences: []metav1.OwnerReference{
-				{UID: "1"},
-				{UID: "2"},
-				{UID: "3"},
-			},
-		},
-	}
-	originalData := serilizeOrDie(t, original)
-	expected := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: "100",
-			OwnerReferences: []metav1.OwnerReference{
-				{UID: "1"},
-			},
-		},
-	}
-	patch := deleteOwnerRefPatch("100", "2", "3")
-	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got v1.Pod
-	if err := json.Unmarshal(patched, &got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(expected, got) {
-		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
-	}
-}
-
-func TestUnblockOwnerReference(t *testing.T) {
-	trueVar := true
-	falseVar := false
-	original := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: "100",
-			OwnerReferences: []metav1.OwnerReference{
-				{UID: "1", BlockOwnerDeletion: &trueVar},
-				{UID: "2", BlockOwnerDeletion: &falseVar},
-				{UID: "3"},
-			},
-		},
-	}
-	originalData := serilizeOrDie(t, original)
-	expected := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: "100",
-			OwnerReferences: []metav1.OwnerReference{
-				{UID: "1", BlockOwnerDeletion: &falseVar},
-				{UID: "2", BlockOwnerDeletion: &falseVar},
-				{UID: "3"},
-			},
-		},
-	}
-	accessor, err := meta.Accessor(&original)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := node{
-		owners: accessor.GetOwnerReferences(),
-	}
-	patch, err := n.patchToUnblockOwnerReferences()
-	if err != nil {
-		t.Fatal(err)
-	}
-	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got v1.Pod
-	if err := json.Unmarshal(patched, &got); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(expected, got) {
-		t.Errorf("expected: %#v,\ngot: %#v", expected, got)
-		t.Errorf("expected: %#v,\ngot: %#v", expected.OwnerReferences, got.OwnerReferences)
-		for _, ref := range got.OwnerReferences {
-			t.Errorf("ref.UID=%s, ref.BlockOwnerDeletion=%v", ref.UID, *ref.BlockOwnerDeletion)
-		}
 	}
 }
 

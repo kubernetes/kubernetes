@@ -473,7 +473,9 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 	blockingDependents := item.blockingDependents()
 	if len(blockingDependents) == 0 {
 		glog.V(2).Infof("remove DeleteDependents finalizer for item %s", item.identity)
-		return gc.removeFinalizer(item, metav1.FinalizerDeleteDependents)
+		patch := deleteFinalizerPatch(metav1.FinalizerDeleteDependents, item.identity.UID)
+		_, err := gc.patchObject(item.identity, patch)
+		return err
 	}
 	for _, dep := range blockingDependents {
 		if !dep.isDeletingDependents() {
@@ -555,7 +557,8 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 		return true
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
-	err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)
+	patch := deleteFinalizerPatch(metav1.FinalizerOrphanDependents, owner.identity.UID)
+	_, err = gc.patchObject(owner.identity, patch)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("removeOrphanFinalizer for %s failed with %v", owner.identity, err))
 		gc.attemptToOrphan.AddRateLimited(item)
