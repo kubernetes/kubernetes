@@ -92,6 +92,16 @@ func (in *Etcd) DeepCopyInto(out *Etcd) {
 			**out = **in
 		}
 	}
+	if in.ServerCertSANs != nil {
+		in, out := &in.ServerCertSANs, &out.ServerCertSANs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.PeerCertSANs != nil {
+		in, out := &in.PeerCertSANs, &out.PeerCertSANs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

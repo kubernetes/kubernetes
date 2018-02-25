@@ -178,6 +178,12 @@ type Etcd struct {
 	Image string
 	// SelfHosted holds configuration for self-hosting etcd.
 	SelfHosted *SelfHostedEtcd
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server
+	// signing cert. This is currently used for the etcd static-pod.
+	ServerCertSANs []string
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer
+	// signing cert. This is currently used for the etcd static-pod.
+	PeerCertSANs []string
 }
 
 // SelfHostedEtcd describes options required to configure self-hosted etcd.

@@ -29,7 +29,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -49,7 +50,7 @@ apiServerExtraArgs: null
 authorizationModes:
 - Node
 - RBAC
-certificatesDir: /etc/kubernetes/pki
+certificatesDir: %s
 cloudProvider: ""
 controllerManagerExtraArgs: null
 etcd:
@@ -60,6 +61,8 @@ etcd:
   extraArgs: null
   image: ""
   keyFile: ""
+  serverCertSANs: null
+  peerCertSANs: null
 featureFlags: null
 imageRepository: k8s.gcr.io
 kubernetesVersion: %s
@@ -305,12 +308,39 @@ func TestStaticPodControlPlane(t *testing.T) {
 		defer os.RemoveAll(pathMgr.TempManifestDir())
 		defer os.RemoveAll(pathMgr.BackupManifestDir())
 
-		oldcfg, err := getConfig("v1.7.0")
+		tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
+		if err != nil {
+			t.Fatalf("couldn't create temporary certificates directory: %v", err)
+		}
+		defer os.RemoveAll(tempCertsDir)
+
+		oldcfg, err := getConfig("v1.7.0", tempCertsDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
+
+		// Initialize PKI minus any etcd certificates to simulate etcd PKI upgrade
+		certActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
+			certsphase.CreateCACertAndKeyfiles,
+			certsphase.CreateAPIServerCertAndKeyFiles,
+			certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
+			// certsphase.CreateEtcdServerCertAndKeyFiles,
+			// certsphase.CreateEtcdPeerCertAndKeyFiles,
+			// certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
+			certsphase.CreateServiceAccountKeyAndPublicKeyFiles,
+			certsphase.CreateFrontProxyCACertAndKeyFiles,
+			certsphase.CreateFrontProxyClientCertAndKeyFiles,
+		}
+		for _, action := range certActions {
+			err := action(oldcfg)
+			if err != nil {
+				t.Fatalf("couldn't initialize pre-upgrade certificate: %v", err)
+			}
+		}
+		fmt.Printf("Wrote certs to %s\n", oldcfg.CertificatesDir)
+
 		// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
-		err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
+		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
 		if err != nil {
 			t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
 		}
@@ -324,7 +354,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't read temp file: %v", err)
 		}
 
-		newcfg, err := getConfig("v1.8.0")
+		newcfg, err := getConfig("v1.8.0", tempCertsDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
@@ -332,9 +362,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		actualErr := StaticPodControlPlane(waiter, pathMgr, newcfg, false)
 		if (actualErr != nil) != rt.expectedErr {
 			t.Errorf(
-				"failed UpgradeStaticPodControlPlane\n\texpected error: %t\n\tgot: %t",
+				"failed UpgradeStaticPodControlPlane\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
 				rt.expectedErr,
 				(actualErr != nil),
+				actualErr,
 			)
 		}
 
@@ -365,10 +396,10 @@ func getAPIServerHash(dir string) (string, error) {
 	return fmt.Sprintf("%x", sha256.Sum256(fileBytes)), nil
 }
 
-func getConfig(version string) (*kubeadmapi.MasterConfiguration, error) {
+func getConfig(version string, certsDir string) (*kubeadmapi.MasterConfiguration, error) {
 	externalcfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, version)), externalcfg); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, version)), externalcfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %v", err)
 	}
 	legacyscheme.Scheme.Convert(externalcfg, internalcfg, nil)

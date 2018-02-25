@@ -170,6 +170,10 @@ type Etcd struct {
 	Image string `json:"image"`
 	// SelfHosted holds configuration for self-hosting etcd.
 	SelfHosted *SelfHostedEtcd `json:"selfHosted,omitempty"`
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
+	ServerCertSANs []string `json:"serverCertSANs,omitempty"`
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
+	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
 }
 
 // SelfHostedEtcd describes options required to configure self-hosted etcd.

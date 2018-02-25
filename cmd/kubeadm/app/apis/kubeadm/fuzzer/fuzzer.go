@@ -43,6 +43,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
+			obj.Etcd.ServerCertSANs = []string{"foo"}
+			obj.Etcd.PeerCertSANs = []string{"foo"}
 			obj.Token = "foo"
 			obj.CRISocket = "foo"
 			obj.Etcd.Image = "foo"
