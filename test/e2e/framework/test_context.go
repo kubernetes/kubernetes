@@ -116,6 +116,9 @@ type TestContextType struct {
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
 
+	// DNS domain to use
+	DNSDomain string
+
 	// Viper-only parameters.  These will in time replace all flags.
 
 	// Example: Create a file 'e2e.json' with the following:
@@ -216,6 +219,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
+	flag.StringVar(&TestContext.DNSDomain, "dns-domain", "cluster.local", "DNS domain to use.")
 }
 
 // Register flags specific to the cluster e2e test suite.

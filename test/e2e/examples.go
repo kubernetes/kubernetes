@@ -273,7 +273,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			// have to change dns prefix because of the dynamic namespace
 			input := generated.ReadOrDie(mkpath("cassandra-statefulset.yaml"))
 
-			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
+			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc."+framework.TestContext.DNSDomain, "cassandra-0.cassandra."+ns+".svc."+framework.TestContext.DNSDomain, -1)
 
 			statefulsetYaml := "/tmp/cassandra-statefulset.yaml"
 
