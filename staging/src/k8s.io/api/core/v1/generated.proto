@@ -1004,6 +1004,7 @@ message Endpoints {
   // subsets for the different ports. No address will appear in both Addresses and
   // NotReadyAddresses in the same subset.
   // Sets of addresses and ports that comprise a service.
+  // +optional
   repeated EndpointSubset subsets = 2;
 }
 
