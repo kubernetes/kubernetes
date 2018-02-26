@@ -23,6 +23,7 @@ go_test(
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/cr:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/test/integration/testserver:go_default_library",
