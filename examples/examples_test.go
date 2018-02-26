@@ -221,12 +221,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"rbd":             &api.Pod{},
 			"rbd-with-secret": &api.Pod{},
 		},
-		"../examples/storage/cassandra": {
-			"cassandra-daemonset":   &extensions.DaemonSet{},
-			"cassandra-controller":  &api.ReplicationController{},
-			"cassandra-service":     &api.Service{},
-			"cassandra-statefulset": &apps.StatefulSet{},
-		},
 		"../examples/cluster-dns": {
 			"dns-backend-rc":      &api.ReplicationController{},
 			"dns-backend-service": &api.Service{},

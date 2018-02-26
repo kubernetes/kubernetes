@@ -387,7 +387,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
+		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}}}
 	err := opts.Complete(buf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
@@ -418,7 +418,7 @@ func TestLabelLocal(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		local: true}
 	err := opts.Complete(buf, cmd, []string{"a=b"})
 	if err == nil {

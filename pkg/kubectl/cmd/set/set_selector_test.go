@@ -334,7 +334,7 @@ func TestSelectorTest(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/service.yaml")
 
 	cmd.Run(cmd, []string{"environment=qa"})
 
