@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission
+package priority
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
-func addPriorityClasses(ctrl *PriorityPlugin, priorityClasses []*scheduling.PriorityClass) {
+func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
@@ -133,7 +133,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := NewPlugin()
+		ctrl := newPlugin()
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 		// Now add the new class.
@@ -218,7 +218,7 @@ func TestDefaultPriority(t *testing.T) {
 
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
-		ctrl := NewPlugin()
+		ctrl := newPlugin()
 		addPriorityClasses(ctrl, test.classesBefore)
 		defaultPriority, err := ctrl.getDefaultPriority()
 		if err != nil {
@@ -464,7 +464,7 @@ func TestPodAdmission(t *testing.T) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := NewPlugin()
+		ctrl := newPlugin()
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 
