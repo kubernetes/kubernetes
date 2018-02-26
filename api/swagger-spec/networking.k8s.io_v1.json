@@ -1427,19 +1427,19 @@
    },
    "v1.NetworkPolicyPeer": {
     "id": "v1.NetworkPolicyPeer",
-    "description": "NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields must be specified.",
+    "description": "NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of fields are allowed",
     "properties": {
      "podSelector": {
       "$ref": "v1.LabelSelector",
-      "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace."
+      "description": "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods.\n\nIf NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace."
      },
      "namespaceSelector": {
       "$ref": "v1.LabelSelector",
-      "description": "Selects Namespaces using cluster scoped-labels. This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces."
+      "description": "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces.\n\nIf PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector."
      },
      "ipBlock": {
       "$ref": "v1.IPBlock",
-      "description": "IPBlock defines policy on a particular IPBlock"
+      "description": "IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be."
      }
     }
    },
