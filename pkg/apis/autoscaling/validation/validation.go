@@ -195,6 +195,10 @@ func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *fiel
 
 	if len(src.MetricName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("metricName"), "must specify a metric name"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(src.MetricName) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("metricName"), src.MetricName, msg))
+		}
 	}
 
 	if src.TargetValue == nil && src.TargetAverageValue == nil {
