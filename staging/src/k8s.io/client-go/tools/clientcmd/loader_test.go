@@ -201,6 +201,174 @@ func TestLoadingEmptyMaps(t *testing.T) {
 	}
 }
 
+func TestDuplicateClusterName(t *testing.T) {
+	configFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(configFile.Name())
+
+	err := ioutil.WriteFile(configFile.Name(), []byte(`
+kind: Config
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: https://kubernetes.default.svc:443
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+- cluster:
+    api-version: v2
+    server: https://test.example.server:443
+    certificate-authority: /var/run/secrets/test.example.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+contexts:
+- context:
+    cluster: kubeconfig-cluster
+    namespace: default
+    user: kubeconfig-user
+  name: kubeconfig-context
+current-context: kubeconfig-context
+users:
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+`), os.FileMode(0755))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	_, err = LoadFromFile(configFile.Name())
+	if err == nil || !strings.Contains(err.Error(),
+		"error converting *[]NamedCluster into *map[string]*api.Cluster: duplicate name \"kubeconfig-cluster\" in list") {
+		t.Error("Expected error in loading duplicate cluster name, got none")
+	}
+}
+
+func TestDuplicateContextName(t *testing.T) {
+	configFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(configFile.Name())
+
+	err := ioutil.WriteFile(configFile.Name(), []byte(`
+kind: Config
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: https://kubernetes.default.svc:443
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+contexts:
+- context:
+    cluster: kubeconfig-cluster
+    namespace: default
+    user: kubeconfig-user
+  name: kubeconfig-context
+- context:
+    cluster: test-example-cluster
+    namespace: test-example
+    user: test-example-user
+  name: kubeconfig-context
+current-context: kubeconfig-context
+users:
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+`), os.FileMode(0755))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	_, err = LoadFromFile(configFile.Name())
+	if err == nil || !strings.Contains(err.Error(),
+		"error converting *[]NamedContext into *map[string]*api.Context: duplicate name \"kubeconfig-context\" in list") {
+		t.Error("Expected error in loading duplicate context name, got none")
+	}
+}
+
+func TestDuplicateUserName(t *testing.T) {
+	configFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(configFile.Name())
+
+	err := ioutil.WriteFile(configFile.Name(), []byte(`
+kind: Config
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: https://kubernetes.default.svc:443
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+contexts:
+- context:
+    cluster: kubeconfig-cluster
+    namespace: default
+    user: kubeconfig-user
+  name: kubeconfig-context
+current-context: kubeconfig-context
+users:
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/test.example.com/serviceaccount/token
+`), os.FileMode(0755))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	_, err = LoadFromFile(configFile.Name())
+	if err == nil || !strings.Contains(err.Error(),
+		"error converting *[]NamedAuthInfo into *map[string]*api.AuthInfo: duplicate name \"kubeconfig-user\" in list") {
+		t.Error("Expected error in loading duplicate user name, got none")
+	}
+}
+
+func TestDuplicateExtensionName(t *testing.T) {
+	configFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(configFile.Name())
+
+	err := ioutil.WriteFile(configFile.Name(), []byte(`
+kind: Config
+apiVersion: v1
+clusters:
+- cluster:
+    api-version: v1
+    server: https://kubernetes.default.svc:443
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  name: kubeconfig-cluster
+contexts:
+- context:
+    cluster: kubeconfig-cluster
+    namespace: default
+    user: kubeconfig-user
+  name: kubeconfig-context
+current-context: kubeconfig-context
+users:
+- name: kubeconfig-user
+  user:
+    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+extensions:
+- extension:
+    bytes: test
+  name: test-extension
+- extension:
+    bytes: some-example
+  name: test-extension
+`), os.FileMode(0755))
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	_, err = LoadFromFile(configFile.Name())
+	if err == nil || !strings.Contains(err.Error(),
+		"error converting *[]NamedExtension into *map[string]runtime.Object: duplicate name \"test-extension\" in list") {
+		t.Error("Expected error in loading duplicate extension name, got none")
+	}
+}
+
 func TestResolveRelativePaths(t *testing.T) {
 	pathResolutionConfig1 := clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
