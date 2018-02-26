@@ -2,6 +2,7 @@
 # gazelle:exclude _gopath
 # gazelle:exclude _output
 # gazelle:exclude _tmp
+# gazelle:prefix k8s.io/kubernetes
 
 package(default_visibility = ["//visibility:public"])
 
