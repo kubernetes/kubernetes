@@ -233,6 +233,7 @@ type instanceGroupAttributes struct {
 	instanceMap map[meta.Key][]*ga.InstanceWithNamedPorts
 }
 
+// AddInstancesHook mocks adding instances from an InstanceGroup
 func AddInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsAddInstancesRequest, m *cloud.MockInstanceGroups) error {
 	_, err := m.Get(ctx, key)
 	if err != nil {
@@ -269,6 +270,7 @@ func AddInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroups
 	return nil
 }
 
+// ListInstancesHook mocks listing instances from an InstanceGroup
 func ListInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsListInstancesRequest, filter *filter.F, m *cloud.MockInstanceGroups) ([]*ga.InstanceWithNamedPorts, error) {
 	_, err := m.Get(ctx, key)
 	if err != nil {
@@ -293,6 +295,7 @@ func ListInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroup
 	return instances, nil
 }
 
+// RemoveInstancesHook mocks removing instances from an InstanceGroup
 func RemoveInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsRemoveInstancesRequest, m *cloud.MockInstanceGroups) error {
 	_, err := m.Get(ctx, key)
 	if err != nil {
@@ -347,7 +350,7 @@ func UpdateFirewallHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m 
 	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "firewalls")
 	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "firewalls", key)
 
-	m.Objects[*key] = &cloud.MockFirewallsObj{obj}
+	m.Objects[*key] = &cloud.MockFirewallsObj{Obj: obj}
 	return nil
 }
 
@@ -366,7 +369,7 @@ func UpdateHealthCheckHook(ctx context.Context, key *meta.Key, obj *ga.HealthChe
 	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "healthChecks")
 	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "healthChecks", key)
 
-	m.Objects[*key] = &cloud.MockHealthChecksObj{obj}
+	m.Objects[*key] = &cloud.MockHealthChecksObj{Obj: obj}
 	return nil
 }
 
@@ -386,6 +389,6 @@ func UpdateRegionBackendServiceHook(ctx context.Context, key *meta.Key, obj *ga.
 	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
 	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "backendServices", key)
 
-	m.Objects[*key] = &cloud.MockRegionBackendServicesObj{obj}
+	m.Objects[*key] = &cloud.MockRegionBackendServicesObj{Obj: obj}
 	return nil
 }
