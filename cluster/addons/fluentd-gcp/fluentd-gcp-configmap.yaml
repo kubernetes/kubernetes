@@ -332,6 +332,16 @@ data:
       </metric>
     </filter>
 
+    # This filter adds record label for google_cloud plugin. It will allow for future up-converting
+    # of resources during stackdriver resource type migration.
+    <filter **>
+      @type record_transformer
+      enable_ruby false
+      <record>
+        "logging.googleapis.com/compatibility" "true"
+      </record>
+    </filter>
+
     # TODO(instrumentation): Reconsider this workaround later.
     # Trim the entries which exceed slightly less than 100KB, to avoid
     # dropping them. It is a necessity, because Stackdriver only supports
