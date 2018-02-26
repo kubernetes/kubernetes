@@ -134,7 +134,7 @@ spec:
         - --service-cluster-ip-range=10.96.0.0/12
         - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
-        - --advertise-address=$(HOST_IP)
+        - --advertise-address=$(POD_IP)
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
         - --insecure-port=0
         - --experimental-bootstrap-token-auth=true
@@ -149,10 +149,10 @@ spec:
         - --authorization-mode=Node,RBAC
         - --etcd-servers=http://127.0.0.1:2379
         env:
-        - name: HOST_IP
+        - name: POD_IP
           valueFrom:
             fieldRef:
-              fieldPath: status.hostIP
+              fieldPath: status.podIP
         image: k8s.gcr.io/kube-apiserver-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
@@ -184,6 +184,9 @@ spec:
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
       volumes:
       - hostPath:
           path: /etc/kubernetes/pki
@@ -334,6 +337,9 @@ spec:
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
       volumes:
       - hostPath:
           path: /etc/kubernetes/pki
@@ -449,6 +455,9 @@ spec:
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
+      - effect: NoSchedule
+        key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
       volumes:
       - hostPath:
           path: /etc/kubernetes/scheduler.conf

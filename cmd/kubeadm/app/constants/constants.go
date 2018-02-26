@@ -185,6 +185,10 @@ const (
 	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
+	// TaintExternalCloudProvider indicate that a node has not been initialized
+	// This is a duplicate definition of the constant in pkg/scheduler/algorithm/well_known_labels.go
+	TaintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
+
 	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	MasterConfigurationConfigMap = "kubeadm-config"
 
@@ -274,6 +278,13 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
+	// CloudProviderUninitializedToleration is the toleration to apply on the PodSpec for being able to run that
+	// Pod on the cloudprovider uninitialized node
+	CloudProviderUninitializedToleration = v1.Toleration{
+		Key:    TaintExternalCloudProvider,
+		Effect: v1.TaintEffectNoSchedule,
+		Value:  "true",
+	}
 	// AuthorizationPolicyPath defines the supported location of authorization policy file
 	AuthorizationPolicyPath = filepath.Join(KubernetesDir, "abac_policy.json")
 	// AuthorizationWebhookConfigPath defines the supported location of webhook config file
