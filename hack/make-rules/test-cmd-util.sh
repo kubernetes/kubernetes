@@ -1323,6 +1323,117 @@ run_kubectl_run_tests() {
   set +o errexit
 }
 
+run_kubectl_server_print_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl get --experimental-server-print"
+  ### Test retrieval of all types in discovery
+  # Pre-condition: no resources exist
+  output_message=$(kubectl get pods --experimental-server-print 2>&1 "${kube_flags[@]}")
+  # Post-condition: Expect text indicating no resources were found
+  kube::test::if_has_string "${output_message}" 'No resources found.'
+
+  ### Test retrieval of pods against server-side printing
+  kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is created
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Compare "old" output with experimental output and ensure both are the same
+  # remove the last column, as it contains the object's AGE, which could cause a mismatch.
+  expected_output=$(kubectl get pod "${kube_flags[@]}" | awk 'NF{NF--};1')
+  actual_output=$(kubectl get pod --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  ### Test retrieval of daemonsets against server-side printing
+  kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Post-condition: daemonset is created
+  kube::test::get_object_assert ds "{{range.items}}{{$id_field}}:{{end}}" 'bind:'
+  # Compare "old" output with experimental output and ensure both are the same
+  # remove the last column, as it contains the object's AGE, which could cause a mismatch.
+  expected_output=$(kubectl get ds "${kube_flags[@]}" | awk 'NF{NF--};1')
+  actual_output=$(kubectl get ds --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  ### Test retrieval of replicationcontrollers against server-side printing
+  kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
+  # Post-condition: frontend replication controller is created
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
+  # Compare "old" output with experimental output and ensure both are the same
+  # remove the last column, as it contains the object's AGE, which could cause a mismatch.
+  expected_output=$(kubectl get rc "${kube_flags[@]}" | awk 'NF{NF--};1')
+  actual_output=$(kubectl get rc --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  ### Test retrieval of replicasets against server-side printing
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  # Post-condition: frontend replica set is created
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
+  # Compare "old" output with experimental output and ensure both are the same
+  # remove the last column, as it contains the object's AGE, which could cause a mismatch.
+  expected_output=$(kubectl get rs "${kube_flags[@]}" | awk 'NF{NF--};1')
+  actual_output=$(kubectl get rs --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  ### Test retrieval of jobs against server-side printing
+  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: assertion object exists
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Compare "old" output with experimental output and ensure both are the same
+  # remove the last column, as it contains the object's AGE, which could cause a mismatch.
+  expected_output=$(kubectl get jobs/pi "${kube_flags[@]}" | awk 'NF{NF--};1')
+  actual_output=$(kubectl get jobs/pi --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  ### Test retrieval of clusterroles against server-side printing
+  kubectl create "${kube_flags[@]}" clusterrole sample-role --verb=* --resource=pods
+  # Post-Condition: assertion object exists
+  kube::test::get_object_assert clusterrole/sample-role "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
+  # Compare "old" output with experimental output and ensure both are the same
+  # remove the last column, as it contains the object's AGE, which could cause a mismatch.
+  expected_output=$(kubectl get clusterroles/sample-role "${kube_flags[@]}" | awk 'NF{NF--};1')
+  actual_output=$(kubectl get clusterroles/sample-role --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  ### Test retrieval of crds against server-side printing
+  kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "foos.company.com"
+  },
+  "spec": {
+    "group": "company.com",
+    "version": "v1",
+    "names": {
+      "plural": "foos",
+      "kind": "Foo"
+    }
+  }
+}
+__EOF__
+
+  # Post-Condition: assertion object exists
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'foos.company.com:'
+
+  # Test that we can list this new CustomResource
+  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Compare "old" output with experimental output and ensure both are the same
+  expected_output=$(kubectl get foos "${kube_flags[@]}")
+  actual_output=$(kubectl get foos --experimental-server-print "${kube_flags[@]}" | awk 'NF{NF--};1')
+  kube::test::if_has_string "${actual_output}" "${expected_output}"
+
+  # teardown
+  kubectl delete customresourcedefinitions/foos.company.com "${kube_flags_with_token[@]}"
+  kubectl delete clusterroles/sample-role "${kube_flags_with_token[@]}"
+  kubectl delete jobs pi "${kube_flags[@]}"
+  kubectl delete rs frontend "${kube_flags[@]}"
+  kubectl delete rc frontend "${kube_flags[@]}"
+  kubectl delete ds bind "${kube_flags[@]}"
+  kubectl delete pod valid-pod "${kube_flags[@]}"
+}
+
 run_kubectl_get_tests() {
   set -o nounset
   set -o errexit
@@ -4781,6 +4892,7 @@ runTests() {
 
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_get_tests
+    record_command run_kubectl_server_print_tests
   fi
 
 
