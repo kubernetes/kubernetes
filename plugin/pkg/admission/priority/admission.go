@@ -52,8 +52,6 @@ type priorityPlugin struct {
 	*admission.Handler
 	client internalclientset.Interface
 	lister schedulinglisters.PriorityClassLister
-	// globalDefaultPriority caches the value of global default priority class.
-	globalDefaultPriority *int32
 }
 
 var _ admission.MutationInterface = &priorityPlugin{}
@@ -129,10 +127,6 @@ func (p *priorityPlugin) Validate(a admission.Attributes) error {
 	case priorityClassResource:
 		if operation == admission.Create || operation == admission.Update {
 			return p.validatePriorityClass(a)
-		}
-		if operation == admission.Delete {
-			p.invalidateCachedDefaultPriority()
-			return nil
 		}
 		return nil
 
@@ -217,8 +211,6 @@ func (p *priorityPlugin) validatePriorityClass(a admission.Attributes) error {
 			}
 		}
 	}
-	// We conservatively invalidate our cache of global default priority upon any changes to any of the existing classes or creation of a new class.
-	p.invalidateCachedDefaultPriority()
 	return nil
 }
 
@@ -241,24 +233,12 @@ func (p *priorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, e
 }
 
 func (p *priorityPlugin) getDefaultPriority() (int32, error) {
-	// If global default priority is cached, return it.
-	if p.globalDefaultPriority != nil {
-		return *p.globalDefaultPriority, nil
-	}
 	dpc, err := p.getDefaultPriorityClass()
 	if err != nil {
 		return 0, err
 	}
-	priority := int32(scheduling.DefaultPriorityWhenNoDefaultClassExists)
 	if dpc != nil {
-		priority = dpc.Value
+		return dpc.Value, nil
 	}
-	// Cache the value.
-	p.globalDefaultPriority = &priority
-	return priority, nil
-}
-
-// invalidateCachedDefaultPriority sets global default priority to nil to indicate that it should be looked up again.
-func (p *priorityPlugin) invalidateCachedDefaultPriority() {
-	p.globalDefaultPriority = nil
+	return int32(scheduling.DefaultPriorityWhenNoDefaultClassExists), nil
 }
