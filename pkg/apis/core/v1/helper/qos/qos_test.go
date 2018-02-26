@@ -66,6 +66,12 @@ func TestGetPodQOS(t *testing.T) {
 			expected: v1.PodQOSBestEffort,
 		},
 		{
+			pod: newPod("best-effort", []v1.Container{
+				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
+			}),
+			expected: v1.PodQOSBestEffort,
+		},
+		{
 			pod: newPod("best-effort-best-effort-with-gpu", []v1.Container{
 				newContainer("best-effort", getResourceList("", ""), addResource("nvidia-gpu", "2", getResourceList("", ""))),
 				newContainer("best-effort", getResourceList("", ""), getResourceList("", "")),
