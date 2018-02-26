@@ -331,3 +331,61 @@ func RemoveInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGro
 	m.X = attrs
 	return nil
 }
+
+// UpdateFirewallHook defines the hook for updating a Firewall. It replaces the
+// object with the same key in the mock with the updated object.
+func UpdateFirewallHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in Firewalls", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "firewalls")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "firewalls", key)
+
+	m.Objects[*key] = &cloud.MockFirewallsObj{obj}
+	return nil
+}
+
+// UpdateHealthCheckHook defines the hook for updating a HealthCheck. It
+// replaces the object with the same key in the mock with the updated object.
+func UpdateHealthCheckHook(ctx context.Context, key *meta.Key, obj *ga.HealthCheck, m *cloud.MockHealthChecks) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in HealthChecks", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "healthChecks")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "healthChecks", key)
+
+	m.Objects[*key] = &cloud.MockHealthChecksObj{obj}
+	return nil
+}
+
+// UpdateRegionBackendServiceHook defines the hook for updating a Region
+// BackendsService. It replaces the object with the same key in the mock with
+// the updated object.
+func UpdateRegionBackendServiceHook(ctx context.Context, key *meta.Key, obj *ga.BackendService, m *cloud.MockRegionBackendServices) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in RegionBackendServices", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "backendServices", key)
+
+	m.Objects[*key] = &cloud.MockRegionBackendServicesObj{obj}
+	return nil
+}
