@@ -697,7 +697,7 @@ func (gce *GCECloud) CreateDisk(
 func (gce *GCECloud) CreateRegionalDisk(
 	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
 
-	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
+	// Do not allow creation of PDs in zones that do not have nodes. Such PDs
 	// are not currently usable. This functionality should be reverted to checking
 	// against managed zones if we want users to be able to create RegionalDisks
 	// in zones where there are no nodes
