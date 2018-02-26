@@ -947,6 +947,15 @@ EOF
 fi
 }
 
+# If we are running in the CI, we need a few more things before we can start
+if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
+  echo "Preparing to test ..."
+  ${KUBE_ROOT}/hack/install-etcd.sh
+  export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
+  KUBE_FASTBUILD=true make ginkgo cross
+  apt install -y sudo
+fi
+
 # validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
@@ -1021,4 +1030,11 @@ print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   while true; do sleep 1; done
+fi
+
+if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
+  cluster/kubectl.sh config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
+  cluster/kubectl.sh config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
+  cluster/kubectl.sh config set-context local --cluster=local --user=myself
+  cluster/kubectl.sh config use-context local
 fi
