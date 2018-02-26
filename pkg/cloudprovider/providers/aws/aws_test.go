@@ -571,6 +571,12 @@ func TestNodeAddresses(t *testing.T) {
 	var instance1 ec2.Instance
 	var instance2 ec2.Instance
 
+	// ClusterID needs to be set
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
 	//0
 	instance0.InstanceId = aws.String("i-0")
 	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
@@ -589,6 +595,7 @@ func TestNodeAddresses(t *testing.T) {
 	}
 	instance0.InstanceType = aws.String("c3.large")
 	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance0.Tags = tags
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -600,6 +607,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance1.PrivateIpAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
 	instance1.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance1.Tags = tags
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -612,6 +620,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance2.PublicIpAddress = aws.String("1.2.3.4")
 	instance2.InstanceType = aws.String("c3.large")
 	instance2.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance2.Tags = tags
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -650,12 +659,19 @@ func TestNodeAddresses(t *testing.T) {
 func TestNodeAddressesWithMetadata(t *testing.T) {
 	var instance ec2.Instance
 
+	// ClusterID needs to be set
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
 	instanceName := "instance.ec2.internal"
 	instance.InstanceId = aws.String("i-0")
 	instance.PrivateDnsName = &instanceName
 	instance.PublicIpAddress = aws.String("2.3.4.5")
 	instance.InstanceType = aws.String("c3.large")
 	instance.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance.Tags = tags
 	state := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
