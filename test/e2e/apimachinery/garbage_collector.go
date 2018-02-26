@@ -336,10 +336,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 
 	/*
-		    Testname: garbage-collector-delete-rc--propagation-background
-		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Background,
-			then deleting a ReplicationController should cause pods created
-			by that RC to also be deleted.
+		Release : v1.9
+		Testname: Garbage Collector, delete replication controller, propagation policy background
+		Description: Create a replication controller with 2 Pods. Once RC is created and the first Pod is created, delete RC with deleteOptions.PropagationPolicy set to Background. Deleting the Replication Controller MUST cause pods created by that RC to be deleted.
 	*/
 	framework.ConformanceIt("should delete pods created by rc when not orphaning", func() {
 		clientSet := f.ClientSet
@@ -394,10 +393,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		    Testname: garbage-collector-delete-rc--propagation-orphan
-		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Orphan,
-			then deleting a ReplicationController should cause pods created
-			by that RC to be orphaned.
+		Release : v1.9
+		Testname: Garbage Collector, delete replication controller, propagation policy orphan
+		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller MUST cause pods created by that RC to be orphaned.
 	*/
 	framework.ConformanceIt("should orphan pods created by rc if delete options say so", func() {
 		clientSet := f.ClientSet
@@ -508,10 +506,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		    Testname: garbage-collector-delete-deployment-propagation-background
-		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Background,
-			then deleting a Deployment should cause ReplicaSets created
-			by that Deployment to also be deleted.
+		Release : v1.9
+		Testname: Garbage Collector, delete deployment,  propagation policy background
+		Description: Create a deployment with a replicaset. Once replicaset is created , delete the deployment  with deleteOptions.PropagationPolicy set to Background. Deleting the deployment MUST delete the replicaset created by the deployment and also the Pods that belong to the deployments MUST be deleted.
 	*/
 	framework.ConformanceIt("should delete RS created by deployment when not orphaning", func() {
 		clientSet := f.ClientSet
@@ -567,10 +564,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		    Testname: garbage-collector-delete-deployment-propagation-true
-		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Orphan,
-			then deleting a Deployment should cause ReplicaSets created
-			by that Deployment to be orphaned.
+		Release : v1.9
+		Testname: Garbage Collector, delete deployment, propagation policy orphan
+		Description: Create a deployment with a replicaset. Once replicaset is created , delete the deployment  with deleteOptions.PropagationPolicy set to Orphan. Deleting the deployment MUST cause the replicaset created by the deployment to be orphaned, also the Pods created by the deployments MUST be orphaned.
 	*/
 	framework.ConformanceIt("should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan", func() {
 		clientSet := f.ClientSet
@@ -641,9 +637,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	/*
-		    Testname: garbage-collector-delete-rc-after-owned-pods
-		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Foreground,
-			then a ReplicationController should not be deleted until all its dependent pods are deleted.
+		Release : v1.9
+		Testname: Garbage Collector, delete replication controller, after owned pods
+		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication Controller MUST cause pods created by that RC to be deleted before the RC is deleted.
 	*/
 	framework.ConformanceIt("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
 		clientSet := f.ClientSet
@@ -729,9 +725,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	// TODO: this should be an integration test
 	/*
-		    Testname: garbage-collector-multiple-owners
-		    Description: Ensure that if a Pod has multiple valid owners, it will not be deleted
-			when one of of those owners gets deleted.
+		Release : v1.9
+		Testname: Garbage Collector, multiple owners
+		Description: Create a replication controller RC1, with maximum allocatable Pods between 10 and 100 replicas. Create second replication controller RC2 and set RC2 as owner for half of those replicas. Once RC1 is created and the all Pods are created, delete RC1 with deleteOptions.PropagationPolicy set to Foreground. Half of the Pods that has RC2 as owner MUST not be deleted but have a deletion timestamp. Deleting the Replication Controller MUST not delete Pods that are owned by multiple replication controllers.
 	*/
 	framework.ConformanceIt("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
 		clientSet := f.ClientSet
@@ -843,9 +839,9 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	// TODO: should be an integration test
 	/*
-		    Testname: garbage-collector-dependency-cycle
-		    Description: Ensure that a dependency cycle will
-			not block the garbage collector.
+		Release : v1.9
+		Testname: Garbage Collector, dependency cycle
+		Description: Create three pods, patch them with Owner references such that pod1 has pod3, pod2 has pod1 and pod3 has pod2 as owner references respectively. Delete pod1 MUST delete all pods. The dependency cycle MUST not block the garbage collection.
 	*/
 	framework.ConformanceIt("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
