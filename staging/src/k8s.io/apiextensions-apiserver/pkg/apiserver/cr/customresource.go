@@ -103,3 +103,39 @@ func (c *CustomResource) GetOwnerReferences() []v1.OwnerReference {
 func (c *CustomResource) SetOwnerReferences(p []v1.OwnerReference) { c.Obj.SetOwnerReferences(p) }
 func (c *CustomResource) GetClusterName() string                   { return c.Obj.GetClusterName() }
 func (c *CustomResource) SetClusterName(clusterName string)        { c.Obj.SetClusterName(clusterName) }
+
+type CustomResourceList struct {
+	v1.TypeMeta
+	// +optional
+	v1.ListMeta
+
+	// Items is a list of CustomResource objects.
+	Items []CustomResource `json:"items"`
+}
+
+func (u *CustomResourceList) GetObjectKind() schema.ObjectKind { return u }
+
+func (u *CustomResourceList) IsList() bool { return true }
+
+func (u *CustomResourceList) EachListItem(fn func(runtime.Object) error) error {
+	for i := range u.Items {
+	if err := fn(&u.Items[i]); err != nil {
+	return err
+}
+}
+	return nil
+}
+
+func (u *CustomResourceList) DeepCopyObject() runtime.Object {
+	if u == nil {
+	return nil
+}
+	out := new(CustomResourceList)
+	out.TypeMeta = u.TypeMeta
+	out.ListMeta = u.ListMeta
+	out.Items = make([]CustomResource, len(u.Items))
+	for i := range u.Items {
+	out.Items[i] = *u.Items[i].DeepCopy()
+}
+	return out
+}

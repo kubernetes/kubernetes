@@ -441,6 +441,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			&metav1.ExportOptions{},
 			&metav1.GetOptions{},
 			&metav1.DeleteOptions{},
+			&cr.CustomResourceList{},
 		)
 		parameterCodec := runtime.NewParameterCodec(parameterScheme)
 		typer := newCRDObjectTyper(parameterScheme)
@@ -623,16 +624,18 @@ func newCRDObjectTyper(delegate runtime.ObjectTyper) *crdObjectTyper {
 }
 
 func (t crdObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.GroupVersionKind, bool, error) {
-	// Delegate for things other than cUstomResource.
-	crd, ok := obj.(*cr.CustomResource)
-	if !ok {
-		if t.Delegate != nil {
-			return t.Delegate.ObjectKinds(obj)
-		} else {
-			return t.UnstructuredTyper.ObjectKinds(obj)
-		}
+	// Delegate for things other than CustomResource.
+	if crd, ok := obj.(*cr.CustomResource); ok {
+		return t.UnstructuredTyper.ObjectKinds(crd.Obj)
 	}
-	return t.UnstructuredTyper.ObjectKinds(crd.Obj)
+	if crdList, ok := obj.(*cr.CustomResourceList); ok {
+		return []schema.GroupVersionKind{crdList.GroupVersionKind()}, false, nil
+	}
+	if t.Delegate != nil {
+		return t.Delegate.ObjectKinds(obj)
+	} else {
+		return t.UnstructuredTyper.ObjectKinds(obj)
+	}
 }
 
 func (t crdObjectTyper) Recognizes(gvk schema.GroupVersionKind) bool {

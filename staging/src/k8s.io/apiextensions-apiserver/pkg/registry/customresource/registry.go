@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -33,7 +32,7 @@ import (
 
 // Registry is an interface for things that know how to store CustomResources.
 type Registry interface {
-	ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error)
+	ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*cr.CustomResourceList, error)
 	WatchCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
 	GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*cr.CustomResource, error)
 	CreateCustomResource(ctx genericapirequest.Context, customResource *cr.CustomResource, createValidation rest.ValidateObjectFunc) (*cr.CustomResource, error)
@@ -52,7 +51,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error) {
+func (s *storage) ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*cr.CustomResourceList, error) {
 	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -60,7 +59,7 @@ func (s *storage) ListCustomResources(ctx genericapirequest.Context, options *me
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*unstructured.UnstructuredList), err
+	return obj.(*cr.CustomResourceList), err
 }
 
 func (s *storage) WatchCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {

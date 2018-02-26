@@ -18,6 +18,7 @@ package conversion
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 )
 
 // NoConversionConverter is a converter that does only set the apiVersion and kind, but without actual conversions.
@@ -37,5 +38,12 @@ func NewNoConversionConverter(clusterScoped bool) NoConversionConverter {
 func (c NoConversionConverter) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (out runtime.Object, err error) {
 	// not actually converting anything. The embedded UnstructuredObjectConverter will set the apiVersion and kind
 	// of the object. In the future other converters can use this method to do actual conversions.
+	if list, ok := in.(*cr.CustomResourceList); ok {
+		// TODO: Restructure converters so this list conversion would be done for all converters by default.
+		list.EachListItem(func(object runtime.Object) error {
+			object, err = c.crConverter.ConvertToVersion(object, gv)
+			return err
+		})
+	}
 	return c.crConverter.ConvertToVersion(in, gv)
 }
