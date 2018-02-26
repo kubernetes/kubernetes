@@ -5110,6 +5110,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 	}
 }
 
+// TODO: Get rid of this duplicate function in favour of the one in test/utils.
 func IsRetryableAPIError(err error) bool {
 	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err)
 }

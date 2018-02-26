@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -229,8 +228,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			configs, secretConfigs, configMapConfigs = generateConfigs(totalPods, itArg.image, itArg.command, namespaces, itArg.kind, itArg.secretsPerPod, itArg.configMapsPerPod)
 
 			if itArg.quotas {
-				err := CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation"))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation")))
 			}
 
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
@@ -240,8 +238,7 @@ var _ = SIGDescribe("Load capacity", func() {
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer GinkgoRecover()
-					_, err := clientset.CoreV1().Services(services[i].Namespace).Create(services[i])
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
 				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
@@ -251,8 +248,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer GinkgoRecover()
-						err := clientset.CoreV1().Services(services[i].Namespace).Delete(services[i].Name, nil)
-						framework.ExpectNoError(err)
+						framework.ExpectNoError(clientset.CoreV1().Services(services[i].Namespace).Delete(services[i].Name, nil))
 					}
 					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
@@ -729,20 +725,11 @@ func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount i
 			Hard: v1.ResourceList{"pods": *resource.NewQuantity(int64(podCount), resource.DecimalSI)},
 		},
 	}
-
 	for _, ns := range namespaces {
-		if err := wait.PollImmediate(2*time.Second, 30*time.Second, func() (bool, error) {
-			quotaTemplate.Name = ns.Name + "-quota"
-			_, err := f.ClientSet.CoreV1().ResourceQuotas(ns.Name).Create(quotaTemplate)
-			if err != nil && !errors.IsAlreadyExists(err) {
-				framework.Logf("Unexpected error while creating resource quota: %v", err)
-				return false, nil
-			}
-			return true, nil
-		}); err != nil {
-			return fmt.Errorf("Failed to create quota: %v", err)
+		quotaTemplate.Name = ns.Name + "-quota"
+		if err := testutils.CreateResourceQuotaWithRetries(f.ClientSet, ns.Name, quotaTemplate); err != nil {
+			return fmt.Errorf("Error creating quota: %v", err)
 		}
 	}
-
 	return nil
 }
