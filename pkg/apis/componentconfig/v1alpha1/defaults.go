@@ -41,6 +41,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
 		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
 	}
 
+	if obj.NumberOfWorkQueueParallel <= 0 {
+		obj.NumberOfWorkQueueParallel = api.DefaultNumberOfWorkQueueParallel
+	}
+
 	if obj.AlgorithmSource.Policy == nil &&
 		(obj.AlgorithmSource.Provider == nil || len(*obj.AlgorithmSource.Provider) == 0) {
 		val := SchedulerDefaultProviderName

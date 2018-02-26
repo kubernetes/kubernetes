@@ -28,6 +28,10 @@ import (
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
+const (
+	defaultNumberOfWorkQueueParallel = 16
+)
+
 type FakeNodeListInfo []*v1.Node
 
 func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
@@ -511,10 +515,11 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		interPodAffinity := InterPodAffinity{
-			info:                  FakeNodeListInfo(test.nodes),
-			nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
-			podLister:             schedulertesting.FakePodLister(test.pods),
-			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			info:                      FakeNodeListInfo(test.nodes),
+			nodeLister:                schedulertesting.FakeNodeLister(test.nodes),
+			podLister:                 schedulertesting.FakePodLister(test.pods),
+			hardPodAffinityWeight:     v1.DefaultHardPodAffinitySymmetricWeight,
+			numberOfWorkQueueParallel: 16,
 		}
 		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
@@ -558,12 +563,13 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod                   *v1.Pod
-		pods                  []*v1.Pod
-		nodes                 []*v1.Node
-		hardPodAffinityWeight int32
-		expectedList          schedulerapi.HostPriorityList
-		test                  string
+		pod                       *v1.Pod
+		pods                      []*v1.Pod
+		nodes                     []*v1.Node
+		hardPodAffinityWeight     int32
+		numberOfWorkQueueParallel int32
+		expectedList              schedulerapi.HostPriorityList
+		test                      string
 	}{
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelServiceS1}},
@@ -576,9 +582,10 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
-			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			expectedList:          []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: 0}},
-			test:                  "Hard Pod Affinity symmetry: hard pod affinity symmetry weights 1 by default, then nodes that match the hard pod affinity symmetry rules, get a high score",
+			hardPodAffinityWeight:     v1.DefaultHardPodAffinitySymmetricWeight,
+			numberOfWorkQueueParallel: defaultNumberOfWorkQueueParallel,
+			expectedList:              []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}, {Host: "machine3", Score: 0}},
+			test:                      "Hard Pod Affinity symmetry: hard pod affinity symmetry weights 1 by default, then nodes that match the hard pod affinity symmetry rules, get a high score",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelServiceS1}},
@@ -591,18 +598,20 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
-			hardPodAffinityWeight: 0,
-			expectedList:          []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
-			test:                  "Hard Pod Affinity symmetry: hard pod affinity symmetry is closed(weights 0), then nodes that match the hard pod affinity symmetry rules, get same score with those not match",
+			hardPodAffinityWeight:     0,
+			numberOfWorkQueueParallel: defaultNumberOfWorkQueueParallel,
+			expectedList:              []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
+			test:                      "Hard Pod Affinity symmetry: hard pod affinity symmetry is closed(weights 0), then nodes that match the hard pod affinity symmetry rules, get same score with those not match",
 		},
 	}
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		ipa := InterPodAffinity{
-			info:                  FakeNodeListInfo(test.nodes),
-			nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
-			podLister:             schedulertesting.FakePodLister(test.pods),
-			hardPodAffinityWeight: test.hardPodAffinityWeight,
+			info:                      FakeNodeListInfo(test.nodes),
+			nodeLister:                schedulertesting.FakeNodeLister(test.nodes),
+			podLister:                 schedulertesting.FakePodLister(test.pods),
+			hardPodAffinityWeight:     test.hardPodAffinityWeight,
+			numberOfWorkQueueParallel: test.numberOfWorkQueueParallel,
 		}
 		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {

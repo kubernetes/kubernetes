@@ -90,6 +90,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 		return err
 	}
 	out.HardPodAffinitySymmetricWeight = in.HardPodAffinitySymmetricWeight
+	out.NumberOfWorkQueueParallel = in.NumberOfWorkQueueParallel
 	if err := Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_componentconfig_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -115,6 +116,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 		return err
 	}
 	out.HardPodAffinitySymmetricWeight = in.HardPodAffinitySymmetricWeight
+	out.NumberOfWorkQueueParallel = in.NumberOfWorkQueueParallel
 	if err := Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}

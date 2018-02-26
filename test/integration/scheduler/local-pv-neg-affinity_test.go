@@ -160,6 +160,7 @@ func setupNodes(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		informers.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true, // Enable EqualCache by default.
+		16,
 	)
 
 	eventBroadcaster := record.NewBroadcaster()

@@ -44,7 +44,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-const enableEquivalenceCache = true
+const (
+	enableEquivalenceCache    = true
+	numberOfWorkQueueParallel = 16
+)
 
 func TestCreate(t *testing.T) {
 	handler := utiltesting.FakeHandler{
@@ -531,5 +534,6 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		numberOfWorkQueueParallel,
 	)
 }

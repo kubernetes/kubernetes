@@ -532,6 +532,7 @@ func TestMultiScheduler(t *testing.T) {
 		informerFactory2.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		16,
 	)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {

@@ -128,6 +128,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		informers.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true, // Enable EqualCache by default.
+		16,
 	)
 
 	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {

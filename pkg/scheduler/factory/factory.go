@@ -121,6 +121,9 @@ type configFactory struct {
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	hardPodAffinitySymmetricWeight int32
 
+	// number of workqueue.
+	numberOfWorkQueueParallel int32
+
 	// Equivalence class cache
 	equivalencePodCache *core.EquivalenceCache
 
@@ -151,6 +154,7 @@ func NewConfigFactory(
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
 	enableEquivalenceClassCache bool,
+	numberOfWorkQueueParallel int32,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -178,6 +182,7 @@ func NewConfigFactory(
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		enableEquivalenceClassCache:    enableEquivalenceClassCache,
+		numberOfWorkQueueParallel:      numberOfWorkQueueParallel,
 	}
 
 	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -579,6 +584,16 @@ func (c *configFactory) GetHardPodAffinitySymmetricWeight() int32 {
 	return c.hardPodAffinitySymmetricWeight
 }
 
+// GetNumberOfWorkQueueParallel provides the number of workqueu parallel, mostly internal use, but may also be called by mock-tests.
+func (c *configFactory) GetNumberOfWorkQueueParallel() int32 {
+	return c.numberOfWorkQueueParallel
+}
+
+func (c *configFactory) GetAlwaysCheckAllPredicates() bool {
+	return c.alwaysCheckAllPredicates
+}
+
+// GetSchedulerName provides a scheduler name, mostly internal use, but may also be called by mock-tests.
 func (c *configFactory) GetSchedulerName() string {
 	return c.schedulerName
 }
@@ -983,6 +998,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	if policy.HardPodAffinitySymmetricWeight != 0 {
 		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
 	}
+
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
 	// predicates even after one or more of them fails.
 	if policy.AlwaysCheckAllPredicates {
@@ -1042,7 +1058,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(c.schedulerCache, c.equivalencePodCache, c.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, c.volumeBinder, c.pVCLister, c.alwaysCheckAllPredicates)
+	algo := core.NewGenericScheduler(c.schedulerCache, c.equivalencePodCache, c.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, c.volumeBinder, c.pVCLister, c.alwaysCheckAllPredicates, c.numberOfWorkQueueParallel)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{

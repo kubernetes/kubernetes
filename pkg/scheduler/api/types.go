@@ -67,6 +67,8 @@ type Policy struct {
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
 	HardPodAffinitySymmetricWeight int32
 
+	// Number of workqueue parallel.
+	NumberOfWorkQueueParallel int32
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all
 	// the configured predicates even after one or more of them fails.
 	// When the flag is set to false, scheduler skips checking the rest

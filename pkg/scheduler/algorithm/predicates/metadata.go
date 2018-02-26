@@ -31,7 +31,8 @@ import (
 
 // PredicateMetadataFactory defines a factory of predicate metadata.
 type PredicateMetadataFactory struct {
-	podLister algorithm.PodLister
+	podLister                 algorithm.PodLister
+	numberOfWorkQueueParallel int
 }
 
 //  Note that predicateMetadata and matchingPodAntiAffinityTerm need to be declared in the same file
@@ -72,9 +73,10 @@ func RegisterPredicateMetadataProducer(predicateName string, precomp PredicateMe
 }
 
 // NewPredicateMetadataFactory creates a PredicateMetadataFactory.
-func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.PredicateMetadataProducer {
+func NewPredicateMetadataFactory(podLister algorithm.PodLister, numberOfWorkQueueParallel int32) algorithm.PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
-		podLister,
+		podLister:                 podLister,
+		numberOfWorkQueueParallel: int(numberOfWorkQueueParallel),
 	}
 	return factory.GetMetadata
 }
@@ -85,7 +87,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	if pod == nil {
 		return nil
 	}
-	matchingTerms, err := getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
+	matchingTerms, err := getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap, pfactory.numberOfWorkQueueParallel)
 	if err != nil {
 		return nil
 	}

@@ -16,5 +16,6 @@
 	{"name" : "EqualPriority", "weight" : 1}
 	],
 "hardPodAffinitySymmetricWeight" : 10,
+"numberOfWorkQueueParallel":16,
 "alwaysCheckAllPredicates" : false
 }

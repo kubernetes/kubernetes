@@ -1216,7 +1216,7 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	return terms
 }
 
-func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) (map[string][]matchingPodAntiAffinityTerm, error) {
+func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo, numberOfWorkQueueParallel int) (map[string][]matchingPodAntiAffinityTerm, error) {
 	allNodeNames := make([]string, 0, len(nodeInfoMap))
 	for name := range nodeInfoMap {
 		allNodeNames = append(allNodeNames, name)
@@ -1272,7 +1272,8 @@ func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*scheduler
 			appendResult(nodeResult)
 		}
 	}
-	workqueue.Parallelize(16, len(allNodeNames), processNode)
+
+	workqueue.Parallelize(numberOfWorkQueueParallel, len(allNodeNames), processNode)
 	return result, firstError
 }
 

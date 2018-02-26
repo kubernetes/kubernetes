@@ -4653,4 +4653,7 @@ const (
 	// When the --hard-pod-affinity-weight scheduler flag is not specified,
 	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
 	DefaultHardPodAffinitySymmetricWeight int32 = 1
+
+	// default of NumberOfWorkQueueParallel.
+	DefaultNumberOfWorkQueueParallel int32 = 16
 )
