@@ -228,6 +228,8 @@ aliases:
   dep-reviewers:
     - cblecker
     - thockin
+    - sttts
   dep-approvers:
     - cblecker
     - thockin
+    - sttts
