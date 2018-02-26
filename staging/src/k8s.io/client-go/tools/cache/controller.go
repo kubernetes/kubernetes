@@ -86,7 +86,7 @@ type Controller interface {
 }
 
 // New makes a new Controller from the given Config.
-func New(c *Config) Controller {
+func NewController(c *Config) Controller {
 	ctlr := &controller{
 		config: *c,
 		clock:  &clock.RealClock{},
@@ -323,7 +323,7 @@ func NewInformer(
 			return nil
 		},
 	}
-	return clientState, New(cfg)
+	return clientState, NewController(cfg)
 }
 
 // NewIndexerInformer returns a Indexer and a controller for populating the index
@@ -390,5 +390,5 @@ func NewIndexerInformer(
 			return nil
 		},
 	}
-	return clientState, New(cfg)
+	return clientState, NewController(cfg)
 }
