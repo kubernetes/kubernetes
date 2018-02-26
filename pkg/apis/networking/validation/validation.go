@@ -75,8 +75,8 @@ func ValidateNetworkPolicyPeer(peer *networking.NetworkPolicyPeer, peerPath *fie
 
 	if numPeers == 0 {
 		allErrs = append(allErrs, field.Required(peerPath, "must specify a peer"))
-	} else if numPeers > 1 {
-		allErrs = append(allErrs, field.Forbidden(peerPath, "may not specify more than 1 peer"))
+	} else if numPeers > 1 && peer.IPBlock != nil {
+		allErrs = append(allErrs, field.Forbidden(peerPath, "may not specify both ipBlock and another peer"))
 	}
 
 	return allErrs
