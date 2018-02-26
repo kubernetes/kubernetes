@@ -2200,7 +2200,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m (avg)\t2\t10\t4\t<unknown>\n",
 		},
 		// external source type, target average value
 		{
@@ -2247,7 +2247,7 @@ func TestPrintHPA(t *testing.T) {
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa\tReplicationController/some-rc\t50m/100m (avg)\t2\t10\t4\t<unknown>\n",
 		},
 		// external source type, target value (no current)
 		{

@@ -2830,13 +2830,13 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 						hpa.Status.CurrentMetrics[i].External.CurrentAverageValue != nil {
 						current = hpa.Status.CurrentMetrics[i].External.CurrentAverageValue.String()
 					}
-					w.Write(LEVEL_1, "%q:\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetAverageValue.String())
+					w.Write(LEVEL_1, "%q (target average value):\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetAverageValue.String())
 				} else {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil {
 						current = hpa.Status.CurrentMetrics[i].External.CurrentValue.String()
 					}
-					w.Write(LEVEL_1, "%q:\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetValue.String())
+					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetValue.String())
 
 				}
 			case autoscaling.PodsMetricSourceType:
