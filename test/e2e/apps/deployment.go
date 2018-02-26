@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -158,12 +159,12 @@ func newDeploymentRollback(name string, annotations map[string]string, revision 
 	}
 }
 
-func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, ns, deploymentName string) {
+func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, deploymentName string) {
 	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClient)
+	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClient, scaleClient)
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 
@@ -224,7 +225,7 @@ func testDeleteDeployment(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nilRs))
-	stopDeployment(c, internalClient, ns, deploymentName)
+	stopDeployment(c, internalClient, f.ScalesGetter, ns, deploymentName)
 }
 
 func testRollingUpdateDeployment(f *framework.Framework) {

@@ -55,7 +55,7 @@ var _ = SIGDescribe("Rescheduler [Serial]", func() {
 	It("should ensure that critical pod is scheduled in case there is no resources available", func() {
 		By("reserving all available cpu")
 		err := reserveAllCpu(f, "reserve-all-cpu", totalMillicores)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, "reserve-all-cpu")
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, "reserve-all-cpu")
 		framework.ExpectNoError(err)
 
 		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")

@@ -71,7 +71,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, RCName)
+			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})

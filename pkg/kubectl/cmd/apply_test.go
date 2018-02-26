@@ -31,14 +31,18 @@ import (
 
 	"github.com/spf13/cobra"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	fakescale "k8s.io/client-go/scale/fake"
+	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -1190,14 +1194,14 @@ func TestForceApply(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 	pathRCList := "/namespaces/test/replicationcontrollers"
 	expected := map[string]int{
-		"getOk":       10,
+		"getOk":       7,
 		"getNotFound": 1,
 		"getList":     1,
 		"patch":       6,
 		"delete":      1,
-		"put":         1,
 		"post":        1,
 	}
+	scaleClientExpected := []string{"get", "update", "get", "get"}
 
 	for _, fn := range testingOpenAPISchemaFns {
 		t.Run("test apply with --force", func(t *testing.T) {
@@ -1277,10 +1281,48 @@ func TestForceApply(t *testing.T) {
 					}
 				}),
 			}
+			newReplicas := int32(3)
+			scaleClient := &fakescale.FakeScaleClient{}
+			scaleClient.AddReactor("get", "replicationcontrollers", func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
+				action := rawAction.(testcore.GetAction)
+				if action.GetName() != "test-rc" {
+					return true, nil, fmt.Errorf("expected = test-rc, got = %s", action.GetName())
+				}
+				obj := &autoscalingv1.Scale{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      action.GetName(),
+						Namespace: action.GetNamespace(),
+					},
+					Spec: autoscalingv1.ScaleSpec{
+						Replicas: newReplicas,
+					},
+				}
+				return true, obj, nil
+			})
+			scaleClient.AddReactor("update", "replicationcontrollers", func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
+				action := rawAction.(testcore.UpdateAction)
+				obj := action.GetObject().(*autoscalingv1.Scale)
+				if obj.Name != "test-rc" {
+					return true, nil, fmt.Errorf("expected = test-rc, got = %s", obj.Name)
+				}
+				newReplicas = obj.Spec.Replicas
+				return true, &autoscalingv1.Scale{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      obj.Name,
+						Namespace: action.GetNamespace(),
+					},
+					Spec: autoscalingv1.ScaleSpec{
+						Replicas: newReplicas,
+					},
+				}, nil
+			})
+
+			tf.ScaleGetter = scaleClient
 			tf.OpenAPISchemaFunc = fn
 			tf.Client = tf.UnstructuredClient
 			tf.ClientConfigVal = &restclient.Config{}
 			tf.Namespace = "test"
+
 			buf := bytes.NewBuffer([]byte{})
 			errBuf := bytes.NewBuffer([]byte{})
 
@@ -1301,6 +1343,22 @@ func TestForceApply(t *testing.T) {
 			}
 			if errBuf.String() != "" {
 				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+
+			scale, err := scaleClient.Scales(tf.Namespace).Get(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, nameRC)
+			if err != nil {
+				t.Error(err)
+			}
+			if scale.Spec.Replicas != 0 {
+				t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
+			}
+			if len(scaleClient.Actions()) != len(scaleClientExpected) {
+				t.Fatalf("a fake scale client has unexpected amout of API calls, wanted = %d, got = %d", len(scaleClientExpected), len(scaleClient.Actions()))
+			}
+			for index, action := range scaleClient.Actions() {
+				if scaleClientExpected[index] != action.GetVerb() {
+					t.Errorf("unexpected API method called on a fake scale client, wanted = %s, got = %s at index = %d", scaleClientExpected[index], action.GetVerb(), index)
+				}
 			}
 		})
 	}

@@ -207,7 +207,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		By("Deleting the job")
 		job := cronJob.Status.Active[0]
-		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset)
+		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset, f.ScalesGetter)
 		Expect(err).NotTo(HaveOccurred())
 		timeout := 1 * time.Minute
 		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, metav1.NewDeleteOptions(0))

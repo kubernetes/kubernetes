@@ -374,7 +374,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	Expect(err).NotTo(HaveOccurred(), "error creating replication controller")
 
 	defer func() {
-		err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
+		err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, rcName)
 		framework.ExpectNoError(err)
 	}()
 

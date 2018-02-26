@@ -21,7 +21,11 @@ package util
 import (
 	"os"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/dynamic"
+	scaleclient "k8s.io/client-go/scale"
+	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
@@ -83,4 +87,50 @@ func (f *ring2Factory) PluginLoader() plugins.PluginLoader {
 
 func (f *ring2Factory) PluginRunner() plugins.PluginRunner {
 	return &plugins.ExecPluginRunner{}
+}
+
+func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
+	discoClient, err := f.clientAccessFactory.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	restClient, err := f.clientAccessFactory.RESTClient()
+	if err != nil {
+		return nil, err
+	}
+	resolver := scaleclient.NewDiscoveryScaleKindResolver(discoClient)
+	mapper, _ := f.objectMappingFactory.Object()
+	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
+}
+
+func (f *ring2Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
+	clientset, err := f.clientAccessFactory.ClientSet()
+	if err != nil {
+		return nil, err
+	}
+
+	scalesGetter, err := f.ScaleClient()
+	if err != nil {
+		return nil, err
+	}
+	gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
+
+	return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset.Batch(), scalesGetter, gvk.GroupResource()), nil
+}
+
+func (f *ring2Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
+	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
+	if clientsetErr != nil {
+		return nil, clientsetErr
+	}
+	scaler, err := f.ScaleClient()
+	if err != nil {
+		return nil, err
+	}
+
+	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset, scaler)
+	if kubectl.IsNoSuchReaperError(reaperErr) {
+		return nil, reaperErr
+	}
+	return reaper, reaperErr
 }

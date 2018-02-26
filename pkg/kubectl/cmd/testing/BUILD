@@ -1,7 +1,4 @@
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -10,9 +7,7 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testing",
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
-    ],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -37,6 +32,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/rest/fake:go_default_library",
+        "//vendor/k8s.io/client-go/scale:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
     ],
@@ -46,13 +42,12 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
-    ],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
 )
