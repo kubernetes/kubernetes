@@ -401,7 +401,6 @@ pkg/volume/vsphere_volume
 plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
-plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
 plugin/pkg/admission/persistentvolume/label

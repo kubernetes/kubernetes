@@ -21,7 +21,6 @@ filegroup(
         "//plugin/pkg/admission/extendedresourcetoleration:all-srcs",
         "//plugin/pkg/admission/gc:all-srcs",
         "//plugin/pkg/admission/imagepolicy:all-srcs",
-        "//plugin/pkg/admission/initialresources:all-srcs",
         "//plugin/pkg/admission/limitranger:all-srcs",
         "//plugin/pkg/admission/namespace/autoprovision:all-srcs",
         "//plugin/pkg/admission/namespace/exists:all-srcs",
