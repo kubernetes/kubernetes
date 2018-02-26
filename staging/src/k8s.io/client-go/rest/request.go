@@ -107,6 +107,10 @@ type Request struct {
 	// This is only used for per-request timeouts, deadlines, and cancellations.
 	ctx context.Context
 
+	// This is the default request timeout set by client. It will be used if no context is
+	// provided, or request's context has no deadline.
+	requestTimeout time.Duration
+
 	backoffMgr BackoffManager
 	throttle   flowcontrol.RateLimiter
 }
@@ -360,6 +364,19 @@ func (r *Request) Timeout(d time.Duration) *Request {
 		return r
 	}
 	r.timeout = d
+	return r
+}
+
+// RequestTimeout sets the timeout for the current request context.
+// A requestTimeout is set only if a one had not previously been set,
+// or the new timeout value is shorter than the existing one.
+func (r *Request) RequestTimeout(d time.Duration) *Request {
+	if r.err != nil {
+		return r
+	}
+	if r.requestTimeout == 0 || r.requestTimeout > d {
+		r.requestTimeout = d
+	}
 	return r
 }
 
@@ -649,9 +666,22 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		if err != nil {
 			return err
 		}
+
+		if r.requestTimeout > 0 {
+			if r.ctx != nil {
+				// only set a new deadline if one had not been set before
+				if _, exists := r.ctx.Deadline(); !exists {
+					r.ctx, _ = context.WithTimeout(r.ctx, r.requestTimeout)
+				}
+			} else {
+				r.ctx, _ = context.WithTimeout(context.Background(), r.requestTimeout)
+			}
+		}
+
 		if r.ctx != nil {
 			req = req.WithContext(r.ctx)
 		}
+
 		req.Header = r.headers
 
 		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))

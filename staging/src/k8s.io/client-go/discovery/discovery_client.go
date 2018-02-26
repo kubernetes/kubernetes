@@ -22,9 +22,10 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,10 @@ const (
 	defaultRetries = 2
 	// protobuf mime type
 	mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
+	// defaultTimeout is the maximum amount of time per request when no timeout has been set on a RESTClient.
+	// defaults to 32s in order to have a distinguishable length of time, relative to other timeouts that exist.
+	// we enforce a timeout for every request here in order to avoid hanging indefinitely
+	defaultTimeout = 32 * time.Second
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -129,7 +134,7 @@ func apiVersionsToAPIGroup(apiVersions *metav1.APIVersions) (apiGroup metav1.API
 func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err error) {
 	// Get the groupVersions exposed at /api
 	v := &metav1.APIVersions{}
-	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do().Into(v)
+	err = d.restClient.Get().RequestTimeout(defaultTimeout).AbsPath(d.LegacyPrefix).Do().Into(v)
 	apiGroup := metav1.APIGroup{}
 	if err == nil && len(v.Versions) != 0 {
 		apiGroup = apiVersionsToAPIGroup(v)
@@ -140,7 +145,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 
 	// Get the groupVersions exposed at /apis
 	apiGroupList = &metav1.APIGroupList{}
-	err = d.restClient.Get().AbsPath("/apis").Do().Into(apiGroupList)
+	err = d.restClient.Get().RequestTimeout(defaultTimeout).AbsPath("/apis").Do().Into(apiGroupList)
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
 		return nil, err
 	}
@@ -170,7 +175,7 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	resources = &metav1.APIResourceList{
 		GroupVersion: groupVersion,
 	}
-	err = d.restClient.Get().AbsPath(url.String()).Do().Into(resources)
+	err = d.restClient.Get().RequestTimeout(defaultTimeout).AbsPath(url.String()).Do().Into(resources)
 	if err != nil {
 		// ignore 403 or 404 error to be compatible with an v1.0 server.
 		if groupVersion == "v1" && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
