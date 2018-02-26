@@ -671,11 +671,11 @@ func (runner *runner) reload() {
 // the error string looking for known values, which is imperfect but works in
 // practice.
 func IsNotFoundError(err error) bool {
-	es := err.Error()
-	if strings.Contains(es, "No such file or directory") {
+	es := strings.ToLower(err.Error())
+	if strings.Contains(es, strings.ToLower("No such file or directory")) {
 		return true
 	}
-	if strings.Contains(es, "No chain/target/match by that name") {
+	if strings.Contains(es, strings.ToLower("No chain/target/match by that name")) {
 		return true
 	}
 	return false
