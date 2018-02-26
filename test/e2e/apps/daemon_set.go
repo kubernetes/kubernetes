@@ -108,7 +108,12 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should run and stop simple daemon", func() {
+	/*
+	  Testname: DaemonSet-Creation
+	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
+	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
+	*/
+	framework.ConformanceIt("should run and stop simple daemon", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
@@ -130,7 +135,12 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 	})
 
-	It("should run and stop complex daemon", func() {
+	/*
+	  Testname: DaemonSet-NodeSelection
+	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
+	  selectors.
+	*/
+	framework.ConformanceIt("should run and stop complex daemon", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon %q with a node selector", dsName)
@@ -175,6 +185,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	// We defer adding this test to conformance pending the disposition of moving DaemonSet scheduling logic to the
+	// default scheduler.
 	It("should run and stop complex daemon with node affinity", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
@@ -223,7 +235,11 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 	})
 
-	It("should retry creating failed daemon pods", func() {
+	/*
+	  Testname: DaemonSet-FailedPodCreation
+	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
+	*/
+	framework.ConformanceIt("should retry creating failed daemon pods", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
@@ -247,7 +263,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
 	})
 
-	It("Should not update pod when spec was updated and update strategy is OnDelete", func() {
+	// This test should not be added to conformance. We will consider deprecating OnDelete when the
+	// extensions/v1beta1 and apps/v1beta1 are removed.
+	It("should not update pod when spec was updated and update strategy is OnDelete", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
@@ -290,7 +308,11 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), firstHash)
 	})
 
-	It("Should update pod when spec was updated and update strategy is RollingUpdate", func() {
+	/*
+	  Testname: DaemonSet-RollingUpdate
+	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
+	*/
+	framework.ConformanceIt("should update pod when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		templateGeneration := int64(999)
@@ -345,7 +367,12 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 	})
 
-	It("Should rollback without unnecessary restarts", func() {
+	/*
+	  Testname: DaemonSet-Rollback
+	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
+	  rollback of updates to a DaemonSet.
+	*/
+	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
 		// Skip clusters with only one node, where we cannot have half-done DaemonSet rollout for this test
 		framework.SkipUnlessNodeCountIsAtLeast(2)
 
