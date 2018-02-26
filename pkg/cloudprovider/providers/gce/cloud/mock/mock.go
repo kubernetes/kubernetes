@@ -33,7 +33,8 @@ import (
 	beta "google.golang.org/api/compute/v0.beta"
 	ga "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
@@ -225,4 +226,108 @@ func InsertBetaAddressHook(ctx context.Context, key *meta.Key, obj *beta.Address
 func InsertAlphaAddressHook(ctx context.Context, key *meta.Key, obj *alpha.Address, m *cloud.MockAlphaAddresses) (bool, error) {
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionBeta, "addresses")
 	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionAlpha, projectID)
+}
+
+// Map from InstanceGroup key to list of Instances
+type instanceGroupAttributes struct {
+	instanceMap map[meta.Key][]*ga.InstanceWithNamedPorts
+}
+
+func AddInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsAddInstancesRequest, m *cloud.MockInstanceGroups) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in InstanceGroups", key.String()),
+		}
+	}
+
+	if m.X == nil {
+		m.X = instanceGroupAttributes{
+			instanceMap: make(map[meta.Key][]*ga.InstanceWithNamedPorts),
+		}
+	}
+
+	var attrs instanceGroupAttributes
+	attrs = m.X.(instanceGroupAttributes)
+
+	instances, ok := attrs.instanceMap[*key]
+	if !ok {
+		instances = []*ga.InstanceWithNamedPorts{}
+	}
+
+	for _, instance := range req.Instances {
+		iWithPort := &ga.InstanceWithNamedPorts{
+			Instance: instance.Instance,
+		}
+
+		instances = append(instances, iWithPort)
+	}
+
+	attrs.instanceMap[*key] = instances
+	m.X = attrs
+	return nil
+}
+
+func ListInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsListInstancesRequest, filter *filter.F, m *cloud.MockInstanceGroups) ([]*ga.InstanceWithNamedPorts, error) {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return nil, &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in InstanceGroups", key.String()),
+		}
+	}
+
+	if m.X == nil {
+		m.X = instanceGroupAttributes{instanceMap: make(map[meta.Key][]*ga.InstanceWithNamedPorts)}
+	}
+
+	var attrs instanceGroupAttributes
+	attrs = m.X.(instanceGroupAttributes)
+
+	instances, ok := attrs.instanceMap[*key]
+	if !ok {
+		instances = []*ga.InstanceWithNamedPorts{}
+	}
+
+	return instances, nil
+}
+
+func RemoveInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsRemoveInstancesRequest, m *cloud.MockInstanceGroups) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in InstanceGroups", key.String()),
+		}
+	}
+
+	if m.X == nil {
+		m.X = instanceGroupAttributes{
+			instanceMap: make(map[meta.Key][]*ga.InstanceWithNamedPorts),
+		}
+	}
+
+	var attrs instanceGroupAttributes
+	attrs = m.X.(instanceGroupAttributes)
+
+	instances, ok := attrs.instanceMap[*key]
+	if !ok {
+		instances = []*ga.InstanceWithNamedPorts{}
+	}
+
+	for _, instanceToRemove := range req.Instances {
+		for i, instance := range instances {
+			if instanceToRemove.Instance == instance.Instance {
+				// Delete instance from instances without preserving order
+				instances[i] = instances[len(instances)-1]
+				instances = instances[:len(instances)-1]
+				break
+			}
+		}
+	}
+
+	attrs.instanceMap[*key] = instances
+	m.X = attrs
+	return nil
 }

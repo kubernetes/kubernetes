@@ -84,6 +84,10 @@ func fakeGCECloud(projectID, region, zoneName string) (*GCECloud, error) {
 	c.MockAddresses.InsertHook = mock.InsertAddressHook
 	c.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
 
+	c.MockInstanceGroups.AddInstancesHook = mock.AddInstancesHook
+	c.MockInstanceGroups.RemoveInstancesHook = mock.RemoveInstancesHook
+	c.MockInstanceGroups.ListInstancesHook = mock.ListInstancesHook
+
 	keyGA := meta.GlobalKey("key-ga")
 	c.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
 		Obj: &compute.Zone{Name: zoneName, Region: gce.getRegionLink(region)},
