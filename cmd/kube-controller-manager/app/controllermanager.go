@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"time"
 
@@ -36,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
@@ -350,34 +348,8 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 //  users don't have to restart their controller manager if they change the apiserver.
 // Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
 func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
-	var discoveryClient discovery.DiscoveryInterface
-
-	var healthzContent string
-	// If apiserver is not running we should wait for some time and fail only then. This is particularly
-	// important when we start apiserver and controller manager at the same time.
-	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		client, err := clientBuilder.Client("controller-discovery")
-		if err != nil {
-			glog.Errorf("Failed to get api versions from server: %v", err)
-			return false, nil
-		}
-
-		healthStatus := 0
-		resp := client.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
-		if healthStatus != http.StatusOK {
-			glog.Errorf("Server isn't healthy yet.  Waiting a little while.")
-			return false, nil
-		}
-		content, _ := resp.Raw()
-		healthzContent = string(content)
-
-		discoveryClient = client.Discovery()
-		return true, nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get api versions from server: %v: %v", healthzContent, err)
-	}
-
+	client := clientBuilder.ClientOrDie("controller-discovery")
+	discoveryClient := client.Discovery()
 	resourceMap, err := discoveryClient.ServerResources()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
@@ -406,6 +378,12 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+
+	// If apiserver is not running we should wait for some time and fail only then. This is particularly
+	// important when we start apiserver and controller manager at the same time.
+	if err := genericcontrollerconfig.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
+		return ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
+	}
 
 	availableResources, err := GetAvailableResources(rootClientBuilder)
 	if err != nil {
