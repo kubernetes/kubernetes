@@ -206,7 +206,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		s.controller = New(cfg)
+		s.controller = NewController(cfg)
 		s.controller.(*controller).clock = s.clock
 		s.started = true
 	}()

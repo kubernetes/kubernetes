@@ -95,7 +95,7 @@ func Example() {
 	// Create the controller and run it until we close stop.
 	stop := make(chan struct{})
 	defer close(stop)
-	go New(cfg).Run(stop)
+	go NewController(cfg).Run(stop)
 
 	// Let's add a few objects to the source.
 	testIDs := []string{"a-hello", "b-controller", "c-framework"}
