@@ -980,7 +980,12 @@ func lookupMonitors(srvRec *v1.SRVRecordSource) ([]string, error) {
 	}
 	hosts := make([]string, len(addrs))
 	for i, srv := range addrs {
-		hosts[i] = net.JoinHostPort(srv.Target, fmt.Sprintf("%d", srv.Port))
+		l := len(srv.Target)
+		if l > 0 && srv.Target[l-1] == '.' {
+			l--
+		}
+		tgt := srv.Target[0:l]
+		hosts[i] = net.JoinHostPort(tgt, fmt.Sprintf("%d", srv.Port))
 	}
 	return hosts, nil
 }
