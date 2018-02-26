@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 )
 
 func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtesting.EtcdTestServer) {
@@ -71,6 +72,9 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 
 	status := &apiextensions.CustomResourceSubresourceStatus{}
 
+	// TODO: identify how to pass printer specification from the CRD
+	table, _ := tableconvertor.New(nil)
+
 	storage := customresource.NewStorage(
 		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
@@ -83,7 +87,9 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 			status,
 			scale,
 		),
-		restOptions, []string{"all"},
+		restOptions,
+		[]string{"all"},
+		table,
 	)
 
 	return storage, server

@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +45,7 @@ import (
 
 // Generate a pod name that is unique among nodes by appending the nodeName.
 func generatePodName(name string, nodeName types.NodeName) string {
-	return fmt.Sprintf("%s-%s", name, nodeName)
+	return fmt.Sprintf("%s-%s", name, strings.ToLower(string(nodeName)))
 }
 
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {

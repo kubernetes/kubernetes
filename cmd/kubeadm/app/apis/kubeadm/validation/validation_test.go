@@ -134,7 +134,7 @@ func TestValidateCloudProvider(t *testing.T) {
 	}
 }
 
-func TestValidateAPIServerCertSANs(t *testing.T) {
+func TestValidateCertSANs(t *testing.T) {
 	var tests = []struct {
 		sans     []string
 		expected bool
@@ -148,10 +148,10 @@ func TestValidateAPIServerCertSANs(t *testing.T) {
 		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
 	}
 	for _, rt := range tests {
-		actual := ValidateAPIServerCertSANs(rt.sans, nil)
+		actual := ValidateCertSANs(rt.sans, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateAPIServerCertSANs:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateCertSANs:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)

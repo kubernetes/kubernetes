@@ -115,6 +115,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		},
 		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
 	}
+	s.ServiceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
+
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 

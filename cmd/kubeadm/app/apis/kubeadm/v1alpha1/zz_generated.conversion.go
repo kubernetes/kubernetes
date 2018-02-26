@@ -122,6 +122,8 @@ func autoConvert_v1alpha1_Etcd_To_kubeadm_Etcd(in *Etcd, out *kubeadm.Etcd, s co
 	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
 	out.Image = in.Image
 	out.SelfHosted = (*kubeadm.SelfHostedEtcd)(unsafe.Pointer(in.SelfHosted))
+	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
+	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
 	return nil
 }
 
@@ -139,6 +141,8 @@ func autoConvert_kubeadm_Etcd_To_v1alpha1_Etcd(in *kubeadm.Etcd, out *Etcd, s co
 	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
 	out.Image = in.Image
 	out.SelfHosted = (*SelfHostedEtcd)(unsafe.Pointer(in.SelfHosted))
+	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
+	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
 	return nil
 }
 

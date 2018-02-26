@@ -12,6 +12,7 @@ go_library(
         "attacher.go",
         "doc.go",
         "gce_pd.go",
+        "gce_pd_block.go",
         "gce_util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/gce_pd",
@@ -38,6 +39,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "attacher_test.go",
+        "gce_pd_block_test.go",
         "gce_pd_test.go",
     ],
     embed = [":go_default_library"],

@@ -253,9 +253,11 @@ func (g *Graph) AddPV(pv *api.PersistentVolume) {
 
 		// since we don't know the other end of the pvc -> pod -> node chain (or it may not even exist yet), we can't decorate these edges with kubernetes node info
 		g.graph.SetEdge(simple.Edge{F: pvVertex, T: g.getOrCreateVertex_locked(pvcVertexType, pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)})
-		pvutil.VisitPVSecretNames(pv, func(namespace, secret string) bool {
+		pvutil.VisitPVSecretNames(pv, func(namespace, secret string, kubeletVisible bool) bool {
 			// This grants access to the named secret in the same namespace as the bound PVC
-			g.graph.SetEdge(simple.Edge{F: g.getOrCreateVertex_locked(secretVertexType, namespace, secret), T: pvVertex})
+			if kubeletVisible {
+				g.graph.SetEdge(simple.Edge{F: g.getOrCreateVertex_locked(secretVertexType, namespace, secret), T: pvVertex})
+			}
 			return true
 		})
 	}

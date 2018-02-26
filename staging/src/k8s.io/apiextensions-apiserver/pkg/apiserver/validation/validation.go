@@ -25,15 +25,15 @@ import (
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
-func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceValidation) (*validate.SchemaValidator, error) {
+func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceValidation) (*validate.SchemaValidator, *spec.Schema, error) {
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), nil
+	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
 }
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.

@@ -39,8 +39,8 @@ type CustomResourceStorage struct {
 	Scale          *ScaleREST
 }
 
-func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string) CustomResourceStorage {
-	customResourceREST, customResourceStatusREST := newREST(resource, listKind, strategy, optsGetter, categories)
+func NewStorage(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor) CustomResourceStorage {
+	customResourceREST, customResourceStatusREST := newREST(resource, listKind, strategy, optsGetter, categories, tableConvertor)
 	customResourceRegistry := NewRegistry(customResourceREST)
 
 	s := CustomResourceStorage{
@@ -75,7 +75,7 @@ type REST struct {
 }
 
 // newREST returns a RESTStorage object that will work against API services.
-func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string) (*REST, *StatusREST) {
+func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object { return &unstructured.Unstructured{} },
 		NewListFunc: func() runtime.Object {
@@ -90,6 +90,8 @@ func newREST(resource schema.GroupResource, listKind schema.GroupVersionKind, st
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
 		DeleteStrategy: strategy,
+
+		TableConvertor: tableConvertor,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: strategy.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {

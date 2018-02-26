@@ -43,6 +43,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
+			obj.Etcd.ServerCertSANs = []string{"foo"}
+			obj.Etcd.PeerCertSANs = []string{"foo"}
 			obj.Token = "foo"
 			obj.CRISocket = "foo"
 			obj.Etcd.Image = "foo"
@@ -66,10 +68,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
-					PodManifestPath: "foo",
-					ClusterDNS:      []string{"foo"},
-					ClusterDomain:   "foo",
-					Authorization:   kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
+					StaticPodPath: "foo",
+					ClusterDNS:    []string{"foo"},
+					ClusterDomain: "foo",
+					Authorization: kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
 					Authentication: kubeletconfigv1beta1.KubeletAuthentication{
 						X509: kubeletconfigv1beta1.KubeletX509Authentication{ClientCAFile: "foo"},
 					},

@@ -23,7 +23,6 @@ go_library(
         "gce_disks.go",
         "gce_firewall.go",
         "gce_forwardingrule.go",
-        "gce_forwardingrule_fakes.go",
         "gce_healthchecks.go",
         "gce_instancegroup.go",
         "gce_instances.go",
@@ -117,6 +116,7 @@ go_test(
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

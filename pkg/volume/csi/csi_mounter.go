@@ -87,8 +87,6 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 var _ volume.Mounter = &csiMountMgr{}
 
 func (c *csiMountMgr) CanMount() error {
-	//TODO (vladimirvivien) use this method to probe controller using CSI.NodeProbe() call
-	// to ensure Node service is ready in the CSI plugin
 	return nil
 }
 
@@ -122,19 +120,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	csi := c.csiClient
 	nodeName := string(c.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-
-	// ensure version is supported
-	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Error(log("mounter.SetUpAt failed to assert version: %v", err))
-		return err
-	}
-
-	// probe driver
-	// TODO (vladimirvivien) move probe call where it is done only when it is needed.
-	if err := csi.NodeProbe(ctx, csiVersion); err != nil {
-		glog.Error(log("mounter.SetUpAt failed to probe driver: %v", err))
-		return err
-	}
 
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	if c.volumeInfo == nil {
@@ -188,7 +173,10 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	if len(fsType) == 0 {
 		fsType = defaultFSType
 	}
-
+	nodePublishSecrets := map[string]string{}
+	if csiSource.NodePublishSecretRef != nil {
+		nodePublishSecrets = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
+	}
 	err = csi.NodePublishVolume(
 		ctx,
 		c.volumeID,
@@ -197,6 +185,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		accessMode,
 		c.volumeInfo,
 		attribs,
+		nodePublishSecrets,
 		fsType,
 	)
 
@@ -244,6 +233,11 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return nil
 	}
 
+	if err != nil {
+		glog.Error(log("mounter.TearDownAt failed to get CSI persistent source: %v", err))
+		return err
+	}
+
 	// load volume info from file
 	dataDir := path.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
@@ -266,12 +260,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	defer cancel()
 
 	csi := c.csiClient
-
-	// TODO make all assertion calls private within the client itself
-	if err := csi.AssertSupportedVersion(ctx, csiVersion); err != nil {
-		glog.Errorf(log("mounter.TearDownAt failed to assert version: %v", err))
-		return err
-	}
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
 		glog.Errorf(log("mounter.TearDownAt failed: %v", err))

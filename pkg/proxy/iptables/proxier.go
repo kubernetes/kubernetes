@@ -434,20 +434,23 @@ type iptablesJumpChain struct {
 	chain       utiliptables.Chain
 	sourceChain utiliptables.Chain
 	comment     string
+	extraArgs   []string
 }
 
 var iptablesJumpChains = []iptablesJumpChain{
-	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals"},
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals"},
-	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals"},
-	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals"},
-	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules"},
-	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules"},
+	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
+	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
+	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
+	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
 }
 
 var iptablesCleanupOnlyChains = []iptablesJumpChain{
 	// Present in kube 1.6 - 1.9. Removed by #56164 in favor of kubeExternalServicesChain
-	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals"},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", nil},
+	// Present in kube <= 1.9. Removed by #60306 in favor of rule with extraArgs
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 }
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
@@ -455,10 +458,10 @@ var iptablesCleanupOnlyChains = []iptablesJumpChain{
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	// Unlink our chains
 	for _, chain := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
-		args := []string{
+		args := append(chain.extraArgs,
 			"-m", "comment", "--comment", chain.comment,
 			"-j", string(chain.chain),
-		}
+		)
 		if err := ipt.DeleteRule(chain.table, chain.sourceChain, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				glog.Errorf("Error removing pure-iptables proxy rule: %v", err)
@@ -732,10 +735,10 @@ func (proxier *Proxier) syncProxyRules() {
 			glog.Errorf("Failed to ensure that %s chain %s exists: %v", chain.table, kubeServicesChain, err)
 			return
 		}
-		args := []string{
+		args := append(chain.extraArgs,
 			"-m", "comment", "--comment", chain.comment,
 			"-j", string(chain.chain),
-		}
+		)
 		if _, err := proxier.iptables.EnsureRule(utiliptables.Prepend, chain.table, chain.sourceChain, args...); err != nil {
 			glog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", chain.table, chain.sourceChain, chain.chain, err)
 			return

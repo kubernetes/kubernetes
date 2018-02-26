@@ -39,16 +39,16 @@ import (
 var _ = framework.KubeDescribe("MirrorPod", func() {
 	f := framework.NewDefaultFramework("mirror-pod")
 	Context("when create a mirror pod ", func() {
-		var ns, manifestPath, staticPodName, mirrorPodName string
+		var ns, podPath, staticPodName, mirrorPodName string
 		BeforeEach(func() {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
-			manifestPath = framework.TestContext.KubeletConfig.PodManifestPath
+			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 
 			By("create the static pod")
-			err := createStaticPod(manifestPath, staticPodName, ns,
+			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.NginxSlim), v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -65,7 +65,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("update the static pod container image")
 			image := imageutils.GetPauseImageNameForHostArch()
-			err = createStaticPod(manifestPath, staticPodName, ns, image, v1.RestartPolicyAlways)
+			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be updated")
@@ -111,7 +111,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 		})
 		AfterEach(func() {
 			By("delete the static pod")
-			err := deleteStaticPod(manifestPath, staticPodName, ns)
+			err := deleteStaticPod(podPath, staticPodName, ns)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to disappear")
