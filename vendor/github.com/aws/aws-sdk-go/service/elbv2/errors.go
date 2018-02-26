@@ -153,7 +153,7 @@ const (
 	// ErrCodeTooManyCertificatesException for service response error code
 	// "TooManyCertificates".
 	//
-	// You've reached the limit on the number of certificates per listener.
+	// You've reached the limit on the number of certificates per load balancer.
 	ErrCodeTooManyCertificatesException = "TooManyCertificates"
 
 	// ErrCodeTooManyListenersException for service response error code
