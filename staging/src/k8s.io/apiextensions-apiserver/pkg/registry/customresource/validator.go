@@ -32,6 +32,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 )
 
@@ -58,12 +59,12 @@ func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj run
 		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
 	}
 
-	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	customResourceObject, ok := obj.(*cr.CustomResource)
 	// this will never happen.
 	if !ok {
 		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
 	}
-	customResource := customResourceObject.UnstructuredContent()
+	customResource := customResourceObject.Obj.UnstructuredContent()
 
 	if err = apiservervalidation.ValidateCustomResource(customResource, a.schemaValidator); err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath(""), customResource, err.Error())}
@@ -129,12 +130,12 @@ func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, o
 		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
 	}
 
-	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	customResourceObject, ok := obj.(*cr.CustomResource)
 	// this will never happen.
 	if !ok {
 		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
 	}
-	customResource := customResourceObject.UnstructuredContent()
+	customResource := customResourceObject.Obj.UnstructuredContent()
 
 	if err = apiservervalidation.ValidateCustomResource(customResource, a.schemaValidator); err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath(""), customResource, err.Error())}
@@ -200,12 +201,12 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx genericapirequest.Cont
 		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
 	}
 
-	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	customResourceObject, ok := obj.(*cr.CustomResource)
 	// this will never happen.
 	if !ok {
 		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
 	}
-	customResource := customResourceObject.UnstructuredContent()
+	customResource := customResourceObject.Obj.UnstructuredContent()
 
 	// validate only the status
 	customResourceStatus := customResource["status"]

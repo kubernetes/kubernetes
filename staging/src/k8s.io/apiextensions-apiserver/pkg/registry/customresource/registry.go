@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,9 +35,9 @@ import (
 type Registry interface {
 	ListCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (*unstructured.UnstructuredList, error)
 	WatchCustomResources(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error)
-	CreateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error)
-	UpdateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error)
+	GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*cr.CustomResource, error)
+	CreateCustomResource(ctx genericapirequest.Context, customResource *cr.CustomResource, createValidation rest.ValidateObjectFunc) (*cr.CustomResource, error)
+	UpdateCustomResource(ctx genericapirequest.Context, customResource *cr.CustomResource, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*cr.CustomResource, error)
 	DeleteCustomResource(ctx genericapirequest.Context, customResourceID string) error
 }
 
@@ -66,15 +67,15 @@ func (s *storage) WatchCustomResources(ctx genericapirequest.Context, options *m
 	return s.Watch(ctx, options)
 }
 
-func (s *storage) GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*unstructured.Unstructured, error) {
+func (s *storage) GetCustomResource(ctx genericapirequest.Context, customResourceID string, options *metav1.GetOptions) (*cr.CustomResource, error) {
 	obj, err := s.Get(ctx, customResourceID, options)
-	customResource, ok := obj.(*unstructured.Unstructured)
+	customResource, ok := obj.(*cr.CustomResource)
 	if !ok {
 		return nil, fmt.Errorf("custom resource must be of type Unstructured")
 	}
 
 	if err != nil {
-		apiVersion := customResource.GetAPIVersion()
+		apiVersion := customResource.Obj.GetAPIVersion()
 		groupVersion := strings.Split(apiVersion, "/")
 		group := groupVersion[0]
 		return nil, errors.NewNotFound(schema.GroupResource{Group: group, Resource: "scale"}, customResourceID)
@@ -82,20 +83,20 @@ func (s *storage) GetCustomResource(ctx genericapirequest.Context, customResourc
 	return customResource, nil
 }
 
-func (s *storage) CreateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc) (*unstructured.Unstructured, error) {
+func (s *storage) CreateCustomResource(ctx genericapirequest.Context, customResource *cr.CustomResource, createValidation rest.ValidateObjectFunc) (*cr.CustomResource, error) {
 	obj, err := s.Create(ctx, customResource, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*unstructured.Unstructured), nil
+	return obj.(*cr.CustomResource), nil
 }
 
-func (s *storage) UpdateCustomResource(ctx genericapirequest.Context, customResource *unstructured.Unstructured, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*unstructured.Unstructured, error) {
+func (s *storage) UpdateCustomResource(ctx genericapirequest.Context, customResource *cr.CustomResource, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*cr.CustomResource, error) {
 	obj, _, err := s.Update(ctx, customResource.GetName(), rest.DefaultUpdatedObjectInfo(customResource), createValidation, updateValidation)
 	if err != nil {
 		return nil, err
 	}
-	return obj.(*unstructured.Unstructured), nil
+	return obj.(*cr.CustomResource), nil
 }
 
 func (s *storage) DeleteCustomResource(ctx genericapirequest.Context, customResourceID string) error {

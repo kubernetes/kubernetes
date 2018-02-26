@@ -22,7 +22,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
@@ -71,8 +71,8 @@ func (a customResourceStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears the status of a CustomResource before creation.
 func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
-		customResourceObject := obj.(*unstructured.Unstructured)
-		customResource := customResourceObject.UnstructuredContent()
+		customResourceObject := obj.(*cr.CustomResource)
+		customResource := customResourceObject.Obj.UnstructuredContent()
 
 		// create cannot set status
 		if _, ok := customResource["status"]; ok {
@@ -90,11 +90,11 @@ func (a customResourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 		return
 	}
 
-	newCustomResourceObject := obj.(*unstructured.Unstructured)
-	oldCustomResourceObject := old.(*unstructured.Unstructured)
+	newCustomResourceObject := obj.(*cr.CustomResource)
+	oldCustomResourceObject := old.(*cr.CustomResource)
 
-	newCustomResource := newCustomResourceObject.UnstructuredContent()
-	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
+	newCustomResource := newCustomResourceObject.Obj.UnstructuredContent()
+	oldCustomResource := oldCustomResourceObject.Obj.UnstructuredContent()
 
 	// update is not allowed to set status
 	_, ok1 := newCustomResource["status"]
