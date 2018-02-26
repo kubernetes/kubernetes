@@ -2782,9 +2782,7 @@ func ScaleResource(
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
 	scaler := kubectl.ScalerFor(kind, internalClientset.Batch(), scalesGetter, gr)
-	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
-	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err := scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
+	if err := testutil.ScaleResourceWithRetries(scaler, ns, name, size); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {
