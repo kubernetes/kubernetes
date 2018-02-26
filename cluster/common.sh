@@ -453,32 +453,37 @@ EOF
   popd
 }
 
-# Check whether required client and server binaries exist, prompting to download
+# Check whether required binaries exist, prompting to download
 # if missing.
 # If KUBERNETES_SKIP_CONFIRM is set to y, we'll automatically download binaries
 # without prompting.
 function verify-kube-binaries() {
-  local missing_binaries=false
   if ! "${KUBE_ROOT}/cluster/kubectl.sh" version --client >&/dev/null; then
     echo "!!! kubectl appears to be broken or missing"
-    missing_binaries=true
+    download-release-binaries
   fi
+}
+
+# Check whether required release artifacts exist, prompting to download
+# if missing.
+# If KUBERNETES_SKIP_CONFIRM is set to y, we'll automatically download binaries
+# without prompting.
+function verify-release-tars() {
   if ! $(find-release-tars); then
-    missing_binaries=true
+    download-release-binaries
   fi
+}
 
-  if ! "${missing_binaries}"; then
-    return
-  fi
-
+# Download release artifacts.
+function download-release-binaries() {
   get_binaries_script="${KUBE_ROOT}/cluster/get-kube-binaries.sh"
   local resp="y"
   if [[ ! "${KUBERNETES_SKIP_CONFIRM:-n}" =~ ^[yY]$ ]]; then
-    echo "Required binaries appear to be missing. Do you wish to download them? [Y/n]"
+    echo "Required release artifacts appear to be missing. Do you wish to download them? [Y/n]"
     read resp
   fi
   if [[ "${resp}" =~ ^[nN]$ ]]; then
-    echo "You must download binaries to continue. You can use "
+    echo "You must download release artifacts to continue. You can use "
     echo "  ${get_binaries_script}"
     echo "to do this for your automatically."
     exit 1
