@@ -3014,47 +3014,47 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.alpha",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.beta",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/gensupport",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi/internal/uritemplates",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/logging/v2beta1",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/monitoring/v3",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/api/pubsub/v1",
-			"Rev": "c0dae069ee96c9261a04c81efd9e0f1e55f565ac"
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
 			"ImportPath": "google.golang.org/genproto/googleapis/api/annotations",
