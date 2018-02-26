@@ -43,7 +43,7 @@ func GetDefaultMutators() map[string][]PodSpecMutatorFunc {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
 			setRightDNSPolicyOnPodSpec,
-			setHostIPOnPodSpec,
+			setPodIPOnPodSpec,
 		},
 		kubeadmconstants.KubeControllerManager: {
 			addNodeSelectorToPodSpec,
@@ -96,20 +96,25 @@ func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
 // setMasterTolerationOnPodSpec makes the Pod tolerate the master taint
 func setMasterTolerationOnPodSpec(podSpec *v1.PodSpec) {
 	if podSpec.Tolerations == nil {
-		podSpec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
+		podSpec.Tolerations = []v1.Toleration{
+			kubeadmconstants.MasterToleration,
+			kubeadmconstants.CloudProviderUninitializedToleration,
+		}
 		return
 	}
 
-	podSpec.Tolerations = append(podSpec.Tolerations, kubeadmconstants.MasterToleration)
+	podSpec.Tolerations = append(podSpec.Tolerations,
+		kubeadmconstants.MasterToleration,
+		kubeadmconstants.CloudProviderUninitializedToleration)
 }
 
-// setHostIPOnPodSpec sets the environment variable HOST_IP using downward API
-func setHostIPOnPodSpec(podSpec *v1.PodSpec) {
+// setPodIPOnPodSpec sets the environment variable POD_IP using downward API
+func setPodIPOnPodSpec(podSpec *v1.PodSpec) {
 	envVar := v1.EnvVar{
-		Name: "HOST_IP",
+		Name: "POD_IP",
 		ValueFrom: &v1.EnvVarSource{
 			FieldRef: &v1.ObjectFieldSelector{
-				FieldPath: "status.hostIP",
+				FieldPath: "status.podIP",
 			},
 		},
 	}
@@ -118,7 +123,7 @@ func setHostIPOnPodSpec(podSpec *v1.PodSpec) {
 
 	for i := range podSpec.Containers[0].Command {
 		if strings.Contains(podSpec.Containers[0].Command[i], "advertise-address") {
-			podSpec.Containers[0].Command[i] = "--advertise-address=$(HOST_IP)"
+			podSpec.Containers[0].Command[i] = "--advertise-address=$(POD_IP)"
 		}
 	}
 }
