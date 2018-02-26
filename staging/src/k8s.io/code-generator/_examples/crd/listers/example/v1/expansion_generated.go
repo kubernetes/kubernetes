@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1
 
+// ClusterTestTypeListerExpansion allows custom methods to be added to
+// ClusterTestTypeLister.
+type ClusterTestTypeListerExpansion interface{}
+
 // TestTypeListerExpansion allows custom methods to be added to
 // TestTypeLister.
 type TestTypeListerExpansion interface{}
