@@ -28,18 +28,10 @@ import (
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-)
-
-var (
-	testDriver = "test-driver"
-	testVol    = "vol-123"
-	testns     = "test-ns"
-	testPodUID = types.UID("test-pod")
 )
 
 func TestMounterGetPath(t *testing.T) {

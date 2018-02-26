@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -518,12 +517,6 @@ func hasStageUnstageCapability(ctx context.Context, csi csiClient) (bool, error)
 		}
 	}
 	return stageUnstageSet, nil
-}
-
-// getAttachmentName returns csi-<sha252(volName,csiDriverName,NodeName>
-func getAttachmentName(volName, csiDriverName, nodeName string) string {
-	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
-	return fmt.Sprintf("csi-%x", result)
 }
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
