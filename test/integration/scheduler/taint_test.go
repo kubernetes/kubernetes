@@ -131,8 +131,8 @@ func TestTaintNodeByCondition(t *testing.T) {
 	)
 
 	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
-		cfg.StopEverything = controllerCh
-		cfg.Recorder = &record.FakeRecorder{}
+		cfg.SetStopEverything(controllerCh)
+		cfg.SetRecorder(&record.FakeRecorder{})
 	})
 	if err != nil {
 		t.Errorf("Failed to create scheduler: %v.", err)

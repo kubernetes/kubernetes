@@ -1060,25 +1060,26 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	algo := core.NewGenericScheduler(c.schedulerCache, c.equivalencePodCache, c.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, c.volumeBinder, c.pVCLister, c.alwaysCheckAllPredicates)
 
 	podBackoff := util.CreateDefaultPodBackoff()
-	return &scheduler.Config{
-		SchedulerCache: c.schedulerCache,
-		Ecache:         c.equivalencePodCache,
+	return scheduler.NewConfig(
+		c.schedulerCache,
+		c.equivalencePodCache,
 		// The scheduler only needs to consider schedulable nodes.
-		NodeLister:          &nodeLister{c.nodeLister},
-		Algorithm:           algo,
-		GetBinder:           c.getBinderFunc(extenders),
-		PodConditionUpdater: &podConditionUpdater{c.client},
-		PodPreemptor:        &podPreemptor{c.client},
-		WaitForCacheSync: func() bool {
-			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
-		},
-		NextPod: func() *v1.Pod {
+		&nodeLister{c.nodeLister},
+		algo,
+		c.getBinderFunc(extenders),
+		&podConditionUpdater{c.client},
+		&podPreemptor{c.client},
+		func() *v1.Pod {
 			return c.getNextPod()
 		},
-		Error:          c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
-		StopEverything: c.StopEverything,
-		VolumeBinder:   c.volumeBinder,
-	}, nil
+		func() bool {
+			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
+		},
+		c.MakeDefaultErrorFunc(podBackoff, c.podQueue),
+		nil,
+		c.StopEverything,
+		c.volumeBinder,
+	), nil
 }
 
 type nodeLister struct {

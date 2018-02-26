@@ -207,11 +207,11 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 
 		// Verify that the config is applied correctly.
 		schedPredicates := sets.NewString()
-		for k := range config.Algorithm.Predicates() {
+		for k := range config.Algorithm().Predicates() {
 			schedPredicates.Insert(k)
 		}
 		schedPrioritizers := sets.NewString()
-		for _, p := range config.Algorithm.Prioritizers() {
+		for _, p := range config.Algorithm().Prioritizers() {
 			schedPrioritizers.Insert(p.Name)
 		}
 		if !schedPredicates.Equal(test.expectedPredicates) {
@@ -538,14 +538,14 @@ func TestMultiScheduler(t *testing.T) {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster2 := record.NewBroadcaster()
-	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
+	schedulerConfig2.SetRecorder(eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler}))
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.CoreV1().RESTClient()).Events("")})
-	go podInformer2.Informer().Run(schedulerConfig2.StopEverything)
-	informerFactory2.Start(schedulerConfig2.StopEverything)
+	go podInformer2.Informer().Run(schedulerConfig2.StopEverything())
+	informerFactory2.Start(schedulerConfig2.StopEverything())
 
 	sched2, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig2}, nil...)
 	sched2.Run()
-	defer close(schedulerConfig2.StopEverything)
+	defer close(schedulerConfig2.StopEverything())
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled
@@ -571,7 +571,7 @@ func TestMultiScheduler(t *testing.T) {
 	// See https://github.com/kubernetes/kubernetes/issues/23715 for more details.
 
 	/*
-		close(schedulerConfig.StopEverything)
+		close(schedulerConfig.StopEverything())
 
 		//	8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
 		//		- note: these two pods belong to default scheduler which no longer exists
@@ -700,7 +700,7 @@ func TestPDBCache(t *testing.T) {
 	}
 	// Wait for PDB to show up in the scheduler's cache.
 	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache().ListPDBs(labels.Everything())
 		if err != nil {
 			t.Errorf("Error while polling for PDB: %v", err)
 			return false, err
@@ -710,7 +710,7 @@ func TestPDBCache(t *testing.T) {
 		t.Fatalf("No PDB was added to the cache: %v", err)
 	}
 	// Read PDB from the cache and compare it.
-	cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+	cachedPDBs, err := context.scheduler.Config().SchedulerCache().ListPDBs(labels.Everything())
 	if len(cachedPDBs) != 1 {
 		t.Fatalf("Expected to have 1 pdb in cache, but found %d.", len(cachedPDBs))
 	}
@@ -727,7 +727,7 @@ func TestPDBCache(t *testing.T) {
 	}
 	// Wait for PDB to be updated in the scheduler's cache.
 	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache().ListPDBs(labels.Everything())
 		if err != nil {
 			t.Errorf("Error while polling for PDB: %v", err)
 			return false, err
@@ -737,7 +737,7 @@ func TestPDBCache(t *testing.T) {
 		t.Fatalf("No PDB was updated in the cache: %v", err)
 	}
 	// Read PDB from the cache and compare it.
-	cachedPDBs, err = context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+	cachedPDBs, err = context.scheduler.Config().SchedulerCache().ListPDBs(labels.Everything())
 	if len(cachedPDBs) != 1 {
 		t.Errorf("Expected to have 1 pdb in cache, but found %d.", len(cachedPDBs))
 	}
@@ -752,7 +752,7 @@ func TestPDBCache(t *testing.T) {
 	}
 	// Wait for PDB to be deleted from the scheduler's cache.
 	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache().ListPDBs(labels.Everything())
 		if err != nil {
 			t.Errorf("Error while polling for PDB: %v", err)
 			return false, err

@@ -385,13 +385,13 @@ func TestSchedulerExtender(t *testing.T) {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
+	schedulerConfig.SetRecorder(eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}))
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 	scheduler, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
-	informerFactory.Start(schedulerConfig.StopEverything)
+	informerFactory.Start(schedulerConfig.StopEverything())
 	scheduler.Run()
 
-	defer close(schedulerConfig.StopEverything)
+	defer close(schedulerConfig.StopEverything())
 
 	DoTestPodScheduling(ns, t, clientSet)
 }

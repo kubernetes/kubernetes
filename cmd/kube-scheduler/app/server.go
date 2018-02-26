@@ -704,6 +704,6 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
 	// Additional tweaks to the config produced by the configurator.
-	config.Recorder = s.Recorder
+	config.SetRecorder(s.Recorder)
 	return config, nil
 }

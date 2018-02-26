@@ -715,7 +715,7 @@ func TestPDBInPreemption(t *testing.T) {
 		}
 		// Wait for PDBs to show up in the scheduler's cache.
 		if err := wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-			cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+			cachedPDBs, err := context.scheduler.Config().SchedulerCache().ListPDBs(labels.Everything())
 			if err != nil {
 				t.Errorf("Error while polling for PDB: %v", err)
 				return false, err

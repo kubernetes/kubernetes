@@ -208,10 +208,10 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
-	if _, found := config.Algorithm.Predicates()["PredicateOne"]; !found {
+	if _, found := config.Algorithm().Predicates()["PredicateOne"]; !found {
 		t.Errorf("Expected predicate PredicateOne from %q", DefaultProvider)
 	}
-	if len(config.Algorithm.Prioritizers()) != 1 || config.Algorithm.Prioritizers()[0].Name != "PriorityOne" {
+	if len(config.Algorithm().Prioritizers()) != 1 || config.Algorithm().Prioritizers()[0].Name != "PriorityOne" {
 		t.Errorf("Expected priority PriorityOne from %q", DefaultProvider)
 	}
 }
@@ -250,10 +250,10 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
-	if len(config.Algorithm.Predicates()) != 0 {
+	if len(config.Algorithm().Predicates()) != 0 {
 		t.Error("Expected empty predicate sets")
 	}
-	if len(config.Algorithm.Prioritizers()) != 0 {
+	if len(config.Algorithm().Prioritizers()) != 0 {
 		t.Error("Expected empty priority sets")
 	}
 }

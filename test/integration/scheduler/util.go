@@ -88,10 +88,10 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster := record.NewBroadcaster()
-	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
+	context.schedulerConfig.SetRecorder(eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}))
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(context.clientSet.CoreV1().RESTClient()).Events("")})
-	go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
-	context.informerFactory.Start(context.schedulerConfig.StopEverything)
+	go podInformer.Informer().Run(context.schedulerConfig.StopEverything())
+	context.informerFactory.Start(context.schedulerConfig.StopEverything())
 	context.scheduler, err = scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: context.schedulerConfig}, nil...)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
@@ -104,7 +104,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // at the end of a test.
 func cleanupTest(t *testing.T, context *TestContext) {
 	// Kill the scheduler.
-	close(context.schedulerConfig.StopEverything)
+	close(context.schedulerConfig.StopEverything())
 	// Cleanup nodes.
 	context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(context.ns, context.httpServer, t)

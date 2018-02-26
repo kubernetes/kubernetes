@@ -408,8 +408,8 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 
 	eventBroadcaster := record.NewBroadcaster()
 	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
-		cfg.StopEverything = controllerCh
-		cfg.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
+		cfg.SetStopEverything(controllerCh)
+		cfg.SetRecorder(eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}))
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
 	})
 	if err != nil {

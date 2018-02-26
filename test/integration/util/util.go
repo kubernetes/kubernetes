@@ -81,7 +81,7 @@ func StartScheduler(clientSet clientset.Interface, enableEquivalenceCache bool) 
 	)
 
 	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
-		conf.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
+		conf.SetRecorder(evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}))
 	})
 	if err != nil {
 		glog.Fatalf("Error creating scheduler: %v", err)
