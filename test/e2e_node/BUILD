@@ -97,7 +97,6 @@ go_test(
         "lifecycle_hook_test.go",
         "log_path_test.go",
         "mirror_pod_test.go",
-	"node_problem_detector_linux.go"
         "pods_container_manager_test.go",
         "runtime_conformance_test.go",
         "security_context_test.go",
