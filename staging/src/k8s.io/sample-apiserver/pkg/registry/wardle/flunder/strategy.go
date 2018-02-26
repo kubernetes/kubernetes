@@ -31,16 +31,19 @@ import (
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
+// NewStrategy creates and returns a flunderStrategy instance
 func NewStrategy(typer runtime.ObjectTyper) flunderStrategy {
 	return flunderStrategy{typer, names.SimpleNameGenerator}
 }
 
+// GetAttrs returns labels.Set, fields.Set, the presence of Initializers if any
+// and error in case the given runtime.Object is not a Flunder
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	apiserver, ok := obj.(*wardle.Flunder)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Flunder.")
+		return nil, nil, false, fmt.Errorf("given object is not a Flunder")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), FlunderToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), apiserver.Initializers != nil, nil
 }
 
 // MatchFlunder is the filter used by the generic etcd backend to watch events
@@ -53,8 +56,8 @@ func MatchFlunder(label labels.Selector, field fields.Selector) storage.Selectio
 	}
 }
 
-// FlunderToSelectableFields returns a field set that represents the object.
-func FlunderToSelectableFields(obj *wardle.Flunder) fields.Set {
+// SelectableFields returns a field set that represents the object.
+func SelectableFields(obj *wardle.Flunder) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }
 

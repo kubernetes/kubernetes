@@ -31,16 +31,19 @@ import (
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
+// NewStrategy creates and returns a fischerStrategy instance
 func NewStrategy(typer runtime.ObjectTyper) fischerStrategy {
 	return fischerStrategy{typer, names.SimpleNameGenerator}
 }
 
+// GetAttrs returns labels.Set, fields.Set, the presence of Initializers if any
+// and error in case the given runtime.Object is not a Fischer
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	apiserver, ok := obj.(*wardle.Fischer)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Fischer.")
+		return nil, nil, false, fmt.Errorf("given object is not a Fischer")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), fischerToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), apiserver.Initializers != nil, nil
 }
 
 // MatchFischer is the filter used by the generic etcd backend to watch events
@@ -53,8 +56,8 @@ func MatchFischer(label labels.Selector, field fields.Selector) storage.Selectio
 	}
 }
 
-// fischerToSelectableFields returns a field set that represents the object.
-func fischerToSelectableFields(obj *wardle.Fischer) fields.Set {
+// SelectableFields returns a field set that represents the object.
+func SelectableFields(obj *wardle.Fischer) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }
 
