@@ -34,7 +34,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/golang/glog"
-	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
@@ -121,7 +121,7 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 	diskType string,
 	zone string) (gceObject, error) {
 	diskTypeURI, err := manager.getDiskTypeURI(
-		manager.gce.region /* diskRegion */, singleZone{zone}, diskType, false /* useAlphaAPI */)
+		manager.gce.region /* diskRegion */, singleZone{zone}, diskType, false /* useBetaAPI */)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		diskTypeURI, err := manager.getDiskTypeURI(
-			manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType, true /* useAlphaAPI */)
+			manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType, true /* useBetaAPI */)
 		if err != nil {
 			return nil, err
 		}
@@ -155,15 +155,15 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 				fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone, true))
 		}
 
-		diskToCreateAlpha := &computealpha.Disk{
+		diskToCreateBeta := &computebeta.Disk{
 			Name:         name,
 			SizeGb:       sizeGb,
 			Description:  tagsStr,
 			Type:         diskTypeURI,
 			ReplicaZones: fullyQualifiedReplicaZones,
 		}
-		return manager.gce.serviceAlpha.RegionDisks.Insert(
-			manager.gce.projectID, manager.gce.region, diskToCreateAlpha).Do()
+		return manager.gce.serviceBeta.RegionDisks.Insert(
+			manager.gce.projectID, manager.gce.region, diskToCreateBeta).Do()
 	}
 
 	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
@@ -239,24 +239,24 @@ func (manager *gceServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*GCEDisk, error) {
 
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
-		diskAlpha, err := manager.gce.serviceAlpha.RegionDisks.Get(
+		diskBeta, err := manager.gce.serviceBeta.RegionDisks.Get(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
 		if err != nil {
 			return nil, err
 		}
 
 		zones := sets.NewString()
-		for _, zoneURI := range diskAlpha.ReplicaZones {
+		for _, zoneURI := range diskBeta.ReplicaZones {
 			zones.Insert(lastComponent(zoneURI))
 		}
 
 		return &GCEDisk{
 			ZoneInfo: multiZone{zones},
-			Region:   lastComponent(diskAlpha.Region),
-			Name:     diskAlpha.Name,
-			Kind:     diskAlpha.Kind,
-			Type:     diskAlpha.Type,
-			SizeGb:   diskAlpha.SizeGb,
+			Region:   lastComponent(diskBeta.Region),
+			Name:     diskBeta.Name,
+			Kind:     diskBeta.Kind,
+			Type:     diskBeta.Type,
+			SizeGb:   diskBeta.SizeGb,
 		}, nil
 	}
 
@@ -273,7 +273,7 @@ func (manager *gceServiceManager) DeleteDiskOnCloudProvider(
 func (manager *gceServiceManager) DeleteRegionalDiskOnCloudProvider(
 	diskName string) (gceObject, error) {
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
-		return manager.gce.serviceAlpha.RegionDisks.Delete(
+		return manager.gce.serviceBeta.RegionDisks.Delete(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
 	}
 
@@ -325,11 +325,11 @@ func (manager *gceServiceManager) getDiskSourceURI(disk *GCEDisk) (string, error
 }
 
 func (manager *gceServiceManager) getDiskTypeURI(
-	diskRegion string, diskZoneInfo zoneType, diskType string, useAlphaAPI bool) (string, error) {
+	diskRegion string, diskZoneInfo zoneType, diskType string, useBetaAPI bool) (string, error) {
 
 	var getProjectsAPIEndpoint string
-	if useAlphaAPI {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
+	if useBetaAPI {
+		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointBeta()
 	} else {
 		getProjectsAPIEndpoint = manager.getProjectsAPIEndpoint()
 	}
@@ -361,10 +361,10 @@ func (manager *gceServiceManager) getDiskTypeURI(
 	}
 }
 
-func (manager *gceServiceManager) getReplicaZoneURI(zone string, useAlphaAPI bool) string {
+func (manager *gceServiceManager) getReplicaZoneURI(zone string, useBetaAPI bool) string {
 	var getProjectsAPIEndpoint string
-	if useAlphaAPI {
-		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
+	if useBetaAPI {
+		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointBeta()
 	} else {
 		getProjectsAPIEndpoint = manager.getProjectsAPIEndpoint()
 	}
@@ -418,10 +418,10 @@ func (manager *gceServiceManager) ResizeDiskOnCloudProvider(disk *GCEDisk, sizeG
 
 func (manager *gceServiceManager) RegionalResizeDiskOnCloudProvider(disk *GCEDisk, sizeGb int64) (gceObject, error) {
 	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
-		resizeServiceRequest := &computealpha.RegionDisksResizeRequest{
+		resizeServiceRequest := &computebeta.RegionDisksResizeRequest{
 			SizeGb: sizeGb,
 		}
-		return manager.gce.serviceAlpha.RegionDisks.Resize(manager.gce.projectID, disk.Region, disk.Name, resizeServiceRequest).Do()
+		return manager.gce.serviceBeta.RegionDisks.Resize(manager.gce.projectID, disk.Region, disk.Name, resizeServiceRequest).Do()
 	}
 	return nil, fmt.Errorf("RegionalResizeDiskOnCloudProvider is a regional PD feature and is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
