@@ -8,11 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nvveen/Gotty"
-
+	gotty "github.com/Nvveen/Gotty"
 	"github.com/docker/docker/pkg/jsonlog"
 	"github.com/docker/docker/pkg/term"
-	"github.com/docker/go-units"
+	units "github.com/docker/go-units"
 )
 
 // JSONError wraps a concrete Code and Message, `Code` is
@@ -187,7 +186,7 @@ func cursorDown(out io.Writer, ti termInfo, l int) {
 func (jm *JSONMessage) Display(out io.Writer, termInfo termInfo) error {
 	if jm.Error != nil {
 		if jm.Error.Code == 401 {
-			return fmt.Errorf("Authentication is required.")
+			return fmt.Errorf("authentication is required")
 		}
 		return jm.Error
 	}

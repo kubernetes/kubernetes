@@ -3,8 +3,9 @@
 package mount
 
 import (
-	"golang.org/x/sys/unix"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // #include <stdlib.h>
