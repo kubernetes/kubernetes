@@ -39,7 +39,7 @@ const (
 	// StoreCertsInSecrets is alpha in v1.8 and v1.9
 	StoreCertsInSecrets = "StoreCertsInSecrets"
 
-	// DynamicKubeletConfig is alpha in v1.9
+	// DynamicKubeletConfig is beta in v1.10
 	DynamicKubeletConfig = "DynamicKubeletConfig"
 
 	// Auditing is beta in 1.8
@@ -55,7 +55,7 @@ var InitFeatureGates = FeatureList{
 	// We don't want to advertise this feature gate exists in v1.9 to avoid confusion as it is not yet working
 	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190, HiddenInHelpText: true},
 	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
-	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Beta}, MinimumVersion: v190},
 	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 }
 
