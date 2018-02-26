@@ -124,7 +124,7 @@ func (i *imageCache) set(images []container.Image) {
 func (i *imageCache) get() []container.Image {
 	i.RLock()
 	defer i.RUnlock()
-	return i.images
+	return append([]container.Image{}, i.images...)
 }
 
 // Information about the images we track.
