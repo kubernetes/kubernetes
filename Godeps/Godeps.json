@@ -3057,6 +3057,10 @@
 			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
 		},
 		{
+			"ImportPath": "google.golang.org/api/tpu/v1alpha1",
+			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+		},
+		{
 			"ImportPath": "google.golang.org/genproto/googleapis/api/annotations",
 			"Rev": "09f6ed296fc66555a25fe4ce95173148778dfa85"
 		},
