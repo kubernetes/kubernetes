@@ -3,6 +3,7 @@ load(
     "go_library",
     "go_test",
 )
+load("//build:vendored.bzl", "vendored_path_prefix")
 
 go_library(
     name = "go_default_library",
@@ -47,7 +48,7 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = [
-        "//pkg/controller:__pkg__",
+        "//" + vendored_path_prefix + "pkg/controller:__pkg__",
     ],
 )
 
