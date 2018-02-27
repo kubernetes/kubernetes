@@ -28,9 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 )
 
-// TopOptions contains all the options for running the top cli command.
-type TopOptions struct{}
-
 var (
 	supportedMetricsAPIVersions = []string{
 		"v1beta1",
