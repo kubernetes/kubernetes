@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,6 +60,42 @@ type LocalAPIGroupInfo struct {
 	AuthroizationCachingPeriod time.Duration
 }
 
+// A ServiceResolver knows how to get an API endpoint URL given a service.
+type ServiceResolver interface {
+	ResolveEndpoint(namespace, name string) (*url.URL, error)
+}
+
+// ProxiedAPIGroupInfo contains settings to enable bulk forwarding for desired group.
+type ProxiedAPIGroupInfo struct {
+
+	// GroupVersion is uniqute group identifier
+	GroupVersion schema.GroupVersion
+	Preferred    bool
+
+	// ServiceName is the name of the service this handler proxies to
+	ServiceName string
+
+	// ServiceNamespace is the namespace the service lives in
+	ServiceNamespace string
+
+	// If present, the Dial method will be used for dialing out to delegate apiservers.
+	ProxyTransport *http.Transport
+
+	// ProxyClientCert/Key are the client cert used to identify this proxy.
+	// Backing APIServices use this to confirm the proxy's identity
+	InsecureSkipTLSVerify bool
+	ProxyClientCert       []byte
+	ProxyClientKey        []byte
+	CABundle              []byte
+
+	// Endpoints based routing to map from cluster IP to routable IP
+	ServiceResolver ServiceResolver
+
+	tlsConfig         *tls.Config
+	dialContext       func(ctx context.Context, network, addr string) (net.Conn, error)
+	transportBuildErr error
+}
+
 // APIManagerFactory constructs instances of APIManager
 type APIManagerFactory struct {
 	Root                 string
@@ -90,7 +127,8 @@ type APIManager struct {
 
 // registeredAPIGroup is either LocalAPIGroupInfo or ProxiedAPIGroupInfo
 type registeredAPIGroup struct {
-	Local *LocalAPIGroupInfo
+	Local   *LocalAPIGroupInfo
+	Proxied *ProxiedAPIGroupInfo
 }
 
 // HTTP handler for bulk-watch, stateless.
@@ -153,6 +191,12 @@ func (m *APIManager) RegisterLocalGroup(agv LocalAPIGroupInfo) error {
 	return m.registerAPIGroupCommon(agv.GroupVersion, registeredAPIGroup{Local: &agv}, agv.Preferred)
 }
 
+// RegisterProxiedGroup forward Bulk API request to other apiserver.
+func (m *APIManager) RegisterProxiedGroup(agv ProxiedAPIGroupInfo) error {
+	agv.prepareProxiedAPIGroup()
+	return m.registerAPIGroupCommon(agv.GroupVersion, registeredAPIGroup{Proxied: &agv}, agv.Preferred)
+}
+
 // RegisterAPIGroup enables Bulk API for provided group.
 func (m *APIManager) registerAPIGroupCommon(gv schema.GroupVersion, agv registeredAPIGroup, preferredVersion bool) error {
 	if _, found := m.apiGroups[gv]; found {
@@ -206,5 +250,33 @@ func (h watchHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		utilruntime.HandleError(err)
 		return
+	}
+}
+
+func (p *ProxiedAPIGroupInfo) prepareProxiedAPIGroup() {
+	restConfig := &restclient.Config{
+		TLSClientConfig: restclient.TLSClientConfig{
+			Insecure:   p.InsecureSkipTLSVerify,
+			ServerName: p.ServiceName + "." + p.ServiceNamespace + ".svc",
+			CertData:   p.ProxyClientCert,
+			KeyData:    p.ProxyClientKey,
+			CAData:     p.CABundle,
+		}}
+
+	var err error
+	p.tlsConfig, err = restclient.TLSConfigFor(restConfig)
+	if err != nil {
+		p.transportBuildErr = err
+		return
+	}
+
+	// TODO(anjensan): We should reuse as much as possible from 'aggregator' here
+	if p.ProxyTransport != nil {
+		p.dialContext = p.ProxyTransport.DialContext
+	} else {
+		p.dialContext = (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext
 	}
 }

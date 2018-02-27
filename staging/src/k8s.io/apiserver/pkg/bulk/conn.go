@@ -74,6 +74,9 @@ type bulkConnectionImpl struct {
 	// Outgoing responses
 	responses chan *bulkapi.BulkResponse
 
+	// connections to proxied apiservers
+	proxyPool proxyConnectionsPool
+
 	serializerInfo runtime.SerializerInfo
 }
 
@@ -86,6 +89,16 @@ func newBulkConnectionImpl(m *APIManager, req *http.Request, ctx request.Context
 		serializerInfo: si,
 		watches:        make(map[string]singleWatch),
 		responses:      make(chan *bulkapi.BulkResponse, 100),
+	}
+	haveProxy := false
+	for _, gi := range m.apiGroups {
+		if gi.Proxied != nil {
+			haveProxy = true
+			break
+		}
+	}
+	if haveProxy {
+		bc.proxyPool = newProxyConnectionsPool(ctx, bc, req)
 	}
 	return bc
 }
@@ -117,8 +130,11 @@ func (s *bulkConnectionImpl) SerializerInfo() runtime.SerializerInfo { return s.
 
 func (s *bulkConnectionImpl) Close() {
 	s.contextCancel() // ask all sub-goroutines to stop & wait for them
-	s.loops.Wait()    // wait for processing loops
+	if s.proxyPool != nil {
+		s.proxyPool.Close()
+	}
 	close(s.responses)
+	s.loops.Wait() // wait for processing loops
 }
 
 func (s *bulkConnectionImpl) handleRequest(r *bulkapi.BulkRequest) {
@@ -155,6 +171,11 @@ func (s *bulkConnectionImpl) handleStopWatch(r *bulkapi.BulkRequest) error {
 		w.StopWatch(r)
 		return nil
 	}
+	if s.proxyPool != nil {
+		if proxy, ok := s.proxyPool.FindConnectionByWatch(wid); ok {
+			return proxy.ForwardRequest(r)
+		}
+	}
 	return fmt.Errorf("watch not found")
 }
 
@@ -169,6 +190,9 @@ func (s *bulkConnectionImpl) handleNewWatch(r *bulkapi.BulkRequest) error {
 	}
 	if err = s.checkWatchAlreadyExists(r.Watch.WatchID); err != nil {
 		return err
+	}
+	if groupInfo.Proxied != nil {
+		return s.forwardRequest(r, groupInfo.Proxied)
 	}
 	w, err := makeSingleWatch(s.context, s, r, groupInfo.Local)
 	if err != nil {
@@ -188,6 +212,9 @@ func (s *bulkConnectionImpl) handleNewWatchList(r *bulkapi.BulkRequest) error {
 	if err = s.checkWatchAlreadyExists(r.WatchList.WatchID); err != nil {
 		return err
 	}
+	if groupInfo.Proxied != nil {
+		return s.forwardRequest(r, groupInfo.Proxied)
+	}
 	w, err := makeSingleWatchList(s.context, s, r, groupInfo.Local)
 	if err != nil {
 		return err
@@ -203,6 +230,9 @@ func (s *bulkConnectionImpl) handleGet(r *bulkapi.BulkRequest) error {
 	if err != nil {
 		return err
 	}
+	if groupInfo.Proxied != nil {
+		return s.forwardRequest(r, groupInfo.Proxied)
+	}
 	return s.spawnAsyncOperation(func() {
 		performSingleGet(s.context, s, r, groupInfo.Local)
 	})
@@ -215,6 +245,9 @@ func (s *bulkConnectionImpl) handleList(r *bulkapi.BulkRequest) error {
 	groupInfo, err := s.findGroupInfo(r.List.ListSelector.GroupVersionResource)
 	if err != nil {
 		return err
+	}
+	if groupInfo.Proxied != nil {
+		return s.forwardRequest(r, groupInfo.Proxied)
 	}
 	return s.spawnAsyncOperation(func() {
 		performSingleList(s.context, s, r, groupInfo.Local)
@@ -264,6 +297,16 @@ func (s *bulkConnectionImpl) findGroupInfo(rs bulkapi.GroupVersionResource) (*re
 		return nil, fmt.Errorf("unsupported group '%s/%s'", rs.Group, version)
 	}
 	return groupInfo, nil
+}
+
+func (s *bulkConnectionImpl) forwardRequest(r *bulkapi.BulkRequest, proxyInfo *ProxiedAPIGroupInfo) error {
+	proxy, err := s.proxyPool.SpawnProxyConnection(proxyInfo)
+	if err != nil {
+		return fmt.Errorf("unable to open proxy connection to %s: %v", proxyInfo.GroupVersion, err)
+	}
+	// Just route request without additional process (authorization etc)
+	// all responses automatically routed directly into current websocket.
+	return proxy.ForwardRequest(r)
 }
 
 func (s *bulkConnectionImpl) stopAndRemoveWatch(w singleWatch) {
