@@ -186,6 +186,10 @@ func ClusterRoles() []rbac.ClusterRole {
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
+					"/bulk", "/bulk/*",
+				).RuleOrDie(),
+				rbac.NewRule("post").URLs(
+					"/bulk", "/bulk/*",
 				).RuleOrDie(),
 			},
 		},
