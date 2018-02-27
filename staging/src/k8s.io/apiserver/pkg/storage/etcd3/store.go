@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -419,6 +420,33 @@ func (s *store) Count(key string) (int64, error) {
 		return 0, err
 	}
 	return getResp.Count, nil
+}
+
+// LastResourceVersion finds the last modified resource version for a given key range and returns it
+// or an error.
+func (s *store) LastResourceVersion(ctx context.Context, keyPrefix string, from string) (string, error) {
+	fromRV, err := s.versioner.ParseListResourceVersion(from)
+	if err != nil {
+		return "", err
+	}
+	key := path.Join(s.pathPrefix, keyPrefix)
+	getResp, err := s.client.KV.Get(
+		ctx,
+		key,
+		clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)),
+		clientv3.WithKeysOnly(),
+		clientv3.WithMinModRev(int64(fromRV)),
+	)
+	if err != nil {
+		return "", err
+	}
+	lastRev := int64(fromRV)
+	for _, kv := range getResp.Kvs {
+		if kv.ModRevision > lastRev {
+			lastRev = kv.ModRevision
+		}
+	}
+	return strconv.FormatInt(lastRev, 10), nil
 }
 
 // continueToken is a simple structured object for encoding the state of a continue token.

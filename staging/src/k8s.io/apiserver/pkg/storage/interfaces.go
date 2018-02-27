@@ -17,7 +17,10 @@ limitations under the License.
 package storage
 
 import (
+	"errors"
+
 	"golang.org/x/net/context"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -109,6 +112,8 @@ func NewUIDPreconditions(uid string) *Preconditions {
 	return &Preconditions{UID: &u}
 }
 
+var ErrNotImplemented = errors.New("this functionality is not implemented")
+
 // Interface offers a common interface for object marshaling/unmarshaling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
@@ -198,4 +203,10 @@ type Interface interface {
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+
+	// LastResourceVersion returns the most recent modification version under a given key
+	// prefix or returns an error. If the implementation does not support this operation it may
+	// return ErrNotImplemented. The implementation is expected to perform a strongly consistent
+	// read to satisfy this API.
+	LastResourceVersion(ctx context.Context, keyPrefix string, from string) (string, error)
 }

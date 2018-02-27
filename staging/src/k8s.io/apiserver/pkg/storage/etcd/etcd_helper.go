@@ -587,7 +587,11 @@ func (h *etcdHelper) GuaranteedUpdate(
 }
 
 func (*etcdHelper) Count(pathPerfix string) (int64, error) {
-	return 0, fmt.Errorf("Count is unimplemented for etcd2!")
+	return 0, storage.ErrNotImplemented
+}
+
+func (*etcdHelper) LastResourceVersion(ctx context.Context, keyPrefix string, from string) (string, error) {
+	return "", storage.ErrNotImplemented
 }
 
 // etcdCache defines interface used for caching objects stored in etcd. Objects are keyed by

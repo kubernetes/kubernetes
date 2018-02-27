@@ -1332,3 +1332,145 @@ func Test_growSlice(t *testing.T) {
 		})
 	}
 }
+
+func TestLastResourceVersion(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
+	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	ctx := context.Background()
+
+	// Setup storage with the following structure:
+	//  /
+	//   - one-level/
+	//  |            - test
+	//  |
+	//   - two-level/
+	//  |            - 1/
+	//  |           |   - test
+	//  |           |
+	//  |            - 2/
+	//  |               - test
+	//  |
+	//   - z-level/
+	//               - 3/
+	//              |   - test
+	//              |
+	//               - 3/
+	//                  - test-2
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{
+		{
+			key: "/one-level/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/1/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/2/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+		{
+			key: "/z-level/3/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fourth"}},
+		},
+		{
+			key: "/z-level/3/test-2",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+	}
+
+	for i, ps := range preset {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+	}
+	updated := &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, preset[3].key, updated, false, nil,
+		func(input runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			pod := *input.(*example.Pod)
+			pod.Generation += 1
+			return &pod, nil, nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted := &example.Pod{}
+	if err := store.Delete(ctx, "/one-level/test", deleted, nil); err != nil {
+		t.Fatal(err)
+	}
+	v, _ := strconv.ParseUint(updated.ResourceVersion, 10, 64)
+	deleted.ResourceVersion = strconv.FormatUint(v+1, 10)
+
+	tests := []struct {
+		name        string
+		rv          string
+		prefix      string
+		expectError bool
+		expectRV    string
+	}{
+		{
+			name:        "rejects invalid resource version",
+			prefix:      "/",
+			rv:          "abc",
+			expectError: true,
+		},
+		{
+			name:     "from first object",
+			prefix:   "/",
+			rv:       preset[0].storedObj.ResourceVersion,
+			expectRV: deleted.ResourceVersion,
+		},
+		{
+			name:     "from last object",
+			prefix:   "/",
+			rv:       preset[4].storedObj.ResourceVersion,
+			expectRV: deleted.ResourceVersion,
+		},
+		{
+			name:     "from first object in range",
+			prefix:   "/two-level/",
+			rv:       preset[1].storedObj.ResourceVersion,
+			expectRV: preset[2].storedObj.ResourceVersion,
+		},
+		{
+			name:     "from last object in range",
+			prefix:   "/two-level/",
+			rv:       preset[2].storedObj.ResourceVersion,
+			expectRV: preset[2].storedObj.ResourceVersion,
+		},
+		{
+			name:     "from beyond last object in range",
+			prefix:   "/two-level/",
+			rv:       preset[4].storedObj.ResourceVersion,
+			expectRV: preset[4].storedObj.ResourceVersion,
+		},
+		{
+			name:     "including a modified object",
+			prefix:   "/z-level/3/",
+			rv:       preset[4].storedObj.ResourceVersion,
+			expectRV: updated.ResourceVersion,
+		},
+	}
+
+	for _, tt := range tests {
+		rv, err := store.LastResourceVersion(ctx, tt.prefix, tt.rv)
+		if (err != nil) != tt.expectError {
+			t.Errorf("(%s): List failed: %v", tt.name, err)
+		}
+		if err != nil {
+			continue
+		}
+		if tt.expectRV != rv {
+			t.Errorf("(%s): unexpected resource version: want=%s, initial=%s got=%s", tt.name, tt.expectRV, tt.rv, rv)
+		}
+	}
+}
