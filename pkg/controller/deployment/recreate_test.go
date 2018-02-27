@@ -90,32 +90,134 @@ func TestOldPodsRunning(t *testing.T) {
 		oldRSs []*extensions.ReplicaSet
 		podMap map[types.UID]*v1.PodList
 
-		expected bool
+		hasOldPodsRunning bool
 	}{
 		{
-			name:     "no old RSs",
-			expected: false,
+			name:              "no old RSs",
+			hasOldPodsRunning: false,
 		},
 		{
-			name:     "old RSs with running pods",
-			oldRSs:   []*extensions.ReplicaSet{rsWithUID("some-uid"), rsWithUID("other-uid")},
-			podMap:   podMapWithUIDs([]string{"some-uid", "other-uid"}),
-			expected: true,
+			name:              "old RSs with running pods",
+			oldRSs:            []*extensions.ReplicaSet{rsWithUID("some-uid"), rsWithUID("other-uid")},
+			podMap:            podMapWithUIDs([]string{"some-uid", "other-uid"}),
+			hasOldPodsRunning: true,
 		},
 		{
-			name:     "old RSs without pods but with non-zero status replicas",
-			oldRSs:   []*extensions.ReplicaSet{newRSWithStatus("rs-blabla", 0, 1, nil)},
-			expected: true,
+			name:              "old RSs without pods but with non-zero status replicas",
+			oldRSs:            []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 1, nil)},
+			hasOldPodsRunning: true,
 		},
 		{
-			name:     "old RSs without pods or non-zero status replicas",
-			oldRSs:   []*extensions.ReplicaSet{newRSWithStatus("rs-blabla", 0, 0, nil)},
-			expected: false,
+			name:              "old RSs without pods or non-zero status replicas",
+			oldRSs:            []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 0, nil)},
+			hasOldPodsRunning: false,
+		},
+		{
+			name:   "old RSs with zero status replicas but pods in terminal state are present",
+			oldRSs: []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 0, nil)},
+			podMap: map[types.UID]*v1.PodList{
+				"uid-1": {
+					Items: []v1.Pod{
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodFailed,
+							},
+						},
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodSucceeded,
+							},
+						},
+					},
+				},
+			},
+			hasOldPodsRunning: false,
+		},
+		{
+			name:   "old RSs with zero status replicas but pod in unknown phase present",
+			oldRSs: []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 0, nil)},
+			podMap: map[types.UID]*v1.PodList{
+				"uid-1": {
+					Items: []v1.Pod{
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodUnknown,
+							},
+						},
+					},
+				},
+			},
+			hasOldPodsRunning: true,
+		},
+		{
+			name:   "old RSs with zero status replicas with pending pod present",
+			oldRSs: []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 0, nil)},
+			podMap: map[types.UID]*v1.PodList{
+				"uid-1": {
+					Items: []v1.Pod{
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodPending,
+							},
+						},
+					},
+				},
+			},
+			hasOldPodsRunning: true,
+		},
+		{
+			name:   "old RSs with zero status replicas with running pod present",
+			oldRSs: []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 0, nil)},
+			podMap: map[types.UID]*v1.PodList{
+				"uid-1": {
+					Items: []v1.Pod{
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodRunning,
+							},
+						},
+					},
+				},
+			},
+			hasOldPodsRunning: true,
+		},
+		{
+			name:   "old RSs with zero status replicas but pods in terminal state and pending are present",
+			oldRSs: []*extensions.ReplicaSet{newRSWithStatus("rs-1", 0, 0, nil)},
+			podMap: map[types.UID]*v1.PodList{
+				"uid-1": {
+					Items: []v1.Pod{
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodFailed,
+							},
+						},
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodSucceeded,
+							},
+						},
+					},
+				},
+				"uid-2": {
+					Items: []v1.Pod{},
+				},
+				"uid-3": {
+					Items: []v1.Pod{
+						{
+							Status: v1.PodStatus{
+								Phase: v1.PodPending,
+							},
+						},
+					},
+				},
+			},
+			hasOldPodsRunning: true,
 		},
 	}
 
 	for _, test := range tests {
-		if expected, got := test.expected, oldPodsRunning(test.newRS, test.oldRSs, test.podMap); expected != got {
+		if expected, got := test.hasOldPodsRunning, oldPodsRunning(test.newRS, test.oldRSs, test.podMap); expected != got {
 			t.Errorf("%s: expected %t, got %t", test.name, expected, got)
 		}
 	}
