@@ -40,7 +40,7 @@ func performSingleGet(ctx request.Context, bc bulkConnection, r *bulkapi.BulkReq
 		return
 	}
 
-	ctx = request.WithNamespace(ctx, rs.GroupVersionResource.Namespace)
+	ctx = request.WithNamespace(ctx, rs.Namespace)
 	err := authorizationCheckerFactory{
 		GroupInfo: gi,
 		Resource:  rs.GroupVersionResource,
@@ -86,7 +86,7 @@ func performSingleList(ctx request.Context, bc bulkConnection, r *bulkapi.BulkRe
 		return
 	}
 
-	ctx = request.WithNamespace(ctx, rs.GroupVersionResource.Namespace)
+	ctx = request.WithNamespace(ctx, rs.Namespace)
 	err := authorizationCheckerFactory{
 		GroupInfo: gi,
 		Resource:  rs.GroupVersionResource,

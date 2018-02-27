@@ -60,7 +60,6 @@ func (o *FeatureOptions) ApplyTo(c *server.Config) error {
 	c.EnableProfiling = o.EnableProfiling
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 	c.EnableSwaggerUI = o.EnableSwaggerUI
-
 	return nil
 }
 

@@ -111,7 +111,7 @@ type APIManager struct {
 	// FIXME: support multiple group versions at the same time
 	GroupVersion schema.GroupVersion
 
-	// root is path prefix for installed endpoints
+	// Root is path prefix for installed endpoints
 	Root string
 
 	// Available api groups.
@@ -168,8 +168,7 @@ func (f APIManagerFactory) New() *APIManager {
 
 // Install adds the handlers to the given mux.
 func (m *APIManager) Install(c *mux.PathRecorderMux) {
-	prefix := fmt.Sprintf("%s/bulk", m.Root)
-	c.HandleFunc(prefix+"/watch", watchHTTPHandler{m}.ServeHTTP)
+	c.HandleFunc(m.Root, watchHTTPHandler{m}.ServeHTTP)
 }
 
 // UnregisterGroup unrgisters group from bulk manager.

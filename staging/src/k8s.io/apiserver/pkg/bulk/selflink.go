@@ -23,31 +23,36 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
+	bulkapi "k8s.io/apiserver/pkg/apis/bulk"
 )
 
-func generateSelfLink(obj runtime.Object, linker runtime.SelfLinker) (uri string, err error) {
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	name, err := linker.Name(obj)
-	if err != nil {
-		return
-	}
-	namespace, err := linker.Namespace(obj)
-	if err != nil {
-		return
-	}
-	uri = "/" + path.Join("apis", gvk.Group, gvk.Version)
+func generateSelfLink(gvr bulkapi.GroupVersionResource, name, namespace string) (uri string) {
+	uri = "/" + path.Join("apis", gvr.Group, gvr.Version)
 	if namespace != "" {
 		uri += "/namespaces/" + namespace
 	}
-	uri += "/" + url.QueryEscape(gvk.Kind)
+	uri += "/" + url.QueryEscape(gvr.Resource)
 	if name != "" {
 		uri += "/" + url.QueryEscape(name)
 	}
 	return
 }
 
-func fixupObjectSelfLink(obj runtime.Object, linker runtime.SelfLinker) runtime.Object {
-	selfLink, err := generateSelfLink(obj, linker)
+func generateSelfLinkForObject(gvr bulkapi.GroupVersionResource, obj runtime.Object, linker runtime.SelfLinker) (uri string, err error) {
+	name, err := linker.Name(obj)
+	if err != nil {
+		return
+	}
+	namespace, err := linker.Name(obj)
+	if err != nil {
+		return
+	}
+	uri = generateSelfLink(gvr, name, namespace)
+	return
+}
+
+func fixupObjectSelfLink(gvr bulkapi.GroupVersionResource, obj runtime.Object, linker runtime.SelfLinker) runtime.Object {
+	selfLink, err := generateSelfLinkForObject(gvr, obj, linker)
 	if err == nil {
 		err = linker.SetSelfLink(obj, selfLink)
 	}

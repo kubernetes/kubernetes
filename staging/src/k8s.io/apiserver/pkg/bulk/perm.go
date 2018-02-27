@@ -18,10 +18,12 @@ package bulk
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	bulkapi "k8s.io/apiserver/pkg/apis/bulk"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -35,8 +37,10 @@ type authorizationCheckerFactory struct {
 	GroupInfo *LocalAPIGroupInfo
 	Context   request.Context
 	Resource  bulkapi.GroupVersionResource
+	Linker    runtime.SelfLinker
 	Name      string
 	Verb      string
+	Namespace string
 }
 
 func (a authorizationCheckerFactory) newForbiddenError(reason string) error {
@@ -57,36 +61,41 @@ func (a authorizationCheckerFactory) makeAuthorizationChecker() permCheckFunc {
 		return func() error { return nil }
 	}
 
+	var lock sync.Mutex
+	var lastCheckAt *time.Time
+	var lastResult error
+
 	var attribs authorizer.AttributesRecord
 	if user, ok := request.UserFrom(a.Context); ok {
 		attribs.User = user
 	}
 	attribs.APIGroup = a.Resource.Group
 	attribs.APIVersion = a.Resource.Version
-	attribs.Namespace = a.Resource.Namespace
+	attribs.Namespace = a.Namespace
 	attribs.Resource = a.Resource.Resource
 	attribs.Name = a.Name
 	attribs.ResourceRequest = true
 	attribs.Subresource = ""
 	attribs.Verb = a.Verb
-	// attribs.Path = generateSelfLink(s) // FIXME
-
-	var lastCheckAt *time.Time
-	var lastResult error
+	attribs.Path = generateSelfLink(a.Resource, a.Name, a.Namespace)
 
 	return func() error {
+		lock.Lock()
+		defer lock.Unlock()
 		now := time.Now()
-		if lastCheckAt == nil || lastCheckAt.Add(permRecheck).Before(now) {
-			lastCheckAt = &now
-			decision, reason, err := auth.Authorize(attribs)
-			if err != nil {
-				lastResult = err
-			} else if decision == authorizer.DecisionAllow {
-				lastResult = nil
-			} else {
-				lastResult = a.newForbiddenError(reason)
-			}
+		if lastCheckAt != nil && lastCheckAt.Add(permRecheck).After(now) {
+			return lastResult
 		}
+
+		decision, reason, err := auth.Authorize(attribs)
+		if err != nil {
+			lastResult = err
+		} else if decision == authorizer.DecisionAllow {
+			lastResult = nil
+		} else {
+			lastResult = a.newForbiddenError(reason)
+		}
+		lastCheckAt = &now
 		return lastResult
 	}
 }

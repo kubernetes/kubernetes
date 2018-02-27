@@ -45,6 +45,9 @@ type singleWatchImpl struct {
 	// Initial watch request (used to match with responses)
 	startWatchRequest *bulkapi.BulkRequest
 
+	// Identifies watched resource
+	gvr bulkapi.GroupVersionResource
+
 	// Root connection
 	bulkConnection
 
@@ -83,11 +86,12 @@ func makeSingleWatch(ctx request.Context, bc bulkConnection, r *bulkapi.BulkRequ
 		return nil, fmt.Errorf("storage doesn't support watching")
 	}
 
-	ctx = request.WithNamespace(ctx, rs.GroupVersionResource.Namespace)
+	ctx = request.WithNamespace(ctx, rs.Namespace)
 	permChecker := authorizationCheckerFactory{
 		GroupInfo: groupInfo,
 		Resource:  rs.GroupVersionResource,
 		Name:      rs.Name,
+		Namespace: rs.Namespace,
 		Context:   ctx,
 		Verb:      "watch"}.makeAuthorizationChecker()
 	if err := permChecker(); err != nil {
@@ -129,10 +133,11 @@ func makeSingleWatchList(ctx request.Context, bc bulkConnection, r *bulkapi.Bulk
 		return nil, fmt.Errorf("storage doesn't support watching")
 	}
 
-	ctx = request.WithNamespace(ctx, rs.GroupVersionResource.Namespace)
+	ctx = request.WithNamespace(ctx, rs.Namespace)
 	permChecker := authorizationCheckerFactory{
 		GroupInfo: groupInfo,
 		Resource:  rs.GroupVersionResource,
+		Namespace: rs.Namespace,
 		Context:   ctx,
 		Verb:      "watch"}.makeAuthorizationChecker()
 	if err := permChecker(); err != nil {
@@ -207,8 +212,8 @@ func (w *singleWatchImpl) RunWatchLoop() {
 				return
 			}
 			err := w.permChecker()
-			obj := fixupObjectSelfLink(event.Object, w.linker)
 			if err == nil {
+				obj := fixupObjectSelfLink(w.gvr, event.Object, w.linker)
 				event.Object, err = serializeEmbeddedObject(obj, w.encoder)
 			}
 			if err != nil {
