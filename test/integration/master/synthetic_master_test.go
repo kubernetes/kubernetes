@@ -289,7 +289,7 @@ var deploymentExtensions string = `
 
 var deploymentApps string = `
 {
-  "apiVersion": "apps/v1beta1",
+  "apiVersion": "apps/v1",
   "kind": "Deployment",
   "metadata": {
      "name": "test-deployment2",
@@ -297,6 +297,11 @@ var deploymentApps string = `
   },
   "spec": {
     "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "nginx0"
+      }
+    },
     "template": {
       "metadata": {
         "labels": {
@@ -396,7 +401,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 		{"POST", appsPath("deployments", metav1.NamespaceDefault, ""), deploymentApps, integration.Code201, ""},
 		{"GET", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Apps.GroupVersion().String()},
 		{"GET", extensionsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Apps.GroupVersion().String()},
+		{"DELETE", appsPath("deployments", metav1.NamespaceDefault, "test-deployment2"), "", integration.Code200, testapi.Default.GroupVersion().String()},
 	}
 
 	for _, r := range requests {
