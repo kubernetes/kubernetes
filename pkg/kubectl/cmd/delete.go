@@ -113,7 +113,7 @@ type DeleteOptions struct {
 }
 
 func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &DeleteOptions{}
+	options := &DeleteOptions{Include3rdParty: true}
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{

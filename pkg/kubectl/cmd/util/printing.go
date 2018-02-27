@@ -63,7 +63,7 @@ func AddOutputFlagsForMutation(cmd *cobra.Command) {
 
 // AddOutputVarFlagsForMutation adds output related flags to a command. Used by mutations only.
 func AddOutputVarFlagsForMutation(cmd *cobra.Command, output *string) {
-	cmd.Flags().StringVarP(output, "output", "o", "", "Output mode. Use \"-o name\" for shorter output (resource/name).")
+	cmd.Flags().StringVarP(output, "output", "o", *output, "Output mode. Use \"-o name\" for shorter output (resource/name).")
 }
 
 // AddOutputFlags adds output related flags to a command.
