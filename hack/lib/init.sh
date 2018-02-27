@@ -131,7 +131,7 @@ function kube::readlinkdashf {
       cd "$1"
       pwd -P
     else
-      cd $(dirname "$1")
+      cd "$(dirname "$1")"
       local f
       f=$(basename "$1")
       if [[ -L "$f" ]]; then

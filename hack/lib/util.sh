@@ -30,13 +30,13 @@ kube::util::wait_for_url() {
   }
 
   local i
-  for i in $(seq 1 $times); do
+  for i in $(seq 1 "$times"); do
     local out
-    if out=$(curl --max-time 1 -gkfs $url 2>/dev/null); then
+    if out=$(curl --max-time 1 -gkfs "$url" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
-    sleep ${wait}
+    sleep "${wait}"
   done
   kube::log::error "Timed out waiting for ${prefix} to answer at ${url}; tried ${times} waiting ${wait} between each"
   return 1
@@ -209,7 +209,7 @@ kube::util::gen-docs() {
 # Puts a placeholder for every generated doc. This makes the link checker work.
 kube::util::set-placeholder-gen-docs() {
   local list_file="${KUBE_ROOT}/docs/.generated_docs"
-  if [ -e ${list_file} ]; then
+  if [[ -e "${list_file}" ]]; then
     # remove all of the old docs; we don't want to check them in.
     while read file; do
       if [[ "${list_file}" != "${KUBE_ROOT}/${file}" ]]; then
@@ -244,11 +244,9 @@ kube::util::remove-gen-docs() {
 kube::util::group-version-to-pkg-path() {
   staging_apis=(
   $(
-    pushd ${KUBE_ROOT}/staging/src/k8s.io/api > /dev/null
-      find . -name types.go | xargs -n1 dirname | sed "s|\./||g" | sort
-    popd > /dev/null
-  )
-  )
+    cd "${KUBE_ROOT}/staging/src/k8s.io/api" &&
+    find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort
+  ))
 
   local group_version="$1"
 
@@ -274,14 +272,8 @@ kube::util::group-version-to-pkg-path() {
     meta/v1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
       ;;
-    meta/v1)
-      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
-      ;;
     meta/v1beta1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-      ;;
-    meta/v1beta1)
-      echo "../vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
       ;;
     unversioned)
       echo "pkg/api/unversioned"
@@ -461,7 +453,12 @@ kube::util::ensure_godep_version() {
 kube::util::ensure_no_staging_repos_in_gopath() {
   kube::util::ensure_single_dir_gopath
   local error=0
-  for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
+  for repo_file in "${KUBE_ROOT}"/staging/src/k8s.io/*; do
+    if [[ ! -d "$repo_file" ]]; then
+      # not a directory or there were no files
+      continue;
+    fi
+    repo="$(basename "$repo_file")"
     if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
       echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
       error=1
