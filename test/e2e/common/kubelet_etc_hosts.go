@@ -51,9 +51,12 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 	}
 
 	/*
-		    Testname: kubelet-managed-etc-hosts
-		    Description: Make sure Kubelet correctly manages /etc/hosts and mounts
-			it into the container.
+		Release : v1.9
+		Testname: Kubelet, managed etc hosts
+		Description: Create a Pod with containers with hostNetwork set to false, one of the containers mounts the /etc/hosts file form the host. Create a second Pod with hostNetwork set to true.
+			1. The Pod with hostNetwork=false MUST have /etc/hosts of containers managed by the Kubelet.
+			2. The Pod with hostNetwork=false but the container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be managed by the Kubelet.
+			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
 	*/
 	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
 		By("Setting up the test")
