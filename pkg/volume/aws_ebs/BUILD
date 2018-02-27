@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "attacher.go",
         "aws_ebs.go",
+        "aws_ebs_block.go",
         "aws_util.go",
         "doc.go",
     ],
@@ -35,6 +36,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "attacher_test.go",
+        "aws_ebs_block_test.go",
         "aws_ebs_test.go",
     ],
     embed = [":go_default_library"],
