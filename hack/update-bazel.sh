@@ -25,8 +25,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
 # The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
-kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel 4eaf9e671bbb549fb4ec292cf251f921d7ef80ac
-kube::util::go_install_from_commit github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle 82483596ec203eb9c1849937636f4cbed83733eb
+kube::util::go_install_from_commit \
+    github.com/kubernetes/repo-infra/kazel \
+    4eaf9e671bbb549fb4ec292cf251f921d7ef80ac
+kube::util::go_install_from_commit \
+    github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle \
+    82483596ec203eb9c1849937636f4cbed83733eb \
+    github.com/bazelbuild/buildtools@9455a9fa1081d94b2b3a11c66b7bde2ae5af3b86
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 
