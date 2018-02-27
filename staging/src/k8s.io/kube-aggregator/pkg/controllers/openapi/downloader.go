@@ -99,10 +99,11 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 	handler = request.WithRequestContext(handler, s.contextMapper)
 	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
 
-	req, err := http.NewRequest("GET", "/swagger.json", nil)
+	req, err := http.NewRequest("GET", "/openapi/v2", nil)
 	if err != nil {
 		return nil, "", 0, err
 	}
+	req.Header.Add("Accept", "application/json")
 
 	// Only pass eTag if it is not generated locally
 	if len(etag) > 0 && !strings.HasPrefix(etag, locallyGeneratedEtagPrefix) {
@@ -111,6 +112,23 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 
 	writer := newInMemoryResponseWriter()
 	handler.ServeHTTP(writer, req)
+
+	// single endpoint not found/registered in old server, try to fetch old endpoint
+	// TODO(roycaihw): remove this in 1.11
+	if writer.respCode == http.StatusForbidden || writer.respCode == http.StatusNotFound {
+		req, err = http.NewRequest("GET", "/swagger.json", nil)
+		if err != nil {
+			return nil, "", 0, err
+		}
+
+		// Only pass eTag if it is not generated locally
+		if len(etag) > 0 && !strings.HasPrefix(etag, locallyGeneratedEtagPrefix) {
+			req.Header.Add("If-None-Match", etag)
+		}
+
+		writer = newInMemoryResponseWriter()
+		handler.ServeHTTP(writer, req)
+	}
 
 	switch writer.respCode {
 	case http.StatusNotModified:
