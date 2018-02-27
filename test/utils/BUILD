@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "conditions.go",
         "create_resources.go",
+        "delete_resources.go",
         "density_utils.go",
         "deployment.go",
         "pod_store.go",
@@ -21,6 +22,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/utils",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
