@@ -83,13 +83,8 @@ func getBackgroundOptions() *metav1.DeleteOptions {
 }
 
 func getOrphanOptions() *metav1.DeleteOptions {
-	var trueVar = true
-	return &metav1.DeleteOptions{OrphanDependents: &trueVar}
-}
-
-func getNonOrphanOptions() *metav1.DeleteOptions {
-	var falseVar = false
-	return &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	policy := metav1.DeletePropagationOrphan
+	return &metav1.DeleteOptions{PropagationPolicy: &policy}
 }
 
 var (
@@ -330,7 +325,14 @@ func newCronJob(name, schedule string) *batchv1beta1.CronJob {
 
 var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
-	It("should delete pods created by rc when not orphaning", func() {
+
+	/*
+		    Testname: garbage-collector-delete-rc--propagation-background
+		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Background,
+			then deleting a ReplicationController should cause pods created
+			by that RC to also be deleted.
+	*/
+	framework.ConformanceIt("should delete pods created by rc when not orphaning", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -362,7 +364,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to wait for the rc to create some pods: %v", err)
 		}
 		By("delete the rc")
-		deleteOptions := getNonOrphanOptions()
+		deleteOptions := getBackgroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
@@ -383,7 +385,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("should orphan pods created by rc if delete options say so", func() {
+	/*
+		    Testname: garbage-collector-delete-rc--propagation-orphan
+		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Orphan,
+			then deleting a ReplicationController should cause pods created
+			by that RC to be orphaned.
+	*/
+	framework.ConformanceIt("should orphan pods created by rc if delete options say so", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -501,7 +509,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("should delete RS created by deployment when not orphaning", func() {
+	/*
+		    Testname: garbage-collector-delete-deployment-propagation-background
+		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Background,
+			then deleting a Deployment should cause ReplicaSets created
+			by that Deployment to also be deleted.
+	*/
+	framework.ConformanceIt("should delete RS created by deployment when not orphaning", func() {
 		clientSet := f.ClientSet
 		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
 		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
@@ -529,7 +543,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 
 		By("delete the deployment")
-		deleteOptions := getNonOrphanOptions()
+		deleteOptions := getBackgroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(createdDeployment.UID))
 		if err := deployClient.Delete(deployment.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the deployment: %v", err)
@@ -552,7 +566,13 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("should orphan RS created by deployment when deleteOptions.OrphanDependents is true", func() {
+	/*
+		    Testname: garbage-collector-delete-deployment-propagation-true
+		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Orphan,
+			then deleting a Deployment should cause ReplicaSets created
+			by that Deployment to be orphaned.
+	*/
+	framework.ConformanceIt("should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan", func() {
 		clientSet := f.ClientSet
 		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
 		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
@@ -617,7 +637,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
+	/*
+		    Testname: garbage-collector-delete-rc-after-owned-pods
+		    Description: Ensure that if deleteOptions.PropagationPolicy is set to Foreground,
+			then a ReplicationController should not be deleted until all its dependent pods are deleted.
+	*/
+	framework.ConformanceIt("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -701,7 +726,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	// TODO: this should be an integration test
-	It("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
+	/*
+		    Testname: garbage-collector-multiple-owners
+		    Description: Ensure that if a Pod has multiple valid owners, it will not be deleted
+			when one of of those owners gets deleted.
+	*/
+	framework.ConformanceIt("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -812,7 +842,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	// TODO: should be an integration test
-	It("should not be blocked by dependency circle", func() {
+	/*
+		    Testname: garbage-collector-dependency-cycle
+		    Description: Ensure that a dependency cycle will
+			not block the garbage collector.
+	*/
+	framework.ConformanceIt("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		pod1 := newGCPod("pod1")
