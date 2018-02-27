@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -34,10 +35,17 @@ import (
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
+)
+
+const (
+	pollInterval = 100 * time.Millisecond
+	pollTimeout  = 60 * time.Second
 )
 
 func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
@@ -175,7 +183,7 @@ func validateDaemonSetPodsAndMarkReady(
 	podInformer cache.SharedIndexInformer,
 	numberPods int,
 	t *testing.T) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
 			return false, nil
@@ -221,7 +229,7 @@ func validateDaemonSetStatus(
 	dsNamespace string,
 	expectedNumberReady int32,
 	t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		ds, err := dsClient.Get(dsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -233,7 +241,7 @@ func validateDaemonSetStatus(
 }
 
 func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		eventList, err := eventClient.List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -388,5 +396,223 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		validateFailedPlacementEvent(eventClient, t)
 
 		close(stopCh)
+	}
+}
+
+func getPods(t *testing.T, podClient corev1typed.PodInterface, labelMap map[string]string) *v1.PodList {
+	podSelector := labels.Set(labelMap).AsSelector()
+	options := metav1.ListOptions{LabelSelector: podSelector.String()}
+	pods, err := podClient.List(options)
+	if err != nil {
+		t.Fatalf("failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
+	}
+	return pods
+}
+
+func updatePod(t *testing.T, podClient corev1typed.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
+	var pod *v1.Pod
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		updateFunc(newPod)
+		pod, err = podClient.Update(newPod)
+		return err
+	}); err != nil {
+		t.Fatalf("failed to update status of pod %q: %v", pod.Name, err)
+	}
+	return pod
+}
+
+func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string, updateFunc func(*apps.DaemonSet)) *apps.DaemonSet {
+	var ds *apps.DaemonSet
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newDS, err := dsClient.Get(dsName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		updateFunc(newDS)
+		ds, err = dsClient.Update(newDS)
+		return err
+	}); err != nil {
+		t.Fatalf("Failed to update daemonset %q: %v", dsName, err)
+	}
+	return ds
+}
+
+// checkAtLeastOnePodWithNewImage checks if there is at least one pod with specific image
+func checkAtLeastOnePodWithImage(podClient corev1typed.PodInterface, image string, t *testing.T) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+		pods := getPods(t, podClient, testLabels())
+		for _, pod := range pods.Items {
+			if pod.Spec.Containers[0].Image == image {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
+func canScheduleOnNode(node v1.Node, ds *apps.DaemonSet) bool {
+	newPod := daemon.NewPod(ds, node.Name)
+	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo.SetNode(&node)
+	fit, _, err := daemon.Predicates(newPod, nodeInfo)
+	if err != nil {
+		return false
+	}
+	return fit
+}
+
+// schedulableNodes returns name list of schedulable nodes for a given DaemonSet
+func schedulableNodes(c clientset.Interface, ds *apps.DaemonSet, t *testing.T) []string {
+	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to get a list of schedulable nodes for daemonset %q: %v", ds.Name, err)
+	}
+	nodeNames := make([]string, 0)
+	for _, node := range nodeList.Items {
+		if !canScheduleOnNode(node, ds) {
+			continue
+		}
+		nodeNames = append(nodeNames, node.Name)
+	}
+	return nodeNames
+}
+
+// checkPodsImageAndAvailability checks whether pods have desired image and
+// maxUnavailable requirement is met after a rolling update operation completes
+func checkPodsImageAndAvailability(c clientset.Interface, ds *apps.DaemonSet, image string, maxUnavailable int, podClient corev1typed.PodInterface, t *testing.T) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+		pods := getPods(t, podClient, testLabels())
+		unavailablePods := 0
+		nodesToUpdatedPodCount := make(map[string]int)
+		for _, pod := range pods.Items {
+			if !metav1.IsControlledBy(&pod, ds) {
+				continue
+			}
+			podImage := pod.Spec.Containers[0].Image
+			if podImage == image {
+				nodesToUpdatedPodCount[pod.Spec.NodeName]++
+			}
+			if !podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+				unavailablePods++
+			}
+		}
+		if unavailablePods > maxUnavailable {
+			return false, fmt.Errorf("number of unavailable pods %d is greater than maxUnavailable %d", unavailablePods, maxUnavailable)
+		}
+		// Make sure every pod on the node has been updated
+		nodeNames := schedulableNodes(c, ds, t)
+		for _, node := range nodeNames {
+			if nodesToUpdatedPodCount[node] == 0 {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A RollingUpdate DaemonSet should rollback without unnecessary restarts
+func TestRollbackWithoutUnnecessaryRestarts(t *testing.T) {
+	server, closeFn, dc, informers, clientset := setup(t)
+	defer closeFn()
+	ns := framework.CreateTestingNamespace("rollback-without-unnecessary-restarts-test", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+	podClient := clientset.CoreV1().Pods(ns.Name)
+	nodeClient := clientset.CoreV1().Nodes()
+	podInformer := informers.Core().V1().Pods().Informer()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go dc.Run(5, stopCh)
+
+	// Create a rolling update daemonset
+	dsName := "daemonset"
+	ds := newDaemonSet(dsName, ns.Name)
+	ds.Spec.UpdateStrategy = *newRollbackStrategy()
+	oldImage := "image"
+	ds.Spec.Template.Spec.Containers[0].Image = oldImage
+	ds, err := dsClient.Create(ds)
+	if err != nil {
+		t.Fatalf("failed to create daemonset %q: %v", dsName, err)
+	}
+
+	// Create 2 nodes
+	addNodes(nodeClient, 0, 2, nil, t)
+
+	// Validate everything works correctly, include marking pods
+	// as ready and ensure they launch on every node
+	validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
+	validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 2, t)
+
+	// Update the daemonset to trigger a rollout
+	newImage := "non-existent-image"
+	ds = updateDS(t, dsClient, dsName, func(update *apps.DaemonSet) {
+		update.Spec.Template.Spec.Containers[0].Image = newImage
+	})
+
+	// Manually update image of first pod to the new image
+	// Note: daemonset image update does not propagate to its pods in integration test setting
+	pods := getPods(t, podClient, testLabels())
+	pod := updatePod(t, podClient, pods.Items[0].Name, func(pod *v1.Pod) {
+		pod.Spec.Containers[0].Image = newImage
+	})
+
+	// Ensure we are in the middle of a rollout by checking whether
+	// there is at least one pod with new image
+	checkAtLeastOnePodWithImage(podClient, newImage, t)
+	var existingPods, newPods []*v1.Pod
+	pods = getPods(t, podClient, testLabels())
+	for i := range pods.Items {
+		pod := pods.Items[i]
+		image := pod.Spec.Containers[0].Image
+		switch image {
+		case oldImage:
+			existingPods = append(existingPods, &pod)
+		case newImage:
+			newPods = append(newPods, &pod)
+		default:
+			t.Fatalf("unexpected pod image %q found", image)
+		}
+	}
+	if len(existingPods) == 0 {
+		t.Fatalf("expected at least one pod with old image exists, but found none")
+	}
+	if len(newPods) == 0 {
+		t.Fatalf("expected at least one pod with new image exists, but found none")
+	}
+
+	// Roll back the daemonset before rollout is complete
+	rollbackedDS := updateDS(t, dsClient, dsName, func(update *apps.DaemonSet) {
+		update.Spec.Template.Spec.Containers[0].Image = oldImage
+	})
+
+	// Manually update image of first pod back to old image
+	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
+		pod.Spec.Containers[0].Image = oldImage
+	})
+
+	// Ensure the rollback is complete
+	checkPodsImageAndAvailability(clientset, rollbackedDS, oldImage, 1, podClient, t)
+
+	// Ensure pods are not restarted during rollback by comparing current and old pods
+	pods = getPods(t, podClient, testLabels())
+	m := map[string]bool{}
+	for _, pod := range pods.Items {
+		m[pod.Name] = true
+	}
+	for _, pod := range existingPods {
+		if _, ok := m[pod.Name]; !ok {
+			t.Fatalf("unexpected pod %q found due to pod restart", pod.Name)
+		}
 	}
 }
