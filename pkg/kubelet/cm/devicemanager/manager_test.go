@@ -67,8 +67,66 @@ func TestNewManagerImplStart(t *testing.T) {
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	m, p := setup(t, []*pluginapi.Device{}, func(n string, a, u, r []pluginapi.Device) {}, socketName, pluginSocketName)
-	cleanup(t, m, p)
+	devs := []*pluginapi.Device{
+		{ID: "Dev1", Health: pluginapi.Healthy},
+		{ID: "Dev2", Health: pluginapi.Healthy},
+	}
+
+	m, p := setup(t, devs, func(n string, a, u, r []pluginapi.Device) {}, socketName, pluginSocketName)
+	expCallbackCount := int32(0)
+	callbackCount := int32(0)
+	callbackChan := make(chan int32)
+	callback := func(n string, a, u, r []pluginapi.Device) {
+		callbackCount++
+		if callbackCount > atomic.LoadInt32(&expCallbackCount) {
+			t.FailNow()
+		}
+		m.genericDeviceUpdateCallback(n, a, u, r)
+
+		callbackChan <- callbackCount
+	}
+	m.callback = callback
+
+	atomic.StoreInt32(&expCallbackCount, 1)
+	p.Register(socketName, testResourceName, true)
+
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
+
+	require.Equal(t, len(devs), m.healthyDevices[testResourceName].Len(), "Devices are not updated.")
+	require.Equal(t, 0, m.unhealthyDevices[testResourceName].Len(), "Devices are not updated.")
+
+	capacity, allocatable, removed := m.GetCapacity()
+	resCapacity, ok := capacity[v1.ResourceName(testResourceName)]
+	as := assert.New(t)
+	as.True(ok)
+	resAllocatable, ok := allocatable[v1.ResourceName(testResourceName)]
+	as.True(ok)
+	as.Equal(int64(len(devs)), resCapacity.Value())
+	as.Equal(int64(len(devs)), resAllocatable.Value())
+	as.Equal(0, len(removed))
+
+	p.Stop()
+	m.Stop()
+
+	require.Equal(t, 0, m.healthyDevices[testResourceName].Len(), "Devices are not updated.")
+	require.Equal(t, 2, m.unhealthyDevices[testResourceName].Len(), "Devices are not updated.")
+
+	_, ok = m.endpoints[testResourceName]
+	as.False(ok)
+
+	capacity, allocatable, removed = m.GetCapacity()
+	resCapacity, ok = capacity[v1.ResourceName(testResourceName)]
+	as.True(ok)
+	resAllocatable, ok = allocatable[v1.ResourceName(testResourceName)]
+	as.True(ok)
+	as.Equal(int64(0), resCapacity.Value())
+	as.Equal(int64(0), resAllocatable.Value())
+	as.Equal(0, len(removed))
 }
 
 // Tests that the device plugin manager correctly handles registration and re-registration by
@@ -149,7 +207,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, *Stub) {
+func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (*ManagerImpl, *Stub) {
 	m, err := newManagerImpl(socketName)
 	require.NoError(t, err)
 
@@ -168,7 +226,7 @@ func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, soc
 	return m, p
 }
 
-func cleanup(t *testing.T, m Manager, p *Stub) {
+func cleanup(t *testing.T, m *ManagerImpl, p *Stub) {
 	p.Stop()
 	m.Stop()
 }
@@ -256,18 +314,23 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// is removed from capacity and it no longer exists in healthyDevices after the call.
 	delete(testManager.endpoints, resourceName1)
 	capacity, allocatable, removed := testManager.GetCapacity()
-	as.Equal([]string{resourceName1}, removed)
-	_, ok = capacity[v1.ResourceName(resourceName1)]
-	as.False(ok)
+	as.Equal([]string{}, removed)
+	resource1Capacity, ok = capacity[v1.ResourceName(resourceName1)]
+	as.True(ok)
+	resource1Allocatable, ok = allocatable[v1.ResourceName(resourceName1)]
+	as.True(ok)
+	as.Equal(int64(0), resource1Capacity.Value())
+	as.Equal(int64(0), resource1Allocatable.Value())
+
 	val, ok := capacity[v1.ResourceName(resourceName2)]
 	as.True(ok)
 	as.Equal(int64(3), val.Value())
 	_, ok = testManager.healthyDevices[resourceName1]
-	as.False(ok)
+	as.True(ok)
 	_, ok = testManager.unhealthyDevices[resourceName1]
-	as.False(ok)
+	as.True(ok)
 	fmt.Println("removed: ", removed)
-	as.Equal(1, len(removed))
+	as.Equal(0, len(removed))
 
 }
 
