@@ -281,6 +281,13 @@ func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
 
+// ResourceVersion returns the last resource version the cache has observed.
+func (w *watchCache) ResourceVersion() uint64 {
+	w.RLock()
+	defer w.RUnlock()
+	return w.resourceVersion
+}
+
 // waitUntilFreshAndBlock waits until cache is at least as fresh as given <resourceVersion>.
 // NOTE: This function acquired lock and doesn't release it.
 // You HAVE TO explicitly call w.RUnlock() after this function.

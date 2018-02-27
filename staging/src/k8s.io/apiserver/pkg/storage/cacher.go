@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -430,6 +431,24 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	c.ready.wait()
 	trace.Step("Ready")
 
+	// The cacher must preserve the "happens after" relationship for lists so that
+	// a client contacting an out-of-date watch cache does not perform a stale read
+	// returning deleted objects. To do that, we ask the storage via a consistent
+	// read what the most recent resource version is and use that as our minimum
+	// watch cache revision for the list.
+	if listRV == 0 {
+		latest, err := c.storage.LastResourceVersion(ctx, key, strconv.FormatUint(c.watchCache.ResourceVersion(), 10))
+		if err != ErrNotImplemented {
+			if err != nil {
+				return err
+			}
+			listRV, err = c.versioner.ParseListResourceVersion(latest)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// List elements with at least 'listRV' from cache.
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -499,6 +518,24 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	c.ready.wait()
 	trace.Step("Ready")
 
+	// The cacher must preserve the "happens after" relationship for lists so that
+	// a client contacting an out-of-date watch cache does not perform a stale read
+	// returning deleted objects. To do that, we ask the storage via a consistent
+	// read what the most recent resource version is and use that as our minimum
+	// watch cache revision for the list.
+	if listRV == 0 {
+		latest, err := c.storage.LastResourceVersion(ctx, key, strconv.FormatUint(c.watchCache.ResourceVersion(), 10))
+		if err != ErrNotImplemented {
+			if err != nil {
+				return err
+			}
+			listRV, err = c.versioner.ParseListResourceVersion(latest)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// List elements with at least 'listRV' from cache.
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -557,6 +594,10 @@ func (c *Cacher) GuaranteedUpdate(
 
 func (c *Cacher) Count(pathPrefix string) (int64, error) {
 	return c.storage.Count(pathPrefix)
+}
+
+func (c *Cacher) LastResourceVersion(ctx context.Context, keyPrefix string, from string) (string, error) {
+	return c.storage.LastResourceVersion(ctx, keyPrefix, from)
 }
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
