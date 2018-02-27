@@ -235,7 +235,9 @@ func TestConstructVolumeSpec(t *testing.T) {
 	}
 
 	cinderSpec, err := plug.(*cinderPlugin).ConstructVolumeSpec("cinderVolume", "/cinderVolume/")
-
+	if err != nil {
+		t.Errorf("ConstructVolumeSpec failed: %v", err)
+	}
 	if cinderSpec.Name() != "cinderVolume" {
 		t.Errorf("Get wrong cinder spec name, got: %s", cinderSpec.Name())
 	}
