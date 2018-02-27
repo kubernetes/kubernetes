@@ -535,6 +535,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/api/bulk/v1alpha1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/api/certificates/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -879,10 +883,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/apiserver/pkg/apis/apiserver/install",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -904,6 +904,18 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/apis/audit/validation",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/apis/bulk",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/apis/bulk/install",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/apis/bulk/validation",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -972,6 +984,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/authorization/union",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/bulk",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
