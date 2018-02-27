@@ -19,6 +19,8 @@ package openapi
 import (
 	"sync"
 
+	"github.com/golang/protobuf/proto"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"k8s.io/client-go/discovery"
 )
 
@@ -29,7 +31,7 @@ type synchronizedOpenAPIGetter struct {
 	openAPISchema Resources
 	err           error
 
-	openAPIClient discovery.OpenAPISchemaInterface
+	openAPIClient discovery.DiscoveryInterface
 }
 
 var _ Getter = &synchronizedOpenAPIGetter{}
@@ -42,16 +44,29 @@ type Getter interface {
 
 // NewOpenAPIGetter returns an object to return OpenAPIDatas which reads
 // from a server, and then stores in memory for subsequent invocations
-func NewOpenAPIGetter(openAPIClient discovery.OpenAPISchemaInterface) Getter {
+func NewOpenAPIGetter(openAPIClient discovery.DiscoveryInterface) Getter {
 	return &synchronizedOpenAPIGetter{
 		openAPIClient: openAPIClient,
 	}
 }
 
+func getOpenAPISchema(d discovery.DiscoveryInterface) (*openapi_v2.Document, error) {
+	data, err := d.RESTClient().Get().AbsPath(discovery.OpenAPIV2SchemaPath).Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	document := &openapi_v2.Document{}
+	err = proto.Unmarshal(data, document)
+	if err != nil {
+		return nil, err
+	}
+	return document, nil
+}
+
 // Resources implements Getter
 func (g *synchronizedOpenAPIGetter) Get() (Resources, error) {
 	g.Do(func() {
-		s, err := g.openAPIClient.OpenAPISchema()
+		s, err := getOpenAPISchema(g.openAPIClient)
 		if err != nil {
 			g.err = err
 			return

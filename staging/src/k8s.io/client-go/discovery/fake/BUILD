@@ -11,7 +11,6 @@ go_library(
     srcs = ["discovery.go"],
     importpath = "k8s.io/client-go/discovery/fake",
     deps = [
-        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",

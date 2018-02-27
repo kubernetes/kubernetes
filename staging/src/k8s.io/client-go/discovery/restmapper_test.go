@@ -28,7 +28,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -377,8 +376,4 @@ func (c *fakeCachedDiscoveryInterface) ServerPreferredNamespacedResources() ([]*
 
 func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 	return &version.Info{}, nil
-}
-
-func (c *fakeCachedDiscoveryInterface) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
 }

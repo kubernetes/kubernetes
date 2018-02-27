@@ -23,9 +23,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/googleapis/gnostic/OpenAPIv2"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +36,24 @@ import (
 // defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. ThirdPartyResources).
 const defaultRetries = 2
 
+// OpenAPIV2SchemaPath is the absolute path the API server's OpenAPI schema
+// description is served at.
+//
+//		func openAPISchema(d discovery.DiscoveryInterface) (*openapi_v2.Document, error) {
+//		       data, err := d.RESTClient().Get().AbsPath(discovery.OpenAPIV2SchemaPath).Do().Raw()
+//		       if err != nil {
+//		               return nil, err
+//		       }
+//		       document := &openapi_v2.Document{}
+//		       err = proto.Unmarshal(data, document)
+//		       if err != nil {
+//		               return nil, err
+//		       }
+//		       return document, nil
+//		}
+//
+const OpenAPIV2SchemaPath = "/swagger-2.0.0.pb-v1"
+
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
 type DiscoveryInterface interface {
@@ -46,7 +61,6 @@ type DiscoveryInterface interface {
 	ServerGroupsInterface
 	ServerResourcesInterface
 	ServerVersionInterface
-	OpenAPISchemaInterface
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -87,12 +101,6 @@ type ServerResourcesInterface interface {
 type ServerVersionInterface interface {
 	// ServerVersion retrieves and parses the server's version (git version).
 	ServerVersion() (*version.Info, error)
-}
-
-// OpenAPISchemaInterface has a method to retrieve the open API schema.
-type OpenAPISchemaInterface interface {
-	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
-	OpenAPISchema() (*openapi_v2.Document, error)
 }
 
 // DiscoveryClient implements the functions that discover server-supported API groups,
@@ -325,20 +333,6 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
-}
-
-// OpenAPISchema fetches the open api schema using a rest client and parses the proto.
-func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	data, err := d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	document := &openapi_v2.Document{}
-	err = proto.Unmarshal(data, document)
-	if err != nil {
-		return nil, err
-	}
-	return document, nil
 }
 
 // withRetries retries the given recovery function in case the groups supported by the server change after ServerGroup() returns.
