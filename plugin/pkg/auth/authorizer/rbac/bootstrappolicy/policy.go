@@ -146,6 +146,13 @@ func NodeRules() []rbac.PolicyRule {
 		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		// Use the Node authorization to limit a node to create tokens for service accounts running on that node
+		// Use the NodeRestriction admission plugin to limit a node to create tokens bound to pods on that node
+		tokenRequestRule := rbac.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, tokenRequestRule)
+	}
+
 	// CSI
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 		volAttachRule := rbac.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()

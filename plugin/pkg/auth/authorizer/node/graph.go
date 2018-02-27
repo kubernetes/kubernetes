@@ -107,16 +107,18 @@ const (
 	pvVertexType
 	secretVertexType
 	vaVertexType
+	serviceAccountVertexType
 )
 
 var vertexTypes = map[vertexType]string{
-	configMapVertexType: "configmap",
-	nodeVertexType:      "node",
-	podVertexType:       "pod",
-	pvcVertexType:       "pvc",
-	pvVertexType:        "pv",
-	secretVertexType:    "secret",
-	vaVertexType:        "volumeattachment",
+	configMapVertexType:      "configmap",
+	nodeVertexType:           "node",
+	podVertexType:            "pod",
+	pvcVertexType:            "pvc",
+	pvVertexType:             "pv",
+	secretVertexType:         "secret",
+	vaVertexType:             "volumeattachment",
+	serviceAccountVertexType: "serviceAccount",
 }
 
 // must be called under a write lock
@@ -204,6 +206,7 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 //   secret    -> pod
 //   configmap -> pod
 //   pvc       -> pod
+//   svcacct   -> pod
 func (g *Graph) AddPod(pod *api.Pod) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
@@ -212,6 +215,14 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	podVertex := g.getOrCreateVertex_locked(podVertexType, pod.Namespace, pod.Name)
 	nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", pod.Spec.NodeName)
 	g.graph.SetEdge(newDestinationEdge(podVertex, nodeVertex, nodeVertex))
+
+	// TODO(mikedanese): If the pod doesn't mount the service account secrets,
+	// should the node still get access to the service account?
+	//
+	// ref https://github.com/kubernetes/kubernetes/issues/58790
+	if len(pod.Spec.ServiceAccountName) > 0 {
+		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName), podVertex, nodeVertex))
+	}
 
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
 		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret), podVertex, nodeVertex))
