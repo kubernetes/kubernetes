@@ -446,7 +446,7 @@ func newAllPhasePodList() *api.PodList {
 	}
 }
 
-func Example_printPodHideTerminated() {
+func Example_printPodShowTerminated() {
 	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
@@ -477,6 +477,8 @@ func Example_printPodHideTerminated() {
 	// NAME      READY     STATUS    RESTARTS   AGE
 	// test1     1/2       Pending   6          10y
 	// test2     1/2       Running   6         10y
+	// test3     1/2       Succeeded   6         10y
+	// test4     1/2       Failed    6         10y
 	// test5     1/2       Unknown   6         10y
 }
 

@@ -25,6 +25,8 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
+        "//vendor/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
     ],
 )
 

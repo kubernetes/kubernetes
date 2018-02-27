@@ -26,6 +26,7 @@ go_test(
     deps = [
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],

@@ -71,7 +71,9 @@ var (
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &editor.EditOptions{
-		EditMode: editor.NormalEditMode,
+		EditMode:        editor.NormalEditMode,
+		ValidateOptions: cmdutil.ValidateOptions{EnableValidation: true},
+		Include3rdParty: true,
 	}
 	validArgs := cmdutil.ValidArgList(f)
 

@@ -80,7 +80,7 @@ go_library(
         "//pkg/util/system:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/util/version:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/manifest:go_default_library",

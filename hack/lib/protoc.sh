@@ -57,7 +57,7 @@ function kube::protoc::check_protoc() {
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::protoc() {
   local package=${1}
-  gogopath=$(dirname $(kube::util::find-binary "protoc-gen-gogo"))
+  gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
 
   PATH="${gogopath}:${PATH}" protoc \
     --proto_path="${package}" \

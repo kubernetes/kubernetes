@@ -309,7 +309,7 @@ values:
 	{
 		yamlBody := []byte(fmt.Sprintf(`
 values:
-  numVal: 3`, apiVersion, kind, uid, resourceVersion))
+  numVal: 3`))
 		result, err := rest.Patch(types.MergePatchType).
 			SetHeader("Accept", "application/yaml").
 			SetHeader("Content-Type", "application/yaml").

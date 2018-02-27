@@ -66,7 +66,7 @@ func TestResourcesLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Out:               buf,
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",

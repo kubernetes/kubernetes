@@ -99,6 +99,7 @@ go_test(
         "//pkg/kubelet/apis/cri/testing:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",

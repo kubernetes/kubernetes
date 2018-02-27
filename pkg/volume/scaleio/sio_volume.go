@@ -33,7 +33,6 @@ import (
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type sioVolume struct {
@@ -142,7 +141,7 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	glog.V(4).Info(log("setup created mount point directory %s", dir))
 
-	diskMounter := volumehelper.NewSafeFormatAndMountFromHost(v.plugin.GetPluginName(), v.plugin.host)
+	diskMounter := util.NewSafeFormatAndMountFromHost(v.plugin.GetPluginName(), v.plugin.host)
 	err = diskMounter.FormatAndMount(devicePath, dir, v.fsType, options)
 
 	if err != nil {
@@ -256,7 +255,7 @@ var _ volume.Provisioner = &sioVolume{}
 func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 	glog.V(4).Info(log("attempting to dynamically provision pvc %v", v.options.PVC.Name))
 
-	if !volume.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
 	}
 
@@ -267,14 +266,14 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 
 	capacity := v.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	volSizeBytes := capacity.Value()
-	volSizeGB := int64(volume.RoundUpSize(volSizeBytes, oneGig))
+	volSizeGB := int64(util.RoundUpSize(volSizeBytes, oneGig))
 
 	if volSizeBytes == 0 {
 		return nil, fmt.Errorf("invalid volume size of 0 specified")
 	}
 
 	if volSizeBytes < eightGig {
-		volSizeGB = int64(volume.RoundUpSize(eightGig, oneGig))
+		volSizeGB = int64(util.RoundUpSize(eightGig, oneGig))
 		glog.V(4).Info(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGB))
 
 	}
@@ -314,7 +313,7 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 			Namespace: v.options.PVC.Namespace,
 			Labels:    map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "scaleio-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "scaleio-dynamic-provisioner",
 			},
 		},
 		Spec: api.PersistentVolumeSpec{

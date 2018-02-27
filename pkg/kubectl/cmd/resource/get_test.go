@@ -401,7 +401,7 @@ func TestGetObjectsFiltered(t *testing.T) {
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "false", "output": "name"}, resp: pods,
 			expect: "pod/foo\npod/bar\n"},
 
-		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods,
+		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}, resp: pods,
 			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
 
 		{args: []string{"pods"}, resp: pods, flags: map[string]string{"show-all": "false"},
@@ -556,7 +556,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 
 	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
@@ -1265,7 +1265,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE

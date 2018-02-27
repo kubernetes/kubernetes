@@ -66,7 +66,7 @@ func TestImageLocal(t *testing.T) {
 	cmd.Flags().Set("local", "true")
 
 	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Out:   buf,
 		Local: true}
 	err := opts.Complete(tf, cmd, []string{"cassandra=thingy"})

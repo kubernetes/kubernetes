@@ -283,6 +283,60 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 		// return the current replicas if the change would be too small
 		return currentReplicas, utilization, timestamp, nil
 	}
+	replicaCount = int32(math.Ceil(usageRatio * float64(currentReplicas)))
+
+	return replicaCount, utilization, timestamp, nil
+}
+
+// GetExternalMetricReplicas calculates the desired replica count based on a
+// target metric value (as a milli-value) for the external metric in the given
+// namespace, and the current replica count.
+func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, targetUtilization int64, metricName, namespace string, selector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return 0, 0, time.Time{}, err
+	}
+	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, labelSelector)
+	if err != nil {
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, selector, err)
+	}
+	utilization = 0
+	for _, val := range metrics {
+		utilization = utilization + val
+	}
+
+	usageRatio := float64(utilization) / float64(targetUtilization)
+	if math.Abs(1.0-usageRatio) <= c.tolerance {
+		// return the current replicas if the change would be too small
+		return currentReplicas, utilization, timestamp, nil
+	}
 
 	return int32(math.Ceil(usageRatio * float64(currentReplicas))), utilization, timestamp, nil
+}
+
+// GetExternalPerPodMetricReplicas calculates the desired replica count based on a
+// target metric value per pod (as a milli-value) for the external metric in the
+// given namespace, and the current replica count.
+func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, selector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		return 0, 0, time.Time{}, err
+	}
+	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, labelSelector)
+	if err != nil {
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, selector, err)
+	}
+	utilization = 0
+	for _, val := range metrics {
+		utilization = utilization + val
+	}
+
+	replicaCount = currentReplicas
+	usageRatio := float64(utilization) / (float64(targetUtilizationPerPod) * float64(replicaCount))
+	if math.Abs(1.0-usageRatio) > c.tolerance {
+		// update number of replicas if the change is large enough
+		replicaCount = int32(math.Ceil(float64(utilization) / float64(targetUtilizationPerPod)))
+	}
+	utilization = int64(math.Ceil(float64(utilization) / float64(currentReplicas)))
+	return replicaCount, utilization, timestamp, nil
 }

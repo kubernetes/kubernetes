@@ -330,7 +330,9 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				// We would not be able to delete the cert until ingress controller
 				// cleans up the target proxy that references it.
 				By("Deleting ingress before deleting ssl certificate")
-				jig.TryDeleteIngress()
+				if jig.Ingress != nil {
+					jig.TryDeleteIngress()
+				}
 				By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
 				err := wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 					if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {

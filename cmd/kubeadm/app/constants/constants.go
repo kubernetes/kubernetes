@@ -266,6 +266,9 @@ var (
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
 
+	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
+	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
+
 	// MasterComponents defines the master component names
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 

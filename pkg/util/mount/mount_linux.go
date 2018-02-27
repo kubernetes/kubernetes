@@ -432,7 +432,7 @@ func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
 	case syscall.S_IFBLK:
 		return FileTypeBlockDev, nil
 	case syscall.S_IFCHR:
-		return FileTypeBlockDev, nil
+		return FileTypeCharDev, nil
 	case syscall.S_IFDIR:
 		return FileTypeDirectory, nil
 	case syscall.S_IFREG:

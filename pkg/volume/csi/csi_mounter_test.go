@@ -114,7 +114,7 @@ func TestMounterSetUp(t *testing.T) {
 	}
 
 	csiMounter := mounter.(*csiMountMgr)
-	csiMounter.csiClient = setupClient(t)
+	csiMounter.csiClient = setupClient(t, false)
 
 	attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
 
@@ -172,7 +172,7 @@ func TestUnmounterTeardown(t *testing.T) {
 	}
 
 	csiUnmounter := unmounter.(*csiMountMgr)
-	csiUnmounter.csiClient = setupClient(t)
+	csiUnmounter.csiClient = setupClient(t, false)
 
 	dir := csiUnmounter.GetPath()
 

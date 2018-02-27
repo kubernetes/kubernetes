@@ -448,6 +448,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIPersistentVolume, true)()
 	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
 	expectAllowed(t, getVolumeAttachment(node2ClientExternal))
+
+	//TODO(mikedanese): integration test node restriction of TokenRequest
 }
 
 // expect executes a function a set number of times until it either returns the

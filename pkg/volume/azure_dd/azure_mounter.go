@@ -116,7 +116,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if m.options.MountOptions != nil {
-		options = volume.JoinMountOptions(m.options.MountOptions, options)
+		options = util.JoinMountOptions(m.options.MountOptions, options)
 	}
 
 	glog.V(4).Infof("azureDisk - Attempting to mount %s on %s", diskName, dir)

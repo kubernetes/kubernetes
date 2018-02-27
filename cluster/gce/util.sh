@@ -500,6 +500,7 @@ function write-master-env {
     KUBERNETES_MASTER_NAME="${MASTER_NAME}"
   fi
 
+  construct-kubelet-flags true
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
   build-kube-master-certs "${KUBE_TEMP}/kube-master-certs.yaml"
 }
@@ -509,7 +510,118 @@ function write-node-env {
     KUBERNETES_MASTER_NAME="${MASTER_NAME}"
   fi
 
+  construct-kubelet-flags false
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+}
+
+# $1: if 'true', we're rendering flags for a master, else a node
+function construct-kubelet-flags {
+  local master=$1
+  local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
+  flags+=" --allow-privileged=true"
+  flags+=" --cgroup-root=/"
+  flags+=" --cloud-provider=gce"
+  flags+=" --cluster-dns=${DNS_SERVER_IP}"
+  flags+=" --cluster-domain=${DNS_DOMAIN}"
+  flags+=" --pod-manifest-path=/etc/kubernetes/manifests"
+  # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
+  flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
+  flags+=" --experimental-check-node-capabilities-before-mount=true"
+  # Keep in sync with the mkdir command in configure-helper.sh (until the TODO is resolved)
+  flags+=" --cert-dir=/var/lib/kubelet/pki/"
+
+  if [[ "${master}" == "true" ]]; then
+    flags+=" ${MASTER_KUBELET_TEST_ARGS:-}"
+    flags+=" --enable-debugging-handlers=false"
+    flags+=" --hairpin-mode=none"
+    if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
+      #TODO(mikedanese): allow static pods to start before creating a client
+      #flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
+      #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
+      flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
+      flags+=" --register-schedulable=false"
+    else
+      # Note: Standalone mode is used by GKE
+      flags+=" --pod-cidr=${MASTER_IP_RANGE}"
+    fi
+  else # For nodes
+    flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
+    flags+=" --enable-debugging-handlers=true"
+    flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
+    flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
+    if [[ "${HAIRPIN_MODE:-}" == "promiscuous-bridge" ]] || \
+       [[ "${HAIRPIN_MODE:-}" == "hairpin-veth" ]] || \
+       [[ "${HAIRPIN_MODE:-}" == "none" ]]; then
+      flags+=" --hairpin-mode=${HAIRPIN_MODE}"
+    fi
+    # Keep client-ca-file in sync with CA_CERT_BUNDLE_PATH in configure-helper.sh
+    flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=/etc/srv/kubernetes/pki/ca-certificates.crt"
+  fi
+  # Network plugin
+  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
+    flags+=" --cni-bin-dir=/home/kubernetes/bin"
+    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
+      # Calico uses CNI always.
+      # Note that network policy won't work for master node.
+      if [[ "${master}" == "true" ]]; then
+        flags+=" --network-plugin=${NETWORK_PROVIDER}"
+      else
+        flags+=" --network-plugin=cni"
+      fi
+    else
+      # Otherwise use the configured value.
+      flags+=" --network-plugin=${NETWORK_PROVIDER}"
+    fi
+  fi
+  if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
+    flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
+  fi
+  flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
+  # Note: ENABLE_MANIFEST_URL is used by GKE
+  if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
+    flags+=" --manifest-url=${MANIFEST_URL}"
+    flags+=" --manifest-url-header=${MANIFEST_URL_HEADER}"
+  fi
+  if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
+    flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
+  fi
+  local node_labels=""
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
+    # Add kube-proxy daemonset label to node to avoid situation during cluster
+    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
+  fi
+  if [[ -n "${NODE_LABELS:-}" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
+  fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
+  fi
+  if [[ -n "${node_labels:-}" ]]; then
+    flags+=" --node-labels=${node_labels}"
+  fi
+  if [[ -n "${NODE_TAINTS:-}" ]]; then
+    flags+=" --register-with-taints=${NODE_TAINTS}"
+  fi
+  if [[ -n "${EVICTION_HARD:-}" ]]; then
+    flags+=" --eviction-hard=${EVICTION_HARD}"
+  fi
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    flags+=" --feature-gates=${FEATURE_GATES}"
+  fi
+  # TODO(mtaufen): ROTATE_CERTIFICATES seems unused; delete it?
+  if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
+    flags+=" --rotate-certificates=true"
+  fi
+  if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
+    flags+=" --container-runtime=${CONTAINER_RUNTIME}"
+  fi
+  # TODO(mtaufen): CONTAINER_RUNTIME_ENDPOINT seems unused; delete it?
+  if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
+    flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+  fi
+
+  KUBELET_ARGS="${flags}"
 }
 
 function build-kube-master-certs {
@@ -622,12 +734,9 @@ CONTAINER_RUNTIME_NAME: $(yaml-quote ${CONTAINER_RUNTIME_NAME:-})
 NODE_LOCAL_SSDS_EXT: $(yaml-quote ${NODE_LOCAL_SSDS_EXT:-})
 LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 ZONE: $(yaml-quote ${ZONE})
+VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
+KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
 EOF
-  if [ -n "${KUBELET_PORT:-}" ]; then
-    cat >>$file <<EOF
-KUBELET_PORT: $(yaml-quote ${KUBELET_PORT})
-EOF
-  fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     cat >>$file <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
@@ -650,26 +759,6 @@ EOF
 TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})
 EOF
   fi
-  if [ -n "${KUBELET_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_ARGS: $(yaml-quote ${KUBELET_TEST_ARGS})
-EOF
-  fi
-  if [ -n "${NODE_KUBELET_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-NODE_KUBELET_TEST_ARGS: $(yaml-quote ${NODE_KUBELET_TEST_ARGS})
-EOF
-  fi
-  if [ -n "${MASTER_KUBELET_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
-MASTER_KUBELET_TEST_ARGS: $(yaml-quote ${MASTER_KUBELET_TEST_ARGS})
-EOF
-  fi
-  if [ -n "${KUBELET_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
-KUBELET_TEST_LOG_LEVEL: $(yaml-quote ${KUBELET_TEST_LOG_LEVEL})
-EOF
-  fi
   if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
@@ -690,28 +779,11 @@ EOF
 DOCKER_LOG_MAX_FILE: $(yaml-quote ${DOCKER_LOG_MAX_FILE})
 EOF
   fi
-  if [ -n "${ENABLE_CUSTOM_METRICS:-}" ]; then
-    cat >>$file <<EOF
-ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
-EOF
-  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>$file <<EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
-  if [ -n "${ROTATE_CERTIFICATES:-}" ]; then
-    cat >>$file <<EOF
-ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
-EOF
-  fi
-  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
-    cat >>$file <<EOF
-VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec})
-EOF
-  fi
-
   if [ -n "${PROVIDER_VARS:-}" ]; then
     local var_name
     local var_value
@@ -736,9 +808,6 @@ MASTER_KEY: $(yaml-quote ${MASTER_KEY_BASE64:-})
 KUBECFG_CERT: $(yaml-quote ${KUBECFG_CERT_BASE64:-})
 KUBECFG_KEY: $(yaml-quote ${KUBECFG_KEY_BASE64:-})
 KUBELET_APISERVER: $(yaml-quote ${KUBELET_APISERVER:-})
-ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
-MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
-MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
 STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-etcd3})
 STORAGE_MEDIA_TYPE: $(yaml-quote ${STORAGE_MEDIA_TYPE:-})
@@ -874,21 +943,6 @@ EOF
 KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
 EOF
     fi
-  fi
-  if [ -n "${NODE_LABELS:-}" ]; then
-      cat >>$file <<EOF
-NODE_LABELS: $(yaml-quote ${NODE_LABELS})
-EOF
-  fi
-  if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
-    cat >>$file <<EOF
-NON_MASTER_NODE_LABELS: $(yaml-quote ${NON_MASTER_NODE_LABELS})
-EOF
-  fi
-  if [ -n "${EVICTION_HARD:-}" ]; then
-      cat >>$file <<EOF
-EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
-EOF
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
       cat >>$file <<EOF

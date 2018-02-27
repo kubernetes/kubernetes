@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -123,7 +124,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 		server:       source.Server,
 		exportPath:   source.Path,
 		readOnly:     readOnly,
-		mountOptions: volume.MountOptionFromSpec(spec),
+		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -142,13 +143,13 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 
 // Recycle recycles/scrubs clean an NFS volume.
 // Recycle blocks until the pod has completed or any error occurs.
-func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) error {
+func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.NFS == nil {
 		return fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
 	}
 
 	pod := plugin.config.RecyclerPodTemplate
-	timeout := volume.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
+	timeout := util.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &timeout
 	pod.GenerateName = "pv-recycler-nfs-"
@@ -158,7 +159,7 @@ func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder
 			Path:   spec.PersistentVolume.Spec.NFS.Path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
+	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -249,7 +250,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	mountOptions := util.JoinMountOptions(b.mountOptions, options)
 	err = b.mounter.Mount(source, dir, "nfs", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)

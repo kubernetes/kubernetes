@@ -23,9 +23,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 )
 
 const (
@@ -123,7 +125,18 @@ func TestRunCreateToken(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		err := RunCreateToken(&buf, fakeClient, tc.token, 0, tc.usages, tc.extraGroups, "", false, "")
+
+		cfg := &kubeadmapiext.MasterConfiguration{
+			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
+			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			KubernetesVersion: "v1.9.0",
+			Token:             tc.token,
+			TokenTTL:          &metav1.Duration{Duration: 0},
+			TokenUsages:       tc.usages,
+			TokenGroups:       tc.extraGroups,
+		}
+
+		err := RunCreateToken(&buf, fakeClient, "", cfg, "", false, "")
 		if (err != nil) != tc.expectedError {
 			t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
 		}

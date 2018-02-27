@@ -225,9 +225,7 @@ aliases:
     - piosz
     - jsafrane
     - jbeda
-  dep-reviewers:
-    - cblecker
-    - thockin
   dep-approvers:
     - cblecker
     - thockin
+    - sttts

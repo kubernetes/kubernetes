@@ -165,7 +165,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 				glog.Errorf("Failed to kill container %q(id=%q) in pod %q: %v, %v",
 					container.Name, kubeContainerID.String(), format.Pod(pod), ErrPostStartHook, err)
 			}
-			return msg, ErrPostStartHook
+			return msg, fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr)
 		}
 	}
 

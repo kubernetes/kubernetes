@@ -26,8 +26,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -82,10 +84,10 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		return "", 0, nil, "", err
 	}
 
-	name := volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
+	name := volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// GCE PDs are allocated in chunks of GBs (not GiBs)
-	requestGB := volume.RoundUpToGB(capacity)
+	requestGB := volumeutil.RoundUpToGB(capacity)
 
 	// Apply Parameters.
 	// Values for parameter "replication-type" are canonicalized to lower case.
@@ -109,6 +111,11 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 			zonesPresent = true
 			configuredZones = v
 		case "replication-type":
+			if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
+				return "", 0, nil, "",
+					fmt.Errorf("the %q option for volume plugin %v is only supported with the %q Kubernetes feature gate enabled",
+						k, c.plugin.GetPluginName(), features.GCERegionalPersistentDisk)
+			}
 			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
 			fstype = v
@@ -169,13 +176,13 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		} else if zonePresent && !zonesPresent {
 			// 10 - "zone" specified
 			// Use specified zone
-			if err := volume.ValidateZone(configuredZone); err != nil {
+			if err := volumeutil.ValidateZone(configuredZone); err != nil {
 				return "", 0, nil, "", err
 			}
 			zones = make(sets.String)
 			zones.Insert(configuredZone)
 		}
-		zone := volume.ChooseZoneForVolume(zones, c.options.PVC.Name)
+		zone := volumeutil.ChooseZoneForVolume(zones, c.options.PVC.Name)
 
 		if err := cloud.CreateDisk(
 			name,
@@ -237,7 +244,7 @@ func createRegionalPD(
 		selectedReplicaZones = replicaZones
 	} else {
 		// Must randomly select zones
-		selectedReplicaZones = volume.ChooseZonesForVolume(
+		selectedReplicaZones = volumeutil.ChooseZonesForVolume(
 			replicaZones, pvcName, maxRegionalPDZones)
 	}
 

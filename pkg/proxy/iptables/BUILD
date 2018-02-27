@@ -42,6 +42,7 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/util:go_default_library",
+        "//pkg/proxy/util/testing:go_default_library",
         "//pkg/util/async:go_default_library",
         "//pkg/util/conntrack:go_default_library",
         "//pkg/util/iptables:go_default_library",

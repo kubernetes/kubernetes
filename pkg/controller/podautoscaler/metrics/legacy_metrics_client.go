@@ -177,6 +177,10 @@ func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace str
 	return 0, time.Time{}, fmt.Errorf("object metrics are not yet supported")
 }
 
+func (h *HeapsterMetricsClient) GetExternalMetric(metricName, namespace string, selector labels.Selector) ([]int64, time.Time, error) {
+	return nil, time.Time{}, fmt.Errorf("external metrics aren't supported")
+}
+
 func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) (int64, time.Time, bool) {
 	floatSum := float64(0)
 	intSum := int64(0)
