@@ -824,6 +824,7 @@ EOF
     sudo "${GO_OUT}/hyperkube" proxy \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" \
+      --cluster-cidr=${SERVICE_CLUSTER_IP_RANGE} \
       --v=${LOG_LEVEL} 2>&1 &
     PROXY_PID=$!
 
