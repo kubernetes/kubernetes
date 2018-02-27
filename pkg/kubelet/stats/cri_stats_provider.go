@@ -35,10 +35,17 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
+
+// LogMetricsService returns a log metrics provider for a specific container.
+// The provider should only be used once, follow-up calls return the same data.
+type LogMetricsService interface {
+	// GetMetricsProvider returns a log metrics provider for a specific container.
+	GetMetricsProvider(uid types.UID, name string) volume.MetricsProvider
+}
 
 // criStatsProvider implements the containerStatsProvider interface by getting
 // the container stats from CRI.
@@ -351,8 +358,7 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Rootfs.Inodes = imageFsInfo.Inodes
 		}
 	}
-	containerLogPath := kuberuntime.BuildContainerLogsDirectory(types.UID(uid), container.GetMetadata().GetName())
-	result.Logs = p.getContainerLogStats(containerLogPath, rootFsInfo)
+	result.Logs = p.getContainerLogStats(types.UID(uid), container.GetMetadata().GetName(), rootFsInfo)
 	return result
 }
 
@@ -430,11 +436,11 @@ func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) map[strin
 }
 
 // TODO Cache the metrics in container log manager
-func (p *criStatsProvider) getContainerLogStats(path string, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
-	m := p.logMetricsService.createLogMetricsProvider(path)
+func (p *criStatsProvider) getContainerLogStats(uid types.UID, name string, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	m := p.logMetricsService.GetMetricsProvider(uid, name)
 	logMetrics, err := m.GetMetrics()
 	if err != nil {
-		glog.Errorf("Unable to fetch container log stats for path %s: %v ", path, err)
+		glog.Errorf("Unable to fetch container log stats for container %q of pod %q: %v ", name, uid, err)
 		return nil
 	}
 	result := &statsapi.FsStats{

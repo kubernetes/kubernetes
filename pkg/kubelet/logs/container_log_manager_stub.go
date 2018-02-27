@@ -16,9 +16,18 @@ limitations under the License.
 
 package logs
 
+import (
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
+)
+
 type containerLogManagerStub struct{}
 
 func (*containerLogManagerStub) Start() {}
+
+func (*containerLogManagerStub) GetMetricsProvider(uid types.UID, name string) volume.MetricsProvider {
+	return nil
+}
 
 // NewStubContainerLogManager returns an empty ContainerLogManager which does nothing.
 func NewStubContainerLogManager() ContainerLogManager {

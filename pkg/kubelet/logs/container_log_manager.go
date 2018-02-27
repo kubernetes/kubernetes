@@ -29,10 +29,16 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/pkg/kubelet/stats"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -55,6 +61,7 @@ type ContainerLogManager interface {
 	// TODO(random-liu): Add RotateLogs function and call it under disk pressure.
 	// Start container log manager.
 	Start()
+	stats.LogMetricsService
 }
 
 // LogRotatePolicy is a policy for container log rotation. The policy applies to all
@@ -144,6 +151,7 @@ type containerLogManager struct {
 	runtimeService internalapi.RuntimeService
 	policy         LogRotatePolicy
 	clock          clock.Clock
+	metricsCache   *metricsCache
 }
 
 // NewContainerLogManager creates a new container log manager.
@@ -155,28 +163,40 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, maxSize s
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse container log max size %q: %v", maxSize, err)
 	}
-	// policy LogRotatePolicy
 	return &containerLogManager{
 		runtimeService: runtimeService,
 		policy: LogRotatePolicy{
 			MaxSize:  parsedMaxSize,
 			MaxFiles: maxFiles,
 		},
-		clock: clock.RealClock{},
+		clock:        clock.RealClock{},
+		metricsCache: newMetricsCache(),
 	}, nil
 }
 
 // Start the container log manager.
 func (c *containerLogManager) Start() {
-	// Start a goroutine peirodically does container log rotation.
-	go wait.Forever(func() {
-		if err := c.rotateLogs(); err != nil {
-			glog.Errorf("Failed to rotate container logs: %v", err)
-		}
-	}, logMonitorPeriod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
+		// Start a goroutine peirodically does container log rotation.
+		go wait.Forever(func() {
+			if err := c.rotateLogs(); err != nil {
+				glog.Errorf("Failed to rotate container logs: %v", err)
+			}
+		}, logMonitorPeriod)
+		glog.V(2).Infof("Container log rotation started with policy %+v", c.policy)
+	}
+	c.metricsCache.start()
+	glog.V(2).Info("Container log manager started")
+}
+
+// GetMetricsProvider returns a log metrics provider for a specific container.
+func (c *containerLogManager) GetMetricsProvider(uid types.UID, name string) volume.MetricsProvider {
+	containerLogPath := kuberuntime.BuildContainerLogsDirectory(uid, name)
+	return c.metricsCache.get(containerLogPath)
 }
 
 func (c *containerLogManager) rotateLogs() error {
+	glog.V(4).Info("Start rotating container logs")
 	// TODO(#59998): Use kubelet pod cache.
 	containers, err := c.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
 	if err != nil {
@@ -220,12 +240,15 @@ func (c *containerLogManager) rotateLogs() error {
 		if info.Size() < c.policy.MaxSize {
 			continue
 		}
+		glog.V(4).Infof("Container %q log size (%d bytes) exceeds limit (%d bytes), perform log rotation", id, info.Size(), c.policy.MaxSize)
 		// Perform log rotation.
 		if err := c.rotateLog(id, path); err != nil {
 			glog.Errorf("Failed to rotate log %q for container %q: %v", path, id, err)
 			continue
 		}
+		glog.V(4).Infof("Container %q log %q is successfully rotated", id, path)
 	}
+	glog.V(4).Info("Finish rotating container logs")
 	return nil
 }
 
