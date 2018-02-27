@@ -169,7 +169,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					{
 						Type: autoscaling.PodsMetricSourceType,
 						Pods: &autoscaling.PodsMetricSource{
-							MetricName:         "some/metric",
+							MetricName:         "somemetric",
 							TargetAverageValue: *resource.NewMilliQuantity(300, resource.DecimalSI),
 						},
 					},
@@ -196,7 +196,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Kind: "ReplicationController",
 								Name: "myrc",
 							},
-							MetricName:  "some/metric",
+							MetricName:  "somemetric",
 							TargetValue: *resource.NewMilliQuantity(300, resource.DecimalSI),
 						},
 					},
@@ -219,7 +219,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					{
 						Type: autoscaling.ExternalMetricSourceType,
 						External: &autoscaling.ExternalMetricSource{
-							MetricName: "some/metric",
+							MetricName: "somemetric",
 							MetricSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"label": "value",
@@ -247,7 +247,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					{
 						Type: autoscaling.ExternalMetricSourceType,
 						External: &autoscaling.ExternalMetricSource{
-							MetricName: "some/metric",
+							MetricName: "somemetric",
 							MetricSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"label": "value",
@@ -490,7 +490,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName: "some/metric",
+								MetricName: "somemetric",
 							},
 						},
 					},
@@ -512,7 +512,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								Target: autoscaling.CrossVersionObjectReference{
 									Name: "myrc",
 								},
-								MetricName:  "some/metric",
+								MetricName:  "somemetric",
 								TargetValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
@@ -579,7 +579,33 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricName: "some/metric",
+								MetricName: "foo/../",
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								TargetValue: resource.NewMilliQuantity(300, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			msg: "'/'",
+		},
+
+		{
+			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					MinReplicas:    utilpointer.Int32Ptr(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricName: "somemetric",
 								MetricSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"label": "value",
@@ -603,7 +629,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricName: "some/metric",
+								MetricName: "somemetric",
 								MetricSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"label": "value",
@@ -628,7 +654,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricName: "some/metric",
+								MetricName: "somemetric",
 								MetricSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"label": "value",
@@ -653,7 +679,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricName: "some/metric",
+								MetricName: "somemetric",
 								MetricSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"label": "value",
@@ -713,7 +739,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some/metric",
+								MetricName:         "somemetric",
 								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
@@ -742,7 +768,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		},
 		autoscaling.PodsMetricSourceType: {
 			Pods: &autoscaling.PodsMetricSource{
-				MetricName:         "some/metric",
+				MetricName:         "somemetric",
 				TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
 			},
 		},
@@ -752,7 +778,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MetricName:  "some/metric",
+				MetricName:  "somemetric",
 				TargetValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
 			},
 		},
