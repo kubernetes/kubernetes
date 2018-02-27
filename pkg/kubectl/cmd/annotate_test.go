@@ -535,7 +535,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	cmd := NewCmdAnnotate(tf, buf)
 	cmd.SetOutput(buf)
 	options := &AnnotateOptions{}
-	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
+	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b", "c-"}
 	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -564,7 +564,7 @@ func TestAnnotateLocal(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdAnnotate(tf, buf)
 	options := &AnnotateOptions{local: true}
-	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
+	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b"}
 	if err := options.Complete(buf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)

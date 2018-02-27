@@ -54,6 +54,7 @@ go_test(
     ],
     data = [
         "//examples:config",
+        "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],
     embed = [":go_default_library"],
