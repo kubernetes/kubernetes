@@ -30,6 +30,7 @@ import (
 
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/api/core/v1"
@@ -590,6 +591,80 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
 			}
 			framework.Logf("0 PersistentVolumes remain.")
+		})
+
+		It("deletion should be idempotent", func() {
+			// This test ensures that deletion of a volume is idempotent.
+			// It creates a PV with Retain policy, deletes underlying AWS / GCE
+			// volume and changes the reclaim policy to Delete.
+			// PV controller should delete the PV even though the underlying volume
+			// is already deleted.
+			framework.SkipUnlessProviderIs("gce", "gke", "aws")
+			By("creating PD")
+			diskName, err := framework.CreatePDWithRetry()
+			framework.ExpectNoError(err)
+
+			By("creating PV")
+			pv := &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "volume-idempotent-delete-",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					// Use Retain to keep the PV, the test will change it to Delete
+					// when the time comes.
+					PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimRetain,
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					Capacity: v1.ResourceList{
+						v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
+					},
+					// PV is bound to non-existing PVC, so it's reclaim policy is
+					// executed immediately
+					ClaimRef: &v1.ObjectReference{
+						Kind:       "PersistentVolumeClaim",
+						APIVersion: "v1",
+						UID:        types.UID("01234567890"),
+						Namespace:  ns,
+						Name:       "dummy-claim-name",
+					},
+				},
+			}
+			switch framework.TestContext.Provider {
+			case "aws":
+				pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+					AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+						VolumeID: diskName,
+					},
+				}
+			case "gce", "gke":
+				pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: diskName,
+					},
+				}
+			}
+			pv, err = c.CoreV1().PersistentVolumes().Create(pv)
+			framework.ExpectNoError(err)
+
+			By("waiting for the PV to get Released")
+			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 2*time.Second, framework.PVReclaimingTimeout)
+			framework.ExpectNoError(err)
+
+			By("deleting the PD")
+			err = framework.DeletePVSource(&pv.Spec.PersistentVolumeSource)
+			framework.ExpectNoError(err)
+
+			By("changing the PV reclaim policy")
+			pv, err = c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimDelete
+			pv, err = c.CoreV1().PersistentVolumes().Update(pv)
+			framework.ExpectNoError(err)
+
+			By("waiting for the PV to get deleted")
+			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, framework.PVDeletingTimeout)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
