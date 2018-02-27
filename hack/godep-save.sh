@@ -89,8 +89,6 @@ hack/update-godep-licenses.sh >/dev/null
 kube::log::status "Creating OWNERS file"
 rm -f "Godeps/OWNERS" "vendor/OWNERS"
 cat <<__EOF__ > "Godeps/OWNERS"
-reviewers:
-- dep-reviewers
 approvers:
 - dep-approvers
 __EOF__
