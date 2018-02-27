@@ -25,6 +25,10 @@ kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
 
+if [[ ! -f test/e2e/generated/bindata.go ]]; then
+  make --no-print-directory -C "${KUBE_ROOT}" verify_generated_files
+fi
+
 ret=0
 go run test/typecheck/main.go "$@" || ret=$?
 if [[ $ret -ne 0 ]]; then
