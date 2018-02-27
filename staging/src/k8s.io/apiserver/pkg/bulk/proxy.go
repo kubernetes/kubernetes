@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -169,7 +168,7 @@ func (p *proxyConnectionsPoolImpl) SpawnProxyConnection(pi *ProxiedAPIGroupInfo)
 	// write a new location based on the existing request pointed at the target service
 	location := &url.URL{}
 	location.Scheme = "wss"
-	location.Path = "/bulk/watch" // TODO: add api version.
+	location.Path = "/bulk" // TODO: add api version.
 	location.Host = rloc.Host
 
 	origin := p.originalRequest
@@ -178,10 +177,10 @@ func (p *proxyConnectionsPoolImpl) SpawnProxyConnection(pi *ProxiedAPIGroupInfo)
 		return
 	}
 
+	wsconf.TlsConfig = pi.tlsConfig
+
 	fakeReq := &http.Request{Header: utilnet.CloneHeader(origin.Header), URL: location}
 	transport.SetAuthProxyHeaders(fakeReq, user.GetName(), user.GetGroups(), user.GetExtra())
-
-	wsconf.TlsConfig = pi.tlsConfig
 	wsconf.Header = fakeReq.Header
 
 	addr := location.Host

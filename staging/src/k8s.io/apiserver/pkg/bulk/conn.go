@@ -299,7 +299,7 @@ func (s *bulkConnectionImpl) findGroupInfo(rs bulkapi.GroupVersionResource) (*re
 	return groupInfo, nil
 }
 
-func (s *bulkConnectionImpl) forwardRequest(r *bulkapi.BulkRequest, proxyInfo *ProxiedAPIGroupInfo) error {
+func (s *bulkConnectionImpl) forwardRequest(r *bulkapi.ClientMessage, proxyInfo *ProxiedAPIGroupInfo) error {
 	proxy, err := s.proxyPool.SpawnProxyConnection(proxyInfo)
 	if err != nil {
 		return fmt.Errorf("unable to open proxy connection to %s: %v", proxyInfo.GroupVersion, err)

@@ -28,6 +28,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 
+	"k8s.io/apiserver/pkg/bulk"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
@@ -235,6 +236,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
+		s.updateInstallBulkApi(apiService)
 		proxyHandler.updateAPIService(apiService)
 		if s.openAPIAggregationController != nil {
 			s.openAPIAggregationController.UpdateAPIService(proxyHandler, apiService)
@@ -261,6 +263,8 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 	if s.openAPIAggregationController != nil {
 		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
 	}
+	s.updateInstallBulkApi(apiService)
+
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
@@ -288,7 +292,28 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(groupPath, groupDiscoveryHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle(groupPath+"/", groupDiscoveryHandler)
 	s.handledGroups.Insert(apiService.Spec.Group)
+
 	return nil
+}
+
+func (s *APIAggregator) updateInstallBulkApi(apiService *apiregistration.APIService) {
+	bulkmgr := s.GenericAPIServer.BulkAPIManager()
+	if bulkmgr != nil && apiService.Spec.Service != nil {
+		gv := schema.GroupVersion{Group: apiService.Spec.Group, Version: apiService.Spec.Version}
+		bulkmgr.UnregisterGroup(gv)
+		bulkmgr.RegisterProxiedGroup(bulk.ProxiedAPIGroupInfo{
+			GroupVersion:          gv,
+			Preferred:             false,
+			ServiceName:           apiService.Spec.Service.Name,
+			ServiceNamespace:      apiService.Spec.Service.Namespace,
+			ProxyTransport:        s.proxyTransport,
+			InsecureSkipTLSVerify: apiService.Spec.InsecureSkipTLSVerify,
+			ProxyClientKey:        s.proxyClientKey,
+			ProxyClientCert:       s.proxyClientCert,
+			CABundle:              apiService.Spec.CABundle,
+			ServiceResolver:       s.serviceResolver,
+		})
+	}
 }
 
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
@@ -307,6 +332,11 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
 	}
 	delete(s.proxyHandlers, apiServiceName)
+
+	bulkmgr := s.GenericAPIServer.BulkAPIManager()
+	if bulkmgr != nil {
+		bulkmgr.UnregisterGroup(version)
+	}
 
 	// TODO unregister group level discovery when there are no more versions for the group
 	// We don't need this right away because the handler properly delegates when no versions are present
