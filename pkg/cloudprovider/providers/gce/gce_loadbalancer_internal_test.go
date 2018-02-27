@@ -317,3 +317,24 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, fwdRule)
 }
+
+func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
+	projectID := "test-project"
+	region := "us-central1"
+	zoneName := "us-central1-b"
+	clusterName := "Test Cluster Name"
+	clusterID := "test-cluster-id"
+
+	gce, err := fakeGCECloud(projectID, region, zoneName)
+	require.NoError(t, err)
+
+	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, clusterName, clusterID, zoneName)
+	assert.NoError(t, err)
+
+	err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, fakeApiService)
+	assert.NoError(t, err)
+
+	// Deleting the loadbalancer and resources again should not cause an error.
+	err = gce.ensureInternalLoadBalancerDeleted(clusterName, clusterID, fakeApiService)
+	assert.NoError(t, err)
+}
