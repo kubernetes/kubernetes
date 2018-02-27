@@ -883,7 +883,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	for _, test := range tests {
 		nodes := []*v1.Node{}
 		for _, n := range test.nodes {
-			node := makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5)
+			node := makeNode(n, 1000*5, priorityutil.DefaultMemoryRequest*5)
 			node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
 			nodes = append(nodes, node)
 		}
@@ -1286,7 +1286,7 @@ func TestPreempt(t *testing.T) {
 		}
 		cachedNodeInfoMap := map[string]*schedulercache.NodeInfo{}
 		for _, name := range nodeNames {
-			node := makeNode(name, priorityutil.DefaultMilliCpuRequest*5, priorityutil.DefaultMemoryRequest*5)
+			node := makeNode(name, 1000*5, priorityutil.DefaultMemoryRequest*5)
 			cache.AddNode(node)
 
 			// Set nodeInfo to extenders to mock extenders' cache for preemption.

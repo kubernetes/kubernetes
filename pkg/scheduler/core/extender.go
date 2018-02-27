@@ -184,18 +184,19 @@ func (h *HTTPExtender) restorePodFromNodeInfo(
 	metaPod *schedulerapi.MetaPod,
 	nodeName string,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo) (*v1.Pod, error) {
+	var nodeInfo *schedulercache.NodeInfo
 	if nodeInfo, ok := nodeNameToInfo[nodeName]; ok {
 		for _, pod := range nodeInfo.Pods() {
 			if string(pod.UID) == metaPod.UID {
 				return pod, nil
 			}
 		}
-		return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node.",
+		return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",
 			h.extenderURL, metaPod, nodeInfo.Node().Name)
-	} else {
-		return nil, fmt.Errorf("extender: %v claims to preempt on node: %v but the node is not found in nodeNameToInfo map",
-			h.extenderURL, nodeInfo.Node().Name)
 	}
+
+	return nil, fmt.Errorf("extender: %v claims to preempt on node: %v but the node is not found in nodeNameToInfo map",
+		h.extenderURL, nodeInfo.Node().Name)
 }
 
 // convertToNodeNameToMetaVictims converts from struct type to meta types.

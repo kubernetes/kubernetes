@@ -54,6 +54,7 @@ type FitError struct {
 	FailedPredicates FailedPredicateMap
 }
 
+// ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 const (
@@ -253,11 +254,11 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	nominatedPods := g.getLowerPriorityNominatedPods(pod, candidateNode.Name)
 	if nodeInfo, ok := g.cachedNodeInfoMap[candidateNode.Name]; ok {
 		return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, err
-	} else {
-		return nil, nil, nil, fmt.Errorf(
-			"preemption failed: the target node %s has been deleted from scheduler cache",
-			candidateNode.Name)
 	}
+
+	return nil, nil, nil, fmt.Errorf(
+		"preemption failed: the target node %s has been deleted from scheduler cache",
+		candidateNode.Name)
 }
 
 // processPreemptionWithExtenders processes preemption with extenders
