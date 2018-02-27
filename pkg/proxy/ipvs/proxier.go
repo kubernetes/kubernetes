@@ -170,6 +170,11 @@ type Proxier struct {
 	// lbWhiteListIPSet is the hash:ip,port,net type ipset where stores all service load balancer ingress IP:Port,sourceCIDR pair, any packets
 	// from the source CIDR visit ingress IP:Port can pass through.
 	lbWhiteListCIDRSet *IPSet
+	// Values are as a parameter to select the interfaces where nodeport works.
+	nodePortAddresses []string
+	// networkInterfacer defines an interface for several net library functions.
+	// Inject for test purpose.
+	networkInterfacer utilproxy.NetworkInterfacer
 }
 
 // IPGetter helps get node network interface IP
@@ -253,6 +258,7 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 	scheduler string,
+	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
@@ -336,6 +342,8 @@ func NewProxier(ipt utiliptables.Interface,
 		lbWhiteListCIDRSet: NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, isIPv6),
 		nodePortSetTCP:     NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
 		nodePortSetUDP:     NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
+		nodePortAddresses:  nodePortAddresses,
+		networkInterfacer:  utilproxy.RealNetwork{},
 	}
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
@@ -1134,6 +1142,7 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				var nodePortSet *IPSet
 				switch protocol {
+
 				case "tcp":
 					nodePortSet = proxier.nodePortSetTCP
 				case "udp":
@@ -1152,31 +1161,43 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Build ipvs kernel routes for each node ip address
-			nodeIPs, err := proxier.ipGetter.NodeIPs()
+			nodeIPs := make([]net.IP, 0)
+			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 			if err != nil {
-				glog.Errorf("Failed to get node IP, err: %v", err)
-			} else {
-				for _, nodeIP := range nodeIPs {
-					// ipvs call
-					serv := &utilipvs.VirtualServer{
-						Address:   nodeIP,
-						Port:      uint16(svcInfo.nodePort),
-						Protocol:  string(svcInfo.protocol),
-						Scheduler: proxier.ipvsScheduler,
+				glog.Errorf("Failed to get node ip address matching nodeport cidr")
+				continue
+			}
+			for address := range addresses {
+				if !utilproxy.IsZeroCIDR(address) {
+					nodeIPs = append(nodeIPs, net.ParseIP(address))
+					continue
+				}
+				// zero cidr
+				nodeIPs, err = proxier.ipGetter.NodeIPs()
+				if err != nil {
+					glog.Errorf("Failed to list all node IPs from host, err: %v", err)
+				}
+			}
+			for _, nodeIP := range nodeIPs {
+				// ipvs call
+				serv := &utilipvs.VirtualServer{
+					Address:   nodeIP,
+					Port:      uint16(svcInfo.nodePort),
+					Protocol:  string(svcInfo.protocol),
+					Scheduler: proxier.ipvsScheduler,
+				}
+				if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
+					serv.Flags |= utilipvs.FlagPersistent
+					serv.Timeout = uint32(svcInfo.stickyMaxAgeSeconds)
+				}
+				// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
+				if err := proxier.syncService(svcNameString, serv, false); err == nil {
+					activeIPVSServices[serv.String()] = true
+					if err := proxier.syncEndpoint(svcName, svcInfo.onlyNodeLocalEndpoints, serv); err != nil {
+						glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 					}
-					if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
-						serv.Flags |= utilipvs.FlagPersistent
-						serv.Timeout = uint32(svcInfo.stickyMaxAgeSeconds)
-					}
-					// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
-					if err := proxier.syncService(svcNameString, serv, false); err == nil {
-						activeIPVSServices[serv.String()] = true
-						if err := proxier.syncEndpoint(svcName, svcInfo.onlyNodeLocalEndpoints, serv); err != nil {
-							glog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
-						}
-					} else {
-						glog.Errorf("Failed to sync service: %v, err: %v", serv, err)
-					}
+				} else {
+					glog.Errorf("Failed to sync service: %v, err: %v", serv, err)
 				}
 			}
 		}

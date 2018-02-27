@@ -18,6 +18,7 @@ go_test(
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/ipvs/testing:go_default_library",
         "//pkg/proxy/util:go_default_library",
+        "//pkg/proxy/util/testing:go_default_library",
         "//pkg/util/ipset:go_default_library",
         "//pkg/util/ipset/testing:go_default_library",
         "//pkg/util/iptables:go_default_library",

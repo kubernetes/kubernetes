@@ -104,6 +104,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_kubeproxyconfig_KubeProxyCon
 		return err
 	}
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
+	out.NodePortAddresses = *(*[]string)(unsafe.Pointer(&in.NodePortAddresses))
 	return nil
 }
 
@@ -138,6 +139,7 @@ func autoConvert_kubeproxyconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 		return err
 	}
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
+	out.NodePortAddresses = *(*[]string)(unsafe.Pointer(&in.NodePortAddresses))
 	return nil
 }
 
