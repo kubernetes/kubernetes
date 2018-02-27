@@ -61,6 +61,9 @@ func runBasicSecureAPIServer(t *testing.T, ciphers []string) (uint32, error) {
 		kubeAPIServerOptions.InsecureServing.BindPort = 0
 		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+		if err := app.DefaultOptions(kubeAPIServerOptions); err != nil {
+			t.Fatal(err)
+		}
 
 		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
 		if err != nil {

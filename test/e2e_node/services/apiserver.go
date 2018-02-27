@@ -40,27 +40,33 @@ func NewAPIServer() *APIServer {
 
 // Start starts the apiserver, returns when apiserver is ready.
 func (a *APIServer) Start() error {
-	config := options.NewServerRunOptions()
-	config.Etcd.StorageConfig.ServerList = []string{getEtcdClientURL()}
+	o := options.NewServerRunOptions()
+	o.Etcd.StorageConfig.ServerList = []string{getEtcdClientURL()}
 	// TODO: Current setup of etcd in e2e-node tests doesn't support etcd v3
 	// protocol. We should migrate it to use the same infrastructure as all
 	// other tests (pkg/storage/etcd/testing).
-	config.Etcd.StorageConfig.Type = "etcd2"
+	o.Etcd.StorageConfig.Type = "etcd2"
 	_, ipnet, err := net.ParseCIDR(clusterIPRange)
 	if err != nil {
 		return err
 	}
-	config.ServiceClusterIPRange = *ipnet
-	config.AllowPrivileged = true
-	config.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	o.ServiceClusterIPRange = *ipnet
+	o.AllowPrivileged = true
+	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		err := apiserver.Run(config, stopCh)
+		completedOptions, err := apiserver.Complete(o)
+		if err != nil {
+			errCh <- fmt.Errorf("set apiserver default options error: %v", err)
+			return
+		}
+		err = apiserver.Run(completedOptions, stopCh)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %v", err)
+			return
 		}
 	}()
 
