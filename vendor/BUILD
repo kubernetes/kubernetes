@@ -63,7 +63,7 @@ filegroup(
         "//vendor/github.com/cockroachdb/cmux:all-srcs",
         "//vendor/github.com/codedellemc/goscaleio:all-srcs",
         "//vendor/github.com/codegangsta/negroni:all-srcs",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi:all-srcs",
+        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:all-srcs",
         "//vendor/github.com/containerd/console:all-srcs",
         "//vendor/github.com/containerd/containerd/api/services/containers/v1:all-srcs",
         "//vendor/github.com/containerd/containerd/api/services/tasks/v1:all-srcs",
