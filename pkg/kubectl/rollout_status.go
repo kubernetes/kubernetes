@@ -19,13 +19,14 @@ package kubectl
 import (
 	"fmt"
 
+	"k8s.io/api/apps"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -37,11 +38,11 @@ type StatusViewer interface {
 // StatusViewerFor returns a StatusViewer for the resource specified by kind.
 func StatusViewerFor(kind schema.GroupKind, c kubernetes.Interface) (StatusViewer, error) {
 	switch kind {
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(), apps.Kind("Deployment"):
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(), appsinternalversion.Kind("Deployment"):
 		return &DeploymentStatusViewer{c.ExtensionsV1beta1()}, nil
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(), apps.Kind("DaemonSet"):
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(), appsinternalversion.Kind("DaemonSet"):
 		return &DaemonSetStatusViewer{c.ExtensionsV1beta1()}, nil
-	case apps.Kind("StatefulSet"):
+	case appsinternalversion.Kind("StatefulSet"):
 		return &StatefulSetStatusViewer{c.AppsV1beta1()}, nil
 	}
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)

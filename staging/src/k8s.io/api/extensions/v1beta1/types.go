@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/apps"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -541,7 +541,7 @@ const (
 	// DefaultDaemonSetUniqueLabelKey is the default label key that is added
 	// to existing DaemonSet pods to distinguish between old and new
 	// DaemonSet pods during DaemonSet template updates.
-	DefaultDaemonSetUniqueLabelKey = appsv1beta1.ControllerRevisionHashLabelKey
+	DefaultDaemonSetUniqueLabelKey = apps.ControllerRevisionHashLabelKey
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

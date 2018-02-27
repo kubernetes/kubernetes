@@ -19,13 +19,14 @@ package v1_test
 import (
 	"testing"
 
+	"k8s.io/api/apps"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
@@ -49,11 +50,11 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 		},
 	}
 	testcases := map[string]struct {
-		stsSpec1 *apps.StatefulSetSpec
+		stsSpec1 *appsinternalversion.StatefulSetSpec
 		stsSepc2 *appsv1.StatefulSetSpec
 	}{
 		"StatefulSetSpec Conversion 1": {
-			stsSpec1: &apps.StatefulSetSpec{
+			stsSpec1: &appsinternalversion.StatefulSetSpec{
 				Replicas: *replicas,
 				Template: apiTemplate,
 			},
@@ -63,7 +64,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 			},
 		},
 		"StatefulSetSpec Conversion 2": {
-			stsSpec1: &apps.StatefulSetSpec{
+			stsSpec1: &appsinternalversion.StatefulSetSpec{
 				Replicas:            *replicas,
 				Selector:            selector,
 				Template:            apiTemplate,
@@ -75,7 +76,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 				Selector:            selector,
 				Template:            appsv1Template,
 				ServiceName:         "foo",
-				PodManagementPolicy: appsv1.PodManagementPolicyType("bar"),
+				PodManagementPolicy: apps.PodManagementPolicyType("bar"),
 			},
 		},
 	}
@@ -92,7 +93,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 		}
 
 		// appsv1 -> apps
-		internal2 := &apps.StatefulSetSpec{}
+		internal2 := &appsinternalversion.StatefulSetSpec{}
 		if err := legacyscheme.Scheme.Convert(tc.stsSepc2, internal2, nil); err != nil {
 			t.Errorf("%q - %q: unexpected error: %v", k, "from appsv1 to extensions", err)
 		}
@@ -108,11 +109,11 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 	collisionCount := new(int32)
 	*collisionCount = 1
 	testcases := map[string]struct {
-		stsStatus1 *apps.StatefulSetStatus
+		stsStatus1 *appsinternalversion.StatefulSetStatus
 		stsStatus2 *appsv1.StatefulSetStatus
 	}{
 		"StatefulSetStatus Conversion 1": {
-			stsStatus1: &apps.StatefulSetStatus{
+			stsStatus1: &appsinternalversion.StatefulSetStatus{
 				Replicas:           int32(3),
 				ReadyReplicas:      int32(1),
 				CurrentReplicas:    int32(3),
@@ -132,7 +133,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 			},
 		},
 		"StatefulSetStatus Conversion 2": {
-			stsStatus1: &apps.StatefulSetStatus{
+			stsStatus1: &appsinternalversion.StatefulSetStatus{
 				ObservedGeneration: observedGeneration,
 				Replicas:           int32(3),
 				ReadyReplicas:      int32(1),
@@ -167,7 +168,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 		}
 
 		// appsv1 -> apps
-		internal2 := &apps.StatefulSetStatus{}
+		internal2 := &appsinternalversion.StatefulSetStatus{}
 		if err := legacyscheme.Scheme.Convert(tc.stsStatus2, internal2, nil); err != nil {
 			t.Errorf("%q - %q: unexpected error: %v", k, "from appsv1 to apps", err)
 		}
@@ -181,19 +182,19 @@ func TestV1StatefulSetUpdateStrategyConversion(t *testing.T) {
 	partition := utilpointer.Int32Ptr(2)
 	appsv1rollingUpdate := new(appsv1.RollingUpdateStatefulSetStrategy)
 	appsv1rollingUpdate.Partition = partition
-	appsrollingUpdate := new(apps.RollingUpdateStatefulSetStrategy)
+	appsrollingUpdate := new(appsinternalversion.RollingUpdateStatefulSetStrategy)
 	appsrollingUpdate.Partition = *partition
 	testcases := map[string]struct {
-		stsUpdateStrategy1 *apps.StatefulSetUpdateStrategy
+		stsUpdateStrategy1 *appsinternalversion.StatefulSetUpdateStrategy
 		stsUpdateStrategy2 *appsv1.StatefulSetUpdateStrategy
 	}{
 		"StatefulSetUpdateStrategy Conversion 1": {
-			stsUpdateStrategy1: &apps.StatefulSetUpdateStrategy{Type: apps.StatefulSetUpdateStrategyType("foo")},
+			stsUpdateStrategy1: &appsinternalversion.StatefulSetUpdateStrategy{Type: appsinternalversion.StatefulSetUpdateStrategyType("foo")},
 			stsUpdateStrategy2: &appsv1.StatefulSetUpdateStrategy{Type: appsv1.StatefulSetUpdateStrategyType("foo")},
 		},
 		"StatefulSetUpdateStrategy Conversion 2": {
-			stsUpdateStrategy1: &apps.StatefulSetUpdateStrategy{
-				Type:          apps.StatefulSetUpdateStrategyType("foo"),
+			stsUpdateStrategy1: &appsinternalversion.StatefulSetUpdateStrategy{
+				Type:          appsinternalversion.StatefulSetUpdateStrategyType("foo"),
 				RollingUpdate: appsrollingUpdate,
 			},
 			stsUpdateStrategy2: &appsv1.StatefulSetUpdateStrategy{
@@ -215,7 +216,7 @@ func TestV1StatefulSetUpdateStrategyConversion(t *testing.T) {
 		}
 
 		// appsv1 -> apps
-		internal2 := &apps.StatefulSetUpdateStrategy{}
+		internal2 := &appsinternalversion.StatefulSetUpdateStrategy{}
 		if err := legacyscheme.Scheme.Convert(tc.stsUpdateStrategy2, internal2, nil); err != nil {
 			t.Errorf("%q - %q: unexpected error: %v", "appsv1 -> apps", k, err)
 		}
@@ -280,7 +281,7 @@ func TestV1DeploymentConversion(t *testing.T) {
 			},
 			deployment2: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{appsv1.DeprecatedRollbackTo: "2"},
+					Annotations: map[string]string{apps.DeprecatedRollbackTo: "2"},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: replica,
@@ -446,11 +447,11 @@ func TestV1DeploymentStrategyConversion(t *testing.T) {
 	}{
 		"DeploymentStrategy Conversion 1": {
 			deploymentStrategy1: &extensions.DeploymentStrategy{Type: extensions.DeploymentStrategyType("foo")},
-			deploymentStrategy2: &appsv1.DeploymentStrategy{Type: appsv1.DeploymentStrategyType("foo")},
+			deploymentStrategy2: &appsv1.DeploymentStrategy{Type: apps.DeploymentStrategyType("foo")},
 		},
 		"DeploymentStrategy Conversion 2": {
 			deploymentStrategy1: &extensions.DeploymentStrategy{Type: extensions.DeploymentStrategyType("foo"), RollingUpdate: &extensionsRollingUpdate},
-			deploymentStrategy2: &appsv1.DeploymentStrategy{Type: appsv1.DeploymentStrategyType("foo"), RollingUpdate: &appsv1RollingUpdate},
+			deploymentStrategy2: &appsv1.DeploymentStrategy{Type: apps.DeploymentStrategyType("foo"), RollingUpdate: &appsv1RollingUpdate},
 		},
 	}
 

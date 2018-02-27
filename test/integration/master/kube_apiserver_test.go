@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/apps"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -55,7 +56,7 @@ func TestRun(t *testing.T) {
 		Spec: appsv1beta1.DeploymentSpec{
 			Replicas: &replicas,
 			Strategy: appsv1beta1.DeploymentStrategy{
-				Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
+				Type: apps.RollingUpdateDeploymentStrategyType,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

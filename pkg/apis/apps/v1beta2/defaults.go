@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	"k8s.io/api/apps"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -29,9 +30,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 func SetDefaults_DaemonSet(obj *appsv1beta2.DaemonSet) {
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
-		updateStrategy.Type = appsv1beta2.RollingUpdateDaemonSetStrategyType
+		updateStrategy.Type = apps.RollingUpdateDaemonSetStrategyType
 	}
-	if updateStrategy.Type == appsv1beta2.RollingUpdateDaemonSetStrategyType {
+	if updateStrategy.Type == apps.RollingUpdateDaemonSetStrategyType {
 		if updateStrategy.RollingUpdate == nil {
 			rollingUpdate := appsv1beta2.RollingUpdateDaemonSet{}
 			updateStrategy.RollingUpdate = &rollingUpdate
@@ -50,17 +51,17 @@ func SetDefaults_DaemonSet(obj *appsv1beta2.DaemonSet) {
 
 func SetDefaults_StatefulSet(obj *appsv1beta2.StatefulSet) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
-		obj.Spec.PodManagementPolicy = appsv1beta2.OrderedReadyPodManagement
+		obj.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
 	}
 
 	if obj.Spec.UpdateStrategy.Type == "" {
-		obj.Spec.UpdateStrategy.Type = appsv1beta2.RollingUpdateStatefulSetStrategyType
+		obj.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
 
 		// UpdateStrategy.RollingUpdate will take default values below.
 		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1beta2.RollingUpdateStatefulSetStrategy{}
 	}
 
-	if obj.Spec.UpdateStrategy.Type == appsv1beta2.RollingUpdateStatefulSetStrategyType &&
+	if obj.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
 		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
@@ -92,9 +93,9 @@ func SetDefaults_Deployment(obj *appsv1beta2.Deployment) {
 	strategy := &obj.Spec.Strategy
 	// Set default appsv1beta2.DeploymentStrategyType as RollingUpdate.
 	if strategy.Type == "" {
-		strategy.Type = appsv1beta2.RollingUpdateDeploymentStrategyType
+		strategy.Type = apps.RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == appsv1beta2.RollingUpdateDeploymentStrategyType {
+	if strategy.Type == apps.RollingUpdateDeploymentStrategyType {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := appsv1beta2.RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate

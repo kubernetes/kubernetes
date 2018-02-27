@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/apps"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -77,7 +78,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1.DaemonSetSpec{
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
-						Type: appsv1.RollingUpdateDaemonSetStrategyType,
+						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
 						},
@@ -107,7 +108,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1.DaemonSetSpec{
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
-						Type: appsv1.RollingUpdateDaemonSetStrategyType,
+						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
 						},
@@ -121,7 +122,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1.DaemonSetSpec{
 					Template: templateNoLabel,
 					UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
-						Type: appsv1.OnDeleteDaemonSetStrategyType,
+						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
 				},
 			},
@@ -129,7 +130,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1.DaemonSetSpec{
 					Template: templateNoLabel,
 					UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
-						Type: appsv1.OnDeleteDaemonSetStrategyType,
+						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
@@ -143,7 +144,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1.DaemonSetSpec{
 					Template: templateNoLabel,
 					UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
-						Type: appsv1.RollingUpdateDaemonSetStrategyType,
+						Type: apps.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
 						},
@@ -205,9 +206,9 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				Spec: appsv1.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						Type: apps.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition: &defaultPartition,
 						},
@@ -221,7 +222,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				Spec: appsv1.StatefulSetSpec{
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.OnDeleteStatefulSetStrategyType,
+						Type: apps.OnDeleteStatefulSetStrategyType,
 					},
 				},
 			},
@@ -232,9 +233,9 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				Spec: appsv1.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					PodManagementPolicy: apps.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.OnDeleteStatefulSetStrategyType,
+						Type: apps.OnDeleteStatefulSetStrategyType,
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
@@ -244,7 +245,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			original: &appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
 					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1.ParallelPodManagement,
+					PodManagementPolicy: apps.ParallelPodManagement,
 				},
 			},
 			expected: &appsv1.StatefulSet{
@@ -254,9 +255,9 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				Spec: appsv1.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
 					Template:            defaultTemplate,
-					PodManagementPolicy: appsv1.ParallelPodManagement,
+					PodManagementPolicy: apps.ParallelPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						Type: apps.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition: &defaultPartition,
 						},
@@ -305,7 +306,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(1),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RollingUpdateDeploymentStrategyType,
+						Type: apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -332,7 +333,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RollingUpdateDeploymentStrategyType,
+						Type: apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
 							MaxSurge:       &differentIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -349,7 +350,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(3),
 					Strategy: appsv1.DeploymentStrategy{
-						Type:          appsv1.RollingUpdateDeploymentStrategyType,
+						Type:          apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
 					},
 				},
@@ -358,7 +359,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(3),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RollingUpdateDeploymentStrategyType,
+						Type: apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -375,7 +376,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(0),
 				},
@@ -384,7 +385,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					RevisionHistoryLimit:    utilpointer.Int32Ptr(0),
 					ProgressDeadlineSeconds: utilpointer.Int32Ptr(600),
@@ -397,7 +398,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: utilpointer.Int32Ptr(30),
 					RevisionHistoryLimit:    utilpointer.Int32Ptr(2),
@@ -407,7 +408,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1.DeploymentStrategy{
-						Type: appsv1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: utilpointer.Int32Ptr(30),
 					RevisionHistoryLimit:    utilpointer.Int32Ptr(2),

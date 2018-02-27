@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/apps"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 
 	"k8s.io/api/core/v1"
@@ -57,7 +58,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(1),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
+						Type: apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -84,7 +85,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
+						Type: apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
 							MaxSurge:       &differentIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -101,7 +102,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(3),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type:          appsv1beta1.RollingUpdateDeploymentStrategyType,
+						Type:          apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
 					},
 				},
@@ -110,7 +111,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(3),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RollingUpdateDeploymentStrategyType,
+						Type: apps.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1beta1.RollingUpdateDeployment{
 							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
@@ -127,7 +128,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(0),
 				},
@@ -136,7 +137,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					RevisionHistoryLimit:    utilpointer.Int32Ptr(0),
 					ProgressDeadlineSeconds: utilpointer.Int32Ptr(600),
@@ -149,7 +150,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: utilpointer.Int32Ptr(30),
 					RevisionHistoryLimit:    utilpointer.Int32Ptr(2),
@@ -159,7 +160,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 				Spec: appsv1beta1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: appsv1beta1.DeploymentStrategy{
-						Type: appsv1beta1.RecreateDeploymentStrategyType,
+						Type: apps.RecreateDeploymentStrategyType,
 					},
 					ProgressDeadlineSeconds: utilpointer.Int32Ptr(30),
 					RevisionHistoryLimit:    utilpointer.Int32Ptr(2),

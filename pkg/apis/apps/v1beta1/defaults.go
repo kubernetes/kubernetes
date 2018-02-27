@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/apps"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,11 +30,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
-		obj.Spec.PodManagementPolicy = appsv1beta1.OrderedReadyPodManagement
+		obj.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
 	}
 
 	if obj.Spec.UpdateStrategy.Type == "" {
-		obj.Spec.UpdateStrategy.Type = appsv1beta1.OnDeleteStatefulSetStrategyType
+		obj.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
 	}
 	labels := obj.Spec.Template.Labels
 	if labels != nil {
@@ -54,7 +55,7 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
-	if obj.Spec.UpdateStrategy.Type == appsv1beta1.RollingUpdateStatefulSetStrategyType &&
+	if obj.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
 		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
 		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
@@ -89,9 +90,9 @@ func SetDefaults_Deployment(obj *appsv1beta1.Deployment) {
 	strategy := &obj.Spec.Strategy
 	// Set default appsv1beta1.DeploymentStrategyType as RollingUpdate.
 	if strategy.Type == "" {
-		strategy.Type = appsv1beta1.RollingUpdateDeploymentStrategyType
+		strategy.Type = apps.RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == appsv1beta1.RollingUpdateDeploymentStrategyType {
+	if strategy.Type == apps.RollingUpdateDeploymentStrategyType {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := appsv1beta1.RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate

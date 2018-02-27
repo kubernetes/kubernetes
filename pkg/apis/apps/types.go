@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"k8s.io/api/apps"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -48,21 +49,6 @@ type StatefulSet struct {
 	Status StatefulSetStatus
 }
 
-// PodManagementPolicyType defines the policy for creating pods under a stateful set.
-type PodManagementPolicyType string
-
-const (
-	// OrderedReadyPodManagement will create pods in strictly increasing order on
-	// scale up and strictly decreasing order on scale down, progressing only when
-	// the previous pod is ready or terminated. At most one pod will be changed
-	// at any time.
-	OrderedReadyPodManagement PodManagementPolicyType = "OrderedReady"
-	// ParallelPodManagement will create and delete pods as soon as the stateful set
-	// replica count is changed, and will not wait for pods to be ready or complete
-	// termination.
-	ParallelPodManagement = "Parallel"
-)
-
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
@@ -76,21 +62,6 @@ type StatefulSetUpdateStrategy struct {
 // StatefulSetUpdateStrategyType is a string enumeration type that enumerates
 // all possible update strategies for the StatefulSet controller.
 type StatefulSetUpdateStrategyType string
-
-const (
-	// RollingUpdateStatefulSetStrategyType indicates that update will be
-	// applied to all Pods in the StatefulSet with respect to the StatefulSet
-	// ordering constraints. When a scale operation is performed with this
-	// strategy, new Pods will be created from the specification version indicated
-	// by the StatefulSet's updateRevision.
-	RollingUpdateStatefulSetStrategyType = "RollingUpdate"
-	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
-	// tracking and ordered rolling restarts are disabled. Pods are recreated
-	// from the StatefulSetSpec when they are manually deleted. When a scale
-	// operation is performed with this strategy,specification version indicated
-	// by the StatefulSet's currentRevision.
-	OnDeleteStatefulSetStrategyType = "OnDelete"
-)
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
@@ -147,7 +118,7 @@ type StatefulSetSpec struct {
 	// to match the desired scale without waiting, and on scale down will delete
 	// all pods at once.
 	// +optional
-	PodManagementPolicy PodManagementPolicyType
+	PodManagementPolicy apps.PodManagementPolicyType
 
 	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
 	// employed to update Pods in the StatefulSet when a revision is made to
