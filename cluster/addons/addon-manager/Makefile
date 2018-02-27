@@ -14,7 +14,9 @@
 
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
-TEMP_DIR:=$(shell mktemp -d)
+ifndef TEMP_DIR
+	TEMP_DIR:=$(shell mktemp -d)
+endif
 VERSION=v8.6
 KUBECTL_VERSION?=v1.9.3
 
@@ -34,18 +36,20 @@ ifeq ($(ARCH),s390x)
 	BASEIMAGE?=s390x/debian
 endif
 
-.PHONY: build push
+.PHONY: build container push
 
-all: build
+all: container
 
 build:
 	cp ./* $(TEMP_DIR)
 	curl -sSL --retry 5 https://dl.k8s.io/release/$(KUBECTL_VERSION)/bin/linux/$(ARCH)/kubectl > $(TEMP_DIR)/kubectl
 	chmod +x $(TEMP_DIR)/kubectl
 	cd $(TEMP_DIR) && sed -i.back "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+
+container: build
 	docker build --pull -t $(IMAGE)-$(ARCH):$(VERSION) $(TEMP_DIR)
 
-push: build
+push: container
 	docker push $(IMAGE)-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
