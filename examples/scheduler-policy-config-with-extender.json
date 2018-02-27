@@ -20,7 +20,6 @@
         "filterVerb": "filter",
         "bindVerb": "bind",
         "prioritizeVerb": "prioritize",
-        "preemptVerb": "preempt",
         "weight": 5,
         "enableHttps": false,
         "nodeCacheCapable": false
