@@ -22,7 +22,7 @@ spec:
         image: gcr.io/google-containers/fluentd-gcp-scaler:0.1
         command:
           - /scaler.sh
-          - --ds-name=fluentd-gcp-v2.0.16
+          - --ds-name=fluentd-gcp-v3.0.0
           - --scaling-policy=fluentd-gcp-scaling-policy
         env:
         # Defaults, used if no overrides are found in fluentd-gcp-scaling-policy
