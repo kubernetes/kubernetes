@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/scheme"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
@@ -170,6 +171,13 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 	// kind and listKind may not be the same or parsing become ambiguous
 	if len(names.Kind) > 0 && names.Kind == names.ListKind {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("listKind"), names.ListKind, "kind and listKind may not be the same"))
+	}
+
+	// kind cannot be a top-level type since they are shared across all groupversions
+	for _, topLevelType := range scheme.Scheme.KnownTypes(scheme.UnversionedVersion) {
+		if names.Kind == topLevelType.Name() {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), names.Kind, fmt.Sprintf("kind %q is invalid because it is reserved", names.Kind)))
+		}
 	}
 
 	for i, category := range names.Categories {

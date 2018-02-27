@@ -821,3 +821,22 @@ func TestNameConflict(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCRDWithTopLevelKind(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	topLevelTypes := []string{"ListOptions", "ExportOptions", "GetOptions", "DeleteOptions", "Status", "APIVersions", "APIGroupList", "APIGroup", "APIResourceList", "WatchEvent"}
+
+	for _, topLevelType := range topLevelTypes {
+		noxuDefinition.Spec.Names.Kind = topLevelType
+		_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+		if err == nil {
+			t.Fatalf("unexpected non-error: creation of CRD should fail since it has a top-level type %v as .spec.names.kind", topLevelType)
+		}
+	}
+}
