@@ -432,6 +432,7 @@ staging/src/k8s.io/api/autoscaling/v2beta1
 staging/src/k8s.io/api/batch/v1
 staging/src/k8s.io/api/batch/v1beta1
 staging/src/k8s.io/api/batch/v2alpha1
+staging/src/k8s.io/api/bulk/v1alpha1
 staging/src/k8s.io/api/certificates/v1beta1
 staging/src/k8s.io/api/core/v1
 staging/src/k8s.io/api/events/v1beta1
@@ -528,6 +529,8 @@ staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1
 staging/src/k8s.io/apiserver/pkg/apis/audit/validation
+staging/src/k8s.io/apiserver/pkg/apis/bulk
+staging/src/k8s.io/apiserver/pkg/apis/bulk/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
 staging/src/k8s.io/apiserver/pkg/apis/example2

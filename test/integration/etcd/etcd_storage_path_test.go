@@ -540,6 +540,11 @@ var kindWhiteList = sets.NewString(
 	// k8s.io/kubernetes/pkg/api/unversioned
 	"Status",
 	// --
+
+	// k8s.io/api/bulk/versioned
+	"BulkRequest",
+	"BulkResponse",
+	// --
 )
 
 // namespace used for all tests, do not change this
