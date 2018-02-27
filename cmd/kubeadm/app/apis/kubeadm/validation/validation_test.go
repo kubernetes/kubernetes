@@ -59,6 +59,51 @@ func TestValidateTokenDiscovery(t *testing.T) {
 	}
 }
 
+func TestValidateValidateTokenUsages(t *testing.T) {
+	var tests = []struct {
+		u        []string
+		f        *field.Path
+		expected bool
+	}{
+		{[]string{}, nil, true},                            // supported (no usages)
+		{[]string{"signing", "authentication"}, nil, true}, // supported
+		{[]string{"something else"}, nil, false},           // usage not supported
+	}
+	for _, rt := range tests {
+		actual := ValidateTokenUsages(rt.u, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenUsages:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateTokenGroups(t *testing.T) {
+	var tests = []struct {
+		u        []string
+		g        []string
+		f        *field.Path
+		expected bool
+	}{
+		{[]string{"some usage"}, []string{"some group"}, nil, false},                       // groups doesn't makes sense if usage authentication
+		{[]string{"authentication"}, []string{"some group"}, nil, false},                   // group not supported
+		{[]string{"authentication"}, []string{"system:bootstrappers:anygroup"}, nil, true}, // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateTokenGroups(rt.u, rt.g, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenGroups:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateAuthorizationModes(t *testing.T) {
 	var tests = []struct {
 		s        []string

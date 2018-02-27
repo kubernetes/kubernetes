@@ -64,8 +64,12 @@ type MasterConfiguration struct {
 	// Token is used for establishing bidirectional trust between nodes and masters.
 	// Used for joining nodes in the cluster.
 	Token string
-	// TokenTTL is a ttl for Token. Defaults to 24h.
+	// TokenTTL defines the ttl for Token. Defaults to 24h.
 	TokenTTL *metav1.Duration
+	// TokenUsages describes the ways in which this token can be used.
+	TokenUsages []string
+	// Extra groups that this token will authenticate as when used for authentication
+	TokenGroups []string
 
 	// CRISocket is used to retrieve container runtime info.
 	CRISocket string

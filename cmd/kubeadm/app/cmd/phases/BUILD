@@ -55,7 +55,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
-        "//vendor/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )

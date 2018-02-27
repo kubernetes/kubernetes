@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -78,6 +80,8 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
 	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("node-name"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
+	allErrs = append(allErrs, ValidateTokenUsages(c.TokenUsages, field.NewPath("tokenUsages"))...)
+	allErrs = append(allErrs, ValidateTokenGroups(c.TokenUsages, c.TokenGroups, field.NewPath("tokenGroups"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
 	allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
@@ -227,6 +231,39 @@ func ValidateToken(t string, fldPath *field.Path) field.ErrorList {
 	if len(id) == 0 || len(secret) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, t, "token must be of form '[a-z0-9]{6}.[a-z0-9]{16}'"))
 	}
+	return allErrs
+}
+
+// ValidateTokenGroups validates token groups
+func ValidateTokenGroups(usages []string, groups []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// adding groups only makes sense for authentication
+	usagesSet := sets.NewString(usages...)
+	usageAuthentication := strings.TrimPrefix(bootstrapapi.BootstrapTokenUsageAuthentication, bootstrapapi.BootstrapTokenUsagePrefix)
+	if len(groups) > 0 && !usagesSet.Has(usageAuthentication) {
+		allErrs = append(allErrs, field.Invalid(fldPath, groups, fmt.Sprintf("token groups cannot be specified unless --usages includes %q", usageAuthentication)))
+	}
+
+	// validate any extra group names
+	for _, group := range groups {
+		if err := bootstraputil.ValidateBootstrapGroupName(group); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, groups, err.Error()))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateTokenUsages validates token usages
+func ValidateTokenUsages(usages []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// validate usages
+	if err := bootstraputil.ValidateUsages(usages); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, usages, err.Error()))
+	}
+
 	return allErrs
 }
 
