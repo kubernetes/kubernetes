@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 // GenericControllerManagerOptions is the common structure for a controller manager. It works with NewGenericControllerManagerOptions
@@ -51,7 +52,8 @@ type GenericControllerManagerOptions struct {
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
-	Debugging *DebuggingOptions
+	Debugging     *DebuggingOptions
+	CloudProvider *kubeoptions.CloudProviderOptions
 
 	Master     string
 	Kubeconfig string
@@ -82,6 +84,7 @@ func NewGenericControllerManagerOptions(componentConfig componentconfig.KubeCont
 		Authentication: nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
 		Authorization:  nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
 		Debugging:      &DebuggingOptions{},
+		CloudProvider:  kubeoptions.NewCloudProviderOptions(),
 	}
 
 	// disable secure serving for now
@@ -158,7 +161,6 @@ func NewDefaultControllerManagerComponentConfig(insecurePort int32) componentcon
 // specified FlagSet. Any common changes should be made here. Any individual changes should be made in that controller.
 func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.ComponentConfig.UseServiceAccountCredentials, "use-service-account-credentials", o.ComponentConfig.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
-	fs.StringVar(&o.ComponentConfig.CloudConfigFile, "cloud-config", o.ComponentConfig.CloudConfigFile, "The path to the cloud provider configuration file. Empty string for no configuration file.")
 	fs.BoolVar(&o.ComponentConfig.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.DurationVar(&o.ComponentConfig.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.ComponentConfig.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
@@ -183,6 +185,7 @@ func (o *GenericControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Authentication.AddFlags(fs)
 	o.Authorization.AddFlags(fs)
 	o.Debugging.AddFlags(fs)
+	o.CloudProvider.AddFlags(fs)
 }
 
 // ApplyTo fills up controller manager config with options and userAgent
@@ -202,6 +205,9 @@ func (o *GenericControllerManagerOptions) ApplyTo(c *genericcontrollermanager.Co
 		return err
 	}
 	if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
+		return err
+	}
+	if err := o.CloudProvider.ApplyTo(&c.CloudProvider, &c.ComponentConfig); err != nil {
 		return err
 	}
 
@@ -234,6 +240,7 @@ func (o *GenericControllerManagerOptions) Validate() []error {
 	errors = append(errors, o.InsecureServing.Validate()...)
 	errors = append(errors, o.Authentication.Validate()...)
 	errors = append(errors, o.Authorization.Validate()...)
+	errors = append(errors, o.CloudProvider.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 

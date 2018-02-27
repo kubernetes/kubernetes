@@ -22,6 +22,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 // Config is the main context object for the controller manager.
@@ -34,6 +35,8 @@ type Config struct {
 	InsecureServing *InsecureServingInfo
 	Authentication  apiserver.AuthenticationInfo
 	Authorization   apiserver.AuthorizationInfo
+
+	CloudProvider *kubeoptions.CloudProviderOptions
 
 	// the general kube client
 	Client *clientset.Clientset

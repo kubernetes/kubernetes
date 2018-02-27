@@ -18,6 +18,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 type CloudProviderOptions struct {
@@ -40,4 +41,21 @@ func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile,
 		"The path to the cloud provider configuration file. Empty string for no configuration file.")
+}
+
+func (s *CloudProviderOptions) ApplyTo(c **CloudProviderOptions, cfg *componentconfig.KubeControllerManagerConfiguration) error {
+	if s == nil {
+		return nil
+	}
+
+	*c = &CloudProviderOptions{
+		CloudProvider:   s.CloudProvider,
+		CloudConfigFile: s.CloudConfigFile,
+	}
+	// sync back to component config
+	// TODO: find more elegant way than synching back the values.
+	cfg.CloudProvider = s.CloudProvider
+	cfg.CloudConfigFile = s.CloudConfigFile
+
+	return nil
 }

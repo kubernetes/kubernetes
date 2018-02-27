@@ -64,7 +64,6 @@ func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
 func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Generic.AddFlags(fs)
 
-	fs.StringVar(&o.Generic.ComponentConfig.CloudProvider, "cloud-provider", o.Generic.ComponentConfig.CloudProvider, "The provider of cloud services. Cannot be empty.")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
 	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
 	fs.StringVar(&o.Generic.ComponentConfig.ServiceAccountKeyFile, "service-account-private-key-file", o.Generic.ComponentConfig.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")

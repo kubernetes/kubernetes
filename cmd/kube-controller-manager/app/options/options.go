@@ -73,7 +73,6 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 		"A list of controllers to enable.  '*' enables all on-by-default controllers, 'foo' enables the controller "+
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
 		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
-	fs.StringVar(&s.Generic.ComponentConfig.CloudProvider, "cloud-provider", s.Generic.ComponentConfig.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.Generic.ComponentConfig.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", s.Generic.ComponentConfig.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
 	fs.Int32Var(&s.Generic.ComponentConfig.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.Generic.ComponentConfig.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.Int32Var(&s.Generic.ComponentConfig.ConcurrentServiceSyncs, "concurrent-service-syncs", s.Generic.ComponentConfig.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")

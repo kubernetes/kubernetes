@@ -30,6 +30,7 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -121,8 +122,8 @@ func TestAddFlags(t *testing.T) {
 				Port:                                            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				AllocateNodeCIDRs:                               true,
-				CloudConfigFile:                                 "/cloud-config",
-				CloudProvider:                                   "gce",
+				CloudConfigFile:                                 "",
+				CloudProvider:                                   "",
 				ClusterCIDR:                                     "1.2.3.4/24",
 				ClusterName:                                     "k8s",
 				ConcurrentDeploymentSyncs:                       10,
@@ -227,6 +228,10 @@ func TestAddFlags(t *testing.T) {
 			Debugging: &cmoptions.DebuggingOptions{
 				EnableProfiling:           false,
 				EnableContentionProfiling: true,
+			},
+			CloudProvider: &kubeoptions.CloudProviderOptions{
+				CloudProvider:   "gce",
+				CloudConfigFile: "/cloud-config",
 			},
 			Kubeconfig: "/kubeconfig",
 			Master:     "192.168.4.20",
