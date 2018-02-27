@@ -453,7 +453,7 @@
 		},
 		{
 			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi/v0",
-			"Comment": "v0.1.0-5-g7ab01a9",
+			"Comment": "v0.1.0-19-g31c1670",
 			"Rev": "31c167062b1a62a9810e4fd94d7c986113b490b8"
 		},
 		{
@@ -1954,7 +1954,6 @@
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
-			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
@@ -2434,7 +2433,6 @@
 		},
 		{
 			"ImportPath": "github.com/pelletier/go-buffruneio",
-			"Comment": "v0.1.0",
 			"Rev": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d"
 		},
 		{
@@ -2784,7 +2782,6 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
-			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{
@@ -3220,43 +3217,43 @@
 		},
 		{
 			"ImportPath": "k8s.io/gengo/args",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/generator",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/namer",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/parser",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/gengo/types",
-			"Rev": "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
+			"Rev": "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
