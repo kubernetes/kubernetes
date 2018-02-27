@@ -323,9 +323,10 @@ func main() {
 	if isTerminal {
 		logPrefix = "\r" // clear status bar when printing
 		// Display a status bar so devs can estimate completion times.
+		wg.Add(1)
 		go func() {
 			total := len(ps) * len(c.dirs)
-			for proc := 0; proc < total; proc = int(atomic.LoadInt64(&processedDirs)) {
+			for proc := 0; ; proc = int(atomic.LoadInt64(&processedDirs)) {
 				work := atomic.LoadInt64(&currentWork)
 				dir := c.dirs[work>>8]
 				platform := ps[work&0xFF]
@@ -333,12 +334,16 @@ func main() {
 					dir = dir[:80]
 				}
 				fmt.Printf("\r%d/%d \033[2m%-13s\033[0m %-80s", proc, total, platform, dir)
+				if proc == total {
+					fmt.Println()
+					break
+				}
 				time.Sleep(50 * time.Millisecond)
 			}
+			wg.Done()
 		}()
 	}
 	wg.Wait()
-	fmt.Println()
 	for _, status := range statuses {
 		if status != 0 {
 			os.Exit(status)
