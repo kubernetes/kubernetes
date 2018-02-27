@@ -201,17 +201,20 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 func ExponentialBackoffUntil(backoff Backoff, condition ConditionFunc, stopCh <-chan struct{}) error {
 	duration := backoff.Duration
 	for i := 0; i < backoff.Steps; i++ {
-		select {
-		case <-stopCh:
-			return nil
-		default:
-		}
 		if i != 0 {
 			adjusted := duration
 			if backoff.Jitter > 0.0 {
 				adjusted = Jitter(duration, backoff.Jitter)
 			}
-			time.Sleep(adjusted)
+			// block until either:
+			// 1. the adjusted duration has expired
+			// 2. the stopCh has been closed
+			select {
+			case <-time.After(adjusted):
+				break
+			case <-stopCh:
+				return nil
+			}
 			duration = time.Duration(float64(duration) * backoff.Factor)
 		}
 		if ok, err := condition(); err != nil || ok {
