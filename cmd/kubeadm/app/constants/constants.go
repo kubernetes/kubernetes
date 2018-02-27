@@ -179,16 +179,12 @@ const (
 	KubeletBaseConfigurationConfigMap = "kubelet-base-config-1.9"
 
 	// KubeletBaseConfigurationConfigMapKey specifies in what ConfigMap key the initial remote configuration of kubelet should be stored
-	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
-	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
 	KubeletBaseConfigurationConfigMapKey = "kubelet"
 
 	// KubeletBaseConfigurationDir specifies the directory on the node where stores the initial remote configuration of kubelet
 	KubeletBaseConfigurationDir = "/var/lib/kubelet/config/init"
 
 	// KubeletBaseConfigurationFile specifies the file name on the node which stores initial remote configuration of kubelet
-	// TODO: Use the constant ("kubelet.config.k8s.io") defined in pkg/kubelet/kubeletconfig/util/keys/keys.go
-	// after https://github.com/kubernetes/kubernetes/pull/53833 being merged.
 	KubeletBaseConfigurationFile = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
