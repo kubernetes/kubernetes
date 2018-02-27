@@ -73,7 +73,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func init() {
@@ -2134,7 +2134,7 @@ func waitForVolumeUnmount(
 		func() (bool, error) {
 			// Verify volumes detached
 			podVolumes = volumeManager.GetMountedVolumesForPod(
-				volumehelper.GetUniquePodName(pod))
+				util.GetUniquePodName(pod))
 
 			if len(podVolumes) != 0 {
 				return false, nil

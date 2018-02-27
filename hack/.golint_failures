@@ -393,6 +393,9 @@ pkg/volume/secret
 pkg/volume/storageos
 pkg/volume/testing
 pkg/volume/util
+pkg/volume/util/fs
+pkg/volume/util/recyclerclient
+pkg/volume/util/volumepathhandler
 pkg/volume/vsphere_volume
 plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit

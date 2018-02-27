@@ -35,8 +35,8 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
@@ -74,7 +74,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	fakePodManager.AddPod(pod)
 
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 
@@ -184,7 +184,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 
 	fakePodManager.AddPod(pod)
 
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 

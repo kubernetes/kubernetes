@@ -31,8 +31,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ActualStateOfWorld defines a set of thread-safe operations supported on
@@ -275,7 +275,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 				err)
 		}
 
-		volumeName, err = volumehelper.GetUniqueVolumeNameFromSpec(
+		volumeName, err = util.GetUniqueVolumeNameFromSpec(
 			attachableVolumePlugin, volumeSpec)
 		if err != nil {
 			return "", fmt.Errorf(

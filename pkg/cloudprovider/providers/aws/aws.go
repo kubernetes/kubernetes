@@ -2150,17 +2150,17 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	var createAZ string
 	if !volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
-		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+		createAZ = volumeutil.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
 	}
 	if !volumeOptions.ZonePresent && volumeOptions.ZonesPresent {
 		if adminSetOfZones, err := volumeutil.ZonesToSet(volumeOptions.AvailabilityZones); err != nil {
 			return "", err
 		} else {
-			createAZ = volume.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
+			createAZ = volumeutil.ChooseZoneForVolume(adminSetOfZones, volumeOptions.PVCName)
 		}
 	}
 	if volumeOptions.ZonePresent && !volumeOptions.ZonesPresent {
-		if err := volume.ValidateZone(volumeOptions.AvailabilityZone); err != nil {
+		if err := volumeutil.ValidateZone(volumeOptions.AvailabilityZone); err != nil {
 			return "", err
 		}
 		createAZ = volumeOptions.AvailabilityZone
@@ -2476,7 +2476,7 @@ func (c *Cloud) ResizeDisk(
 	}
 	requestBytes := newSize.Value()
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volume.RoundUpSize(requestBytes, 1024*1024*1024)
+	requestGiB := volumeutil.RoundUpSize(requestBytes, 1024*1024*1024)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return

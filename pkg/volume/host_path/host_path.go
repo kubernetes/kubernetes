@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -129,13 +130,13 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 // Recycle recycles/scrubs clean a HostPath volume.
 // Recycle blocks until the pod has completed or any error occurs.
 // HostPath recycling only works in single node clusters and is meant for testing purposes only.
-func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) error {
+func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")
 	}
 
 	pod := plugin.config.RecyclerPodTemplate
-	timeout := volume.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
+	timeout := util.CalculateTimeoutForVolume(plugin.config.RecyclerMinimumTimeout, plugin.config.RecyclerTimeoutIncrement, spec.PersistentVolume)
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &timeout
 	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
@@ -143,7 +144,7 @@ func (plugin *hostPathPlugin) Recycle(pvName string, spec *volume.Spec, eventRec
 			Path: spec.PersistentVolume.Spec.HostPath.Path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
+	return recyclerclient.RecycleVolumeByWatchingPodUntilCompletion(pvName, pod, plugin.host.GetKubeClient(), eventRecorder)
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -272,7 +273,7 @@ func (r *hostPathProvisioner) Provision() (*v1.PersistentVolume, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: r.options.PVName,
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "hostpath-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "hostpath-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

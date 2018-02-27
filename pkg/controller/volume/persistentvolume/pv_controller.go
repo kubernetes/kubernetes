@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 
 	"github.com/golang/glog"
 )
@@ -1262,7 +1262,7 @@ func (ctrl *PersistentVolumeController) isVolumeUsed(pv *v1.PersistentVolume) ([
 		return nil, false, fmt.Errorf("error listing pods: %s", err)
 	}
 	for _, pod := range pods {
-		if volumehelper.IsPodTerminated(pod, pod.Status) {
+		if util.IsPodTerminated(pod, pod.Status) {
 			continue
 		}
 		for i := range pod.Spec.Volumes {
@@ -1550,7 +1550,7 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 
 // newRecyclerEventRecorder returns a RecycleEventRecorder that sends all events
 // to given volume.
-func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.PersistentVolume) vol.RecycleEventRecorder {
+func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *v1.PersistentVolume) recyclerclient.RecycleEventRecorder {
 	return func(eventtype, message string) {
 		ctrl.eventRecorder.Eventf(volume, eventtype, events.RecyclerPod, "Recycler pod: %s", message)
 	}

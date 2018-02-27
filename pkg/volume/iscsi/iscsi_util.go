@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 var (
@@ -518,10 +519,10 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
 	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
 	// local attach plugins needs to remove loopback device during TearDownDevice().
-	blkUtil := volumeutil.NewBlockVolumePathHandler()
-	loop, err := volumeutil.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
 	if err != nil {
-		if err.Error() != volumeutil.ErrDeviceNotFound {
+		if err.Error() != volumepathhandler.ErrDeviceNotFound {
 			return fmt.Errorf("failed to get loopback for device: %v, err: %v", devicePath, err)
 		}
 		glog.Warning("iscsi: loopback for device: %s not found", device)
@@ -533,7 +534,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	}
 	if len(loop) != 0 {
 		// The volume was successfully detached from node. We can safely remove the loopback.
-		err = volumeutil.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
+		err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
 		if err != nil {
 			return fmt.Errorf("failed to remove loopback :%v, err: %v", loop, err)
 		}

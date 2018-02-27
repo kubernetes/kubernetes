@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 var _ volume.DeletableVolumePlugin = &azureFilePlugin{}
@@ -132,18 +132,18 @@ type azureFileProvisioner struct {
 var _ volume.Provisioner = &azureFileProvisioner{}
 
 func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(a.plugin.GetAccessModes(), a.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", a.options.PVC.Spec.AccessModes, a.plugin.GetAccessModes())
 	}
 
 	var sku, location, account string
 
 	// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
-	name := volume.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
+	name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
 	name = strings.Replace(name, "--", "-", -1)
 	capacity := a.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
-	requestGiB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB := int(util.RoundUpSize(requestBytes, 1024*1024*1024))
 	secretNamespace := a.options.PVC.Namespace
 	// Apply ProvisionerParameters (case-insensitive). We leave validation of
 	// the values to the cloud provider.
@@ -182,7 +182,7 @@ func (a *azureFileProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   a.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "azure-file-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "azure-file-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

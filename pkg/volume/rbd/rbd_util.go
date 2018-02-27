@@ -563,7 +563,7 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	// Convert to MB that rbd defaults on.
-	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024))
+	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
 	volSz := fmt.Sprintf("%d", sz)
 	mon := util.kernelRBDMonitorsOpt(p.Mon)
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
@@ -621,7 +621,7 @@ func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 	var err error
 	volSizeBytes := newSize.Value()
 	// Convert to MB that rbd defaults on.
-	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024))
+	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
 	newVolSz := fmt.Sprintf("%d", sz)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
 
