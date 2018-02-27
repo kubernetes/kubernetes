@@ -76,6 +76,9 @@ const (
 
 	// APIGroupPrefix is where non-legacy API group will be located.
 	APIGroupPrefix = "/apis"
+
+	// BulkAPIPrefix is where bulk api will be located.
+	BulkAPIPrefix = "/bulk"
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -272,7 +275,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch", "bulk"), sets.NewString()),
 	}
 }
 
@@ -498,7 +501,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		bulkAPIManager: bulk.APIManagerFactory{
 			NegotiatedSerializer: c.Serializer,
 			ContextMapper:        c.RequestContextMapper,
-			Root:                 "/bulk",
+			Root:                 BulkAPIPrefix,
 			Delegate:             delegationTarget.BulkAPIManager(),
 		}.New(),
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
@@ -619,5 +622,6 @@ func NewRequestInfoResolver(c *Config) *apirequest.RequestInfoFactory {
 	return &apirequest.RequestInfoFactory{
 		APIPrefixes:          apiPrefixes,
 		GrouplessAPIPrefixes: legacyAPIPrefixes,
+		BulkAPIPrefix:        strings.Trim(BulkAPIPrefix, "/"),
 	}
 }

@@ -59,7 +59,7 @@ type RequestInfo struct {
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
 // TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
 // master's Mux.
-var specialVerbs = sets.NewString("proxy", "watch")
+var specialVerbs = sets.NewString("proxy", "watch", "bulk")
 
 // specialVerbsNoSubresources contains root verbs which do not allow subresources
 var specialVerbsNoSubresources = sets.NewString("proxy")
@@ -72,8 +72,10 @@ var namespaceSubresources = sets.NewString("status", "finalize")
 var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
 type RequestInfoFactory struct {
-	APIPrefixes          sets.String // without leading and trailing slashes
-	GrouplessAPIPrefixes sets.String // without leading and trailing slashes
+	// all prefixes are without leading and trailing slashes
+	APIPrefixes          sets.String
+	GrouplessAPIPrefixes sets.String
+	BulkAPIPrefix        string
 }
 
 // TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses
@@ -104,6 +106,7 @@ type RequestInfoFactory struct {
 // /api/{version}
 // /api
 // /healthz
+// /bulk
 // /
 func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, error) {
 	// start with a non-resource request until proven otherwise
@@ -116,6 +119,12 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	currentParts := splitPath(req.URL.Path)
 	if len(currentParts) < 3 {
 		// return a non-resource request
+		return &requestInfo, nil
+	}
+
+	if r.BulkAPIPrefix != "" && currentParts[0] == r.BulkAPIPrefix {
+		// Required API version detected by the bulk layer itself, so keep it empty here.
+		requestInfo.Verb = "bulk"
 		return &requestInfo, nil
 	}
 

@@ -121,7 +121,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
-		sets.NewString("watch", "proxy"),
+		sets.NewString("watch", "proxy", "bulk"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
