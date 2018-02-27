@@ -48,6 +48,7 @@ pkg_tar(
         ":package_src": "//",
         "//conditions:default": ".",
     }),
+    tags = ["no-cache"],
 )
 
 # FIXME: this should be configurable/auto-detected
@@ -68,6 +69,7 @@ pkg_tar(
     srcs = ["//build:client-targets"],
     mode = "0755",
     package_dir = "client/bin",
+    tags = ["no-cache"],
     visibility = ["//visibility:private"],
 )
 
@@ -75,6 +77,7 @@ pkg_tar(
     name = "kubernetes-client-%s" % PLATFORM_ARCH_STRING,
     extension = "tar.gz",
     package_dir = "kubernetes",
+    tags = ["no-cache"],
     deps = [
         ":_client-bin",
     ],
@@ -88,6 +91,7 @@ pkg_tar(
     ],
     mode = "0755",
     package_dir = "node/bin",
+    tags = ["no-cache"],
     visibility = ["//visibility:private"],
 )
 
@@ -97,6 +101,7 @@ pkg_tar(
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
+    tags = ["no-cache"],
     deps = [
         ":_node-bin",
     ],
@@ -112,6 +117,7 @@ pkg_tar(
     ],
     mode = "0755",
     package_dir = "server/bin",
+    tags = ["no-cache"],
     visibility = ["//visibility:private"],
 )
 
@@ -129,6 +135,7 @@ pkg_tar(
         ":.dummy",
     ],
     package_dir = "addons",
+    tags = ["no-cache"],
     visibility = ["//visibility:private"],
 )
 
@@ -138,6 +145,7 @@ pkg_tar(
     extension = "tar.gz",
     mode = "0644",
     package_dir = "kubernetes",
+    tags = ["no-cache"],
     deps = [
         ":_server-addons",
         ":_server-bin",
@@ -149,6 +157,7 @@ pkg_tar(
     srcs = ["//build:test-targets"],
     mode = "0755",
     package_dir = "platforms/" + PLATFORM_ARCH_STRING.replace("-", "/"),
+    tags = ["no-cache"],
     # TODO: how to make this multiplatform?
     visibility = ["//visibility:private"],
 )
@@ -159,6 +168,7 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
+    tags = ["no-cache"],
     deps = [
         # TODO: how to make this multiplatform?
         ":_test-bin",
@@ -171,6 +181,7 @@ pkg_tar(
         ":kubernetes-manifests.tar.gz",
     ],
     package_dir = "server",
+    tags = ["no-cache"],
     visibility = ["//visibility:private"],
 )
 
@@ -189,6 +200,7 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
+    tags = ["no-cache"],
     deps = [
         ":_full_server",
     ],
@@ -197,6 +209,7 @@ pkg_tar(
 pkg_tar(
     name = "kubernetes-manifests",
     extension = "tar.gz",
+    tags = ["no-cache"],
     deps = [
         "//cluster:manifests",
     ],
