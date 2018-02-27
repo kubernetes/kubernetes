@@ -437,7 +437,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		const (
 			volsPerNode = 10 // Make this non-divisable by volsPerPod to increase changes of partial binding failure
 			volsPerPod  = 3
-			podsFactor  = 5
+			podsFactor  = 4
 		)
 
 		BeforeEach(func() {
