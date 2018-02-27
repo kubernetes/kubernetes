@@ -114,12 +114,27 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
-	defer cancel()
-
 	csi := c.csiClient
 	nodeName := string(c.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
+
+	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	defer cancel()
+	// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
+	deviceMountPath := ""
+	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
+	if err != nil {
+		glog.Error(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
+		return err
+	}
+
+	if stageUnstageSet {
+		deviceMountPath, err = makeDeviceMountPath(c.plugin, c.spec)
+		if err != nil {
+			glog.Error(log("mounter.SetUpAt failed to make device mount path: %v", err))
+			return err
+		}
+	}
 
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	if c.volumeInfo == nil {
@@ -181,6 +196,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		ctx,
 		c.volumeID,
 		c.readOnly,
+		deviceMountPath,
 		dir,
 		accessMode,
 		c.volumeInfo,
