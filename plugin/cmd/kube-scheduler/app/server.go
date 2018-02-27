@@ -151,6 +151,9 @@ func NewOptions() (*Options, error) {
 		return nil, err
 	}
 
+	// TODO: we should fix this up better (PR 59732)
+	o.config.LeaderElection.LeaderElect = true
+
 	return o, nil
 }
 
