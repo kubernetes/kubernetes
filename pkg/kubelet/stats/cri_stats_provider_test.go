@@ -31,6 +31,7 @@ import (
 	critest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
@@ -78,6 +79,7 @@ func TestCRIListPodStats(t *testing.T) {
 		rootFsInfo        = getTestFsInfo(1000)
 
 		sandbox0           = makeFakePodSandbox("sandbox0-name", "sandbox0-uid", "sandbox0-ns")
+		sandbox0Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox0.PodSandboxStatus.Metadata.Uid))
 		container0         = makeFakeContainer(sandbox0, cName0, 0, false)
 		containerStats0    = makeFakeContainerStats(container0, imageFsMountpoint)
 		containerLogStats0 = makeFakeLogStats(1000)
@@ -86,11 +88,13 @@ func TestCRIListPodStats(t *testing.T) {
 		containerLogStats1 = makeFakeLogStats(2000)
 
 		sandbox1           = makeFakePodSandbox("sandbox1-name", "sandbox1-uid", "sandbox1-ns")
+		sandbox1Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox1.PodSandboxStatus.Metadata.Uid))
 		container2         = makeFakeContainer(sandbox1, cName2, 0, false)
 		containerStats2    = makeFakeContainerStats(container2, imageFsMountpoint)
 		containerLogStats2 = makeFakeLogStats(3000)
 
 		sandbox2           = makeFakePodSandbox("sandbox2-name", "sandbox2-uid", "sandbox2-ns")
+		sandbox2Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox2.PodSandboxStatus.Metadata.Uid))
 		container3         = makeFakeContainer(sandbox2, cName3, 0, true)
 		containerStats3    = makeFakeContainerStats(container3, imageFsMountpoint)
 		container4         = makeFakeContainer(sandbox2, cName3, 1, false)
@@ -112,11 +116,14 @@ func TestCRIListPodStats(t *testing.T) {
 		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
 		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox0Cgroup:                getTestContainerInfo(seedSandbox0, "", "", ""),
 		container0.ContainerStatus.Id: getTestContainerInfo(seedContainer0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName0),
 		container1.ContainerStatus.Id: getTestContainerInfo(seedContainer1, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName1),
 		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox1Cgroup:                getTestContainerInfo(seedSandbox1, "", "", ""),
 		container2.ContainerStatus.Id: getTestContainerInfo(seedContainer2, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, cName2),
 		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
+		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", ""),
 		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3),
 	}
 
@@ -199,6 +206,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIRootfsStats(assert, c1, containerStats1, nil)
 	checkCRILogsStats(assert, c1, &rootFsInfo, containerLogStats1)
 	checkCRINetworkStats(assert, p0.Network, infos[sandbox0.PodSandboxStatus.Id].Stats[0].Network)
+	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
@@ -212,6 +220,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIRootfsStats(assert, c2, containerStats2, &imageFsInfo)
 	checkCRILogsStats(assert, c2, &rootFsInfo, containerLogStats2)
 	checkCRINetworkStats(assert, p1.Network, infos[sandbox1.PodSandboxStatus.Id].Stats[0].Network)
+	checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
 
 	p2 := podStatsMap[statsapi.PodReference{Name: "sandbox2-name", UID: "sandbox2-uid", Namespace: "sandbox2-ns"}]
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
@@ -227,6 +236,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	checkCRILogsStats(assert, c3, &rootFsInfo, containerLogStats4)
 	checkCRINetworkStats(assert, p2.Network, infos[sandbox2.PodSandboxStatus.Id].Stats[0].Network)
+	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -451,6 +461,18 @@ func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkSta
 	assert.Equal(expected.Interfaces[0].RxErrors, *actual.RxErrors)
 	assert.Equal(expected.Interfaces[0].TxBytes, *actual.TxBytes)
 	assert.Equal(expected.Interfaces[0].TxErrors, *actual.TxErrors)
+}
+
+func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+	assert.Equal(cs.Timestamp.UnixNano(), actual.CPU.Time.UnixNano())
+	assert.Equal(cs.Cpu.Usage.Total, *actual.CPU.UsageCoreNanoSeconds)
+	assert.Equal(cs.CpuInst.Usage.Total, *actual.CPU.UsageNanoCores)
+
+	assert.Equal(cs.Memory.Usage, *actual.Memory.UsageBytes)
+	assert.Equal(cs.Memory.WorkingSet, *actual.Memory.WorkingSetBytes)
+	assert.Equal(cs.Memory.RSS, *actual.Memory.RSSBytes)
+	assert.Equal(cs.Memory.ContainerData.Pgfault, *actual.Memory.PageFaults)
+	assert.Equal(cs.Memory.ContainerData.Pgmajfault, *actual.Memory.MajorPageFaults)
 }
 
 func makeFakeLogStats(seed int) *volume.Metrics {
