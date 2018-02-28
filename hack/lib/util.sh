@@ -469,9 +469,11 @@ kube::util::ensure_no_staging_repos_in_gopath() {
 }
 
 # Installs the specified go package at a particular commit.
+# Optionally specify an additional dependency constraint as "pkg@revision".
 kube::util::go_install_from_commit() {
   local -r pkg=$1
   local -r commit=$2
+  local -r extra_constraint=${3:-}
 
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
@@ -484,6 +486,12 @@ kube::util::go_install_from_commit() {
     git fetch # TODO(spiffxp): workaround
     git checkout -q "${commit}"
     GOPATH="${KUBE_TEMP}/go" go get -d "${pkg}" #TODO(spiffxp): workaround
+    if [[ "${extra_constraint}" =~ ^(.+)@(.+)$ ]]; then
+      (
+        cd "${KUBE_TEMP}/go/src/${BASH_REMATCH[1]}"
+        git checkout -q "${BASH_REMATCH[2]}"
+      )
+    fi
     GOPATH="${KUBE_TEMP}/go" go install "${pkg}"
   )
   PATH="${KUBE_TEMP}/go/bin:${PATH}"
