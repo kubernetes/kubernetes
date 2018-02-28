@@ -286,7 +286,7 @@ func AddHandlers(h printers.PrintHandler) {
 	persistentVolumeClaimColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["phase"]},
-		{Name: "Volume", Type: "string", Description: apiv1.PersistentVolumeSpec{}.SwaggerDoc()["volumeName"]},
+		{Name: "Volume", Type: "string", Description: apiv1.PersistentVolumeClaimSpec{}.SwaggerDoc()["volumeName"]},
 		{Name: "Capacity", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["capacity"]},
 		{Name: "Access Modes", Type: "string", Description: apiv1.PersistentVolumeClaimStatus{}.SwaggerDoc()["accessModes"]},
 		{Name: "StorageClass", Type: "string", Description: "StorageClass of the pvc"},
@@ -1057,7 +1057,7 @@ func printSecret(obj *api.Secret, options printers.PrintOptions) ([]metav1beta1.
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Type, len(obj.Data), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(obj.Type), len(obj.Data), translateTimestamp(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1211,7 +1211,7 @@ func printPersistentVolume(obj *api.PersistentVolume, options printers.PrintOpti
 	}
 
 	row.Cells = append(row.Cells, obj.Name, aSize, modesStr, reclaimPolicyStr,
-		phase, claimRefUID, helper.GetPersistentVolumeClass(obj),
+		string(phase), claimRefUID, helper.GetPersistentVolumeClass(obj),
 		obj.Status.Reason,
 		translateTimestamp(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
@@ -1248,7 +1248,7 @@ func printPersistentVolumeClaim(obj *api.PersistentVolumeClaim, options printers
 		capacity = storage.String()
 	}
 
-	row.Cells = append(row.Cells, obj.Name, phase, obj.Spec.VolumeName, capacity, accessModes, helper.GetPersistentVolumeClaimClass(obj), translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(phase), obj.Spec.VolumeName, capacity, accessModes, helper.GetPersistentVolumeClaimClass(obj), translateTimestamp(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1610,9 +1610,20 @@ func printPodSecurityPolicy(obj *extensions.PodSecurityPolicy, options printers.
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Privileged,
-		obj.Spec.AllowedCapabilities, obj.Spec.SELinux.Rule,
-		obj.Spec.RunAsUser.Rule, obj.Spec.FSGroup.Rule, obj.Spec.SupplementalGroups.Rule, obj.Spec.ReadOnlyRootFilesystem, obj.Spec.Volumes)
+
+	capabilities := make([]string, len(obj.Spec.AllowedCapabilities))
+	for i, c := range obj.Spec.AllowedCapabilities {
+		capabilities[i] = string(c)
+	}
+	volumes := make([]string, len(obj.Spec.Volumes))
+	for i, v := range obj.Spec.Volumes {
+		volumes[i] = string(v)
+	}
+	row.Cells = append(row.Cells, obj.Name, fmt.Sprintf("%v", obj.Spec.Privileged),
+		strings.Join(capabilities, ","), string(obj.Spec.SELinux.Rule),
+		string(obj.Spec.RunAsUser.Rule), string(obj.Spec.FSGroup.Rule),
+		string(obj.Spec.SupplementalGroups.Rule), obj.Spec.ReadOnlyRootFilesystem,
+		strings.Join(volumes, ","))
 	return []metav1beta1.TableRow{row}, nil
 }
 
