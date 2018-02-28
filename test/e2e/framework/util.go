@@ -62,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -5110,7 +5111,7 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 // TODO: Get rid of this duplicate function in favour of the one in test/utils.
 func IsRetryableAPIError(err error) bool {
-	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err)
+	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err)
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
