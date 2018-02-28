@@ -43,16 +43,15 @@ func (pr PortRange) String() string {
 	return fmt.Sprintf("%d-%d", pr.Base, pr.Base+pr.Size-1)
 }
 
-const (
-	SinglePortNotation = iota
-	HyphenNotation     = 1 << iota
-	PlusNotation
-)
-
-// Set parses a string of the form "min-max", inclusive at both ends, and
+// Set parses a string of the form "value", "min-max", or "min+offset", inclusive at both ends, and
 // sets the PortRange from it.  This is part of the flag.Value and pflag.Value
 // interfaces.
 func (pr *PortRange) Set(value string) error {
+	const (
+		SinglePortNotation = 1 << iota
+		HyphenNotation
+		PlusNotation
+	)
 
 	value = strings.TrimSpace(value)
 	hyphenIndex := strings.Index(value, "-")
@@ -65,10 +64,13 @@ func (pr *PortRange) Set(value string) error {
 	}
 
 	var err error
-	var notation int
 	var low, high int
+	var notation int
 
-	if hyphenIndex >= 0 {
+	if plusIndex == -1 && hyphenIndex == -1 {
+		notation |= SinglePortNotation
+	}
+	if hyphenIndex != -1 {
 		notation |= HyphenNotation
 	}
 	if plusIndex != -1 {
