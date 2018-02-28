@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package reconciler implements interfaces that attempt to reconcile the
-// desired state of the with the actual state of the world by triggering
+// desired state of the world with the actual state of the world by triggering
 // relevant actions (attach, detach, mount, unmount).
 package reconciler
 
