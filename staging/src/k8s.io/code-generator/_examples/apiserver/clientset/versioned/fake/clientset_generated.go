@@ -43,7 +43,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
+	fakePtr := &testing.Fake{}
 	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
 	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -55,14 +55,14 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		return true, watch, nil
 	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: fakePtr}}
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
-	testing.Fake
+	*testing.Fake
 	discovery *fakediscovery.FakeDiscovery
 }
 
@@ -74,20 +74,20 @@ var _ clientset.Interface = &Clientset{}
 
 // ExampleV1 retrieves the ExampleV1Client
 func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {
-	return &fakeexamplev1.FakeExampleV1{Fake: &c.Fake}
+	return &fakeexamplev1.FakeExampleV1{Fake: c.Fake}
 }
 
 // Example retrieves the ExampleV1Client
 func (c *Clientset) Example() examplev1.ExampleV1Interface {
-	return &fakeexamplev1.FakeExampleV1{Fake: &c.Fake}
+	return &fakeexamplev1.FakeExampleV1{Fake: c.Fake}
 }
 
 // SecondExampleV1 retrieves the SecondExampleV1Client
 func (c *Clientset) SecondExampleV1() secondexamplev1.SecondExampleV1Interface {
-	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: &c.Fake}
+	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: c.Fake}
 }
 
 // SecondExample retrieves the SecondExampleV1Client
 func (c *Clientset) SecondExample() secondexamplev1.SecondExampleV1Interface {
-	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: &c.Fake}
+	return &fakesecondexamplev1.FakeSecondExampleV1{Fake: c.Fake}
 }

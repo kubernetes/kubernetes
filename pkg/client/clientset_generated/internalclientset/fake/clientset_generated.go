@@ -71,7 +71,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
+	fakePtr := &testing.Fake{}
 	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
 	fakePtr.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -83,14 +83,14 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		return true, watch, nil
 	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: fakePtr}}
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
 // struct to get a default implementation. This makes faking out just the method
 // you want to test easier.
 type Clientset struct {
-	testing.Fake
+	*testing.Fake
 	discovery *fakediscovery.FakeDiscovery
 }
 
@@ -102,80 +102,80 @@ var _ clientset.Interface = &Clientset{}
 
 // Admissionregistration retrieves the AdmissionregistrationClient
 func (c *Clientset) Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface {
-	return &fakeadmissionregistrationinternalversion.FakeAdmissionregistration{Fake: &c.Fake}
+	return &fakeadmissionregistrationinternalversion.FakeAdmissionregistration{Fake: c.Fake}
 }
 
 // Core retrieves the CoreClient
 func (c *Clientset) Core() coreinternalversion.CoreInterface {
-	return &fakecoreinternalversion.FakeCore{Fake: &c.Fake}
+	return &fakecoreinternalversion.FakeCore{Fake: c.Fake}
 }
 
 // Apps retrieves the AppsClient
 func (c *Clientset) Apps() appsinternalversion.AppsInterface {
-	return &fakeappsinternalversion.FakeApps{Fake: &c.Fake}
+	return &fakeappsinternalversion.FakeApps{Fake: c.Fake}
 }
 
 // Authentication retrieves the AuthenticationClient
 func (c *Clientset) Authentication() authenticationinternalversion.AuthenticationInterface {
-	return &fakeauthenticationinternalversion.FakeAuthentication{Fake: &c.Fake}
+	return &fakeauthenticationinternalversion.FakeAuthentication{Fake: c.Fake}
 }
 
 // Authorization retrieves the AuthorizationClient
 func (c *Clientset) Authorization() authorizationinternalversion.AuthorizationInterface {
-	return &fakeauthorizationinternalversion.FakeAuthorization{Fake: &c.Fake}
+	return &fakeauthorizationinternalversion.FakeAuthorization{Fake: c.Fake}
 }
 
 // Autoscaling retrieves the AutoscalingClient
 func (c *Clientset) Autoscaling() autoscalinginternalversion.AutoscalingInterface {
-	return &fakeautoscalinginternalversion.FakeAutoscaling{Fake: &c.Fake}
+	return &fakeautoscalinginternalversion.FakeAutoscaling{Fake: c.Fake}
 }
 
 // Batch retrieves the BatchClient
 func (c *Clientset) Batch() batchinternalversion.BatchInterface {
-	return &fakebatchinternalversion.FakeBatch{Fake: &c.Fake}
+	return &fakebatchinternalversion.FakeBatch{Fake: c.Fake}
 }
 
 // Certificates retrieves the CertificatesClient
 func (c *Clientset) Certificates() certificatesinternalversion.CertificatesInterface {
-	return &fakecertificatesinternalversion.FakeCertificates{Fake: &c.Fake}
+	return &fakecertificatesinternalversion.FakeCertificates{Fake: c.Fake}
 }
 
 // Events retrieves the EventsClient
 func (c *Clientset) Events() eventsinternalversion.EventsInterface {
-	return &fakeeventsinternalversion.FakeEvents{Fake: &c.Fake}
+	return &fakeeventsinternalversion.FakeEvents{Fake: c.Fake}
 }
 
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() extensionsinternalversion.ExtensionsInterface {
-	return &fakeextensionsinternalversion.FakeExtensions{Fake: &c.Fake}
+	return &fakeextensionsinternalversion.FakeExtensions{Fake: c.Fake}
 }
 
 // Networking retrieves the NetworkingClient
 func (c *Clientset) Networking() networkinginternalversion.NetworkingInterface {
-	return &fakenetworkinginternalversion.FakeNetworking{Fake: &c.Fake}
+	return &fakenetworkinginternalversion.FakeNetworking{Fake: c.Fake}
 }
 
 // Policy retrieves the PolicyClient
 func (c *Clientset) Policy() policyinternalversion.PolicyInterface {
-	return &fakepolicyinternalversion.FakePolicy{Fake: &c.Fake}
+	return &fakepolicyinternalversion.FakePolicy{Fake: c.Fake}
 }
 
 // Rbac retrieves the RbacClient
 func (c *Clientset) Rbac() rbacinternalversion.RbacInterface {
-	return &fakerbacinternalversion.FakeRbac{Fake: &c.Fake}
+	return &fakerbacinternalversion.FakeRbac{Fake: c.Fake}
 }
 
 // Scheduling retrieves the SchedulingClient
 func (c *Clientset) Scheduling() schedulinginternalversion.SchedulingInterface {
-	return &fakeschedulinginternalversion.FakeScheduling{Fake: &c.Fake}
+	return &fakeschedulinginternalversion.FakeScheduling{Fake: c.Fake}
 }
 
 // Settings retrieves the SettingsClient
 func (c *Clientset) Settings() settingsinternalversion.SettingsInterface {
-	return &fakesettingsinternalversion.FakeSettings{Fake: &c.Fake}
+	return &fakesettingsinternalversion.FakeSettings{Fake: c.Fake}
 }
 
 // Storage retrieves the StorageClient
 func (c *Clientset) Storage() storageinternalversion.StorageInterface {
-	return &fakestorageinternalversion.FakeStorage{Fake: &c.Fake}
+	return &fakestorageinternalversion.FakeStorage{Fake: c.Fake}
 }
