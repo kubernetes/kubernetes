@@ -309,7 +309,7 @@ data:
         health
         kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
-           upstream 
+           upstream
            fallthrough in-addr.arpa ip6.arpa
         }{{ .Federation }}
         prometheus :9153

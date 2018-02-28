@@ -201,28 +201,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 
 			expectOne: `
     foo.com:53 {
-        errors
-        cache 30
-        proxy . 1.2.3.4:5300 3.3.3.3
+       errors
+       cache 30
+       proxy . 1.2.3.4:5300 3.3.3.3
     }
+    
     my.cluster.local:53 {
-        errors
-        cache 30
-        proxy . 2.3.4.5
-    }
-    `,
+       errors
+       cache 30
+       proxy . 2.3.4.5
+    }`,
 			expectTwo: `
     my.cluster.local:53 {
-        errors
-        cache 30
-        proxy . 2.3.4.5
+       errors
+       cache 30
+       proxy . 2.3.4.5
     }
+    
     foo.com:53 {
-        errors
-        cache 30
-        proxy . 1.2.3.4:5300 3.3.3.3
-    }
-    `,
+       errors
+       cache 30
+       proxy . 1.2.3.4:5300 3.3.3.3
+    }`,
 		},
 		{
 			configMap: &v1.ConfigMap{
@@ -248,28 +248,28 @@ func TestTranslateStubDomainKubeDNSToCoreDNS(t *testing.T) {
 
 			expectOne: `
     foo.com:53 {
-        errors
-        cache 30
-        proxy . 1.2.3.4:5300
+       errors
+       cache 30
+       proxy . 1.2.3.4:5300
     }
+    
     my.cluster.local:53 {
-        errors
-        cache 30
-        proxy . 2.3.4.5
-    }
-    `,
+       errors
+       cache 30
+       proxy . 2.3.4.5
+    }`,
 			expectTwo: `
     my.cluster.local:53 {
-        errors
-        cache 30
-        proxy . 2.3.4.5
+       errors
+       cache 30
+       proxy . 2.3.4.5
     }
+    
     foo.com:53 {
-        errors
-        cache 30
-        proxy . 1.2.3.4:5300
-    }
-    `,
+       errors
+       cache 30
+       proxy . 1.2.3.4:5300
+    }`,
 		},
 		{
 			configMap: &v1.ConfigMap{
@@ -370,15 +370,15 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 			},
 
 			expectOne: `
-    federation cluster.local {
-       foo foo.feddomain.com
-       bar bar.feddomain.com
-    }`,
+        federation cluster.local {
+           foo foo.feddomain.com
+           bar bar.feddomain.com
+        }`,
 			expectTwo: `
-    federation cluster.local {
-       bar bar.feddomain.com
-       foo foo.feddomain.com
-    }`,
+        federation cluster.local {
+           bar bar.feddomain.com
+           foo foo.feddomain.com
+        }`,
 		},
 		{
 			configMap: &v1.ConfigMap{

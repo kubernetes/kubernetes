@@ -46,7 +46,6 @@ const (
 	kubeDNSStubDomain          = "stubDomains"
 	kubeDNSUpstreamNameservers = "upstreamNameservers"
 	kubeDNSFederation          = "federations"
-	coreDNSStanzaFormat        = "\n    "
 )
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
@@ -281,24 +280,20 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigMap *v1.ConfigMap) (string, error) {
 	if proxy, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		stubDomainData := make(map[string][]string)
-		var proxyStanzaList string
-
 		err := json.Unmarshal([]byte(proxy), &stubDomainData)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse JSON from 'kube-dns ConfigMap: %v", err)
 		}
-		var proxyStanza []interface{}
 
+		var proxyStanza []interface{}
 		for domain, proxyIP := range stubDomainData {
-			strings.Join(proxyIP, " ")
 			pStanza := map[string]interface{}{}
 			pStanza["keys"] = []string{domain + ":53"}
 			pStanza["body"] = [][]string{
 				{"errors"},
 				{"cache", "30"},
-				{"proxy", ".", strings.Join(proxyIP, " ")},
+				append([]string{"proxy", "."}, proxyIP...),
 			}
-
 			proxyStanza = append(proxyStanza, pStanza)
 		}
 		stanzasBytes, err := json.Marshal(proxyStanza)
@@ -306,15 +301,12 @@ func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigM
 			return "", err
 		}
 
-		outputJSON, err := caddyfile.FromJSON(stanzasBytes)
+		corefileStanza, err := caddyfile.FromJSON(stanzasBytes)
 		if err != nil {
 			return "", err
 		}
-		// This is required to format the Corefile, otherwise errors due to bad yaml format.
-		output := strings.NewReplacer("\n\t", "\n        ", "\"", "", "\n}", "\n    }", "\n\n", "\n    ").Replace(string(outputJSON))
-		proxyStanzaList = coreDNSStanzaFormat + output + coreDNSStanzaFormat
 
-		return proxyStanzaList, nil
+		return prepCorefileFormat(string(corefileStanza), 4), nil
 	}
 	return "", nil
 }
@@ -342,7 +334,7 @@ func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kub
 	if federation, ok := kubeDNSConfigMap.Data[dataField]; ok {
 		var (
 			federationStanza []interface{}
-			fData            []string
+			body             [][]string
 		)
 		federationData := make(map[string]string)
 
@@ -350,33 +342,37 @@ func translateFederationsofKubeDNSToCoreDNS(dataField, coreDNSDomain string, kub
 		if err != nil {
 			return "", fmt.Errorf("failed to parse JSON from kube-dns ConfigMap: %v", err)
 		}
+		fStanza := map[string]interface{}{}
 
 		for name, domain := range federationData {
-			fData = append(fData, name+" "+domain)
-		}
-		fStanza := map[string]interface{}{}
-		fStanza["body"] = [][]string{
-			{strings.Join(fData, "\n       ")},
+			body = append(body, []string{name, domain})
 		}
 		federationStanza = append(federationStanza, fStanza)
 		fStanza["keys"] = []string{"federation " + coreDNSDomain}
-
+		fStanza["body"] = body
 		stanzasBytes, err := json.Marshal(federationStanza)
 		if err != nil {
 			return "", err
 		}
 
-		outputJSON, err := caddyfile.FromJSON(stanzasBytes)
+		corefileStanza, err := caddyfile.FromJSON(stanzasBytes)
 		if err != nil {
 			return "", err
 		}
 
-		// This is required to format the Corefile, otherwise errors due to bad yaml format.
-		output := strings.NewReplacer("\n\t", "\n       ", "\"", "", "\n}", "\n    }").Replace(string(outputJSON))
-		federationStanzaList := coreDNSStanzaFormat + output
-
-		return federationStanzaList, nil
-
+		return prepCorefileFormat(string(corefileStanza), 8), nil
 	}
 	return "", nil
+}
+
+// prepCorefileFormat indents the output of the Corefile caddytext and replaces tabs with spaces
+// to neatly format the configmap, making it readable.
+func prepCorefileFormat(s string, indentation int) string {
+	r := []string{}
+	for _, line := range strings.Split(s, "\n") {
+		indented := strings.Repeat(" ", indentation) + line
+		r = append(r, indented)
+	}
+	corefile := strings.Join(r, "\n")
+	return "\n" + strings.Replace(corefile, "\t", "   ", -1)
 }
