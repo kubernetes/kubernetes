@@ -18,11 +18,11 @@ package conntrack
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
 )
 
@@ -30,17 +30,6 @@ import (
 
 // NoConnectionToDelete is the error string returned by conntrack when no matching connections are found
 const NoConnectionToDelete = "0 flow entries have been deleted"
-
-// IsIPv6 returns true if the given ip address is a valid ipv6 address
-func IsIPv6(netIP net.IP) bool {
-	return netIP != nil && netIP.To4() == nil
-}
-
-// IsIPv6String returns true if the given string is a valid ipv6 address
-func IsIPv6String(ip string) bool {
-	netIP := net.ParseIP(ip)
-	return IsIPv6(netIP)
-}
 
 func protoStr(proto v1.Protocol) string {
 	return strings.ToLower(string(proto))
@@ -56,7 +45,7 @@ func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
 // ClearEntriesForIP uses the conntrack tool to delete the conntrack entries
 // for the UDP connections specified by the given service IP
 func ClearEntriesForIP(execer exec.Interface, ip string, protocol v1.Protocol) error {
-	parameters := parametersWithFamily(IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
+	parameters := parametersWithFamily(utilnet.IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
@@ -107,7 +96,7 @@ func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol 
 // ClearEntriesForNAT uses the conntrack tool to delete the conntrack entries
 // for connections specified by the {origin, dest} IP pair.
 func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.Protocol) error {
-	parameters := parametersWithFamily(IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
+	parameters := parametersWithFamily(utilnet.IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
 		"-p", protoStr(protocol))
 	err := Exec(execer, parameters...)
 	if err != nil && !strings.Contains(err.Error(), NoConnectionToDelete) {

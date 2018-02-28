@@ -13,9 +13,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/iptables",
     deps = [
-        "//pkg/api/service:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/metrics:go_default_library",
@@ -23,6 +21,7 @@ go_library(
         "//pkg/util/async:go_default_library",
         "//pkg/util/conntrack:go_default_library",
         "//pkg/util/iptables:go_default_library",
+        "//pkg/util/net:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
