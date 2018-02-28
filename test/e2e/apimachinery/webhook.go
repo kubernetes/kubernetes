@@ -144,9 +144,9 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMutatingPodWebhook(f)
 	})
 
-	It("Should not be able to prevent deleting validating-webhook-configurations", func() {
+	It("Should not be able to prevent deleting validating-webhook-configurations or mutating-webhook-configurations", func() {
 		webhookCleanup := registerWebhookForWebhookConfigurations(f, context)
-		defer webhookCleanup()	
+		defer webhookCleanup()
 		testWebhookForWebhookConfigurations(f)
 	})
 
@@ -721,7 +721,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 func registerWebhookForWebhookConfigurations(f *framework.Framework, context *certContext) func() {
 	var err error
 	client := f.ClientSet
-	By("Registering a webhook on ValidatingWebhookConfiguration objects, via the AdmissionRegistration API")
+	By("Registering a webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
 	configName := webhookForWebhooksConfigName
@@ -740,7 +740,7 @@ func registerWebhookForWebhookConfigurations(f *framework.Framework, context *ce
 					Rule: v1beta1.Rule{
 						APIGroups:   []string{"admissionregistration.k8s.io"},
 						APIVersions: []string{"*"},
-						Resources:   []string{
+						Resources: []string{
 							"validatingwebhookconfigurations",
 							"mutatingwebhookconfigurations",
 						},
@@ -750,7 +750,7 @@ func registerWebhookForWebhookConfigurations(f *framework.Framework, context *ce
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path: strPtr("/always-deny"),
+						Path:      strPtr("/always-deny"),
 					},
 					CABundle: context.signingCert,
 				},
@@ -822,7 +822,7 @@ func testWebhookForWebhookConfigurations(f *framework.Framework) {
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "should-be-removable-webhook.k8s.io",
+				Name: "should-be-removable-mutating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
