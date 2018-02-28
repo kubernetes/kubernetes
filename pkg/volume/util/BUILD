@@ -10,6 +10,7 @@ go_library(
         "finalizer.go",
         "io_util.go",
         "metrics.go",
+        "nested_volumes.go",
         "resize_util.go",
         "util.go",
     ] + select({
@@ -77,6 +78,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "nested_volumes_test.go",
         "resize_util_test.go",
         "util_test.go",
     ] + select({
@@ -96,6 +98,7 @@ go_test(
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/util/testing:go_default_library",
     ],

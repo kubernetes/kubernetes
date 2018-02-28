@@ -54,7 +54,6 @@ go_library(
         "transport.go",
         "url_utils.go",
         "urlbackoff.go",
-        "versions.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/client-go/rest",

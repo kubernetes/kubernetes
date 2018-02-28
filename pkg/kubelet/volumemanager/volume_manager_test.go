@@ -187,9 +187,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 		stopCh := runVolumeManager(manager)
-		defer func() {
-			close(stopCh)
-		}()
+		defer close(stopCh)
 
 		podManager.SetPods([]*v1.Pod{pod})
 

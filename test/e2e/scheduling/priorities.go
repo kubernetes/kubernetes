@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -62,7 +61,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var nodeList *v1.NodeList
 	var systemPodsNo int
 	var ns string
-	var masterNodes sets.String
 	f := framework.NewDefaultFramework("sched-priority")
 	ignoreLabels := framework.ImagePullerLabels
 
@@ -75,7 +73,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		nodeList = &v1.NodeList{}
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
-		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
+		_, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)

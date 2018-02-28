@@ -104,25 +104,20 @@ func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) er
 
 var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
-	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string
 	ignoreLabels := framework.ImagePullerLabels
-	var group string
 
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
+		_, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = int32(len(systemPods))
 
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
 		framework.SkipUnlessProviderIs("gke", "aws")
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
-		} else {
-			group = framework.TestContext.CloudConfig.NodeInstanceGroup
 		}
 	})
 

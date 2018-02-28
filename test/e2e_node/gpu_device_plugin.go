@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -34,8 +32,7 @@ import (
 )
 
 const (
-	devicePluginFeatureGate = "DevicePlugins=true"
-	testPodNamePrefix       = "nvidia-gpu-"
+	testPodNamePrefix = "nvidia-gpu-"
 )
 
 // Serial because the test restarts Kubelet
@@ -43,19 +40,12 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
 	Context("DevicePlugin", func() {
-		By("Enabling support for Device Plugin")
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.DevicePlugins)] = true
-		})
-
 		var devicePluginPod *v1.Pod
 		BeforeEach(func() {
 			By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
 				Skip("Nvidia GPUs do not exist on the node. Skipping test.")
 			}
-
-			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 
 			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
 			devicePluginPod = f.PodClient().CreateSync(framework.NVIDIADevicePlugin(f.Namespace.Name))

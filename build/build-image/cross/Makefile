@@ -24,4 +24,4 @@ build:
 	docker build --pull -t staging-k8s.gcr.io/$(IMAGE):$(TAG) .
 
 push: build
-	gcloud docker -- push staging-k8s.gcr.io/$(IMAGE):$(TAG)
+	docker push staging-k8s.gcr.io/$(IMAGE):$(TAG)

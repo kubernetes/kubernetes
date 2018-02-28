@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -53,6 +54,13 @@ type predicateMetadata struct {
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
+	// ignoredExtendedResources is a set of extended resource names that will
+	// be ignored in the PodFitsResources predicate.
+	//
+	// They can be scheduler extender managed resources, the consumption of
+	// which should be accounted only by the extenders. This set is synthesized
+	// from scheduler extender configuration and does not change per pod.
+	ignoredExtendedResources sets.String
 }
 
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
@@ -69,6 +77,17 @@ func RegisterPredicateMetadataProducer(predicateName string, precomp PredicateMe
 	predicateMetaProducerRegisterLock.Lock()
 	defer predicateMetaProducerRegisterLock.Unlock()
 	predicateMetadataProducers[predicateName] = precomp
+}
+
+// RegisterPredicateMetadataProducerWithExtendedResourceOptions registers a
+// PredicateMetadataProducer that creates predicate metadata with the provided
+// options for extended resources.
+//
+// See the comments in "predicateMetadata" for the explanation of the options.
+func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources sets.String) {
+	RegisterPredicateMetadataProducer("PredicateWithExtendedResourceOptions", func(pm *predicateMetadata) {
+		pm.ignoredExtendedResources = ignoredExtendedResources
+	})
 }
 
 // NewPredicateMetadataFactory creates a PredicateMetadataFactory.
@@ -170,10 +189,11 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 // its maps and slices, but it does not copy the contents of pointer values.
 func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 	newPredMeta := &predicateMetadata{
-		pod:                  meta.pod,
-		podBestEffort:        meta.podBestEffort,
-		podRequest:           meta.podRequest,
-		serviceAffinityInUse: meta.serviceAffinityInUse,
+		pod:                      meta.pod,
+		podBestEffort:            meta.podBestEffort,
+		podRequest:               meta.podRequest,
+		serviceAffinityInUse:     meta.serviceAffinityInUse,
+		ignoredExtendedResources: meta.ignoredExtendedResources,
 	}
 	newPredMeta.podPorts = append([]*v1.ContainerPort(nil), meta.podPorts...)
 	newPredMeta.matchingAntiAffinityTerms = map[string][]matchingPodAntiAffinityTerm{}

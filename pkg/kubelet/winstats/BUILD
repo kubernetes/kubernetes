@@ -2,7 +2,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = select({
+    srcs = [
+        "doc.go",
+    ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
             "perfcounter_nodestats.go",
             "perfcounters.go",

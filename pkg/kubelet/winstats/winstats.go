@@ -144,6 +144,7 @@ func (c *StatsClient) createRootContainerInfo() (*cadvisorapiv2.ContainerInfo, e
 	return &rootInfo, nil
 }
 
+// GetDirFsInfo returns filesystem capacity and usage information.
 func (c *StatsClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
 	var err error
