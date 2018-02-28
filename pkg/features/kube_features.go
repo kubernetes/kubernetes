@@ -299,7 +299,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.Beta},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Beta},
+	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
