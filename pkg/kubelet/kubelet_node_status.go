@@ -56,6 +56,9 @@ const (
 	// maxNamesPerImageInNodeStatus is max number of names per image stored in
 	// the node status.
 	maxNamesPerImageInNodeStatus = 5
+
+	// seconds to wait for node status related cloud provider calls
+	maxSecondsPerCPCall = 10
 )
 
 // registerWithAPIServer registers the node with the cluster master. It is safe
@@ -304,7 +307,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
 		// TODO: ExternalID is deprecated, we'll have to drop this code
-		externalID, err := instances.ExternalID(context.TODO(), kl.nodeName)
+		ctx, cancel := context.WithTimeout(context.Background(), maxSecondsPerCPCall*time.Second)
+		defer cancel()
+		externalID, err := instances.ExternalID(ctx, kl.nodeName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get external ID from cloud provider: %v", err)
 		}
@@ -314,13 +319,17 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// cloudprovider from arbitrary nodes. At most, we should talk to a
 		// local metadata server here.
 		if node.Spec.ProviderID == "" {
-			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
+			ctx, cancel = context.WithTimeout(context.Background(), maxSecondsPerCPCall*time.Second)
+			defer cancel()
+			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(ctx, kl.cloud, kl.nodeName)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		instanceType, err := instances.InstanceType(context.TODO(), kl.nodeName)
+		ctx, cancel = context.WithTimeout(context.Background(), maxSecondsPerCPCall*time.Second)
+		defer cancel()
+		instanceType, err := instances.InstanceType(ctx, kl.nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +340,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {
-			zone, err := zones.GetZone(context.TODO())
+			ctx, cancel = context.WithTimeout(context.Background(), maxSecondsPerCPCall*time.Second)
+			defer cancel()
+			zone, err := zones.GetZone(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
@@ -454,7 +465,9 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		// to the cloud provider?
 		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
 		// TODO: If IP addresses couldn't be fetched from the cloud provider, should kubelet fallback on the other methods for getting the IP below?
-		nodeAddresses, err := instances.NodeAddresses(context.TODO(), kl.nodeName)
+		ctx, cancel := context.WithTimeout(context.Background(), maxSecondsPerCPCall*time.Second)
+		defer cancel()
+		nodeAddresses, err := instances.NodeAddresses(ctx, kl.nodeName)
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
