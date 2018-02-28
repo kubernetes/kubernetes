@@ -107,8 +107,6 @@ const (
 )
 
 const (
-	// The amount of time the nodecontroller polls on the list nodes endpoint.
-	apiserverStartupGracePeriod = 10 * time.Minute
 	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
 	retrySleepTime = 20 * time.Millisecond
 )
