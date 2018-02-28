@@ -26,8 +26,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/capabilities"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
@@ -257,5 +260,196 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	}
 	if fakeHttp.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+}
+
+func TestCapabilityAdmitHandler(t *testing.T) {
+	privileged := true
+	testCases := []struct {
+		name           string
+		capabilities   capabilities.Capabilities
+		attrs          *PodAdmitAttributes
+		podAdmitResult PodAdmitResult
+	}{
+		{
+			name: "Host Network Allowed",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+						HostNetwork: true,
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Host Network Disallowed",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostNetworkSources: []string{},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+						HostNetwork: true,
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: false},
+		},
+		{
+			name: "Network Errors Without source",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(nil,
+					v1.PodSpec{
+						HostNetwork: true,
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: false},
+		},
+		{
+			name: "Host PID Allowed",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostPIDSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+						HostPID: true,
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Host PID Disallowed",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostPIDSources: []string{},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+						HostPID: true,
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: false},
+		},
+		{
+			name: "Host IPC Allowed",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostIPCSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+						HostIPC: true,
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Host IPC Disallowed",
+			capabilities: capabilities.Capabilities{
+				PrivilegedSources: capabilities.PrivilegedSources{
+					HostIPCSources: []string{},
+				},
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo"},
+						},
+						HostIPC: true,
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: false},
+		},
+		{
+			name: "Privilege Container Allowed",
+			capabilities: capabilities.Capabilities{
+				AllowPrivileged: true,
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo", SecurityContext: &v1.SecurityContext{Privileged: &privileged}},
+						},
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: true},
+		},
+		{
+			name: "Privilege Container Disallowed",
+			capabilities: capabilities.Capabilities{
+				AllowPrivileged: false,
+			},
+			attrs: &PodAdmitAttributes{
+				Pod: makePod(map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
+					v1.PodSpec{
+						Containers: []v1.Container{
+							{Name: "foo", SecurityContext: &v1.SecurityContext{Privileged: &privileged}},
+						},
+					}),
+			},
+			podAdmitResult: PodAdmitResult{Admit: false},
+		},
+	}
+
+	capabilityAdmitHandler := NewCapabilityAdmitHandler()
+
+	for _, testCase := range testCases {
+		capabilities.SetForTests(testCase.capabilities)
+		result := capabilityAdmitHandler.Admit(testCase.attrs)
+
+		if result.Admit != testCase.podAdmitResult.Admit {
+			t.Errorf("%v: expected: %v, got: %v", testCase.name, testCase.podAdmitResult.Admit, result.Admit)
+		}
+	}
+
+}
+
+func makePod(annotations map[string]string, spec v1.PodSpec) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         "12345678",
+			Name:        "foo",
+			Namespace:   "new",
+			Annotations: annotations,
+		},
+		Spec: spec,
 	}
 }
