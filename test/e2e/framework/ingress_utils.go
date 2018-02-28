@@ -45,6 +45,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -79,6 +80,9 @@ const (
 
 	// Pre-shared-cert annotation defined in ingress repository.
 	IngressPreSharedCertKey = "ingress.gcp.kubernetes.io/pre-shared-cert"
+
+	// ServiceApplicationProtocolKey annotation defined in ingress repository.
+	ServiceApplicationProtocolKey = "service.alpha.kubernetes.io/app-protocols"
 
 	// all cloud resources created by the ingress controller start with this
 	// prefix.
@@ -1518,4 +1522,112 @@ func (cont *NginxIngressController) Init() {
 	cont.externalIP, err = GetHostExternalAddress(cont.Client, cont.pod)
 	ExpectNoError(err)
 	Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
+}
+
+func GenerateReencryptionIngressSpec() *extensions.Ingress {
+	return &extensions.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "echoheaders-reencryption",
+		},
+		Spec: extensions.IngressSpec{
+			Backend: &extensions.IngressBackend{
+				ServiceName: "echoheaders-reencryption",
+				ServicePort: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 443,
+				},
+			},
+		},
+	}
+}
+
+func GenerateReencryptionServiceSpec() *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "echoheaders-reencryption",
+			Annotations: map[string]string{
+				ServiceApplicationProtocolKey: `{"my-https-port":"HTTPS"}`,
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{
+				Name:       "my-https-port",
+				Protocol:   v1.ProtocolTCP,
+				Port:       443,
+				TargetPort: intstr.FromString("echo-443"),
+			}},
+			Selector: map[string]string{
+				"app": "echoheaders-reencryption",
+			},
+			Type: v1.ServiceTypeNodePort,
+		},
+	}
+}
+
+func GenerateReencryptionDeploymentSpec() *extensions.Deployment {
+	return &extensions.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "echoheaders-reencryption",
+		},
+		Spec: extensions.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+				"app": "echoheaders-reencryption",
+			}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": "echoheaders-reencryption",
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "echoheaders-reencryption",
+							Image: "k8s.gcr.io/echoserver:1.9",
+							Ports: []v1.ContainerPort{{
+								ContainerPort: 8443,
+								Name:          "echo-443",
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func CreateReencryptionIngress(cs clientset.Interface, namespace string) (*extensions.Deployment, *v1.Service, *extensions.Ingress, error) {
+	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(GenerateReencryptionDeploymentSpec())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	svcCreated, err := cs.CoreV1().Services(namespace).Create(GenerateReencryptionServiceSpec())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	ingCreated, err := cs.ExtensionsV1beta1().Ingresses(namespace).Create(GenerateReencryptionIngressSpec())
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return deployCreated, svcCreated, ingCreated, nil
+}
+
+func CleanupReencryptionIngress(cs clientset.Interface, deploy *extensions.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
+	var errs []error
+	if ing != nil {
+		if err := cs.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil); err != nil {
+			errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
+		}
+	}
+	if svc != nil {
+		if err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil); err != nil {
+			errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
+		}
+	}
+	if deploy != nil {
+		if err := cs.ExtensionsV1beta1().Deployments(deploy.Namespace).Delete(deploy.Name, nil); err != nil {
+			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", deploy.Namespace, deploy.Name, err))
+		}
+	}
+	return errs
 }
