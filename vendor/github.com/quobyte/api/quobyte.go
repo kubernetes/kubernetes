@@ -5,20 +5,38 @@ import (
 	"net/http"
 )
 
+// retry policy codes
+const (
+	RetryNever         string = "NEVER"
+	RetryInteractive   string = "INTERACTIVE"
+	RetryInfinitely    string = "INFINITELY"
+	RetryOncePerTarget string = "ONCE_PER_TARGET"
+)
+
 type QuobyteClient struct {
-	client   *http.Client
-	url      string
-	username string
-	password string
+	client         *http.Client
+	url            string
+	username       string
+	password       string
+	apiRetryPolicy string
+}
+
+func (client *QuobyteClient) SetAPIRetryPolicy(retry string) {
+	client.apiRetryPolicy = retry
+}
+
+func (client *QuobyteClient) GetAPIRetryPolicy() string {
+	return client.apiRetryPolicy
 }
 
 // NewQuobyteClient creates a new Quobyte API client
 func NewQuobyteClient(url string, username string, password string) *QuobyteClient {
 	return &QuobyteClient{
-		client:   &http.Client{},
-		url:      url,
-		username: username,
-		password: password,
+		client:         &http.Client{},
+		url:            url,
+		username:       username,
+		password:       password,
+		apiRetryPolicy: RetryInteractive,
 	}
 }
 
@@ -80,6 +98,7 @@ func (client *QuobyteClient) GetClientList(tenant string) (GetClientListResponse
 	return response, nil
 }
 
+// SetVolumeQuota sets a Quota to the specified Volume
 func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64) error {
 	request := &setQuotaRequest{
 		Quotas: []*quota{
@@ -101,4 +120,51 @@ func (client *QuobyteClient) SetVolumeQuota(volumeUUID string, quotaSize uint64)
 	}
 
 	return client.sendRequest("setQuota", request, nil)
+}
+
+// GetTenant returns the Tenant configuration for all specified tenants
+func (client *QuobyteClient) GetTenant(tenantIDs []string) (GetTenantResponse, error) {
+	request := &getTenantRequest{TenantIDs: tenantIDs}
+
+	var response GetTenantResponse
+	err := client.sendRequest("getTenant", request, &response)
+	if err != nil {
+		return response, err
+	}
+
+	return response, nil
+}
+
+// GetTenantMap returns a map that contains all tenant names and there ID's
+func (client *QuobyteClient) GetTenantMap() (map[string]string, error) {
+	result := map[string]string{}
+	response, err := client.GetTenant([]string{})
+
+	if err != nil {
+		return result, err
+	}
+
+	for _, tenant := range response.Tenants {
+		result[tenant.Name] = tenant.TenantID
+	}
+
+	return result, nil
+}
+
+// SetTenant creates a Tenant with the specified name
+func (client *QuobyteClient) SetTenant(tenantName string) (string, error) {
+	request := &setTenantRequest{
+		&TenantDomainConfiguration{
+			Name: tenantName,
+		},
+		retryPolicy{client.GetAPIRetryPolicy()},
+	}
+
+	var response setTenantResponse
+	err := client.sendRequest("setTenant", request, &response)
+	if err != nil {
+		return "", err
+	}
+
+	return response.TenantID, nil
 }

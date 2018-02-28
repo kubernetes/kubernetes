@@ -2515,7 +2515,7 @@
 		},
 		{
 			"ImportPath": "github.com/quobyte/api",
-			"Rev": "cb10db90715b14d4784465d2fa3b915dfacc0628"
+			"Rev": "f2b94aa4aa4f8fcf279fe667ccd916abe6a064d5"
 		},
 		{
 			"ImportPath": "github.com/rancher/go-rancher/client",
