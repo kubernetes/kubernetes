@@ -198,6 +198,10 @@ function create-and-upload-hollow-node-image {
     exit 1
   fi
 
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
+
   echo "Copying kubemark binary to ${MAKE_DIR}"
   cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
   CURR_DIR=`pwd`
@@ -223,6 +227,10 @@ function create-and-upload-hollow-node-image {
 # Use bazel rule to create a docker image for hollow-node and upload
 # it to the appropriate docker container registry for the cloud provider.
 function create-and-upload-hollow-node-image-bazel {
+  echo "Configuring registry authentication"
+  mkdir -p "${HOME}/.docker"
+  gcloud beta auth configure-docker -q
+
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
     if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${FULL_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then

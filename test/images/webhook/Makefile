@@ -17,4 +17,4 @@ build:
 	docker build --no-cache -t gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.9v1 .
 	rm -rf webhook
 push:
-	gcloud docker -- push gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.9v1
+	docker push gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.9v1
