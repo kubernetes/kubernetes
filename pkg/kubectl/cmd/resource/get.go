@@ -86,10 +86,7 @@ var (
 		desired resource type is namespaced you will only see results in your current
 		namespace unless you pass --all-namespaces.
 
-		This command will hide resources that have completed, such as pods that are
-		in the Succeeded or Failed phases. You can see the full results for any
-		resource by providing the --show-all flag. Uninitialized objects are not
-		shown unless --include-uninitialized is passed.
+		Uninitialized objects are not shown unless --include-uninitialized is passed.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`)
