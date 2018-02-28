@@ -66,11 +66,11 @@ func TestCanSupport(t *testing.T) {
 }
 
 type fakeMountDetector struct {
-	medium  storageMedium
+	medium  v1.StorageMedium
 	isMount bool
 }
 
-func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
+func (fake *fakeMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool, error) {
 	return fake.medium, fake.isMount, nil
 }
 
@@ -196,9 +196,9 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	physicalMounter.ResetLog()
 
 	// Make an unmounter for the volume
-	teardownMedium := mediumUnknown
+	teardownMedium := v1.StorageMediumDefault
 	if config.medium == v1.StorageMediumMemory {
-		teardownMedium = mediumMemory
+		teardownMedium = v1.StorageMediumMemory
 	}
 	unmounterMountDetector := &fakeMountDetector{medium: teardownMedium, isMount: config.shouldBeMountedBeforeTeardown}
 	unmounter, err := plug.(*emptyDirPlugin).newUnmounterInternal(volumeName, types.UID("poduid"), &physicalMounter, unmounterMountDetector)
