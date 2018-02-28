@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -1147,7 +1148,7 @@ func TestForceApply(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 	pathRCList := "/namespaces/test/replicationcontrollers"
 	expected := map[string]int{
-		"getOk":       9,
+		"getOk":       10,
 		"getNotFound": 1,
 		"getList":     1,
 		"patch":       6,
@@ -1158,6 +1159,7 @@ func TestForceApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		deleted := false
+		isScaledDownToZero := false
 		counts := map[string]int{}
 		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
@@ -1170,7 +1172,18 @@ func TestForceApply(t *testing.T) {
 						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
 					}
 					counts["getOk"]++
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+					var bodyRC io.ReadCloser
+					if isScaledDownToZero {
+						rcObj := readReplicationControllerFromFile(t, filenameRC)
+						rcObj.Spec.Replicas = 0
+						rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+						if err != nil {
+							t.Fatal(err)
+						}
+						bodyRC = ioutil.NopCloser(bytes.NewReader(rcBytes))
+					} else {
+						bodyRC = ioutil.NopCloser(bytes.NewReader(currentRC))
+					}
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 				case strings.HasSuffix(p, pathRCList) && m == "GET":
 					counts["getList"]++
@@ -1205,10 +1218,12 @@ func TestForceApply(t *testing.T) {
 				case strings.HasSuffix(p, pathRC) && m == "PUT":
 					counts["put"]++
 					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+					isScaledDownToZero = true
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 				case strings.HasSuffix(p, pathRCList) && m == "POST":
 					counts["post"]++
 					deleted = false
+					isScaledDownToZero = false
 					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 				default:
