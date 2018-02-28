@@ -606,8 +606,16 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 
 		for _, removedResource := range removedDevicePlugins {
-			glog.V(2).Infof("Remove capacity for %s", removedResource)
-			delete(node.Status.Capacity, v1.ResourceName(removedResource))
+			glog.V(2).Infof("Set capacity for %s to 0 on device removal", removedResource)
+			// Set the capacity of the removed resource to 0 instead of
+			// removing the resource from the node status. This is to indicate
+			// that the resource is managed by device plugin and had been
+			// registered before.
+			//
+			// This is required to differentiate the device plugin managed
+			// resources and the cluster-level resources, which are absent in
+			// node status.
+			node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 		}
 	}
 

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -712,9 +713,15 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourcePods, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber)))
 	}
 
+	// No extended resources should be ignored by default.
+	ignoredExtendedResources := sets.NewString()
+
 	var podRequest *schedulercache.Resource
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podRequest = predicateMeta.podRequest
+		if predicateMeta.ignoredExtendedResources != nil {
+			ignoredExtendedResources = predicateMeta.ignoredExtendedResources
+		}
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
 		podRequest = GetResourceRequest(pod)
@@ -743,6 +750,13 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
+		if v1helper.IsExtendedResourceName(rName) {
+			// If this resource is one of the extended resources that should be
+			// ignored, we will skip checking it.
+			if ignoredExtendedResources.Has(string(rName)) {
+				continue
+			}
+		}
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
 		}

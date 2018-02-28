@@ -41,6 +41,10 @@ type SchedulerExtender interface {
 
 	// IsBinder returns whether this extender is configured for the Bind method.
 	IsBinder() bool
+
+	// IsInterested returns true if at least one extended resource requested by
+	// this pod is managed by this extender.
+	IsInterested(pod *v1.Pod) bool
 }
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
