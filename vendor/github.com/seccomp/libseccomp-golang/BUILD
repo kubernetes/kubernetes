@@ -13,7 +13,6 @@ go_library(
     clinkopts = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "-lseccomp",
-            "-lseccomp",
         ],
         "//conditions:default": [],
     }),

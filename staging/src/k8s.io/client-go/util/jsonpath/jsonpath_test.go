@@ -190,7 +190,7 @@ func TestStructInput(t *testing.T) {
 		{"nonexistent field", "{.hello}", storeData, "hello is not found", false},
 		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice", false},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>", false},
-		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end", false},
+		{"redundant end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end", false},
 	}
 	testFailJSONPath(failStoreTests, t)
 }

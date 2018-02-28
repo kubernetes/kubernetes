@@ -395,7 +395,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 
 	// Generate the token
-	token, err := e.token.GenerateToken(*serviceAccount, *secret)
+	token, err := e.token.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *secret))
 	if err != nil {
 		// retriable error
 		return true, err
@@ -551,7 +551,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 
 	// Generate the token
 	if needsToken {
-		token, err := e.token.GenerateToken(*serviceAccount, *liveSecret)
+		token, err := e.token.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *liveSecret))
 		if err != nil {
 			return false, err
 		}

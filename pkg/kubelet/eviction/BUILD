@@ -13,7 +13,6 @@ go_test(
         "helpers_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",

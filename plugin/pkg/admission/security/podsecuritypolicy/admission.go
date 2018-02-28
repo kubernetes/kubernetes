@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -301,7 +302,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
 
-	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
+	errs = append(errs, provider.ValidatePod(pod, field.NewPath("spec", "securityContext"))...)
 
 	for i := range pod.Spec.InitContainers {
 		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
@@ -354,11 +355,19 @@ func isAuthorizedForPolicy(user, sa user.Info, namespace, policyName string, aut
 }
 
 // authorizedForPolicy returns true if info is authorized to perform the "use" verb on the policy resource.
+// TODO: check against only the policy group when PSP will be completely moved out of the extensions
 func authorizedForPolicy(info user.Info, namespace string, policyName string, authz authorizer.Authorizer) bool {
+	// Check against extensions API group for backward compatibility
+	return authorizedForPolicyInAPIGroup(info, namespace, policyName, policy.GroupName, authz) ||
+		authorizedForPolicyInAPIGroup(info, namespace, policyName, extensions.GroupName, authz)
+}
+
+// authorizedForPolicyInAPIGroup returns true if info is authorized to perform the "use" verb on the policy resource in the specified API group.
+func authorizedForPolicyInAPIGroup(info user.Info, namespace, policyName, apiGroupName string, authz authorizer.Authorizer) bool {
 	if info == nil {
 		return false
 	}
-	attr := buildAttributes(info, namespace, policyName)
+	attr := buildAttributes(info, namespace, policyName, apiGroupName)
 	decision, reason, err := authz.Authorize(attr)
 	if err != nil {
 		glog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
@@ -367,14 +376,14 @@ func authorizedForPolicy(info user.Info, namespace string, policyName string, au
 }
 
 // buildAttributes builds an attributes record for a SAR based on the user info and policy.
-func buildAttributes(info user.Info, namespace string, policyName string) authorizer.Attributes {
+func buildAttributes(info user.Info, namespace, policyName, apiGroupName string) authorizer.Attributes {
 	// check against the namespace that the pod is being created in to allow per-namespace PSP grants.
 	attr := authorizer.AttributesRecord{
 		User:            info,
 		Verb:            "use",
 		Namespace:       namespace,
 		Name:            policyName,
-		APIGroup:        extensions.GroupName,
+		APIGroup:        apiGroupName,
 		Resource:        "podsecuritypolicies",
 		ResourceRequest: true,
 	}

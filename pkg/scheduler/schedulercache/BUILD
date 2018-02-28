@@ -26,9 +26,11 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["cache_test.go"],
+    srcs = [
+        "cache_test.go",
+        "node_info_test.go",
+    ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/schedulercache",
     deps = [
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/util:go_default_library",

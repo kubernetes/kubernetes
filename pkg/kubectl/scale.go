@@ -24,10 +24,8 @@ import (
 	autoscalingapi "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -38,14 +36,16 @@ import (
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
+
+// TODO: Figure out if we should be waiting on initializers in the Scale() functions below.
 
 // Scaler provides an interface for resources that can be scaled.
 type Scaler interface {
 	// Scale scales the named resource after checking preconditions. It optionally
 	// retries in the event of resource version mismatch (if retry is not nil),
 	// and optionally waits until the status of the resource matches newSize (if wait is not nil)
+	// TODO: Make the implementation of this watch-based (#56075) once #31345 is fixed.
 	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams) error
 	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
 	// a necessary building block for Scale
@@ -200,51 +200,23 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		// Make it try only once, immediately
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
-	var updatedResourceVersion string
-	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, &updatedResourceVersion)
+	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, nil)
 	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
-		checkRC := func(rc *api.ReplicationController) bool {
-			if uint(rc.Spec.Replicas) != newSize {
-				// the size is changed by other party. Don't need to wait for the new change to complete.
-				return true
-			}
-			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas
-		}
-		// If number of replicas doesn't change, then the update may not event
-		// be sent to underlying databse (we don't send no-op changes).
-		// In such case, <updatedResourceVersion> will have value of the most
-		// recent update (which may be far in the past) so we may get "too old
-		// RV" error from watch or potentially no ReplicationController events
-		// will be deliver, since it may already be in the expected state.
-		// To protect from these two, we first issue Get() to ensure that we
-		// are not already in the expected state.
-		currentRC, err := scaler.c.ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		rc, err := scaler.c.ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		if !checkRC(currentRC) {
-			watchOptions := metav1.ListOptions{
-				FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
-				ResourceVersion: updatedResourceVersion,
-			}
-			watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)
-			if err != nil {
-				return err
-			}
-			_, err = watch.Until(waitForReplicas.Timeout, watcher, func(event watch.Event) (bool, error) {
-				if event.Type != watch.Added && event.Type != watch.Modified {
-					return false, nil
-				}
-				return checkRC(event.Object.(*api.ReplicationController)), nil
-			})
-			if err == wait.ErrWaitTimeout {
-				return fmt.Errorf("timed out waiting for %q to be synced", name)
-			}
-			return err
+		if rc.Initializers != nil {
+			return nil
 		}
+		err = wait.PollImmediate(waitForReplicas.Interval, waitForReplicas.Timeout, ControllerHasDesiredReplicas(scaler.c, rc))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -300,7 +272,7 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, nil)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
@@ -311,7 +283,7 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		if rs.Initializers != nil {
 			return nil
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		err = wait.PollImmediate(waitForReplicas.Interval, waitForReplicas.Timeout, ReplicaSetHasDesiredReplicas(scaler.c, rs))
 
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
@@ -372,7 +344,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, nil)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
@@ -383,7 +355,7 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 		if job.Initializers != nil {
 			return nil
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.StatefulSetHasDesiredReplicas(scaler.c, job))
+		err = wait.PollImmediate(waitForReplicas.Interval, waitForReplicas.Timeout, StatefulSetHasDesiredReplicas(scaler.c, job))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}
@@ -432,7 +404,7 @@ func (scaler *jobScaler) Scale(namespace, name string, newSize uint, preconditio
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, nil)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
@@ -440,7 +412,7 @@ func (scaler *jobScaler) Scale(namespace, name string, newSize uint, preconditio
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.JobHasDesiredParallelism(scaler.c, job))
+		err = wait.PollImmediate(waitForReplicas.Interval, waitForReplicas.Timeout, JobHasDesiredParallelism(scaler.c, job))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}
@@ -503,7 +475,7 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, nil)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
@@ -511,7 +483,7 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+		err = wait.PollImmediate(waitForReplicas.Interval, waitForReplicas.Timeout, DeploymentHasDesiredReplicas(scaler.c, deployment))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}

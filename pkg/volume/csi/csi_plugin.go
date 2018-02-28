@@ -19,10 +19,8 @@ package csi
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"time"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,8 +30,7 @@ import (
 )
 
 const (
-	csiPluginName              = "kubernetes.io/csi"
-	csiVolAttribsAnnotationKey = "csi.volume.kubernetes.io/volume-attributes"
+	csiPluginName = "kubernetes.io/csi"
 
 	// TODO (vladimirvivien) implement a more dynamic way to discover
 	// the unix domain socket path for each installed csi driver.
@@ -43,12 +40,6 @@ const (
 	csiTimeout      = 15 * time.Second
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
-)
-
-var (
-	// csiVersion supported csi version
-	csiVersion     = &csipb.Version{Major: 0, Minor: 1, Patch: 0}
-	driverNameRexp = regexp.MustCompile(`^[A-Za-z]+(\.?-?_?[A-Za-z0-9-])+$`)
 )
 
 type csiPlugin struct {
@@ -85,12 +76,6 @@ func (p *csiPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		return "", err
 	}
 
-	//TODO (vladimirvivien) this validation should be done at the API validation check
-	if !isDriverNameValid(csi.Driver) {
-		glog.Error(log("plugin.GetVolumeName failed to create volume name: invalid csi driver name %s", csi.Driver))
-		return "", errors.New("invalid csi driver name")
-	}
-
 	// return driverName<separator>volumeHandle
 	return fmt.Sprintf("%s%s%s", csi.Driver, volNameSep, csi.VolumeHandle), nil
 }
@@ -112,13 +97,6 @@ func (p *csiPlugin) NewMounter(
 	pvSource, err := getCSISourceFromSpec(spec)
 	if err != nil {
 		return nil, err
-	}
-
-	// TODO (vladimirvivien) consider moving this check in API validation
-	// check Driver name to conform to CSI spec
-	if !isDriverNameValid(pvSource.Driver) {
-		glog.Error(log("driver name does not conform to CSI spec: %s", pvSource.Driver))
-		return nil, errors.New("driver name is invalid")
 	}
 
 	// before it is used in any paths such as socket etc
@@ -242,12 +220,4 @@ func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, er
 // log prepends log string with `kubernetes.io/csi`
 func log(msg string, parts ...interface{}) string {
 	return fmt.Sprintf(fmt.Sprintf("%s: %s", csiPluginName, msg), parts...)
-}
-
-// isDriverNameValid validates the driverName using CSI spec
-func isDriverNameValid(name string) bool {
-	if len(name) == 0 || len(name) > 63 {
-		return false
-	}
-	return driverNameRexp.MatchString(name)
 }

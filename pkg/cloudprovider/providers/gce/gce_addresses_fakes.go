@@ -25,6 +25,8 @@ import (
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
+
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
 // test
@@ -49,7 +51,7 @@ func NewFakeCloudAddressService() *FakeCloudAddressService {
 	}
 }
 
-// SetRegionalAddresses sets the addresses of ther region. This is used for
+// SetRegionalAddresses sets the addresses of there region. This is used for
 // setting the test environment.
 func (cas *FakeCloudAddressService) SetRegionalAddresses(region string, addrs []*computealpha.Address) {
 	// Reset addresses in the region.
@@ -68,7 +70,7 @@ func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha
 	}
 
 	if addr.AddressType == "" {
-		addr.AddressType = string(schemeExternal)
+		addr.AddressType = string(cloud.SchemeExternal)
 	}
 
 	if cas.reservedAddrs[addr.Address] {
@@ -76,8 +78,8 @@ func (cas *FakeCloudAddressService) ReserveAlphaRegionAddress(addr *computealpha
 		// When the IP is already in use, this call returns an error code based
 		// on the type (internal vs external) of the address. This is to be
 		// consistent with actual GCE API.
-		switch lbScheme(addr.AddressType) {
-		case schemeExternal:
+		switch cloud.LbScheme(addr.AddressType) {
+		case cloud.SchemeExternal:
 			return makeGoogleAPIError(http.StatusBadRequest, msg)
 		default:
 			return makeGoogleAPIError(http.StatusConflict, msg)
@@ -209,7 +211,7 @@ func convertToAlphaAddress(object gceObject) *computealpha.Address {
 		panic(fmt.Sprintf("Failed to convert GCE apiObject %v to alpha address: %v", object, err))
 	}
 	// Set the default values for the Alpha fields.
-	addr.NetworkTier = NetworkTierDefault.ToGCEValue()
+	addr.NetworkTier = cloud.NetworkTierDefault.ToGCEValue()
 	return &addr
 }
 

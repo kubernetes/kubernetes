@@ -24,7 +24,7 @@ import (
 	"github.com/blang/semver"
 	dockercontainer "github.com/docker/docker/api/types/container"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 
@@ -122,40 +122,33 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 
 // modifySandboxNamespaceOptions apply namespace options for sandbox
 func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, network *knetwork.PluginManager) {
-	hostNetwork := false
-	if nsOpts != nil {
-		hostNetwork = nsOpts.HostNetwork
-	}
+	// The sandbox's PID namespace is the one that's shared, so CONTAINER and POD are equivalent for it
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForSandbox(hostNetwork, network, hostConfig)
+	modifyHostOptionsForSandbox(nsOpts, network, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
 func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hostConfig *dockercontainer.HostConfig) {
-	hostNetwork := false
-	if nsOpts != nil {
-		hostNetwork = nsOpts.HostNetwork
+	if nsOpts.GetPid() == runtimeapi.NamespaceMode_POD {
+		hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	}
-	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForContainer(hostNetwork, podSandboxID, hostConfig)
+	modifyHostOptionsForContainer(nsOpts, podSandboxID, hostConfig)
 }
 
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
 func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
-	if nsOpts != nil {
-		if nsOpts.HostPid {
-			hostConfig.PidMode = namespaceModeHost
-		}
-		if nsOpts.HostIpc {
-			hostConfig.IpcMode = namespaceModeHost
-		}
+	if nsOpts.GetPid() == runtimeapi.NamespaceMode_NODE {
+		hostConfig.PidMode = namespaceModeHost
 	}
 }
 
-// modifyHostNetworkOptionForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
-	if hostNetwork {
+// modifyHostOptionsForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
+func modifyHostOptionsForSandbox(nsOpts *runtimeapi.NamespaceOption, network *knetwork.PluginManager, hc *dockercontainer.HostConfig) {
+	if nsOpts.GetIpc() == runtimeapi.NamespaceMode_NODE {
+		hc.IpcMode = namespaceModeHost
+	}
+	if nsOpts.GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		hc.NetworkMode = namespaceModeHost
 		return
 	}
@@ -175,14 +168,14 @@ func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.Plugi
 	}
 }
 
-// modifyHostNetworkOptionForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForContainer(hostNetwork bool, podSandboxID string, hc *dockercontainer.HostConfig) {
+// modifyHostOptionsForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
+func modifyHostOptionsForContainer(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hc *dockercontainer.HostConfig) {
 	sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
 	hc.UTSMode = ""
 
-	if hostNetwork {
+	if nsOpts.GetNetwork() == runtimeapi.NamespaceMode_NODE {
 		hc.UTSMode = namespaceModeHost
 	}
 }
@@ -191,14 +184,16 @@ func modifyHostNetworkOptionForContainer(hostNetwork bool, podSandboxID string, 
 //     1. Docker engine prior to API Version 1.24 doesn't support attaching to another container's
 //        PID namespace, and it didn't stabilize until 1.26. This check can be removed when Kubernetes'
 //        minimum Docker version is at least 1.13.1 (API version 1.26).
-//     2. The administrator has overridden the default behavior by means of a kubelet flag. This is an
-//        "escape hatch" to return to previous behavior of isolated namespaces and should be removed once
-//        no longer needed.
-func modifyPIDNamespaceOverrides(disableSharedPID bool, version *semver.Version, hc *dockercontainer.HostConfig) {
-	if !strings.HasPrefix(string(hc.PidMode), "container:") {
-		return
-	}
-	if disableSharedPID || version.LT(semver.Version{Major: 1, Minor: 26}) {
-		hc.PidMode = ""
+//     2. The administrator can override the API behavior by using the deprecated --docker-disable-shared-pid=false
+//        flag. Until this flag is removed, this causes pods to use NamespaceMode_POD instead of
+//        NamespaceMode_CONTAINER regardless of pod configuration.
+// TODO(verb): remove entirely once these two conditions are satisfied
+func modifyContainerPIDNamespaceOverrides(disableSharedPID bool, version *semver.Version, hc *dockercontainer.HostConfig, podSandboxID string) {
+	if version.LT(semver.Version{Major: 1, Minor: 26}) {
+		if strings.HasPrefix(string(hc.PidMode), "container:") {
+			hc.PidMode = ""
+		}
+	} else if !disableSharedPID && hc.PidMode == "" {
+		hc.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	}
 }

@@ -115,6 +115,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
 	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
 	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
+	cmd.AddCommand(NewCmdCreateJob(f, out))
 	return cmd
 }
 
@@ -185,14 +186,13 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 	output := cmdutil.GetFlagString(cmd, "output")
-	mapper := r.Mapper().RESTMapper
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -212,13 +212,10 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 		shortOutput := output == "name"
 		if len(output) > 0 && !shortOutput {
-			return f.PrintResourceInfoForCommand(cmd, info, o.Out)
-		}
-		if !shortOutput {
-			f.PrintObjectSpecificMessage(info.Object, o.Out)
+			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
 
-		f.PrintSuccess(mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, dryRun, "created")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -340,7 +337,7 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	if err != nil {
 		return err
 	}
-	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 		return err
 	}
 	obj = info.Object
@@ -357,9 +354,9 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		f.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, info.Name, options.DryRun, "created")
+		cmdutil.PrintSuccess(useShortOutput, out, info.Object, options.DryRun, "created")
 		return nil
 	}
 
-	return f.PrintObject(cmd, false, mapper, obj, out)
+	return cmdutil.PrintObject(cmd, obj, out)
 }

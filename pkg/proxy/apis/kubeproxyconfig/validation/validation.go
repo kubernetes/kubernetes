@@ -73,6 +73,8 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("PortRange"), config.PortRange, "must be a valid port range (e.g. 300-2000)"))
 	}
 
+	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
+
 	return allErrs
 }
 
@@ -236,5 +238,18 @@ func validateIPVSSchedulerMethod(scheduler kubeproxyconfig.IPVSSchedulerMethod, 
 		errMsg := fmt.Sprintf("must be in %v, blank means the default algorithm method (currently rr)", supportedMethod)
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("Scheduler"), string(scheduler), errMsg))
 	}
+	return allErrs
+}
+
+func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i := range nodePortAddresses {
+		if _, _, err := net.ParseCIDR(nodePortAddresses[i]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, nodePortAddresses, "must be a valid IP block"))
+			break
+		}
+	}
+
 	return allErrs
 }

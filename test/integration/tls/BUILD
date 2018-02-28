@@ -7,7 +7,6 @@ go_test(
         "ciphers_test.go",
         "main_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/tls",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
@@ -15,6 +14,7 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],

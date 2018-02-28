@@ -523,6 +523,9 @@ function compute-kube-apiserver-params {
 	if [[ -n "${ETCD_QUORUM_READ:-}" ]]; then
 		params+=" --etcd-quorum-read=${ETCD_QUORUM_READ}"
 	fi
+  if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
+    params+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"
+  fi
 	if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]]; then
 		params+=" --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
 	fi
@@ -692,7 +695,7 @@ fi
 
 # Setup docker flags and load images of the master components.
 assemble-docker-flags
-DOCKER_REGISTRY="gcr.io/google_containers"
+DOCKER_REGISTRY="k8s.gcr.io"
 load-docker-images
 
 readonly audit_policy_file="/etc/audit_policy.config"

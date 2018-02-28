@@ -23,8 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 var emptyVolumeName = v1.UniqueVolumeName("")
@@ -56,7 +56,7 @@ func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
 	}
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	devicePath := "fake/device/path"
-	generatedVolumeName, _ := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	generatedVolumeName, _ := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 
 	// Act
 	err := asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
@@ -143,7 +143,7 @@ func Test_MarkVolumeAsAttached_Positive_ExistingVolume(t *testing.T) {
 		},
 	}
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	generatedVolumeName, _ := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	generatedVolumeName, _ := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 
 	err := asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
@@ -191,13 +191,13 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 		},
 	}
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	generatedVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 
 	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
@@ -222,6 +222,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 }
 
 // Populates data struct with a volume
@@ -254,14 +255,14 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	}
 
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-	generatedVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
 
 	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
@@ -292,9 +293,10 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 }
 
-// Calls AddPodToVolume() to add pod to empty data stuct
+// Calls AddPodToVolume() to add pod to empty data struct
 // Verifies call fails with "volume does not exist" error.
 func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	// Arrange
@@ -337,10 +339,10 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 			err)
 	}
 
-	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
+	volumeName, err := util.GetUniqueVolumeNameFromSpec(
 		plugin, volumeSpec)
 
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
 	if err != nil {
@@ -370,6 +372,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 		volumeName,
 		false, /* expectVolumeToExist */
 		asw)
+	verifyVolumeDoesntExistWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
 }
 
 // Calls MarkVolumeAsAttached() once to add volume
@@ -400,7 +403,8 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	}
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	devicePath := "fake/device/path"
-	generatedVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	deviceMountPath := "fake/device/mount/path"
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 
 	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
 	if err != nil {
@@ -408,7 +412,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	}
 
 	// Act
-	err = asw.MarkDeviceAsMounted(generatedVolumeName)
+	err = asw.MarkDeviceAsMounted(generatedVolumeName, devicePath, deviceMountPath)
 
 	// Assert
 	if err != nil {
@@ -544,5 +548,35 @@ func verifyPodDoesntExistInVolumeAsw(
 		t.Fatalf(
 			"Invalid devicePath. Expected: <\"\"> Actual: <%q> ",
 			devicePath)
+	}
+}
+
+func verifyVolumeExistsWithSpecNameInVolumeAsw(
+	t *testing.T,
+	expectedPodName volumetypes.UniquePodName,
+	expectedVolumeName string,
+	asw ActualStateOfWorld) {
+	podExistsInVolume :=
+		asw.VolumeExistsWithSpecName(expectedPodName, expectedVolumeName)
+
+	if !podExistsInVolume {
+		t.Fatalf(
+			"ASW VolumeExistsWithSpecName result invalid. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+}
+
+func verifyVolumeDoesntExistWithSpecNameInVolumeAsw(
+	t *testing.T,
+	podToCheck volumetypes.UniquePodName,
+	volumeToCheck string,
+	asw ActualStateOfWorld) {
+	podExistsInVolume :=
+		asw.VolumeExistsWithSpecName(podToCheck, volumeToCheck)
+
+	if podExistsInVolume {
+		t.Fatalf(
+			"ASW VolumeExistsWithSpecName result invalid. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
 	}
 }

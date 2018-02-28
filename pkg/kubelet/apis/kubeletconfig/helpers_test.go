@@ -29,7 +29,7 @@ func TestKubeletConfigurationPathFields(t *testing.T) {
 	// ensure the intersection of kubeletConfigurationPathFieldPaths and KubeletConfigurationNonPathFields is empty
 	if i := kubeletConfigurationPathFieldPaths.Intersection(kubeletConfigurationNonPathFieldPaths); len(i) > 0 {
 		t.Fatalf("expect the intersection of kubeletConfigurationPathFieldPaths and "+
-			"KubeletConfigurationNonPathFields to be emtpy, got:\n%s",
+			"KubeletConfigurationNonPathFields to be empty, got:\n%s",
 			strings.Join(i.List(), "\n"))
 	}
 
@@ -128,7 +128,7 @@ func TestAllPrimitiveFieldPaths(t *testing.T) {
 var (
 	// KubeletConfiguration fields that contain file paths. If you update this, also update KubeletConfigurationPathRefs!
 	kubeletConfigurationPathFieldPaths = sets.NewString(
-		"PodManifestPath",
+		"StaticPodPath",
 		"Authentication.X509.ClientCAFile",
 		"TLSCertFile",
 		"TLSPrivateKeyFile",
@@ -144,7 +144,6 @@ var (
 		"Authorization.Mode",
 		"Authorization.Webhook.CacheAuthorizedTTL.Duration",
 		"Authorization.Webhook.CacheUnauthorizedTTL.Duration",
-		"CAdvisorPort",
 		"CPUCFSQuota",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
@@ -153,12 +152,12 @@ var (
 		"CgroupsPerQOS",
 		"ClusterDNS[*]",
 		"ClusterDomain",
-		"ConfigTrialDuration.Duration",
+		"ContainerLogMaxFiles",
+		"ContainerLogMaxSize",
 		"ContentType",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",
 		"EnableDebuggingHandlers",
-		"EnableServer",
 		"EnforceNodeAllocatable[*]",
 		"EventBurst",
 		"EventRecordQPS",
@@ -188,8 +187,8 @@ var (
 		"KubeReserved[*]",
 		"KubeletCgroups",
 		"MakeIPTablesUtilChains",
-		"ManifestURL",
-		"ManifestURLHeader[*][*]",
+		"StaticPodURL",
+		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",
 		"MaxPods",
 		"NodeStatusUpdateFrequency.Duration",

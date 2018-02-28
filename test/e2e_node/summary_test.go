@@ -107,9 +107,21 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					"UserDefinedMetrics": BeEmpty(),
 				})
 			}
+			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
+			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
+				"Time": recent(maxStatsAge),
+				// Pods are limited by Node Allocatable
+				"AvailableBytes":  bounded(1*framework.Kb, memoryLimit),
+				"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
+				"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
+				"RSSBytes":        bounded(1*framework.Kb, 20*framework.Mb),
+				"PageFaults":      bounded(0, 1000000),
+				"MajorPageFaults": bounded(0, 10),
+			})
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
 				"runtime": sysContExpectations(),
+				"pods":    podsContExpectations,
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
@@ -276,6 +288,11 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"Inodes":     bounded(1E4, 1E8),
 							"InodesUsed": bounded(0, 1E8),
 						}),
+					}),
+					"Rlimit": ptrMatchAllFields(gstruct.Fields{
+						"Time":                  recent(maxStatsAge),
+						"MaxPID":                bounded(0, 1E8),
+						"NumOfRunningProcesses": bounded(0, 1E8),
 					}),
 				}),
 				// Ignore extra pods since the tests run in parallel.

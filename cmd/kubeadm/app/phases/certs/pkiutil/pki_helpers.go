@@ -20,11 +20,16 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 // NewCertificateAuthority creates new certificate and private key for the certificate authority
@@ -125,7 +130,7 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	return nil
 }
 
-// CertOrKeyExist retuns a boolean whether the cert or the key exists
+// CertOrKeyExist returns a boolean whether the cert or the key exists
 func CertOrKeyExist(pkiPath, name string) bool {
 	certificatePath, privateKeyPath := pathsForCertAndKey(pkiPath, name)
 
@@ -245,4 +250,107 @@ func pathForKey(pkiPath, name string) string {
 
 func pathForPublicKey(pkiPath, name string) string {
 	return filepath.Join(pkiPath, fmt.Sprintf("%s.pub", name))
+}
+
+// GetAPIServerAltNames builds an AltNames object for to be used when generating apiserver certificate
+func GetAPIServerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error) {
+	// advertise address
+	advertiseAddress := net.ParseIP(cfg.API.AdvertiseAddress)
+	if advertiseAddress == nil {
+		return nil, fmt.Errorf("error parsing API AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.API.AdvertiseAddress)
+	}
+
+	// internal IP address for the API server
+	_, svcSubnet, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
+	}
+
+	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get first IP address from the given CIDR (%s): %v", svcSubnet.String(), err)
+	}
+
+	// create AltNames with defaults DNSNames/IPs
+	altNames := &certutil.AltNames{
+		DNSNames: []string{
+			cfg.NodeName,
+			"kubernetes",
+			"kubernetes.default",
+			"kubernetes.default.svc",
+			fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
+		},
+		IPs: []net.IP{
+			internalAPIServerVirtualIP,
+			advertiseAddress,
+		},
+	}
+
+	// add api server dns advertise address
+	if len(cfg.API.ControlPlaneEndpoint) > 0 {
+		altNames.DNSNames = append(altNames.DNSNames, cfg.API.ControlPlaneEndpoint)
+	}
+
+	appendSANsToAltNames(altNames, cfg.APIServerCertSANs, kubeadmconstants.APIServerCertName)
+
+	return altNames, nil
+}
+
+// GetEtcdAltNames builds an AltNames object for generating the etcd server certificate.
+// `localhost` is included in the SAN since this is the interface the etcd static pod listens on.
+// Hostname and `API.AdvertiseAddress` are excluded since etcd does not listen on this interface by default.
+// The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.ServerCertSANs`.
+func GetEtcdAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error) {
+	// create AltNames with defaults DNSNames/IPs
+	altNames := &certutil.AltNames{
+		DNSNames: []string{"localhost"},
+		IPs:      []net.IP{net.IPv4(127, 0, 0, 1)},
+	}
+
+	appendSANsToAltNames(altNames, cfg.Etcd.ServerCertSANs, kubeadmconstants.EtcdServerCertName)
+
+	return altNames, nil
+}
+
+// GetEtcdPeerAltNames builds an AltNames object for generating the etcd peer certificate.
+// `localhost` is excluded from the SAN since etcd will not refer to itself as a peer.
+// Hostname and `API.AdvertiseAddress` are included if the user chooses to promote the single node etcd cluster into a multi-node one.
+// The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.PeerCertSANs`.
+func GetEtcdPeerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, error) {
+	// advertise address
+	advertiseAddress := net.ParseIP(cfg.API.AdvertiseAddress)
+	if advertiseAddress == nil {
+		return nil, fmt.Errorf("error parsing API AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.API.AdvertiseAddress)
+	}
+
+	// create AltNames with defaults DNSNames/IPs
+	altNames := &certutil.AltNames{
+		DNSNames: []string{cfg.NodeName},
+		IPs:      []net.IP{advertiseAddress},
+	}
+
+	appendSANsToAltNames(altNames, cfg.Etcd.PeerCertSANs, kubeadmconstants.EtcdPeerCertName)
+
+	return altNames, nil
+}
+
+// appendSANsToAltNames parses SANs from as list of strings and adds them to altNames for use on a specific cert
+// altNames is passed in with a pointer, and the struct is modified
+// valid IP address strings are parsed and added to altNames.IPs as net.IP's
+// RFC-1123 compliant DNS strings are added to altNames.DNSNames as strings
+// certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
+func appendSANsToAltNames(altNames *certutil.AltNames, SANs []string, certName string) {
+	for _, altname := range SANs {
+		if ip := net.ParseIP(altname); ip != nil {
+			altNames.IPs = append(altNames.IPs, ip)
+		} else if len(validation.IsDNS1123Subdomain(altname)) == 0 {
+			altNames.DNSNames = append(altNames.DNSNames, altname)
+		} else {
+			fmt.Printf(
+				"[certificates] WARNING: '%s' was not added to the '%s' SAN, because it is not a valid IP or RFC-1123 compliant DNS entry\n",
+				altname,
+				certName,
+			)
+		}
+	}
 }

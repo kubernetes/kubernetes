@@ -65,14 +65,9 @@ func (l *linuxStandardInit) Init() error {
 	}
 
 	label.Init()
-
-	// prepareRootfs() can be executed only for a new mount namespace.
-	if l.config.Config.Namespaces.Contains(configs.NEWNS) {
-		if err := prepareRootfs(l.pipe, l.config); err != nil {
-			return err
-		}
+	if err := prepareRootfs(l.pipe, l.config); err != nil {
+		return err
 	}
-
 	// Set up the console. This has to be done *before* we finalize the rootfs,
 	// but *after* we've given the user the chance to set up all of the mounts
 	// they wanted.

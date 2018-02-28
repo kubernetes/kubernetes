@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: zeppelin
-          image: gcr.io/google_containers/zeppelin:v0.5.6_v1
+          image: k8s.gcr.io/zeppelin:v0.5.6_v1
           ports:
             - containerPort: 8080
           resources:

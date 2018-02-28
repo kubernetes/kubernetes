@@ -115,7 +115,8 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 type AttachOptions struct {
 	StreamOptions
 
-	CommandName string
+	CommandName       string
+	SuggestedCmdUsage string
 
 	Pod *api.Pod
 
@@ -167,6 +168,15 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 
 	p.PodName = attachablePod.Name
 	p.Namespace = namespace
+
+	fullCmdName := ""
+	cmdParent := cmd.Parent()
+	if cmdParent != nil {
+		fullCmdName = cmdParent.CommandPath()
+	}
+	if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, p.PodName, p.Namespace)
+	}
 
 	config, err := f.ClientConfig()
 	if err != nil {
@@ -309,6 +319,11 @@ func (p *AttachOptions) containerToAttachTo(pod *api.Pod) (*api.Container, error
 			}
 		}
 		return nil, fmt.Errorf("container not found (%s)", p.ContainerName)
+	}
+
+	if len(p.SuggestedCmdUsage) > 0 {
+		fmt.Fprintf(p.Err, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
+		fmt.Fprintf(p.Err, "%s\n", p.SuggestedCmdUsage)
 	}
 
 	glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)

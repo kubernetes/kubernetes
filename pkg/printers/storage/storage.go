@@ -17,7 +17,7 @@ limitations under the License.
 package storage
 
 import (
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/printers"
@@ -27,6 +27,6 @@ type TableConvertor struct {
 	printers.TablePrinter
 }
 
-func (c TableConvertor) ConvertToTable(ctx genericapirequest.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+func (c TableConvertor) ConvertToTable(ctx genericapirequest.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return c.TablePrinter.PrintTable(obj, printers.PrintOptions{Wide: true})
 }

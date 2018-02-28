@@ -96,7 +96,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-aggregator,busybox
-          kube-proxy,gcr.io/google-containers/debian-iptables-amd64:${debian_iptables_version}
+          kube-proxy,k8s.gcr.io/debian-iptables-amd64:${debian_iptables_version}
         );;
     "arm")
         local targets=(
@@ -105,7 +105,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,arm32v7/busybox
           kube-scheduler,arm32v7/busybox
           kube-aggregator,arm32v7/busybox
-          kube-proxy,gcr.io/google-containers/debian-iptables-arm:${debian_iptables_version}
+          kube-proxy,k8s.gcr.io/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
         local targets=(
@@ -114,7 +114,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,arm64v8/busybox
           kube-scheduler,arm64v8/busybox
           kube-aggregator,arm64v8/busybox
-          kube-proxy,gcr.io/google-containers/debian-iptables-arm64:${debian_iptables_version}
+          kube-proxy,k8s.gcr.io/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
         local targets=(
@@ -123,7 +123,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
           kube-aggregator,ppc64le/busybox
-          kube-proxy,gcr.io/google-containers/debian-iptables-ppc64le:${debian_iptables_version}
+          kube-proxy,k8s.gcr.io/debian-iptables-ppc64le:${debian_iptables_version}
         );;
     "s390x")
         local targets=(
@@ -132,7 +132,7 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
           kube-aggregator,s390x/busybox
-          kube-proxy,gcr.io/google-containers/debian-iptables-s390x:${debian_iptables_version}
+          kube-proxy,k8s.gcr.io/debian-iptables-s390x:${debian_iptables_version}
         );;
   esac
 
@@ -501,9 +501,11 @@ function kube::build::ensure_data_container() {
   # If the data container exists AND exited successfully, we can use it.
   # Otherwise nuke it and start over.
   local ret=0
-  local code=$(docker inspect \
+  local code=0
+
+  code=$(docker inspect \
       -f '{{.State.ExitCode}}' \
-      "${KUBE_DATA_CONTAINER_NAME}" 2>/dev/null || ret=$?)
+      "${KUBE_DATA_CONTAINER_NAME}" 2>/dev/null) || ret=$?
   if [[ "${ret}" == 0 && "${code}" != 0 ]]; then
     kube::build::destroy_container "${KUBE_DATA_CONTAINER_NAME}"
     ret=1

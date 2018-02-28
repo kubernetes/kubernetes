@@ -147,7 +147,7 @@ type GCEImage struct {
 	Project    string `json:"project"`
 	Metadata   string `json:"metadata"`
 	ImageRegex string `json:"image_regex, omitempty"`
-	// Defaults to using only the latest image. Acceptible values are [0, # of images that match the regex).
+	// Defaults to using only the latest image. Acceptable values are [0, # of images that match the regex).
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images, omitempty"`
 
@@ -178,6 +178,8 @@ func main() {
 	switch *testSuite {
 	case "conformance":
 		suite = remote.InitConformanceRemote()
+	case "cadvisor":
+		suite = remote.InitCAdvisorE2ERemote()
 	// TODO: Add subcommand for node soaking, node conformance, cri validation.
 	case "default":
 		// Use node e2e suite by default if no subcommand is specified.

@@ -15,7 +15,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
-        "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -32,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = ["repair_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",

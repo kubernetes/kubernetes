@@ -395,7 +395,7 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 
 // systemd represents slice hierarchy using `-`, so we need to follow suit when
 // generating the path of slice. Essentially, test-a-b.slice becomes
-// test.slice/test-a.slice/test-a-b.slice.
+// /test.slice/test-a.slice/test-a-b.slice.
 func ExpandSlice(slice string) (string, error) {
 	suffix := ".slice"
 	// Name has to end with ".slice", but can't be just ".slice".
@@ -421,10 +421,9 @@ func ExpandSlice(slice string) (string, error) {
 		}
 
 		// Append the component to the path and to the prefix.
-		path += prefix + component + suffix + "/"
+		path += "/" + prefix + component + suffix
 		prefix += component + "-"
 	}
-
 	return path, nil
 }
 

@@ -17,7 +17,6 @@ go_test(
         "purge_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/third_party/forked/etcd221/pkg/fileutil",
 )
 
 go_library(

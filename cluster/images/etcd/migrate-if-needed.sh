@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.17')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.17', '3.1.11', '3.2.14')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -28,7 +28,8 @@
 # The update workflow support the following upgrade steps:
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
 # - 2.3.7/etcd2 -> 3.0.17/etcd2
-# - 3.0.17/etcd2 -> 3.0.17/etcd3
+# - 3.0.17/etcd3 -> 3.1.11/etcd3
+# - 3.1.11/etcd3 -> 3.2.14/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -38,6 +39,72 @@
 
 set -o errexit
 set -o nounset
+
+source $(dirname "$0")/start-stop-etcd.sh
+
+# Rollback to previous minor version of etcd 3.x, if needed.
+#
+# Warning: For HA etcd clusters (any cluster with more than one member), all members must be stopped before rolling back, zero
+# downtime rollbacks are not supported.
+rollback_etcd3_minor_version() {
+  if [ ${TARGET_MINOR_VERSION} != $((${CURRENT_MINOR_VERSION}-1)) ]; then
+    echo "Rollback from ${CURRENT_VERSION} to ${TARGET_VERSION} not supported, only rollbacks to the previous minor version are supported."
+    exit 1
+  fi
+  echo "Performing etcd ${CURRENT_VERSION} -> ${TARGET_VERSION} rollback"
+  ROLLBACK_BACKUP_DIR="${DATA_DIRECTORY}.bak"
+  rm -rf "${ROLLBACK_BACKUP_DIR}"
+  SNAPSHOT_FILE="${DATA_DIRECTORY}.snapshot.db"
+  rm -rf "${SNAPSHOT_FILE}"
+  ETCD_CMD="/usr/local/bin/etcd-${CURRENT_VERSION}"
+  ETCDCTL_CMD="/usr/local/bin/etcdctl-${CURRENT_VERSION}"
+
+  # Start CURRENT_VERSION of etcd.
+  START_VERSION="${CURRENT_VERSION}"
+  START_STORAGE="${CURRENT_STORAGE}"
+  echo "Starting etcd version ${START_VERSION} to capture rollback snapshot."
+  if ! start_etcd; then
+    echo "Unable to automatically downgrade etcd: starting etcd version ${START_VERSION} to capture rollback snapshot failed."
+    echo "See https://coreos.com/etcd/docs/3.2.13/op-guide/recovery.html for manual downgrade options."
+    exit 1
+  else
+    ETCDCTL_API=3 ${ETCDCTL_CMD} snapshot --endpoints "http://127.0.0.1:${ETCD_PORT}" save "${SNAPSHOT_FILE}"
+  fi
+  stop_etcd
+
+  # Backup the data before rolling back.
+  mv "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
+  ETCDCTL_CMD="/usr/local/bin/etcdctl-${TARGET_VERSION}"
+  NAME="etcd-$(hostname)"
+  ETCDCTL_API=3 ${ETCDCTL_CMD} snapshot restore "${SNAPSHOT_FILE}" \
+      --data-dir "${DATA_DIRECTORY}"  --name "${NAME}" --initial-cluster "${INITIAL_CLUSTER}"
+
+  CURRENT_VERSION="${TARGET_VERSION}"
+  echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
+}
+
+# Rollback from "3.0.x" version in 'etcd3' mode to "2.2.1" version in 'etcd2' mode, if needed.
+rollback_to_etcd2() {
+  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.2.1" ]; then
+    echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.2.1"
+    return 0
+  fi
+  echo "Backup and remove all existing v2 data"
+  ROLLBACK_BACKUP_DIR="${DATA_DIRECTORY}.bak"
+  rm -rf "${ROLLBACK_BACKUP_DIR}"
+  mkdir -p "${ROLLBACK_BACKUP_DIR}"
+  cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
+  echo "Performing etcd3 -> etcd2 rollback"
+  ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
+  if [ "$?" -ne "0" ]; then
+    echo "Rollback to etcd2 failed"
+    exit 1
+  fi
+  CURRENT_STORAGE="etcd2"
+  CURRENT_VERSION="2.2.1"
+  echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
+}
+
 
 if [ -z "${TARGET_STORAGE:-}" ]; then
   echo "TARGET_STORAGE variable unset - unexpected failure"
@@ -50,6 +117,10 @@ fi
 if [ -z "${DATA_DIRECTORY:-}" ]; then
   echo "DATA_DIRECTORY variable unset - unexpected failure"
   exit 1
+fi
+if [ -z "${INITIAL_CLUSTER:-}" ]; then
+  echo "Warn: INITIAL_CLUSTER variable unset - defaulting to etcd-$(hostname)=http://localhost:2380"
+  INITIAL_CLUSTER="etcd-$(hostname)=http://localhost:2380"
 fi
 
 echo "$(date +'%Y-%m-%d %H:%M:%S') Detecting if migration is needed"
@@ -68,7 +139,7 @@ fi
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
 # We cannot use array since sh doesn't support it.
-SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.17"
+SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.17 3.1.11 3.2.14"
 SUPPORTED_VERSIONS=$(echo "${SUPPORTED_VERSIONS_STRING}" | tr " " "\n")
 
 VERSION_FILE="version.txt"
@@ -96,58 +167,6 @@ if [ -z "$(ls -A ${DATA_DIRECTORY})" ]; then
   exit 0
 fi
 
-# Starts 'etcd' version ${START_VERSION} and writes to it:
-# 'etcd_version' -> "${START_VERSION}"
-# Successful write confirms that etcd is up and running.
-# Sets ETCD_PID at the end.
-# Returns 0 if etcd was successfully started, non-0 otherwise.
-start_etcd() {
-  # Use random ports, so that apiserver cannot connect to etcd.
-  ETCD_PORT=18629
-  ETCD_PEER_PORT=2380
-  # Avoid collisions between etcd and event-etcd.
-  case "${DATA_DIRECTORY}" in
-    *event*)
-      ETCD_PORT=18631
-      ETCD_PEER_PORT=2381
-      ;;
-  esac
-  local ETCD_CMD="${ETCD:-/usr/local/bin/etcd-${START_VERSION}}"
-  local ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
-  local API_VERSION="$(echo ${START_STORAGE} | cut -c5-5)"
-  if [ "${API_VERSION}" = "2" ]; then
-    ETCDCTL_CMD="${ETCDCTL_CMD} --debug --endpoint=http://127.0.0.1:${ETCD_PORT} set"
-  else
-    ETCDCTL_CMD="${ETCDCTL_CMD} --endpoints=http://127.0.0.1:${ETCD_PORT} put"
-  fi
-  ${ETCD_CMD} \
-    --name="etcd-$(hostname)" \
-    --debug \
-    --data-dir=${DATA_DIRECTORY} \
-    --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
-    --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
-    --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
-    --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} &
-  ETCD_PID=$!
-  # Wait until we can write to etcd.
-  for i in $(seq 240); do
-    sleep 0.5
-    ETCDCTL_API="${API_VERSION}" ${ETCDCTL_CMD} 'etcd_version' ${START_VERSION}
-    if [ "$?" -eq "0" ]; then
-      echo "Etcd on port ${ETCD_PORT} is up."
-      return 0
-    fi
-  done
-  echo "Timeout while waiting for etcd on port ${ETCD_PORT}"
-  return 1
-}
-
-# Stops etcd with ${ETCD_PID} pid.
-stop_etcd() {
-  kill "${ETCD_PID-}" >/dev/null 2>&1 || :
-  wait "${ETCD_PID-}" >/dev/null 2>&1 || :
-}
-
 ATTACHLEASE="${ATTACHLEASE:-/usr/local/bin/attachlease}"
 ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 
@@ -162,6 +181,24 @@ if [ "${CURRENT_VERSION}" = "2.2.1" -a "${CURRENT_VERSION}" != "${TARGET_VERSION
     --backup-dir=${BACKUP_DIR}
   echo "Backup done in ${BACKUP_DIR}"
 fi
+
+CURRENT_MINOR_VERSION="$(echo ${CURRENT_VERSION} | awk -F'.' '{print $2}')"
+TARGET_MINOR_VERSION="$(echo ${TARGET_VERSION} | awk -F'.' '{print $2}')"
+
+# "rollback-if-needed"
+case "${CURRENT_STORAGE}-${TARGET_STORAGE}" in
+  "etcd3-etcd3")
+    [ ${TARGET_MINOR_VERSION} -lt ${CURRENT_MINOR_VERSION} ] && rollback_etcd3_minor_version
+    break
+    ;;
+  "etcd3-etcd2")
+    rollback_to_etcd2
+    break
+    ;;
+  *)
+    break
+    ;;
+esac
 
 # Do the roll-forward migration if needed.
 # The migration goes as following:
@@ -227,7 +264,7 @@ for step in ${SUPPORTED_VERSIONS}; do
       echo "Starting etcd ${step} in v3 mode failed"
       exit 1
     fi
-    ${ETCDCTL_CMD} rm --recursive "${ETCD_DATA_PREFIX}"
+    ${ETCDCTL_CMD} --endpoints "http://127.0.0.1:${ETCD_PORT}" rm --recursive "${ETCD_DATA_PREFIX}"
     # Kill etcd and wait until this is down.
     stop_etcd
     echo "Successfully remove v2 data"
@@ -238,29 +275,5 @@ for step in ${SUPPORTED_VERSIONS}; do
     break
   fi
 done
-
-# Do the rollback of needed.
-# NOTE: Rollback is only supported from "3.0.x" version in 'etcd3' mode to
-# "2.2.1" version in 'etcd2' mode.
-if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
-  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.2.1" ]; then
-    echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.2.1"
-    return 0
-  fi
-  echo "Backup and remove all existing v2 data"
-  ROLLBACK_BACKUP_DIR="${DATA_DIRECTORY}.bak"
-  rm -rf "${ROLLBACK_BACKUP_DIR}"
-  mkdir -p "${ROLLBACK_BACKUP_DIR}"
-  cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
-  echo "Performing etcd3 -> etcd2 rollback"
-  ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
-  if [ "$?" -ne "0" ]; then
-    echo "Rollback to etcd2 failed"
-    exit 1
-  fi
-  CURRENT_STORAGE="etcd2"
-  CURRENT_VERSION="2.2.1"
-  echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
-fi
 
 echo "$(date +'%Y-%m-%d %H:%M:%S') Migration finished"

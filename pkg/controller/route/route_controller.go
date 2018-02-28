@@ -17,6 +17,7 @@ limitations under the License.
 package route
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -121,7 +122,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 }
 
 func (rc *RouteController) reconcileNodeRoutes() error {
-	routeList, err := rc.routes.ListRoutes(rc.clusterName)
+	routeList, err := rc.routes.ListRoutes(context.TODO(), rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
@@ -170,7 +171,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
 					glog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
-					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
+					err := rc.routes.CreateRoute(context.TODO(), rc.clusterName, nameHint, route)
 					<-rateLimiter
 
 					rc.updateNetworkingCondition(nodeName, err == nil)
@@ -210,7 +211,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 				// Delete the route.
 				go func(route *cloudprovider.Route, startTime time.Time) {
 					glog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(rc.clusterName, route); err != nil {
+					if err := rc.routes.DeleteRoute(context.TODO(), rc.clusterName, route); err != nil {
 						glog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime), err)
 					} else {
 						glog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Now().Sub(startTime))

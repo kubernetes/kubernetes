@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
@@ -69,15 +70,18 @@ var requestedResourcePrefixes = []string{
 	api.ResourceHugePagesPrefix,
 }
 
-const (
-	requestsPrefix = "requests."
-	limitsPrefix   = "limits."
-)
-
 // maskResourceWithPrefix mask resource with certain prefix
 // e.g. hugepages-XXX -> requests.hugepages-XXX
 func maskResourceWithPrefix(resource api.ResourceName, prefix string) api.ResourceName {
 	return api.ResourceName(fmt.Sprintf("%s%s", prefix, string(resource)))
+}
+
+// isExtendedResourceNameForQuota returns true if the extended resource name
+// has the quota related resource prefix.
+func isExtendedResourceNameForQuota(name api.ResourceName) bool {
+	// As overcommit is not supported by extended resources for now,
+	// only quota objects in format of "requests.resourceName" is allowed.
+	return !helper.IsDefaultNamespaceResource(name) && strings.HasPrefix(string(name), api.DefaultResourceRequestsPrefix)
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
@@ -164,7 +168,12 @@ func (p *podEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 func (p *podEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
 	result := quota.Intersection(input, podResources)
 	for _, resource := range input {
+		// for resources with certain prefix, e.g. hugepages
 		if quota.ContainsPrefix(podResourcePrefixes, resource) {
+			result = append(result, resource)
+		}
+		// for extended resources
+		if isExtendedResourceNameForQuota(resource) {
 			result = append(result, resource)
 		}
 	}
@@ -225,14 +234,15 @@ func podComputeUsageHelper(requests api.ResourceList, limits api.ResourceList) a
 		result[api.ResourceLimitsEphemeralStorage] = limit
 	}
 	for resource, request := range requests {
+		// for resources with certain prefix, e.g. hugepages
 		if quota.ContainsPrefix(requestedResourcePrefixes, resource) {
 			result[resource] = request
-			result[maskResourceWithPrefix(resource, requestsPrefix)] = request
+			result[maskResourceWithPrefix(resource, api.DefaultResourceRequestsPrefix)] = request
 		}
-	}
-	for resource, limit := range limits {
-		if quota.ContainsPrefix(requestedResourcePrefixes, resource) {
-			result[maskResourceWithPrefix(resource, limitsPrefix)] = limit
+		// for extended resources
+		if helper.IsExtendedResourceName(resource) {
+			// only quota objects in format of "requests.resourceName" is allowed for extended resource.
+			result[maskResourceWithPrefix(resource, api.DefaultResourceRequestsPrefix)] = request
 		}
 	}
 

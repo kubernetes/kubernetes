@@ -12,7 +12,6 @@ go_test(
         "main_test.go",
         "secrets_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/secrets",
     tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",

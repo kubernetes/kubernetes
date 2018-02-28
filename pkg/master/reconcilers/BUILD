@@ -31,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = ["lease_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/master/reconcilers",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

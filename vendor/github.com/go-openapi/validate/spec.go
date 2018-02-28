@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/go-openapi/analysis"
@@ -193,6 +194,13 @@ func (s *SpecValidator) validateDuplicatePropertyNames() *Result {
 	return res
 }
 
+func (s *SpecValidator) resolveRef(ref *spec.Ref) (*spec.Schema, error) {
+	if s.spec.SpecFilePath() != "" {
+		return spec.ResolveRefWithBase(s.spec.Spec(), ref, &spec.ExpandOptions{RelativeBase: s.spec.SpecFilePath()})
+	}
+	return spec.ResolveRef(s.spec.Spec(), ref)
+}
+
 func (s *SpecValidator) validateSchemaPropertyNames(nm string, sch spec.Schema, knowns map[string]struct{}) []dupProp {
 	var dups []dupProp
 
@@ -200,7 +208,7 @@ func (s *SpecValidator) validateSchemaPropertyNames(nm string, sch spec.Schema, 
 	schc := &sch
 	for schc.Ref.String() != "" {
 		// gather property names
-		reso, err := spec.ResolveRef(s.spec.Spec(), &schc.Ref)
+		reso, err := s.resolveRef(&schc.Ref)
 		if err != nil {
 			panic(err)
 		}
@@ -236,7 +244,7 @@ func (s *SpecValidator) validateCircularAncestry(nm string, sch spec.Schema, kno
 	schn := nm
 	schc := &sch
 	for schc.Ref.String() != "" {
-		reso, err := spec.ResolveRef(s.spec.Spec(), &schc.Ref)
+		reso, err := s.resolveRef(&schc.Ref)
 		if err != nil {
 			panic(err)
 		}
@@ -335,15 +343,15 @@ func (s *SpecValidator) validateSchemaItems(schema spec.Schema, prefix, opID str
 		return errors.New(422, "%s for %q is a collection without an element type", prefix, opID)
 	}
 
-	schemas := schema.Items.Schemas
 	if schema.Items.Schema != nil {
-		schemas = []spec.Schema{*schema.Items.Schema}
-	}
-	for _, sch := range schemas {
-		if err := s.validateSchemaItems(sch, prefix, opID); err != nil {
-			return err
+		schema = *schema.Items.Schema
+		if _, err := regexp.Compile(schema.Pattern); err != nil {
+			return errors.New(422, "%s for %q has invalid items pattern: %q", prefix, opID, schema.Pattern)
 		}
+
+		return s.validateSchemaItems(schema, prefix, opID)
 	}
+
 	return nil
 }
 
@@ -524,8 +532,15 @@ func (s *SpecValidator) validateParameters() *Result {
 			}
 			var fromPath []string
 			for _, i := range params {
-				fromPath = append(fromPath, knowns[i])
-				knowns[i] = "!"
+				knownsi := knowns[i]
+				iparams := extractPathParams(knownsi)
+				if len(iparams) > 0 {
+					fromPath = append(fromPath, iparams...)
+					for _, iparam := range iparams {
+						knownsi = strings.Replace(knownsi, iparam, "!", 1)
+					}
+					knowns[i] = knownsi
+				}
 			}
 			knownPath := strings.Join(knowns, "/")
 			if orig, ok := knownPaths[knownPath]; ok {
@@ -544,7 +559,9 @@ func (s *SpecValidator) validateParameters() *Result {
 				for pr.Ref.String() != "" {
 					obj, _, err := pr.Ref.GetPointer().Get(sw)
 					if err != nil {
-						log.Println(err)
+						if Debug {
+							log.Println(err)
+						}
 						res.AddErrors(err)
 						break PARAMETERS
 					}
@@ -575,6 +592,10 @@ func (s *SpecValidator) validateParameters() *Result {
 					pr = obj.(spec.Parameter)
 				}
 
+				if _, err := regexp.Compile(pr.Pattern); err != nil {
+					res.AddErrors(errors.New(422, "operation %q has invalid pattern in param %q: %q", op.ID, pr.Name, pr.Pattern))
+				}
+
 				if pr.In == "body" {
 					if firstBodyParam != "" {
 						res.AddErrors(errors.New(422, "operation %q has more than 1 body param (accepted: %q, dropped: %q)", op.ID, firstBodyParam, pr.Name))
@@ -595,18 +616,35 @@ func (s *SpecValidator) validateParameters() *Result {
 func parsePath(path string) (segments []string, params []int) {
 	for i, p := range strings.Split(path, "/") {
 		segments = append(segments, p)
-		if len(p) > 0 && p[0] == '{' && p[len(p)-1] == '}' {
+		if d0 := strings.Index(p, "{"); d0 >= 0 && d0 < strings.Index(p, "}") {
 			params = append(params, i)
 		}
 	}
 	return
 }
 
+func extractPathParams(segment string) (params []string) {
+	for {
+		d0 := strings.IndexByte(segment, '{')
+		if d0 < 0 {
+			break
+		}
+		d1 := strings.IndexByte(segment[d0:], '}')
+		if d1 > 0 {
+			params = append(params, segment[d0:d0+d1+1])
+		} else {
+			break
+		}
+		segment = segment[d1:]
+	}
+	return params
+}
+
 func (s *SpecValidator) validateReferencesValid() *Result {
 	// each reference must point to a valid object
 	res := new(Result)
 	for _, r := range s.analyzer.AllRefs() {
-		if !r.IsValidURI() {
+		if !r.IsValidURI(s.spec.SpecFilePath()) {
 			res.AddErrors(errors.New(404, "invalid ref %q", r.String()))
 		}
 	}
@@ -698,7 +736,9 @@ func (s *SpecValidator) validateDefaultValueValidAgainstSchema() *Result {
 				}
 				// check simple paramters first
 				if param.Default != nil && param.Schema == nil {
-					//fmt.Println(param.Name, "in", param.In, "has a default without a schema")
+					if Debug {
+						log.Println(param.Name, "in", param.In, "has a default without a schema")
+					}
 					// check param valid
 					res.Merge(NewParamValidator(&param, s.KnownFormats).Validate(param.Default))
 				}
@@ -721,9 +761,15 @@ func (s *SpecValidator) validateDefaultValueValidAgainstSchema() *Result {
 					if h.Items != nil {
 						res.Merge(s.validateDefaultValueItemsAgainstSchema(nm, "header", &h, h.Items))
 					}
+					if _, err := regexp.Compile(h.Pattern); err != nil {
+						res.AddErrors(errors.New(422, "operation %q has invalid pattern in default header %q: %q", op.ID, nm, h.Pattern))
+					}
+				}
+				if dr.Schema != nil {
+					res.Merge(s.validateDefaultValueSchemaAgainstSchema("default", "response", dr.Schema))
 				}
 			}
-			for _, r := range op.Responses.StatusCodeResponses {
+			for code, r := range op.Responses.StatusCodeResponses {
 				for nm, h := range r.Headers {
 					if h.Default != nil {
 						res.Merge(NewHeaderValidator(nm, &h, s.KnownFormats).Validate(h.Default))
@@ -731,6 +777,12 @@ func (s *SpecValidator) validateDefaultValueValidAgainstSchema() *Result {
 					if h.Items != nil {
 						res.Merge(s.validateDefaultValueItemsAgainstSchema(nm, "header", &h, h.Items))
 					}
+					if _, err := regexp.Compile(h.Pattern); err != nil {
+						res.AddErrors(errors.New(422, "operation %q has invalid pattern in %v's header %q: %q", op.ID, code, nm, h.Pattern))
+					}
+				}
+				if r.Schema != nil {
+					res.Merge(s.validateDefaultValueSchemaAgainstSchema(strconv.Itoa(code), "response", r.Schema))
 				}
 			}
 
@@ -757,6 +809,9 @@ func (s *SpecValidator) validateDefaultValueSchemaAgainstSchema(path, in string,
 			for i, sch := range schema.Items.Schemas {
 				res.Merge(s.validateDefaultValueSchemaAgainstSchema(fmt.Sprintf("%s.items[%d]", path, i), in, &sch))
 			}
+		}
+		if _, err := regexp.Compile(schema.Pattern); err != nil {
+			res.AddErrors(errors.New(422, "%s in %s has invalid pattern: %q", path, in, schema.Pattern))
 		}
 		if schema.AdditionalItems != nil && schema.AdditionalItems.Schema != nil {
 			res.Merge(s.validateDefaultValueSchemaAgainstSchema(fmt.Sprintf("%s.additionalItems", path), in, schema.AdditionalItems.Schema))
@@ -786,6 +841,9 @@ func (s *SpecValidator) validateDefaultValueItemsAgainstSchema(path, in string, 
 		}
 		if items.Items != nil {
 			res.Merge(s.validateDefaultValueItemsAgainstSchema(path+"[0]", in, root, items.Items))
+		}
+		if _, err := regexp.Compile(items.Pattern); err != nil {
+			res.AddErrors(errors.New(422, "%s in %s has invalid pattern: %q", path, in, items.Pattern))
 		}
 	}
 	return res

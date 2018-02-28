@@ -53,7 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -96,7 +96,7 @@ func generateImageTags() []string {
 	// that kubelet report up to maxNamesPerImageInNodeStatus tags.
 	count := rand.IntnRange(maxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
 	for ; count > 0; count-- {
-		tagList = append(tagList, "gcr.io/google_containers:v"+strconv.Itoa(count))
+		tagList = append(tagList, "k8s.gcr.io:v"+strconv.Itoa(count))
 	}
 	return tagList
 }
@@ -249,6 +249,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -276,6 +279,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasNoDiskPressure",
 					Message:            fmt.Sprintf("kubelet has no disk pressure"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodePIDPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientPID",
+					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
@@ -335,7 +346,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	}
 
 	// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
-	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type, "NotReady should be last")
+	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
+		"NotReady should be last")
 	assert.Len(t, updatedNode.Status.Images, maxImagesInNodeStatus)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 }
@@ -388,6 +400,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
 				{
+					Type:               v1.NodePIDPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientPID",
+					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
 					Type:               v1.NodeReady,
 					Status:             v1.ConditionTrue,
 					Reason:             "KubeletReady",
@@ -424,6 +444,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -451,6 +474,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientDisk",
 					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodePIDPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientPID",
+					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
@@ -492,11 +523,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			// images will be sorted from max to min in node status.
 			Images: []v1.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
 					SizeBytes: 456,
 				},
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					Names:     []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
 					SizeBytes: 123,
 				},
 			},
@@ -620,6 +651,9 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
@@ -647,6 +681,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasNoDiskPressure",
 					Message:            fmt.Sprintf("kubelet has no disk pressure"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodePIDPressure,
+					Status:             v1.ConditionFalse,
+					Reason:             "KubeletHasSufficientPID",
+					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
@@ -680,11 +722,11 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			},
 			Images: []v1.ContainerImage{
 				{
-					Names:     []string{"gcr.io/google_containers:v3", "gcr.io/google_containers:v4"},
+					Names:     []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
 					SizeBytes: 456,
 				},
 				{
-					Names:     []string{"gcr.io/google_containers:v1", "gcr.io/google_containers:v2"},
+					Names:     []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
 					SizeBytes: 123,
 				},
 			},
@@ -895,7 +937,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 		if cmad {
 			node.Annotations = make(map[string]string)
-			node.Annotations[volumehelper.ControllerManagedAttachAnnotation] = "true"
+			node.Annotations[util.ControllerManagedAttachAnnotation] = "true"
 		}
 
 		return node
@@ -1047,7 +1089,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[volumehelper.ControllerManagedAttachAnnotation])
+			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[util.ControllerManagedAttachAnnotation])
 			assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
 		}
 	}
@@ -1089,6 +1131,9 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+	maxAge := 0 * time.Second
+	options := cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false, MaxAge: &maxAge}
+	mockCadvisor.On("ContainerInfoV2", "/", options).Return(map[string]cadvisorapiv2.ContainerInfo{}, nil)
 
 	expectedNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},

@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 // This init should be removed after switching this command and its tests to user external types.
@@ -466,8 +466,10 @@ func TestRunExposeService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
-		tf.Printer = &printers.JSONPrinter{}
+		tf := cmdtesting.NewTestFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: ns,
@@ -486,7 +488,7 @@ func TestRunExposeService(t *testing.T) {
 		tf.Namespace = test.ns
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdExposeService(f, buf)
+		cmd := NewCmdExposeService(tf, buf)
 		cmd.SetOutput(buf)
 		for flag, value := range test.flags {
 			cmd.Flags().Set(flag, value)
@@ -495,12 +497,6 @@ func TestRunExposeService(t *testing.T) {
 
 		out := buf.String()
 		if _, ok := test.flags["dry-run"]; ok {
-			buf.Reset()
-			if err := tf.Printer.PrintObj(test.output, buf); err != nil {
-				t.Errorf("%s: Unexpected error: %v", test.name, err)
-				continue
-			}
-
 			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
 		}
 

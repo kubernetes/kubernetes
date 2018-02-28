@@ -20,7 +20,6 @@ go_library(
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )
 
@@ -31,7 +30,6 @@ go_test(
         "whitelist_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/sysctl",
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 

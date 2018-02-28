@@ -341,11 +341,13 @@ func (p *initProcess) start() error {
 				}
 
 				if p.config.Config.Hooks != nil {
+					bundle, annotations := utils.Annotations(p.container.config.Labels)
 					s := configs.HookState{
-						Version: p.container.config.Version,
-						ID:      p.container.id,
-						Pid:     p.pid(),
-						Bundle:  utils.SearchLabels(p.config.Config.Labels, "bundle"),
+						Version:     p.container.config.Version,
+						ID:          p.container.id,
+						Pid:         p.pid(),
+						Bundle:      bundle,
+						Annotations: annotations,
 					}
 					for i, hook := range p.config.Config.Hooks.Prestart {
 						if err := hook.Run(s); err != nil {
@@ -370,11 +372,13 @@ func (p *initProcess) start() error {
 				}
 			}
 			if p.config.Config.Hooks != nil {
+				bundle, annotations := utils.Annotations(p.container.config.Labels)
 				s := configs.HookState{
-					Version: p.container.config.Version,
-					ID:      p.container.id,
-					Pid:     p.pid(),
-					Bundle:  utils.SearchLabels(p.config.Config.Labels, "bundle"),
+					Version:     p.container.config.Version,
+					ID:          p.container.id,
+					Pid:         p.pid(),
+					Bundle:      bundle,
+					Annotations: annotations,
 				}
 				for i, hook := range p.config.Config.Hooks.Prestart {
 					if err := hook.Run(s); err != nil {

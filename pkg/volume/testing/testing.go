@@ -40,7 +40,8 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -89,8 +90,8 @@ func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
 	return path.Join(f.rootDir, "plugins", podUID)
 }
 
-func (f *fakeVolumeHost) GetVolumeDevicePluginDir(podUID string) string {
-	return path.Join(f.rootDir, "plugins", podUID)
+func (f *fakeVolumeHost) GetVolumeDevicePluginDir(pluginName string) string {
+	return path.Join(f.rootDir, "plugins", pluginName, "volumeDevices")
 }
 
 func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
@@ -379,7 +380,7 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
-func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *Spec, eventRecorder RecycleEventRecorder) error {
+func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	return nil
 }
 
@@ -711,7 +712,7 @@ func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -731,10 +732,10 @@ func (fc *FakeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-var _ util.BlockVolumePathHandler = &FakeVolumePathHandler{}
+var _ volumepathhandler.BlockVolumePathHandler = &FakeVolumePathHandler{}
 
 //NewDeviceHandler Create a new IoHandler implementation
-func NewBlockVolumePathHandler() util.BlockVolumePathHandler {
+func NewBlockVolumePathHandler() volumepathhandler.BlockVolumePathHandler {
 	return &FakeVolumePathHandler{}
 }
 

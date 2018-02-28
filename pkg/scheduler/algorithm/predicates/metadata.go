@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -29,6 +30,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// PredicateMetadataFactory defines a factory of predicate metadata.
 type PredicateMetadataFactory struct {
 	podLister algorithm.PodLister
 }
@@ -52,23 +54,43 @@ type predicateMetadata struct {
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
+	// ignoredExtendedResources is a set of extended resource names that will
+	// be ignored in the PodFitsResources predicate.
+	//
+	// They can be scheduler extender managed resources, the consumption of
+	// which should be accounted only by the extenders. This set is synthesized
+	// from scheduler extender configuration and does not change per pod.
+	ignoredExtendedResources sets.String
 }
 
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
 var _ algorithm.PredicateMetadata = &predicateMetadata{}
 
-// PredicateMetadataProducer: Helper types/variables...
+// PredicateMetadataProducer function produces predicate metadata.
 type PredicateMetadataProducer func(pm *predicateMetadata)
 
 var predicateMetaProducerRegisterLock sync.Mutex
-var predicateMetadataProducers map[string]PredicateMetadataProducer = make(map[string]PredicateMetadataProducer)
+var predicateMetadataProducers = make(map[string]PredicateMetadataProducer)
 
+// RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
 func RegisterPredicateMetadataProducer(predicateName string, precomp PredicateMetadataProducer) {
 	predicateMetaProducerRegisterLock.Lock()
 	defer predicateMetaProducerRegisterLock.Unlock()
 	predicateMetadataProducers[predicateName] = precomp
 }
 
+// RegisterPredicateMetadataProducerWithExtendedResourceOptions registers a
+// PredicateMetadataProducer that creates predicate metadata with the provided
+// options for extended resources.
+//
+// See the comments in "predicateMetadata" for the explanation of the options.
+func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources sets.String) {
+	RegisterPredicateMetadataProducer("PredicateWithExtendedResourceOptions", func(pm *predicateMetadata) {
+		pm.ignoredExtendedResources = ignoredExtendedResources
+	})
+}
+
+// NewPredicateMetadataFactory creates a PredicateMetadataFactory.
 func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
 		podLister,
@@ -105,7 +127,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
 	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
-		return fmt.Errorf("deletedPod and meta.pod must not be the same.")
+		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
 	// Delete any anti-affinity rule from the deletedPod.
 	delete(meta.matchingAntiAffinityTerms, deletedPodFullName)
@@ -132,10 +154,10 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache.NodeInfo) error {
 	addedPodFullName := schedutil.GetPodFullName(addedPod)
 	if addedPodFullName == schedutil.GetPodFullName(meta.pod) {
-		return fmt.Errorf("addedPod and meta.pod must not be the same.")
+		return fmt.Errorf("addedPod and meta.pod must not be the same")
 	}
 	if nodeInfo.Node() == nil {
-		return fmt.Errorf("Invalid node in nodeInfo.")
+		return fmt.Errorf("invalid node in nodeInfo")
 	}
 	// Add matching anti-affinity terms of the addedPod to the map.
 	podMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(meta.pod, addedPod, nodeInfo.Node())
@@ -167,10 +189,11 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 // its maps and slices, but it does not copy the contents of pointer values.
 func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 	newPredMeta := &predicateMetadata{
-		pod:                  meta.pod,
-		podBestEffort:        meta.podBestEffort,
-		podRequest:           meta.podRequest,
-		serviceAffinityInUse: meta.serviceAffinityInUse,
+		pod:                      meta.pod,
+		podBestEffort:            meta.podBestEffort,
+		podRequest:               meta.podRequest,
+		serviceAffinityInUse:     meta.serviceAffinityInUse,
+		ignoredExtendedResources: meta.ignoredExtendedResources,
 	}
 	newPredMeta.podPorts = append([]*v1.ContainerPort(nil), meta.podPorts...)
 	newPredMeta.matchingAntiAffinityTerms = map[string][]matchingPodAntiAffinityTerm{}

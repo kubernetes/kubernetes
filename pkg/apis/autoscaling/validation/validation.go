@@ -115,7 +115,7 @@ func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-var validMetricSourceTypes = sets.NewString(string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType), string(autoscaling.ResourceMetricSourceType))
+var validMetricSourceTypes = sets.NewString(string(autoscaling.ObjectMetricSourceType), string(autoscaling.PodsMetricSourceType), string(autoscaling.ResourceMetricSourceType), string(autoscaling.ExternalMetricSourceType))
 var validMetricSourceTypesList = validMetricSourceTypes.List()
 
 func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.ErrorList {
@@ -134,6 +134,13 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		typesPresent.Insert("object")
 		if typesPresent.Len() == 1 {
 			allErrs = append(allErrs, validateObjectSource(spec.Object, fldPath.Child("object"))...)
+		}
+	}
+
+	if spec.External != nil {
+		typesPresent.Insert("external")
+		if typesPresent.Len() == 1 {
+			allErrs = append(allErrs, validateExternalSource(spec.External, fldPath.Child("external"))...)
 		}
 	}
 
@@ -178,6 +185,36 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 
 	if src.TargetValue.Sign() != 1 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("targetValue"), "must specify a positive target value"))
+	}
+
+	return allErrs
+}
+
+func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(src.MetricName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("metricName"), "must specify a metric name"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(src.MetricName) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("metricName"), src.MetricName, msg))
+		}
+	}
+
+	if src.TargetValue == nil && src.TargetAverageValue == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("targetValue"), "must set either a target value for metric or a per-pod target"))
+	}
+
+	if src.TargetValue != nil && src.TargetAverageValue != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("targetValue"), "may not set both a target value for metric and a per-pod target"))
+	}
+
+	if src.TargetAverageValue != nil && src.TargetAverageValue.Sign() != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetAverageValue"), src.TargetAverageValue, "must be positive"))
+	}
+
+	if src.TargetValue != nil && src.TargetValue.Sign() != 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetValue"), src.TargetValue, "must be positive"))
 	}
 
 	return allErrs

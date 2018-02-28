@@ -18,21 +18,13 @@ Currently, local-up scripts and kubeadm support switching IPVS proxy mode via ex
 
 Kube-proxy will run in iptables mode by default in a [local-up cluster](https://github.com/kubernetes/community/blob/master/contributors/devel/running-locally.md). 
 
-Users should export the env `KUBEPROXY_MODE=ipvs` to specify the ipvs mode before deploying the cluster if want to run kube-proxy in ipvs mode.
+Users should export the env `KUBE_PROXY_MODE=ipvs` to specify the ipvs mode before deploying the cluster if want to run kube-proxy in ipvs mode.
 
 ### Cluster Created by Kubeadm
 
 Kube-proxy will run in iptables mode by default in a cluster deployed by [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/). 
 
-Since IPVS mode is still feature-gated, users should add the flag `--feature-gates=SupportIPVSProxyMode=true` in `kubeadm init` command
-
-```
-kubeadm init --feature-gates=SupportIPVSProxyMode=true
-```
-
-to specify the ipvs mode before deploying the cluster if want to run kube-proxy in ipvs mode.
-
-If you are using kubeadm with a configuration file, you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `featureGates` field.
+If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `kubeProxy` field.
 Then the configuration file is similar to:
 
 ```json

@@ -6,6 +6,7 @@ go_library(
         "authorization_manager.go",
         "datacenter.go",
         "doc.go",
+        "event_manager.go",
         "host_config_info.go",
         "host_firewall_system.go",
         "host_hardware_info.go",

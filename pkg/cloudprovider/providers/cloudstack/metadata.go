@@ -17,6 +17,7 @@ limitations under the License.
 package cloudstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -46,7 +47,7 @@ const (
 )
 
 // NodeAddresses returns the addresses of the specified instance.
-func (m *metadata) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (m *metadata) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	externalIP, err := m.get(metadataTypeExternalIP)
 	if err != nil {
 		return nil, fmt.Errorf("could not get external IP: %v", err)
@@ -64,17 +65,17 @@ func (m *metadata) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) 
 }
 
 // NodeAddressesByProviderID returns the addresses of the specified instance.
-func (m *metadata) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (m *metadata) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	return nil, errors.New("NodeAddressesByProviderID not implemented")
 }
 
 // ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (m *metadata) ExternalID(name types.NodeName) (string, error) {
-	return m.InstanceID(name)
+func (m *metadata) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
+	return m.InstanceID(ctx, name)
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-func (m *metadata) InstanceID(name types.NodeName) (string, error) {
+func (m *metadata) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	instanceID, err := m.get(metadataTypeInstanceID)
 	if err != nil {
 		return "", fmt.Errorf("could not get instance ID: %v", err)
@@ -89,7 +90,7 @@ func (m *metadata) InstanceID(name types.NodeName) (string, error) {
 }
 
 // InstanceType returns the type of the specified instance.
-func (m *metadata) InstanceType(name types.NodeName) (string, error) {
+func (m *metadata) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	instanceType, err := m.get(metadataTypeInstanceType)
 	if err != nil {
 		return "", fmt.Errorf("could not get instance type: %v", err)
@@ -99,27 +100,27 @@ func (m *metadata) InstanceType(name types.NodeName) (string, error) {
 }
 
 // InstanceTypeByProviderID returns the type of the specified instance.
-func (m *metadata) InstanceTypeByProviderID(providerID string) (string, error) {
+func (m *metadata) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	return "", errors.New("InstanceTypeByProviderID not implemented")
 }
 
 // AddSSHKeyToAllInstances is currently not implemented.
-func (m *metadata) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (m *metadata) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return errors.New("AddSSHKeyToAllInstances not implemented")
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
-func (m *metadata) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (m *metadata) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
 // InstanceExistsByProviderID returns if the instance still exists.
-func (m *metadata) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("InstanceExistsByProviderID not implemented")
 }
 
 // GetZone returns the Zone containing the region that the program is running in.
-func (m *metadata) GetZone() (cloudprovider.Zone, error) {
+func (m *metadata) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	zone := cloudprovider.Zone{}
 
 	if m.zone == "" {
@@ -139,12 +140,12 @@ func (m *metadata) GetZone() (cloudprovider.Zone, error) {
 }
 
 // GetZoneByProviderID returns the Zone, found by using the provider ID.
-func (m *metadata) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+func (m *metadata) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
 }
 
 // GetZoneByNodeName returns the Zone, found by using the node name.
-func (m *metadata) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (m *metadata) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not implemented")
 }
 
@@ -195,7 +196,7 @@ func findDHCPServer() (string, error) {
 
 				offerPacket, err := client.GetOffer(&discoverPacket)
 				if err != nil {
-					return "", fmt.Errorf("error recieving DHCP offer package: %v", err)
+					return "", fmt.Errorf("error receiving DHCP offer package: %v", err)
 				}
 
 				offerPacketOptions := offerPacket.ParseOptions()

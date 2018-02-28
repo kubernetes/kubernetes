@@ -9,7 +9,7 @@ Despite the ideal philosophy above, we have to face the reality. NSG depends on 
 And also, For Azure, we cannot afford to have more than 1 worker of service_controller. Because, different services could operate on the same LB, concurrent execution could result in conflict or unexpected result. For AWS and GCE, they apparently doesn't have the problem, they use one LB per service, no such conflict.
 
 There are two load balancers per availability set internal and external. There is a limit on number of services that can be associated with a single load balancer.
-By default primary load balancer is selected. Services can be annotated to allow auto selection of available load balancers. Service annotations can also be used to provide specific availability sets that host the load balancers. Note that in case of auto selection or specific availability set selection, when the availability set is lost incase of downtime or cluster scale down the services are currently not auto assigned to an available load balancer.
+By default primary load balancer is selected. Services can be annotated to allow auto selection of available load balancers. Service annotations can also be used to provide specific availability sets that host the load balancers. Note that in case of auto selection or specific availability set selection, when the availability set is lost in case of downtime or cluster scale down the services are currently not auto assigned to an available load balancer.
 Service Annotation for Auto and specific load balancer mode
 
 - service.beta.kubernetes.io/azure-load-balancer-mode" (__auto__|as1,as2...)
@@ -40,7 +40,7 @@ Service Annotation for Auto and specific load balancer mode
 
 - getServiceLoadBalancer(service *v1.Service, clusterName string, nodes []*v1.Node, wantLb bool) (lb, status, exists, error)
   - gets the loadbalancer for the service if it already exists
-  - If wantLb is TRUE then -it selects a new load balancer, the selction helps distribute the services across load balancers
+  - If wantLb is TRUE then -it selects a new load balancer, the selection helps distribute the services across load balancers
   - In case the selected load balancer does not exists it returns network.LoadBalancer struct with added metadata (such as name, location) and existsLB set to FALSE 
   - By default - cluster default LB is returned
 

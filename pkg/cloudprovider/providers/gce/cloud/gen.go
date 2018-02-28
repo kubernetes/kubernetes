@@ -319,7 +319,7 @@ func (gce *GCE) Zones() Zones {
 }
 
 // NewMockGCE returns a new mock for GCE.
-func NewMockGCE() *MockGCE {
+func NewMockGCE(projectRouter ProjectRouter) *MockGCE {
 	mockAddressesObjs := map[meta.Key]*MockAddressesObj{}
 	mockBackendServicesObjs := map[meta.Key]*MockBackendServicesObj{}
 	mockDisksObjs := map[meta.Key]*MockDisksObj{}
@@ -346,39 +346,39 @@ func NewMockGCE() *MockGCE {
 	mockZonesObjs := map[meta.Key]*MockZonesObj{}
 
 	mock := &MockGCE{
-		MockAddresses:                  NewMockAddresses(mockAddressesObjs),
-		MockAlphaAddresses:             NewMockAlphaAddresses(mockAddressesObjs),
-		MockBetaAddresses:              NewMockBetaAddresses(mockAddressesObjs),
-		MockGlobalAddresses:            NewMockGlobalAddresses(mockGlobalAddressesObjs),
-		MockBackendServices:            NewMockBackendServices(mockBackendServicesObjs),
-		MockAlphaBackendServices:       NewMockAlphaBackendServices(mockBackendServicesObjs),
-		MockRegionBackendServices:      NewMockRegionBackendServices(mockRegionBackendServicesObjs),
-		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(mockRegionBackendServicesObjs),
-		MockDisks:                      NewMockDisks(mockDisksObjs),
-		MockAlphaDisks:                 NewMockAlphaDisks(mockDisksObjs),
-		MockAlphaRegionDisks:           NewMockAlphaRegionDisks(mockRegionDisksObjs),
-		MockFirewalls:                  NewMockFirewalls(mockFirewallsObjs),
-		MockForwardingRules:            NewMockForwardingRules(mockForwardingRulesObjs),
-		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(mockForwardingRulesObjs),
-		MockGlobalForwardingRules:      NewMockGlobalForwardingRules(mockGlobalForwardingRulesObjs),
-		MockHealthChecks:               NewMockHealthChecks(mockHealthChecksObjs),
-		MockAlphaHealthChecks:          NewMockAlphaHealthChecks(mockHealthChecksObjs),
-		MockHttpHealthChecks:           NewMockHttpHealthChecks(mockHttpHealthChecksObjs),
-		MockHttpsHealthChecks:          NewMockHttpsHealthChecks(mockHttpsHealthChecksObjs),
-		MockInstanceGroups:             NewMockInstanceGroups(mockInstanceGroupsObjs),
-		MockInstances:                  NewMockInstances(mockInstancesObjs),
-		MockBetaInstances:              NewMockBetaInstances(mockInstancesObjs),
-		MockAlphaInstances:             NewMockAlphaInstances(mockInstancesObjs),
-		MockAlphaNetworkEndpointGroups: NewMockAlphaNetworkEndpointGroups(mockNetworkEndpointGroupsObjs),
-		MockProjects:                   NewMockProjects(mockProjectsObjs),
-		MockRegions:                    NewMockRegions(mockRegionsObjs),
-		MockRoutes:                     NewMockRoutes(mockRoutesObjs),
-		MockSslCertificates:            NewMockSslCertificates(mockSslCertificatesObjs),
-		MockTargetHttpProxies:          NewMockTargetHttpProxies(mockTargetHttpProxiesObjs),
-		MockTargetHttpsProxies:         NewMockTargetHttpsProxies(mockTargetHttpsProxiesObjs),
-		MockTargetPools:                NewMockTargetPools(mockTargetPoolsObjs),
-		MockUrlMaps:                    NewMockUrlMaps(mockUrlMapsObjs),
-		MockZones:                      NewMockZones(mockZonesObjs),
+		MockAddresses:                  NewMockAddresses(projectRouter, mockAddressesObjs),
+		MockAlphaAddresses:             NewMockAlphaAddresses(projectRouter, mockAddressesObjs),
+		MockBetaAddresses:              NewMockBetaAddresses(projectRouter, mockAddressesObjs),
+		MockGlobalAddresses:            NewMockGlobalAddresses(projectRouter, mockGlobalAddressesObjs),
+		MockBackendServices:            NewMockBackendServices(projectRouter, mockBackendServicesObjs),
+		MockAlphaBackendServices:       NewMockAlphaBackendServices(projectRouter, mockBackendServicesObjs),
+		MockRegionBackendServices:      NewMockRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
+		MockAlphaRegionBackendServices: NewMockAlphaRegionBackendServices(projectRouter, mockRegionBackendServicesObjs),
+		MockDisks:                      NewMockDisks(projectRouter, mockDisksObjs),
+		MockAlphaDisks:                 NewMockAlphaDisks(projectRouter, mockDisksObjs),
+		MockAlphaRegionDisks:           NewMockAlphaRegionDisks(projectRouter, mockRegionDisksObjs),
+		MockFirewalls:                  NewMockFirewalls(projectRouter, mockFirewallsObjs),
+		MockForwardingRules:            NewMockForwardingRules(projectRouter, mockForwardingRulesObjs),
+		MockAlphaForwardingRules:       NewMockAlphaForwardingRules(projectRouter, mockForwardingRulesObjs),
+		MockGlobalForwardingRules:      NewMockGlobalForwardingRules(projectRouter, mockGlobalForwardingRulesObjs),
+		MockHealthChecks:               NewMockHealthChecks(projectRouter, mockHealthChecksObjs),
+		MockAlphaHealthChecks:          NewMockAlphaHealthChecks(projectRouter, mockHealthChecksObjs),
+		MockHttpHealthChecks:           NewMockHttpHealthChecks(projectRouter, mockHttpHealthChecksObjs),
+		MockHttpsHealthChecks:          NewMockHttpsHealthChecks(projectRouter, mockHttpsHealthChecksObjs),
+		MockInstanceGroups:             NewMockInstanceGroups(projectRouter, mockInstanceGroupsObjs),
+		MockInstances:                  NewMockInstances(projectRouter, mockInstancesObjs),
+		MockBetaInstances:              NewMockBetaInstances(projectRouter, mockInstancesObjs),
+		MockAlphaInstances:             NewMockAlphaInstances(projectRouter, mockInstancesObjs),
+		MockAlphaNetworkEndpointGroups: NewMockAlphaNetworkEndpointGroups(projectRouter, mockNetworkEndpointGroupsObjs),
+		MockProjects:                   NewMockProjects(projectRouter, mockProjectsObjs),
+		MockRegions:                    NewMockRegions(projectRouter, mockRegionsObjs),
+		MockRoutes:                     NewMockRoutes(projectRouter, mockRoutesObjs),
+		MockSslCertificates:            NewMockSslCertificates(projectRouter, mockSslCertificatesObjs),
+		MockTargetHttpProxies:          NewMockTargetHttpProxies(projectRouter, mockTargetHttpProxiesObjs),
+		MockTargetHttpsProxies:         NewMockTargetHttpsProxies(projectRouter, mockTargetHttpsProxiesObjs),
+		MockTargetPools:                NewMockTargetPools(projectRouter, mockTargetPoolsObjs),
+		MockUrlMaps:                    NewMockUrlMaps(projectRouter, mockUrlMapsObjs),
+		MockZones:                      NewMockZones(projectRouter, mockZonesObjs),
 	}
 	return mock
 }
@@ -1194,8 +1194,10 @@ type Addresses interface {
 }
 
 // NewMockAddresses returns a new mock for Addresses.
-func NewMockAddresses(objs map[meta.Key]*MockAddressesObj) *MockAddresses {
+func NewMockAddresses(pr ProjectRouter, objs map[meta.Key]*MockAddressesObj) *MockAddresses {
 	mock := &MockAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -1207,6 +1209,8 @@ func NewMockAddresses(objs map[meta.Key]*MockAddressesObj) *MockAddresses {
 // MockAddresses is the mock for Addresses.
 type MockAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockAddressesObj
@@ -1222,10 +1226,10 @@ type MockAddresses struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAddresses, ctx context.Context, key *meta.Key) (bool, *ga.Address, error)
-	ListHook   func(m *MockAddresses, ctx context.Context, region string, fl *filter.F) (bool, []*ga.Address, error)
-	InsertHook func(m *MockAddresses, ctx context.Context, key *meta.Key, obj *ga.Address) (bool, error)
-	DeleteHook func(m *MockAddresses, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAddresses) (bool, *ga.Address, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockAddresses) (bool, []*ga.Address, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Address, m *MockAddresses) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAddresses) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -1235,7 +1239,7 @@ type MockAddresses struct {
 // Get returns the object from the mock.
 func (m *MockAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAddresses.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -1268,7 +1272,7 @@ func (m *MockAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, er
 // List all of the objects in the mock in the given region.
 func (m *MockAddresses) List(ctx context.Context, region string, fl *filter.F) ([]*ga.Address, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockAddresses.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -1302,7 +1306,7 @@ func (m *MockAddresses) List(ctx context.Context, region string, fl *filter.F) (
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Address) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAddresses.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -1328,9 +1332,8 @@ func (m *MockAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addre
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockAddressesObj{obj}
 	glog.V(5).Infof("MockAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -1340,7 +1343,7 @@ func (m *MockAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Addre
 // Delete is a mock for deleting the object.
 func (m *MockAddresses) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAddresses.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -1525,8 +1528,10 @@ type AlphaAddresses interface {
 }
 
 // NewMockAlphaAddresses returns a new mock for Addresses.
-func NewMockAlphaAddresses(objs map[meta.Key]*MockAddressesObj) *MockAlphaAddresses {
+func NewMockAlphaAddresses(pr ProjectRouter, objs map[meta.Key]*MockAddressesObj) *MockAlphaAddresses {
 	mock := &MockAlphaAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -1538,6 +1543,8 @@ func NewMockAlphaAddresses(objs map[meta.Key]*MockAddressesObj) *MockAlphaAddres
 // MockAlphaAddresses is the mock for Addresses.
 type MockAlphaAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockAddressesObj
@@ -1553,10 +1560,10 @@ type MockAlphaAddresses struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAlphaAddresses, ctx context.Context, key *meta.Key) (bool, *alpha.Address, error)
-	ListHook   func(m *MockAlphaAddresses, ctx context.Context, region string, fl *filter.F) (bool, []*alpha.Address, error)
-	InsertHook func(m *MockAlphaAddresses, ctx context.Context, key *meta.Key, obj *alpha.Address) (bool, error)
-	DeleteHook func(m *MockAlphaAddresses, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaAddresses) (bool, *alpha.Address, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockAlphaAddresses) (bool, []*alpha.Address, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.Address, m *MockAlphaAddresses) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaAddresses) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -1566,7 +1573,7 @@ type MockAlphaAddresses struct {
 // Get returns the object from the mock.
 func (m *MockAlphaAddresses) Get(ctx context.Context, key *meta.Key) (*alpha.Address, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaAddresses.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -1599,7 +1606,7 @@ func (m *MockAlphaAddresses) Get(ctx context.Context, key *meta.Key) (*alpha.Add
 // List all of the objects in the mock in the given region.
 func (m *MockAlphaAddresses) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Address, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaAddresses.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -1633,7 +1640,7 @@ func (m *MockAlphaAddresses) List(ctx context.Context, region string, fl *filter
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alpha.Address) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaAddresses.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -1659,9 +1666,8 @@ func (m *MockAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alp
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockAddressesObj{obj}
 	glog.V(5).Infof("MockAlphaAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -1671,7 +1677,7 @@ func (m *MockAlphaAddresses) Insert(ctx context.Context, key *meta.Key, obj *alp
 // Delete is a mock for deleting the object.
 func (m *MockAlphaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaAddresses.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -1856,8 +1862,10 @@ type BetaAddresses interface {
 }
 
 // NewMockBetaAddresses returns a new mock for Addresses.
-func NewMockBetaAddresses(objs map[meta.Key]*MockAddressesObj) *MockBetaAddresses {
+func NewMockBetaAddresses(pr ProjectRouter, objs map[meta.Key]*MockAddressesObj) *MockBetaAddresses {
 	mock := &MockBetaAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -1869,6 +1877,8 @@ func NewMockBetaAddresses(objs map[meta.Key]*MockAddressesObj) *MockBetaAddresse
 // MockBetaAddresses is the mock for Addresses.
 type MockBetaAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockAddressesObj
@@ -1884,10 +1894,10 @@ type MockBetaAddresses struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockBetaAddresses, ctx context.Context, key *meta.Key) (bool, *beta.Address, error)
-	ListHook   func(m *MockBetaAddresses, ctx context.Context, region string, fl *filter.F) (bool, []*beta.Address, error)
-	InsertHook func(m *MockBetaAddresses, ctx context.Context, key *meta.Key, obj *beta.Address) (bool, error)
-	DeleteHook func(m *MockBetaAddresses, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockBetaAddresses) (bool, *beta.Address, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockBetaAddresses) (bool, []*beta.Address, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *beta.Address, m *MockBetaAddresses) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockBetaAddresses) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -1897,7 +1907,7 @@ type MockBetaAddresses struct {
 // Get returns the object from the mock.
 func (m *MockBetaAddresses) Get(ctx context.Context, key *meta.Key) (*beta.Address, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockBetaAddresses.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -1930,7 +1940,7 @@ func (m *MockBetaAddresses) Get(ctx context.Context, key *meta.Key) (*beta.Addre
 // List all of the objects in the mock in the given region.
 func (m *MockBetaAddresses) List(ctx context.Context, region string, fl *filter.F) ([]*beta.Address, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockBetaAddresses.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -1964,7 +1974,7 @@ func (m *MockBetaAddresses) List(ctx context.Context, region string, fl *filter.
 // Insert is a mock for inserting/creating a new object.
 func (m *MockBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta.Address) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockBetaAddresses.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -1990,9 +2000,8 @@ func (m *MockBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionBeta, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockAddressesObj{obj}
 	glog.V(5).Infof("MockBetaAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -2002,7 +2011,7 @@ func (m *MockBetaAddresses) Insert(ctx context.Context, key *meta.Key, obj *beta
 // Delete is a mock for deleting the object.
 func (m *MockBetaAddresses) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockBetaAddresses.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -2187,8 +2196,10 @@ type GlobalAddresses interface {
 }
 
 // NewMockGlobalAddresses returns a new mock for GlobalAddresses.
-func NewMockGlobalAddresses(objs map[meta.Key]*MockGlobalAddressesObj) *MockGlobalAddresses {
+func NewMockGlobalAddresses(pr ProjectRouter, objs map[meta.Key]*MockGlobalAddressesObj) *MockGlobalAddresses {
 	mock := &MockGlobalAddresses{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -2200,6 +2211,8 @@ func NewMockGlobalAddresses(objs map[meta.Key]*MockGlobalAddressesObj) *MockGlob
 // MockGlobalAddresses is the mock for GlobalAddresses.
 type MockGlobalAddresses struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockGlobalAddressesObj
@@ -2215,10 +2228,10 @@ type MockGlobalAddresses struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockGlobalAddresses, ctx context.Context, key *meta.Key) (bool, *ga.Address, error)
-	ListHook   func(m *MockGlobalAddresses, ctx context.Context, fl *filter.F) (bool, []*ga.Address, error)
-	InsertHook func(m *MockGlobalAddresses, ctx context.Context, key *meta.Key, obj *ga.Address) (bool, error)
-	DeleteHook func(m *MockGlobalAddresses, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockGlobalAddresses) (bool, *ga.Address, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockGlobalAddresses) (bool, []*ga.Address, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Address, m *MockGlobalAddresses) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockGlobalAddresses) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -2228,7 +2241,7 @@ type MockGlobalAddresses struct {
 // Get returns the object from the mock.
 func (m *MockGlobalAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Address, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockGlobalAddresses.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -2261,7 +2274,7 @@ func (m *MockGlobalAddresses) Get(ctx context.Context, key *meta.Key) (*ga.Addre
 // List all of the objects in the mock.
 func (m *MockGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*ga.Address, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockGlobalAddresses.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -2292,7 +2305,7 @@ func (m *MockGlobalAddresses) List(ctx context.Context, fl *filter.F) ([]*ga.Add
 // Insert is a mock for inserting/creating a new object.
 func (m *MockGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga.Address) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockGlobalAddresses.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -2318,9 +2331,8 @@ func (m *MockGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "addresses", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "addresses")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "addresses", key)
 
 	m.Objects[*key] = &MockGlobalAddressesObj{obj}
 	glog.V(5).Infof("MockGlobalAddresses.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -2330,7 +2342,7 @@ func (m *MockGlobalAddresses) Insert(ctx context.Context, key *meta.Key, obj *ga
 // Delete is a mock for deleting the object.
 func (m *MockGlobalAddresses) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockGlobalAddresses.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -2518,8 +2530,10 @@ type BackendServices interface {
 }
 
 // NewMockBackendServices returns a new mock for BackendServices.
-func NewMockBackendServices(objs map[meta.Key]*MockBackendServicesObj) *MockBackendServices {
+func NewMockBackendServices(pr ProjectRouter, objs map[meta.Key]*MockBackendServicesObj) *MockBackendServices {
 	mock := &MockBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -2531,6 +2545,8 @@ func NewMockBackendServices(objs map[meta.Key]*MockBackendServicesObj) *MockBack
 // MockBackendServices is the mock for BackendServices.
 type MockBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockBackendServicesObj
@@ -2546,12 +2562,12 @@ type MockBackendServices struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook       func(m *MockBackendServices, ctx context.Context, key *meta.Key) (bool, *ga.BackendService, error)
-	ListHook      func(m *MockBackendServices, ctx context.Context, fl *filter.F) (bool, []*ga.BackendService, error)
-	InsertHook    func(m *MockBackendServices, ctx context.Context, key *meta.Key, obj *ga.BackendService) (bool, error)
-	DeleteHook    func(m *MockBackendServices, ctx context.Context, key *meta.Key) (bool, error)
-	GetHealthHook func(*MockBackendServices, context.Context, *meta.Key, *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error)
-	UpdateHook    func(*MockBackendServices, context.Context, *meta.Key, *ga.BackendService) error
+	GetHook       func(ctx context.Context, key *meta.Key, m *MockBackendServices) (bool, *ga.BackendService, error)
+	ListHook      func(ctx context.Context, fl *filter.F, m *MockBackendServices) (bool, []*ga.BackendService, error)
+	InsertHook    func(ctx context.Context, key *meta.Key, obj *ga.BackendService, m *MockBackendServices) (bool, error)
+	DeleteHook    func(ctx context.Context, key *meta.Key, m *MockBackendServices) (bool, error)
+	GetHealthHook func(context.Context, *meta.Key, *ga.ResourceGroupReference, *MockBackendServices) (*ga.BackendServiceGroupHealth, error)
+	UpdateHook    func(context.Context, *meta.Key, *ga.BackendService, *MockBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -2561,7 +2577,7 @@ type MockBackendServices struct {
 // Get returns the object from the mock.
 func (m *MockBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.BackendService, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockBackendServices.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -2594,7 +2610,7 @@ func (m *MockBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.Backe
 // List all of the objects in the mock.
 func (m *MockBackendServices) List(ctx context.Context, fl *filter.F) ([]*ga.BackendService, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockBackendServices.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -2625,7 +2641,7 @@ func (m *MockBackendServices) List(ctx context.Context, fl *filter.F) ([]*ga.Bac
 // Insert is a mock for inserting/creating a new object.
 func (m *MockBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -2651,9 +2667,8 @@ func (m *MockBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockBackendServicesObj{obj}
 	glog.V(5).Infof("MockBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -2663,7 +2678,7 @@ func (m *MockBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga
 // Delete is a mock for deleting the object.
 func (m *MockBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -2701,7 +2716,7 @@ func (m *MockBackendServices) Obj(o *ga.BackendService) *MockBackendServicesObj 
 // GetHealth is a mock for the corresponding method.
 func (m *MockBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error) {
 	if m.GetHealthHook != nil {
-		return m.GetHealthHook(m, ctx, key, arg0)
+		return m.GetHealthHook(ctx, key, arg0, m)
 	}
 	return nil, fmt.Errorf("GetHealthHook must be set")
 }
@@ -2709,7 +2724,7 @@ func (m *MockBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0
 // Update is a mock for the corresponding method.
 func (m *MockBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -2927,8 +2942,10 @@ type AlphaBackendServices interface {
 }
 
 // NewMockAlphaBackendServices returns a new mock for BackendServices.
-func NewMockAlphaBackendServices(objs map[meta.Key]*MockBackendServicesObj) *MockAlphaBackendServices {
+func NewMockAlphaBackendServices(pr ProjectRouter, objs map[meta.Key]*MockBackendServicesObj) *MockAlphaBackendServices {
 	mock := &MockAlphaBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -2940,6 +2957,8 @@ func NewMockAlphaBackendServices(objs map[meta.Key]*MockBackendServicesObj) *Moc
 // MockAlphaBackendServices is the mock for BackendServices.
 type MockAlphaBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockBackendServicesObj
@@ -2955,11 +2974,11 @@ type MockAlphaBackendServices struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAlphaBackendServices, ctx context.Context, key *meta.Key) (bool, *alpha.BackendService, error)
-	ListHook   func(m *MockAlphaBackendServices, ctx context.Context, fl *filter.F) (bool, []*alpha.BackendService, error)
-	InsertHook func(m *MockAlphaBackendServices, ctx context.Context, key *meta.Key, obj *alpha.BackendService) (bool, error)
-	DeleteHook func(m *MockAlphaBackendServices, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockAlphaBackendServices, context.Context, *meta.Key, *alpha.BackendService) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaBackendServices) (bool, *alpha.BackendService, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockAlphaBackendServices) (bool, []*alpha.BackendService, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *MockAlphaBackendServices) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaBackendServices) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *alpha.BackendService, *MockAlphaBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -2969,7 +2988,7 @@ type MockAlphaBackendServices struct {
 // Get returns the object from the mock.
 func (m *MockAlphaBackendServices) Get(ctx context.Context, key *meta.Key) (*alpha.BackendService, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaBackendServices.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -3002,7 +3021,7 @@ func (m *MockAlphaBackendServices) Get(ctx context.Context, key *meta.Key) (*alp
 // List all of the objects in the mock.
 func (m *MockAlphaBackendServices) List(ctx context.Context, fl *filter.F) ([]*alpha.BackendService, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaBackendServices.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -3033,7 +3052,7 @@ func (m *MockAlphaBackendServices) List(ctx context.Context, fl *filter.F) ([]*a
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -3059,9 +3078,8 @@ func (m *MockAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockBackendServicesObj{obj}
 	glog.V(5).Infof("MockAlphaBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -3071,7 +3089,7 @@ func (m *MockAlphaBackendServices) Insert(ctx context.Context, key *meta.Key, ob
 // Delete is a mock for deleting the object.
 func (m *MockAlphaBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -3109,7 +3127,7 @@ func (m *MockAlphaBackendServices) Obj(o *alpha.BackendService) *MockBackendServ
 // Update is a mock for the corresponding method.
 func (m *MockAlphaBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *alpha.BackendService) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -3300,8 +3318,10 @@ type RegionBackendServices interface {
 }
 
 // NewMockRegionBackendServices returns a new mock for RegionBackendServices.
-func NewMockRegionBackendServices(objs map[meta.Key]*MockRegionBackendServicesObj) *MockRegionBackendServices {
+func NewMockRegionBackendServices(pr ProjectRouter, objs map[meta.Key]*MockRegionBackendServicesObj) *MockRegionBackendServices {
 	mock := &MockRegionBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -3313,6 +3333,8 @@ func NewMockRegionBackendServices(objs map[meta.Key]*MockRegionBackendServicesOb
 // MockRegionBackendServices is the mock for RegionBackendServices.
 type MockRegionBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionBackendServicesObj
@@ -3328,12 +3350,12 @@ type MockRegionBackendServices struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook       func(m *MockRegionBackendServices, ctx context.Context, key *meta.Key) (bool, *ga.BackendService, error)
-	ListHook      func(m *MockRegionBackendServices, ctx context.Context, region string, fl *filter.F) (bool, []*ga.BackendService, error)
-	InsertHook    func(m *MockRegionBackendServices, ctx context.Context, key *meta.Key, obj *ga.BackendService) (bool, error)
-	DeleteHook    func(m *MockRegionBackendServices, ctx context.Context, key *meta.Key) (bool, error)
-	GetHealthHook func(*MockRegionBackendServices, context.Context, *meta.Key, *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error)
-	UpdateHook    func(*MockRegionBackendServices, context.Context, *meta.Key, *ga.BackendService) error
+	GetHook       func(ctx context.Context, key *meta.Key, m *MockRegionBackendServices) (bool, *ga.BackendService, error)
+	ListHook      func(ctx context.Context, region string, fl *filter.F, m *MockRegionBackendServices) (bool, []*ga.BackendService, error)
+	InsertHook    func(ctx context.Context, key *meta.Key, obj *ga.BackendService, m *MockRegionBackendServices) (bool, error)
+	DeleteHook    func(ctx context.Context, key *meta.Key, m *MockRegionBackendServices) (bool, error)
+	GetHealthHook func(context.Context, *meta.Key, *ga.ResourceGroupReference, *MockRegionBackendServices) (*ga.BackendServiceGroupHealth, error)
+	UpdateHook    func(context.Context, *meta.Key, *ga.BackendService, *MockRegionBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -3343,7 +3365,7 @@ type MockRegionBackendServices struct {
 // Get returns the object from the mock.
 func (m *MockRegionBackendServices) Get(ctx context.Context, key *meta.Key) (*ga.BackendService, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockRegionBackendServices.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -3376,7 +3398,7 @@ func (m *MockRegionBackendServices) Get(ctx context.Context, key *meta.Key) (*ga
 // List all of the objects in the mock in the given region.
 func (m *MockRegionBackendServices) List(ctx context.Context, region string, fl *filter.F) ([]*ga.BackendService, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockRegionBackendServices.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -3410,7 +3432,7 @@ func (m *MockRegionBackendServices) List(ctx context.Context, region string, fl 
 // Insert is a mock for inserting/creating a new object.
 func (m *MockRegionBackendServices) Insert(ctx context.Context, key *meta.Key, obj *ga.BackendService) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockRegionBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -3436,9 +3458,8 @@ func (m *MockRegionBackendServices) Insert(ctx context.Context, key *meta.Key, o
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockRegionBackendServicesObj{obj}
 	glog.V(5).Infof("MockRegionBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -3448,7 +3469,7 @@ func (m *MockRegionBackendServices) Insert(ctx context.Context, key *meta.Key, o
 // Delete is a mock for deleting the object.
 func (m *MockRegionBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockRegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -3486,7 +3507,7 @@ func (m *MockRegionBackendServices) Obj(o *ga.BackendService) *MockRegionBackend
 // GetHealth is a mock for the corresponding method.
 func (m *MockRegionBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *ga.ResourceGroupReference) (*ga.BackendServiceGroupHealth, error) {
 	if m.GetHealthHook != nil {
-		return m.GetHealthHook(m, ctx, key, arg0)
+		return m.GetHealthHook(ctx, key, arg0, m)
 	}
 	return nil, fmt.Errorf("GetHealthHook must be set")
 }
@@ -3494,7 +3515,7 @@ func (m *MockRegionBackendServices) GetHealth(ctx context.Context, key *meta.Key
 // Update is a mock for the corresponding method.
 func (m *MockRegionBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *ga.BackendService) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -3712,8 +3733,10 @@ type AlphaRegionBackendServices interface {
 }
 
 // NewMockAlphaRegionBackendServices returns a new mock for RegionBackendServices.
-func NewMockAlphaRegionBackendServices(objs map[meta.Key]*MockRegionBackendServicesObj) *MockAlphaRegionBackendServices {
+func NewMockAlphaRegionBackendServices(pr ProjectRouter, objs map[meta.Key]*MockRegionBackendServicesObj) *MockAlphaRegionBackendServices {
 	mock := &MockAlphaRegionBackendServices{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -3725,6 +3748,8 @@ func NewMockAlphaRegionBackendServices(objs map[meta.Key]*MockRegionBackendServi
 // MockAlphaRegionBackendServices is the mock for RegionBackendServices.
 type MockAlphaRegionBackendServices struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionBackendServicesObj
@@ -3740,12 +3765,12 @@ type MockAlphaRegionBackendServices struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook       func(m *MockAlphaRegionBackendServices, ctx context.Context, key *meta.Key) (bool, *alpha.BackendService, error)
-	ListHook      func(m *MockAlphaRegionBackendServices, ctx context.Context, region string, fl *filter.F) (bool, []*alpha.BackendService, error)
-	InsertHook    func(m *MockAlphaRegionBackendServices, ctx context.Context, key *meta.Key, obj *alpha.BackendService) (bool, error)
-	DeleteHook    func(m *MockAlphaRegionBackendServices, ctx context.Context, key *meta.Key) (bool, error)
-	GetHealthHook func(*MockAlphaRegionBackendServices, context.Context, *meta.Key, *alpha.ResourceGroupReference) (*alpha.BackendServiceGroupHealth, error)
-	UpdateHook    func(*MockAlphaRegionBackendServices, context.Context, *meta.Key, *alpha.BackendService) error
+	GetHook       func(ctx context.Context, key *meta.Key, m *MockAlphaRegionBackendServices) (bool, *alpha.BackendService, error)
+	ListHook      func(ctx context.Context, region string, fl *filter.F, m *MockAlphaRegionBackendServices) (bool, []*alpha.BackendService, error)
+	InsertHook    func(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *MockAlphaRegionBackendServices) (bool, error)
+	DeleteHook    func(ctx context.Context, key *meta.Key, m *MockAlphaRegionBackendServices) (bool, error)
+	GetHealthHook func(context.Context, *meta.Key, *alpha.ResourceGroupReference, *MockAlphaRegionBackendServices) (*alpha.BackendServiceGroupHealth, error)
+	UpdateHook    func(context.Context, *meta.Key, *alpha.BackendService, *MockAlphaRegionBackendServices) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -3755,7 +3780,7 @@ type MockAlphaRegionBackendServices struct {
 // Get returns the object from the mock.
 func (m *MockAlphaRegionBackendServices) Get(ctx context.Context, key *meta.Key) (*alpha.BackendService, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionBackendServices.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -3788,7 +3813,7 @@ func (m *MockAlphaRegionBackendServices) Get(ctx context.Context, key *meta.Key)
 // List all of the objects in the mock in the given region.
 func (m *MockAlphaRegionBackendServices) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.BackendService, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionBackendServices.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -3822,7 +3847,7 @@ func (m *MockAlphaRegionBackendServices) List(ctx context.Context, region string
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.Key, obj *alpha.BackendService) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionBackendServices.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -3848,9 +3873,8 @@ func (m *MockAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.K
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "backendServices", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "backendServices")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "backendServices", key)
 
 	m.Objects[*key] = &MockRegionBackendServicesObj{obj}
 	glog.V(5).Infof("MockAlphaRegionBackendServices.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -3860,7 +3884,7 @@ func (m *MockAlphaRegionBackendServices) Insert(ctx context.Context, key *meta.K
 // Delete is a mock for deleting the object.
 func (m *MockAlphaRegionBackendServices) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionBackendServices.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -3898,7 +3922,7 @@ func (m *MockAlphaRegionBackendServices) Obj(o *alpha.BackendService) *MockRegio
 // GetHealth is a mock for the corresponding method.
 func (m *MockAlphaRegionBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0 *alpha.ResourceGroupReference) (*alpha.BackendServiceGroupHealth, error) {
 	if m.GetHealthHook != nil {
-		return m.GetHealthHook(m, ctx, key, arg0)
+		return m.GetHealthHook(ctx, key, arg0, m)
 	}
 	return nil, fmt.Errorf("GetHealthHook must be set")
 }
@@ -3906,7 +3930,7 @@ func (m *MockAlphaRegionBackendServices) GetHealth(ctx context.Context, key *met
 // Update is a mock for the corresponding method.
 func (m *MockAlphaRegionBackendServices) Update(ctx context.Context, key *meta.Key, arg0 *alpha.BackendService) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -4122,8 +4146,10 @@ type Disks interface {
 }
 
 // NewMockDisks returns a new mock for Disks.
-func NewMockDisks(objs map[meta.Key]*MockDisksObj) *MockDisks {
+func NewMockDisks(pr ProjectRouter, objs map[meta.Key]*MockDisksObj) *MockDisks {
 	mock := &MockDisks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -4135,6 +4161,8 @@ func NewMockDisks(objs map[meta.Key]*MockDisksObj) *MockDisks {
 // MockDisks is the mock for Disks.
 type MockDisks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockDisksObj
@@ -4150,10 +4178,10 @@ type MockDisks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockDisks, ctx context.Context, key *meta.Key) (bool, *ga.Disk, error)
-	ListHook   func(m *MockDisks, ctx context.Context, zone string, fl *filter.F) (bool, []*ga.Disk, error)
-	InsertHook func(m *MockDisks, ctx context.Context, key *meta.Key, obj *ga.Disk) (bool, error)
-	DeleteHook func(m *MockDisks, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockDisks) (bool, *ga.Disk, error)
+	ListHook   func(ctx context.Context, zone string, fl *filter.F, m *MockDisks) (bool, []*ga.Disk, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Disk, m *MockDisks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockDisks) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -4163,7 +4191,7 @@ type MockDisks struct {
 // Get returns the object from the mock.
 func (m *MockDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -4196,7 +4224,7 @@ func (m *MockDisks) Get(ctx context.Context, key *meta.Key) (*ga.Disk, error) {
 // List all of the objects in the mock in the given zone.
 func (m *MockDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.Disk, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockDisks.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -4230,7 +4258,7 @@ func (m *MockDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.
 // Insert is a mock for inserting/creating a new object.
 func (m *MockDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -4256,9 +4284,8 @@ func (m *MockDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) err
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "disks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "disks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "disks", key)
 
 	m.Objects[*key] = &MockDisksObj{obj}
 	glog.V(5).Infof("MockDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -4268,7 +4295,7 @@ func (m *MockDisks) Insert(ctx context.Context, key *meta.Key, obj *ga.Disk) err
 // Delete is a mock for deleting the object.
 func (m *MockDisks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockDisks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -4453,8 +4480,10 @@ type AlphaDisks interface {
 }
 
 // NewMockAlphaDisks returns a new mock for Disks.
-func NewMockAlphaDisks(objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
+func NewMockAlphaDisks(pr ProjectRouter, objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
 	mock := &MockAlphaDisks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -4466,6 +4495,8 @@ func NewMockAlphaDisks(objs map[meta.Key]*MockDisksObj) *MockAlphaDisks {
 // MockAlphaDisks is the mock for Disks.
 type MockAlphaDisks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockDisksObj
@@ -4481,10 +4512,10 @@ type MockAlphaDisks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAlphaDisks, ctx context.Context, key *meta.Key) (bool, *alpha.Disk, error)
-	ListHook   func(m *MockAlphaDisks, ctx context.Context, zone string, fl *filter.F) (bool, []*alpha.Disk, error)
-	InsertHook func(m *MockAlphaDisks, ctx context.Context, key *meta.Key, obj *alpha.Disk) (bool, error)
-	DeleteHook func(m *MockAlphaDisks, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaDisks) (bool, *alpha.Disk, error)
+	ListHook   func(ctx context.Context, zone string, fl *filter.F, m *MockAlphaDisks) (bool, []*alpha.Disk, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.Disk, m *MockAlphaDisks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaDisks) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -4494,7 +4525,7 @@ type MockAlphaDisks struct {
 // Get returns the object from the mock.
 func (m *MockAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -4527,7 +4558,7 @@ func (m *MockAlphaDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, e
 // List all of the objects in the mock in the given zone.
 func (m *MockAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Disk, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaDisks.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -4561,7 +4592,7 @@ func (m *MockAlphaDisks) List(ctx context.Context, zone string, fl *filter.F) ([
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -4587,9 +4618,8 @@ func (m *MockAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.D
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "disks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "disks")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "disks", key)
 
 	m.Objects[*key] = &MockDisksObj{obj}
 	glog.V(5).Infof("MockAlphaDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -4599,7 +4629,7 @@ func (m *MockAlphaDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.D
 // Delete is a mock for deleting the object.
 func (m *MockAlphaDisks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaDisks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -4784,8 +4814,10 @@ type AlphaRegionDisks interface {
 }
 
 // NewMockAlphaRegionDisks returns a new mock for RegionDisks.
-func NewMockAlphaRegionDisks(objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRegionDisks {
+func NewMockAlphaRegionDisks(pr ProjectRouter, objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRegionDisks {
 	mock := &MockAlphaRegionDisks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -4797,6 +4829,8 @@ func NewMockAlphaRegionDisks(objs map[meta.Key]*MockRegionDisksObj) *MockAlphaRe
 // MockAlphaRegionDisks is the mock for RegionDisks.
 type MockAlphaRegionDisks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionDisksObj
@@ -4812,10 +4846,10 @@ type MockAlphaRegionDisks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAlphaRegionDisks, ctx context.Context, key *meta.Key) (bool, *alpha.Disk, error)
-	ListHook   func(m *MockAlphaRegionDisks, ctx context.Context, region string, fl *filter.F) (bool, []*alpha.Disk, error)
-	InsertHook func(m *MockAlphaRegionDisks, ctx context.Context, key *meta.Key, obj *alpha.Disk) (bool, error)
-	DeleteHook func(m *MockAlphaRegionDisks, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaRegionDisks) (bool, *alpha.Disk, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockAlphaRegionDisks) (bool, []*alpha.Disk, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.Disk, m *MockAlphaRegionDisks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaRegionDisks) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -4825,7 +4859,7 @@ type MockAlphaRegionDisks struct {
 // Get returns the object from the mock.
 func (m *MockAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.Disk, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionDisks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -4858,7 +4892,7 @@ func (m *MockAlphaRegionDisks) Get(ctx context.Context, key *meta.Key) (*alpha.D
 // List all of the objects in the mock in the given region.
 func (m *MockAlphaRegionDisks) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.Disk, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionDisks.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -4892,7 +4926,7 @@ func (m *MockAlphaRegionDisks) List(ctx context.Context, region string, fl *filt
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *alpha.Disk) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -4918,9 +4952,8 @@ func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *a
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "disks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "disks")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "disks", key)
 
 	m.Objects[*key] = &MockRegionDisksObj{obj}
 	glog.V(5).Infof("MockAlphaRegionDisks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -4930,7 +4963,7 @@ func (m *MockAlphaRegionDisks) Insert(ctx context.Context, key *meta.Key, obj *a
 // Delete is a mock for deleting the object.
 func (m *MockAlphaRegionDisks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaRegionDisks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -5116,8 +5149,10 @@ type Firewalls interface {
 }
 
 // NewMockFirewalls returns a new mock for Firewalls.
-func NewMockFirewalls(objs map[meta.Key]*MockFirewallsObj) *MockFirewalls {
+func NewMockFirewalls(pr ProjectRouter, objs map[meta.Key]*MockFirewallsObj) *MockFirewalls {
 	mock := &MockFirewalls{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -5129,6 +5164,8 @@ func NewMockFirewalls(objs map[meta.Key]*MockFirewallsObj) *MockFirewalls {
 // MockFirewalls is the mock for Firewalls.
 type MockFirewalls struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockFirewallsObj
@@ -5144,11 +5181,11 @@ type MockFirewalls struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockFirewalls, ctx context.Context, key *meta.Key) (bool, *ga.Firewall, error)
-	ListHook   func(m *MockFirewalls, ctx context.Context, fl *filter.F) (bool, []*ga.Firewall, error)
-	InsertHook func(m *MockFirewalls, ctx context.Context, key *meta.Key, obj *ga.Firewall) (bool, error)
-	DeleteHook func(m *MockFirewalls, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockFirewalls, context.Context, *meta.Key, *ga.Firewall) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockFirewalls) (bool, *ga.Firewall, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockFirewalls) (bool, []*ga.Firewall, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *MockFirewalls) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockFirewalls) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *ga.Firewall, *MockFirewalls) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -5158,7 +5195,7 @@ type MockFirewalls struct {
 // Get returns the object from the mock.
 func (m *MockFirewalls) Get(ctx context.Context, key *meta.Key) (*ga.Firewall, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockFirewalls.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -5191,7 +5228,7 @@ func (m *MockFirewalls) Get(ctx context.Context, key *meta.Key) (*ga.Firewall, e
 // List all of the objects in the mock.
 func (m *MockFirewalls) List(ctx context.Context, fl *filter.F) ([]*ga.Firewall, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockFirewalls.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -5222,7 +5259,7 @@ func (m *MockFirewalls) List(ctx context.Context, fl *filter.F) ([]*ga.Firewall,
 // Insert is a mock for inserting/creating a new object.
 func (m *MockFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firewall) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockFirewalls.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -5248,9 +5285,8 @@ func (m *MockFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firew
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "firewalls", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "firewalls")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "firewalls", key)
 
 	m.Objects[*key] = &MockFirewallsObj{obj}
 	glog.V(5).Infof("MockFirewalls.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -5260,7 +5296,7 @@ func (m *MockFirewalls) Insert(ctx context.Context, key *meta.Key, obj *ga.Firew
 // Delete is a mock for deleting the object.
 func (m *MockFirewalls) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockFirewalls.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -5298,7 +5334,7 @@ func (m *MockFirewalls) Obj(o *ga.Firewall) *MockFirewallsObj {
 // Update is a mock for the corresponding method.
 func (m *MockFirewalls) Update(ctx context.Context, key *meta.Key, arg0 *ga.Firewall) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -5487,8 +5523,10 @@ type ForwardingRules interface {
 }
 
 // NewMockForwardingRules returns a new mock for ForwardingRules.
-func NewMockForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *MockForwardingRules {
+func NewMockForwardingRules(pr ProjectRouter, objs map[meta.Key]*MockForwardingRulesObj) *MockForwardingRules {
 	mock := &MockForwardingRules{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -5500,6 +5538,8 @@ func NewMockForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *MockForw
 // MockForwardingRules is the mock for ForwardingRules.
 type MockForwardingRules struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockForwardingRulesObj
@@ -5515,10 +5555,10 @@ type MockForwardingRules struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockForwardingRules, ctx context.Context, key *meta.Key) (bool, *ga.ForwardingRule, error)
-	ListHook   func(m *MockForwardingRules, ctx context.Context, region string, fl *filter.F) (bool, []*ga.ForwardingRule, error)
-	InsertHook func(m *MockForwardingRules, ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) (bool, error)
-	DeleteHook func(m *MockForwardingRules, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockForwardingRules) (bool, *ga.ForwardingRule, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockForwardingRules) (bool, []*ga.ForwardingRule, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule, m *MockForwardingRules) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockForwardingRules) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -5528,7 +5568,7 @@ type MockForwardingRules struct {
 // Get returns the object from the mock.
 func (m *MockForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.ForwardingRule, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockForwardingRules.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -5561,7 +5601,7 @@ func (m *MockForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.Forwa
 // List all of the objects in the mock in the given region.
 func (m *MockForwardingRules) List(ctx context.Context, region string, fl *filter.F) ([]*ga.ForwardingRule, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockForwardingRules.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -5595,7 +5635,7 @@ func (m *MockForwardingRules) List(ctx context.Context, region string, fl *filte
 // Insert is a mock for inserting/creating a new object.
 func (m *MockForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockForwardingRules.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -5621,9 +5661,8 @@ func (m *MockForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "forwardingRules", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "forwardingRules")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "forwardingRules", key)
 
 	m.Objects[*key] = &MockForwardingRulesObj{obj}
 	glog.V(5).Infof("MockForwardingRules.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -5633,7 +5672,7 @@ func (m *MockForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga
 // Delete is a mock for deleting the object.
 func (m *MockForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -5818,8 +5857,10 @@ type AlphaForwardingRules interface {
 }
 
 // NewMockAlphaForwardingRules returns a new mock for ForwardingRules.
-func NewMockAlphaForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *MockAlphaForwardingRules {
+func NewMockAlphaForwardingRules(pr ProjectRouter, objs map[meta.Key]*MockForwardingRulesObj) *MockAlphaForwardingRules {
 	mock := &MockAlphaForwardingRules{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -5831,6 +5872,8 @@ func NewMockAlphaForwardingRules(objs map[meta.Key]*MockForwardingRulesObj) *Moc
 // MockAlphaForwardingRules is the mock for ForwardingRules.
 type MockAlphaForwardingRules struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockForwardingRulesObj
@@ -5846,10 +5889,10 @@ type MockAlphaForwardingRules struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAlphaForwardingRules, ctx context.Context, key *meta.Key) (bool, *alpha.ForwardingRule, error)
-	ListHook   func(m *MockAlphaForwardingRules, ctx context.Context, region string, fl *filter.F) (bool, []*alpha.ForwardingRule, error)
-	InsertHook func(m *MockAlphaForwardingRules, ctx context.Context, key *meta.Key, obj *alpha.ForwardingRule) (bool, error)
-	DeleteHook func(m *MockAlphaForwardingRules, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaForwardingRules) (bool, *alpha.ForwardingRule, error)
+	ListHook   func(ctx context.Context, region string, fl *filter.F, m *MockAlphaForwardingRules) (bool, []*alpha.ForwardingRule, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.ForwardingRule, m *MockAlphaForwardingRules) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaForwardingRules) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -5859,7 +5902,7 @@ type MockAlphaForwardingRules struct {
 // Get returns the object from the mock.
 func (m *MockAlphaForwardingRules) Get(ctx context.Context, key *meta.Key) (*alpha.ForwardingRule, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaForwardingRules.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -5892,7 +5935,7 @@ func (m *MockAlphaForwardingRules) Get(ctx context.Context, key *meta.Key) (*alp
 // List all of the objects in the mock in the given region.
 func (m *MockAlphaForwardingRules) List(ctx context.Context, region string, fl *filter.F) ([]*alpha.ForwardingRule, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaForwardingRules.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -5926,7 +5969,7 @@ func (m *MockAlphaForwardingRules) List(ctx context.Context, region string, fl *
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *alpha.ForwardingRule) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaForwardingRules.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -5952,9 +5995,8 @@ func (m *MockAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "forwardingRules", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "forwardingRules")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "forwardingRules", key)
 
 	m.Objects[*key] = &MockForwardingRulesObj{obj}
 	glog.V(5).Infof("MockAlphaForwardingRules.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -5964,7 +6006,7 @@ func (m *MockAlphaForwardingRules) Insert(ctx context.Context, key *meta.Key, ob
 // Delete is a mock for deleting the object.
 func (m *MockAlphaForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -6150,8 +6192,10 @@ type GlobalForwardingRules interface {
 }
 
 // NewMockGlobalForwardingRules returns a new mock for GlobalForwardingRules.
-func NewMockGlobalForwardingRules(objs map[meta.Key]*MockGlobalForwardingRulesObj) *MockGlobalForwardingRules {
+func NewMockGlobalForwardingRules(pr ProjectRouter, objs map[meta.Key]*MockGlobalForwardingRulesObj) *MockGlobalForwardingRules {
 	mock := &MockGlobalForwardingRules{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -6163,6 +6207,8 @@ func NewMockGlobalForwardingRules(objs map[meta.Key]*MockGlobalForwardingRulesOb
 // MockGlobalForwardingRules is the mock for GlobalForwardingRules.
 type MockGlobalForwardingRules struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockGlobalForwardingRulesObj
@@ -6178,11 +6224,11 @@ type MockGlobalForwardingRules struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook       func(m *MockGlobalForwardingRules, ctx context.Context, key *meta.Key) (bool, *ga.ForwardingRule, error)
-	ListHook      func(m *MockGlobalForwardingRules, ctx context.Context, fl *filter.F) (bool, []*ga.ForwardingRule, error)
-	InsertHook    func(m *MockGlobalForwardingRules, ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) (bool, error)
-	DeleteHook    func(m *MockGlobalForwardingRules, ctx context.Context, key *meta.Key) (bool, error)
-	SetTargetHook func(*MockGlobalForwardingRules, context.Context, *meta.Key, *ga.TargetReference) error
+	GetHook       func(ctx context.Context, key *meta.Key, m *MockGlobalForwardingRules) (bool, *ga.ForwardingRule, error)
+	ListHook      func(ctx context.Context, fl *filter.F, m *MockGlobalForwardingRules) (bool, []*ga.ForwardingRule, error)
+	InsertHook    func(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule, m *MockGlobalForwardingRules) (bool, error)
+	DeleteHook    func(ctx context.Context, key *meta.Key, m *MockGlobalForwardingRules) (bool, error)
+	SetTargetHook func(context.Context, *meta.Key, *ga.TargetReference, *MockGlobalForwardingRules) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -6192,7 +6238,7 @@ type MockGlobalForwardingRules struct {
 // Get returns the object from the mock.
 func (m *MockGlobalForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga.ForwardingRule, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockGlobalForwardingRules.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -6225,7 +6271,7 @@ func (m *MockGlobalForwardingRules) Get(ctx context.Context, key *meta.Key) (*ga
 // List all of the objects in the mock.
 func (m *MockGlobalForwardingRules) List(ctx context.Context, fl *filter.F) ([]*ga.ForwardingRule, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockGlobalForwardingRules.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -6256,7 +6302,7 @@ func (m *MockGlobalForwardingRules) List(ctx context.Context, fl *filter.F) ([]*
 // Insert is a mock for inserting/creating a new object.
 func (m *MockGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockGlobalForwardingRules.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -6282,9 +6328,8 @@ func (m *MockGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, o
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "forwardingRules", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "forwardingRules")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "forwardingRules", key)
 
 	m.Objects[*key] = &MockGlobalForwardingRulesObj{obj}
 	glog.V(5).Infof("MockGlobalForwardingRules.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -6294,7 +6339,7 @@ func (m *MockGlobalForwardingRules) Insert(ctx context.Context, key *meta.Key, o
 // Delete is a mock for deleting the object.
 func (m *MockGlobalForwardingRules) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockGlobalForwardingRules.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -6332,7 +6377,7 @@ func (m *MockGlobalForwardingRules) Obj(o *ga.ForwardingRule) *MockGlobalForward
 // SetTarget is a mock for the corresponding method.
 func (m *MockGlobalForwardingRules) SetTarget(ctx context.Context, key *meta.Key, arg0 *ga.TargetReference) error {
 	if m.SetTargetHook != nil {
-		return m.SetTargetHook(m, ctx, key, arg0)
+		return m.SetTargetHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -6522,8 +6567,10 @@ type HealthChecks interface {
 }
 
 // NewMockHealthChecks returns a new mock for HealthChecks.
-func NewMockHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockHealthChecks {
+func NewMockHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHealthChecksObj) *MockHealthChecks {
 	mock := &MockHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -6535,6 +6582,8 @@ func NewMockHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockHealthChec
 // MockHealthChecks is the mock for HealthChecks.
 type MockHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHealthChecksObj
@@ -6550,11 +6599,11 @@ type MockHealthChecks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockHealthChecks, ctx context.Context, key *meta.Key) (bool, *ga.HealthCheck, error)
-	ListHook   func(m *MockHealthChecks, ctx context.Context, fl *filter.F) (bool, []*ga.HealthCheck, error)
-	InsertHook func(m *MockHealthChecks, ctx context.Context, key *meta.Key, obj *ga.HealthCheck) (bool, error)
-	DeleteHook func(m *MockHealthChecks, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockHealthChecks, context.Context, *meta.Key, *ga.HealthCheck) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockHealthChecks) (bool, *ga.HealthCheck, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockHealthChecks) (bool, []*ga.HealthCheck, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.HealthCheck, m *MockHealthChecks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockHealthChecks) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *ga.HealthCheck, *MockHealthChecks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -6564,7 +6613,7 @@ type MockHealthChecks struct {
 // Get returns the object from the mock.
 func (m *MockHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HealthCheck, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockHealthChecks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -6597,7 +6646,7 @@ func (m *MockHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HealthCh
 // List all of the objects in the mock.
 func (m *MockHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HealthCheck, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockHealthChecks.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -6628,7 +6677,7 @@ func (m *MockHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Health
 // Insert is a mock for inserting/creating a new object.
 func (m *MockHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HealthCheck) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -6654,9 +6703,8 @@ func (m *MockHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.He
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "healthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "healthChecks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "healthChecks", key)
 
 	m.Objects[*key] = &MockHealthChecksObj{obj}
 	glog.V(5).Infof("MockHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -6666,7 +6714,7 @@ func (m *MockHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.He
 // Delete is a mock for deleting the object.
 func (m *MockHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -6704,7 +6752,7 @@ func (m *MockHealthChecks) Obj(o *ga.HealthCheck) *MockHealthChecksObj {
 // Update is a mock for the corresponding method.
 func (m *MockHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HealthCheck) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -6894,8 +6942,10 @@ type AlphaHealthChecks interface {
 }
 
 // NewMockAlphaHealthChecks returns a new mock for HealthChecks.
-func NewMockAlphaHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockAlphaHealthChecks {
+func NewMockAlphaHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHealthChecksObj) *MockAlphaHealthChecks {
 	mock := &MockAlphaHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -6907,6 +6957,8 @@ func NewMockAlphaHealthChecks(objs map[meta.Key]*MockHealthChecksObj) *MockAlpha
 // MockAlphaHealthChecks is the mock for HealthChecks.
 type MockAlphaHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHealthChecksObj
@@ -6922,11 +6974,11 @@ type MockAlphaHealthChecks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockAlphaHealthChecks, ctx context.Context, key *meta.Key) (bool, *alpha.HealthCheck, error)
-	ListHook   func(m *MockAlphaHealthChecks, ctx context.Context, fl *filter.F) (bool, []*alpha.HealthCheck, error)
-	InsertHook func(m *MockAlphaHealthChecks, ctx context.Context, key *meta.Key, obj *alpha.HealthCheck) (bool, error)
-	DeleteHook func(m *MockAlphaHealthChecks, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockAlphaHealthChecks, context.Context, *meta.Key, *alpha.HealthCheck) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockAlphaHealthChecks) (bool, *alpha.HealthCheck, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockAlphaHealthChecks) (bool, []*alpha.HealthCheck, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *alpha.HealthCheck, m *MockAlphaHealthChecks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockAlphaHealthChecks) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *alpha.HealthCheck, *MockAlphaHealthChecks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -6936,7 +6988,7 @@ type MockAlphaHealthChecks struct {
 // Get returns the object from the mock.
 func (m *MockAlphaHealthChecks) Get(ctx context.Context, key *meta.Key) (*alpha.HealthCheck, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaHealthChecks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -6969,7 +7021,7 @@ func (m *MockAlphaHealthChecks) Get(ctx context.Context, key *meta.Key) (*alpha.
 // List all of the objects in the mock.
 func (m *MockAlphaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*alpha.HealthCheck, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaHealthChecks.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -7000,7 +7052,7 @@ func (m *MockAlphaHealthChecks) List(ctx context.Context, fl *filter.F) ([]*alph
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *alpha.HealthCheck) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -7026,9 +7078,8 @@ func (m *MockAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "healthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "healthChecks")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "healthChecks", key)
 
 	m.Objects[*key] = &MockHealthChecksObj{obj}
 	glog.V(5).Infof("MockAlphaHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -7038,7 +7089,7 @@ func (m *MockAlphaHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 // Delete is a mock for deleting the object.
 func (m *MockAlphaHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -7076,7 +7127,7 @@ func (m *MockAlphaHealthChecks) Obj(o *alpha.HealthCheck) *MockHealthChecksObj {
 // Update is a mock for the corresponding method.
 func (m *MockAlphaHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *alpha.HealthCheck) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -7266,8 +7317,10 @@ type HttpHealthChecks interface {
 }
 
 // NewMockHttpHealthChecks returns a new mock for HttpHealthChecks.
-func NewMockHttpHealthChecks(objs map[meta.Key]*MockHttpHealthChecksObj) *MockHttpHealthChecks {
+func NewMockHttpHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHttpHealthChecksObj) *MockHttpHealthChecks {
 	mock := &MockHttpHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -7279,6 +7332,8 @@ func NewMockHttpHealthChecks(objs map[meta.Key]*MockHttpHealthChecksObj) *MockHt
 // MockHttpHealthChecks is the mock for HttpHealthChecks.
 type MockHttpHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHttpHealthChecksObj
@@ -7294,11 +7349,11 @@ type MockHttpHealthChecks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockHttpHealthChecks, ctx context.Context, key *meta.Key) (bool, *ga.HttpHealthCheck, error)
-	ListHook   func(m *MockHttpHealthChecks, ctx context.Context, fl *filter.F) (bool, []*ga.HttpHealthCheck, error)
-	InsertHook func(m *MockHttpHealthChecks, ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck) (bool, error)
-	DeleteHook func(m *MockHttpHealthChecks, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockHttpHealthChecks, context.Context, *meta.Key, *ga.HttpHealthCheck) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockHttpHealthChecks) (bool, *ga.HttpHealthCheck, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockHttpHealthChecks) (bool, []*ga.HttpHealthCheck, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck, m *MockHttpHealthChecks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockHttpHealthChecks) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *ga.HttpHealthCheck, *MockHttpHealthChecks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -7308,7 +7363,7 @@ type MockHttpHealthChecks struct {
 // Get returns the object from the mock.
 func (m *MockHttpHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpHealthCheck, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockHttpHealthChecks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -7341,7 +7396,7 @@ func (m *MockHttpHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.Http
 // List all of the objects in the mock.
 func (m *MockHttpHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HttpHealthCheck, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockHttpHealthChecks.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -7372,7 +7427,7 @@ func (m *MockHttpHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.Ht
 // Insert is a mock for inserting/creating a new object.
 func (m *MockHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockHttpHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -7398,9 +7453,8 @@ func (m *MockHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "httpHealthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "httpHealthChecks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "httpHealthChecks", key)
 
 	m.Objects[*key] = &MockHttpHealthChecksObj{obj}
 	glog.V(5).Infof("MockHttpHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -7410,7 +7464,7 @@ func (m *MockHttpHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *g
 // Delete is a mock for deleting the object.
 func (m *MockHttpHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockHttpHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -7448,7 +7502,7 @@ func (m *MockHttpHealthChecks) Obj(o *ga.HttpHealthCheck) *MockHttpHealthChecksO
 // Update is a mock for the corresponding method.
 func (m *MockHttpHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HttpHealthCheck) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -7638,8 +7692,10 @@ type HttpsHealthChecks interface {
 }
 
 // NewMockHttpsHealthChecks returns a new mock for HttpsHealthChecks.
-func NewMockHttpsHealthChecks(objs map[meta.Key]*MockHttpsHealthChecksObj) *MockHttpsHealthChecks {
+func NewMockHttpsHealthChecks(pr ProjectRouter, objs map[meta.Key]*MockHttpsHealthChecksObj) *MockHttpsHealthChecks {
 	mock := &MockHttpsHealthChecks{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -7651,6 +7707,8 @@ func NewMockHttpsHealthChecks(objs map[meta.Key]*MockHttpsHealthChecksObj) *Mock
 // MockHttpsHealthChecks is the mock for HttpsHealthChecks.
 type MockHttpsHealthChecks struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockHttpsHealthChecksObj
@@ -7666,11 +7724,11 @@ type MockHttpsHealthChecks struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockHttpsHealthChecks, ctx context.Context, key *meta.Key) (bool, *ga.HttpsHealthCheck, error)
-	ListHook   func(m *MockHttpsHealthChecks, ctx context.Context, fl *filter.F) (bool, []*ga.HttpsHealthCheck, error)
-	InsertHook func(m *MockHttpsHealthChecks, ctx context.Context, key *meta.Key, obj *ga.HttpsHealthCheck) (bool, error)
-	DeleteHook func(m *MockHttpsHealthChecks, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockHttpsHealthChecks, context.Context, *meta.Key, *ga.HttpsHealthCheck) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockHttpsHealthChecks) (bool, *ga.HttpsHealthCheck, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockHttpsHealthChecks) (bool, []*ga.HttpsHealthCheck, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.HttpsHealthCheck, m *MockHttpsHealthChecks) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockHttpsHealthChecks) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *ga.HttpsHealthCheck, *MockHttpsHealthChecks) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -7680,7 +7738,7 @@ type MockHttpsHealthChecks struct {
 // Get returns the object from the mock.
 func (m *MockHttpsHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.HttpsHealthCheck, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockHttpsHealthChecks.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -7713,7 +7771,7 @@ func (m *MockHttpsHealthChecks) Get(ctx context.Context, key *meta.Key) (*ga.Htt
 // List all of the objects in the mock.
 func (m *MockHttpsHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.HttpsHealthCheck, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockHttpsHealthChecks.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -7744,7 +7802,7 @@ func (m *MockHttpsHealthChecks) List(ctx context.Context, fl *filter.F) ([]*ga.H
 // Insert is a mock for inserting/creating a new object.
 func (m *MockHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *ga.HttpsHealthCheck) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockHttpsHealthChecks.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -7770,9 +7828,8 @@ func (m *MockHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "httpsHealthChecks", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "httpsHealthChecks")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "httpsHealthChecks", key)
 
 	m.Objects[*key] = &MockHttpsHealthChecksObj{obj}
 	glog.V(5).Infof("MockHttpsHealthChecks.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -7782,7 +7839,7 @@ func (m *MockHttpsHealthChecks) Insert(ctx context.Context, key *meta.Key, obj *
 // Delete is a mock for deleting the object.
 func (m *MockHttpsHealthChecks) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockHttpsHealthChecks.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -7820,7 +7877,7 @@ func (m *MockHttpsHealthChecks) Obj(o *ga.HttpsHealthCheck) *MockHttpsHealthChec
 // Update is a mock for the corresponding method.
 func (m *MockHttpsHealthChecks) Update(ctx context.Context, key *meta.Key, arg0 *ga.HttpsHealthCheck) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -8013,8 +8070,10 @@ type InstanceGroups interface {
 }
 
 // NewMockInstanceGroups returns a new mock for InstanceGroups.
-func NewMockInstanceGroups(objs map[meta.Key]*MockInstanceGroupsObj) *MockInstanceGroups {
+func NewMockInstanceGroups(pr ProjectRouter, objs map[meta.Key]*MockInstanceGroupsObj) *MockInstanceGroups {
 	mock := &MockInstanceGroups{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -8026,6 +8085,8 @@ func NewMockInstanceGroups(objs map[meta.Key]*MockInstanceGroupsObj) *MockInstan
 // MockInstanceGroups is the mock for InstanceGroups.
 type MockInstanceGroups struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstanceGroupsObj
@@ -8041,14 +8102,14 @@ type MockInstanceGroups struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook             func(m *MockInstanceGroups, ctx context.Context, key *meta.Key) (bool, *ga.InstanceGroup, error)
-	ListHook            func(m *MockInstanceGroups, ctx context.Context, zone string, fl *filter.F) (bool, []*ga.InstanceGroup, error)
-	InsertHook          func(m *MockInstanceGroups, ctx context.Context, key *meta.Key, obj *ga.InstanceGroup) (bool, error)
-	DeleteHook          func(m *MockInstanceGroups, ctx context.Context, key *meta.Key) (bool, error)
-	AddInstancesHook    func(*MockInstanceGroups, context.Context, *meta.Key, *ga.InstanceGroupsAddInstancesRequest) error
-	ListInstancesHook   func(*MockInstanceGroups, context.Context, *meta.Key, *ga.InstanceGroupsListInstancesRequest, *filter.F) ([]*ga.InstanceWithNamedPorts, error)
-	RemoveInstancesHook func(*MockInstanceGroups, context.Context, *meta.Key, *ga.InstanceGroupsRemoveInstancesRequest) error
-	SetNamedPortsHook   func(*MockInstanceGroups, context.Context, *meta.Key, *ga.InstanceGroupsSetNamedPortsRequest) error
+	GetHook             func(ctx context.Context, key *meta.Key, m *MockInstanceGroups) (bool, *ga.InstanceGroup, error)
+	ListHook            func(ctx context.Context, zone string, fl *filter.F, m *MockInstanceGroups) (bool, []*ga.InstanceGroup, error)
+	InsertHook          func(ctx context.Context, key *meta.Key, obj *ga.InstanceGroup, m *MockInstanceGroups) (bool, error)
+	DeleteHook          func(ctx context.Context, key *meta.Key, m *MockInstanceGroups) (bool, error)
+	AddInstancesHook    func(context.Context, *meta.Key, *ga.InstanceGroupsAddInstancesRequest, *MockInstanceGroups) error
+	ListInstancesHook   func(context.Context, *meta.Key, *ga.InstanceGroupsListInstancesRequest, *filter.F, *MockInstanceGroups) ([]*ga.InstanceWithNamedPorts, error)
+	RemoveInstancesHook func(context.Context, *meta.Key, *ga.InstanceGroupsRemoveInstancesRequest, *MockInstanceGroups) error
+	SetNamedPortsHook   func(context.Context, *meta.Key, *ga.InstanceGroupsSetNamedPortsRequest, *MockInstanceGroups) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -8058,7 +8119,7 @@ type MockInstanceGroups struct {
 // Get returns the object from the mock.
 func (m *MockInstanceGroups) Get(ctx context.Context, key *meta.Key) (*ga.InstanceGroup, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockInstanceGroups.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -8091,7 +8152,7 @@ func (m *MockInstanceGroups) Get(ctx context.Context, key *meta.Key) (*ga.Instan
 // List all of the objects in the mock in the given zone.
 func (m *MockInstanceGroups) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.InstanceGroup, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockInstanceGroups.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -8125,7 +8186,7 @@ func (m *MockInstanceGroups) List(ctx context.Context, zone string, fl *filter.F
 // Insert is a mock for inserting/creating a new object.
 func (m *MockInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.InstanceGroup) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockInstanceGroups.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -8151,9 +8212,8 @@ func (m *MockInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "instanceGroups", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "instanceGroups")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "instanceGroups", key)
 
 	m.Objects[*key] = &MockInstanceGroupsObj{obj}
 	glog.V(5).Infof("MockInstanceGroups.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -8163,7 +8223,7 @@ func (m *MockInstanceGroups) Insert(ctx context.Context, key *meta.Key, obj *ga.
 // Delete is a mock for deleting the object.
 func (m *MockInstanceGroups) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockInstanceGroups.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -8201,7 +8261,7 @@ func (m *MockInstanceGroups) Obj(o *ga.InstanceGroup) *MockInstanceGroupsObj {
 // AddInstances is a mock for the corresponding method.
 func (m *MockInstanceGroups) AddInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsAddInstancesRequest) error {
 	if m.AddInstancesHook != nil {
-		return m.AddInstancesHook(m, ctx, key, arg0)
+		return m.AddInstancesHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -8209,7 +8269,7 @@ func (m *MockInstanceGroups) AddInstances(ctx context.Context, key *meta.Key, ar
 // ListInstances is a mock for the corresponding method.
 func (m *MockInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsListInstancesRequest, fl *filter.F) ([]*ga.InstanceWithNamedPorts, error) {
 	if m.ListInstancesHook != nil {
-		return m.ListInstancesHook(m, ctx, key, arg0, fl)
+		return m.ListInstancesHook(ctx, key, arg0, fl, m)
 	}
 	return nil, nil
 }
@@ -8217,7 +8277,7 @@ func (m *MockInstanceGroups) ListInstances(ctx context.Context, key *meta.Key, a
 // RemoveInstances is a mock for the corresponding method.
 func (m *MockInstanceGroups) RemoveInstances(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsRemoveInstancesRequest) error {
 	if m.RemoveInstancesHook != nil {
-		return m.RemoveInstancesHook(m, ctx, key, arg0)
+		return m.RemoveInstancesHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -8225,7 +8285,7 @@ func (m *MockInstanceGroups) RemoveInstances(ctx context.Context, key *meta.Key,
 // SetNamedPorts is a mock for the corresponding method.
 func (m *MockInstanceGroups) SetNamedPorts(ctx context.Context, key *meta.Key, arg0 *ga.InstanceGroupsSetNamedPortsRequest) error {
 	if m.SetNamedPortsHook != nil {
-		return m.SetNamedPortsHook(m, ctx, key, arg0)
+		return m.SetNamedPortsHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -8525,8 +8585,10 @@ type Instances interface {
 }
 
 // NewMockInstances returns a new mock for Instances.
-func NewMockInstances(objs map[meta.Key]*MockInstancesObj) *MockInstances {
+func NewMockInstances(pr ProjectRouter, objs map[meta.Key]*MockInstancesObj) *MockInstances {
 	mock := &MockInstances{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -8538,6 +8600,8 @@ func NewMockInstances(objs map[meta.Key]*MockInstancesObj) *MockInstances {
 // MockInstances is the mock for Instances.
 type MockInstances struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstancesObj
@@ -8553,12 +8617,12 @@ type MockInstances struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook        func(m *MockInstances, ctx context.Context, key *meta.Key) (bool, *ga.Instance, error)
-	ListHook       func(m *MockInstances, ctx context.Context, zone string, fl *filter.F) (bool, []*ga.Instance, error)
-	InsertHook     func(m *MockInstances, ctx context.Context, key *meta.Key, obj *ga.Instance) (bool, error)
-	DeleteHook     func(m *MockInstances, ctx context.Context, key *meta.Key) (bool, error)
-	AttachDiskHook func(*MockInstances, context.Context, *meta.Key, *ga.AttachedDisk) error
-	DetachDiskHook func(*MockInstances, context.Context, *meta.Key, string) error
+	GetHook        func(ctx context.Context, key *meta.Key, m *MockInstances) (bool, *ga.Instance, error)
+	ListHook       func(ctx context.Context, zone string, fl *filter.F, m *MockInstances) (bool, []*ga.Instance, error)
+	InsertHook     func(ctx context.Context, key *meta.Key, obj *ga.Instance, m *MockInstances) (bool, error)
+	DeleteHook     func(ctx context.Context, key *meta.Key, m *MockInstances) (bool, error)
+	AttachDiskHook func(context.Context, *meta.Key, *ga.AttachedDisk, *MockInstances) error
+	DetachDiskHook func(context.Context, *meta.Key, string, *MockInstances) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -8568,7 +8632,7 @@ type MockInstances struct {
 // Get returns the object from the mock.
 func (m *MockInstances) Get(ctx context.Context, key *meta.Key) (*ga.Instance, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockInstances.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -8601,7 +8665,7 @@ func (m *MockInstances) Get(ctx context.Context, key *meta.Key) (*ga.Instance, e
 // List all of the objects in the mock in the given zone.
 func (m *MockInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*ga.Instance, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockInstances.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -8635,7 +8699,7 @@ func (m *MockInstances) List(ctx context.Context, zone string, fl *filter.F) ([]
 // Insert is a mock for inserting/creating a new object.
 func (m *MockInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Instance) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockInstances.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -8661,9 +8725,8 @@ func (m *MockInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Insta
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "instances", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "instances")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "instances", key)
 
 	m.Objects[*key] = &MockInstancesObj{obj}
 	glog.V(5).Infof("MockInstances.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -8673,7 +8736,7 @@ func (m *MockInstances) Insert(ctx context.Context, key *meta.Key, obj *ga.Insta
 // Delete is a mock for deleting the object.
 func (m *MockInstances) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockInstances.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -8711,7 +8774,7 @@ func (m *MockInstances) Obj(o *ga.Instance) *MockInstancesObj {
 // AttachDisk is a mock for the corresponding method.
 func (m *MockInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *ga.AttachedDisk) error {
 	if m.AttachDiskHook != nil {
-		return m.AttachDiskHook(m, ctx, key, arg0)
+		return m.AttachDiskHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -8719,7 +8782,7 @@ func (m *MockInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *ga.
 // DetachDisk is a mock for the corresponding method.
 func (m *MockInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
 	if m.DetachDiskHook != nil {
-		return m.DetachDiskHook(m, ctx, key, arg0)
+		return m.DetachDiskHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -8939,11 +9002,14 @@ type BetaInstances interface {
 	Delete(ctx context.Context, key *meta.Key) error
 	AttachDisk(context.Context, *meta.Key, *beta.AttachedDisk) error
 	DetachDisk(context.Context, *meta.Key, string) error
+	UpdateNetworkInterface(context.Context, *meta.Key, string, *beta.NetworkInterface) error
 }
 
 // NewMockBetaInstances returns a new mock for Instances.
-func NewMockBetaInstances(objs map[meta.Key]*MockInstancesObj) *MockBetaInstances {
+func NewMockBetaInstances(pr ProjectRouter, objs map[meta.Key]*MockInstancesObj) *MockBetaInstances {
 	mock := &MockBetaInstances{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -8955,6 +9021,8 @@ func NewMockBetaInstances(objs map[meta.Key]*MockInstancesObj) *MockBetaInstance
 // MockBetaInstances is the mock for Instances.
 type MockBetaInstances struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstancesObj
@@ -8970,12 +9038,13 @@ type MockBetaInstances struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook        func(m *MockBetaInstances, ctx context.Context, key *meta.Key) (bool, *beta.Instance, error)
-	ListHook       func(m *MockBetaInstances, ctx context.Context, zone string, fl *filter.F) (bool, []*beta.Instance, error)
-	InsertHook     func(m *MockBetaInstances, ctx context.Context, key *meta.Key, obj *beta.Instance) (bool, error)
-	DeleteHook     func(m *MockBetaInstances, ctx context.Context, key *meta.Key) (bool, error)
-	AttachDiskHook func(*MockBetaInstances, context.Context, *meta.Key, *beta.AttachedDisk) error
-	DetachDiskHook func(*MockBetaInstances, context.Context, *meta.Key, string) error
+	GetHook                    func(ctx context.Context, key *meta.Key, m *MockBetaInstances) (bool, *beta.Instance, error)
+	ListHook                   func(ctx context.Context, zone string, fl *filter.F, m *MockBetaInstances) (bool, []*beta.Instance, error)
+	InsertHook                 func(ctx context.Context, key *meta.Key, obj *beta.Instance, m *MockBetaInstances) (bool, error)
+	DeleteHook                 func(ctx context.Context, key *meta.Key, m *MockBetaInstances) (bool, error)
+	AttachDiskHook             func(context.Context, *meta.Key, *beta.AttachedDisk, *MockBetaInstances) error
+	DetachDiskHook             func(context.Context, *meta.Key, string, *MockBetaInstances) error
+	UpdateNetworkInterfaceHook func(context.Context, *meta.Key, string, *beta.NetworkInterface, *MockBetaInstances) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -8985,7 +9054,7 @@ type MockBetaInstances struct {
 // Get returns the object from the mock.
 func (m *MockBetaInstances) Get(ctx context.Context, key *meta.Key) (*beta.Instance, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockBetaInstances.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -9018,7 +9087,7 @@ func (m *MockBetaInstances) Get(ctx context.Context, key *meta.Key) (*beta.Insta
 // List all of the objects in the mock in the given zone.
 func (m *MockBetaInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*beta.Instance, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockBetaInstances.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -9052,7 +9121,7 @@ func (m *MockBetaInstances) List(ctx context.Context, zone string, fl *filter.F)
 // Insert is a mock for inserting/creating a new object.
 func (m *MockBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta.Instance) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockBetaInstances.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -9078,9 +9147,8 @@ func (m *MockBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionBeta, "mock-project", "instances", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "instances")
+	obj.SelfLink = SelfLink(meta.VersionBeta, projectID, "instances", key)
 
 	m.Objects[*key] = &MockInstancesObj{obj}
 	glog.V(5).Infof("MockBetaInstances.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -9090,7 +9158,7 @@ func (m *MockBetaInstances) Insert(ctx context.Context, key *meta.Key, obj *beta
 // Delete is a mock for deleting the object.
 func (m *MockBetaInstances) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockBetaInstances.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -9128,7 +9196,7 @@ func (m *MockBetaInstances) Obj(o *beta.Instance) *MockInstancesObj {
 // AttachDisk is a mock for the corresponding method.
 func (m *MockBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *beta.AttachedDisk) error {
 	if m.AttachDiskHook != nil {
-		return m.AttachDiskHook(m, ctx, key, arg0)
+		return m.AttachDiskHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -9136,7 +9204,15 @@ func (m *MockBetaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 
 // DetachDisk is a mock for the corresponding method.
 func (m *MockBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
 	if m.DetachDiskHook != nil {
-		return m.DetachDiskHook(m, ctx, key, arg0)
+		return m.DetachDiskHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// UpdateNetworkInterface is a mock for the corresponding method.
+func (m *MockBetaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *beta.NetworkInterface) error {
+	if m.UpdateNetworkInterfaceHook != nil {
+		return m.UpdateNetworkInterfaceHook(ctx, key, arg0, arg1, m)
 	}
 	return nil
 }
@@ -9348,6 +9424,39 @@ func (g *GCEBetaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 s
 	return err
 }
 
+// UpdateNetworkInterface is a method on GCEBetaInstances.
+func (g *GCEBetaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *beta.NetworkInterface) error {
+	glog.V(5).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "beta", "Instances")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "UpdateNetworkInterface",
+		Version:   meta.Version("beta"),
+		Service:   "Instances",
+	}
+	glog.V(5).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.Beta.Instances.UpdateNetworkInterface(projectID, key.Zone, key.Name, arg0, arg1)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCEBetaInstances.UpdateNetworkInterface(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
 // AlphaInstances is an interface that allows for mocking of Instances.
 type AlphaInstances interface {
 	Get(ctx context.Context, key *meta.Key) (*alpha.Instance, error)
@@ -9360,8 +9469,10 @@ type AlphaInstances interface {
 }
 
 // NewMockAlphaInstances returns a new mock for Instances.
-func NewMockAlphaInstances(objs map[meta.Key]*MockInstancesObj) *MockAlphaInstances {
+func NewMockAlphaInstances(pr ProjectRouter, objs map[meta.Key]*MockInstancesObj) *MockAlphaInstances {
 	mock := &MockAlphaInstances{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -9373,6 +9484,8 @@ func NewMockAlphaInstances(objs map[meta.Key]*MockInstancesObj) *MockAlphaInstan
 // MockAlphaInstances is the mock for Instances.
 type MockAlphaInstances struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockInstancesObj
@@ -9388,13 +9501,13 @@ type MockAlphaInstances struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook                    func(m *MockAlphaInstances, ctx context.Context, key *meta.Key) (bool, *alpha.Instance, error)
-	ListHook                   func(m *MockAlphaInstances, ctx context.Context, zone string, fl *filter.F) (bool, []*alpha.Instance, error)
-	InsertHook                 func(m *MockAlphaInstances, ctx context.Context, key *meta.Key, obj *alpha.Instance) (bool, error)
-	DeleteHook                 func(m *MockAlphaInstances, ctx context.Context, key *meta.Key) (bool, error)
-	AttachDiskHook             func(*MockAlphaInstances, context.Context, *meta.Key, *alpha.AttachedDisk) error
-	DetachDiskHook             func(*MockAlphaInstances, context.Context, *meta.Key, string) error
-	UpdateNetworkInterfaceHook func(*MockAlphaInstances, context.Context, *meta.Key, string, *alpha.NetworkInterface) error
+	GetHook                    func(ctx context.Context, key *meta.Key, m *MockAlphaInstances) (bool, *alpha.Instance, error)
+	ListHook                   func(ctx context.Context, zone string, fl *filter.F, m *MockAlphaInstances) (bool, []*alpha.Instance, error)
+	InsertHook                 func(ctx context.Context, key *meta.Key, obj *alpha.Instance, m *MockAlphaInstances) (bool, error)
+	DeleteHook                 func(ctx context.Context, key *meta.Key, m *MockAlphaInstances) (bool, error)
+	AttachDiskHook             func(context.Context, *meta.Key, *alpha.AttachedDisk, *MockAlphaInstances) error
+	DetachDiskHook             func(context.Context, *meta.Key, string, *MockAlphaInstances) error
+	UpdateNetworkInterfaceHook func(context.Context, *meta.Key, string, *alpha.NetworkInterface, *MockAlphaInstances) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -9404,7 +9517,7 @@ type MockAlphaInstances struct {
 // Get returns the object from the mock.
 func (m *MockAlphaInstances) Get(ctx context.Context, key *meta.Key) (*alpha.Instance, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaInstances.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -9437,7 +9550,7 @@ func (m *MockAlphaInstances) Get(ctx context.Context, key *meta.Key) (*alpha.Ins
 // List all of the objects in the mock in the given zone.
 func (m *MockAlphaInstances) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.Instance, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaInstances.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -9471,7 +9584,7 @@ func (m *MockAlphaInstances) List(ctx context.Context, zone string, fl *filter.F
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alpha.Instance) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaInstances.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -9497,9 +9610,8 @@ func (m *MockAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alp
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "instances", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "instances")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "instances", key)
 
 	m.Objects[*key] = &MockInstancesObj{obj}
 	glog.V(5).Infof("MockAlphaInstances.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -9509,7 +9621,7 @@ func (m *MockAlphaInstances) Insert(ctx context.Context, key *meta.Key, obj *alp
 // Delete is a mock for deleting the object.
 func (m *MockAlphaInstances) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaInstances.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -9547,7 +9659,7 @@ func (m *MockAlphaInstances) Obj(o *alpha.Instance) *MockInstancesObj {
 // AttachDisk is a mock for the corresponding method.
 func (m *MockAlphaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0 *alpha.AttachedDisk) error {
 	if m.AttachDiskHook != nil {
-		return m.AttachDiskHook(m, ctx, key, arg0)
+		return m.AttachDiskHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -9555,7 +9667,7 @@ func (m *MockAlphaInstances) AttachDisk(ctx context.Context, key *meta.Key, arg0
 // DetachDisk is a mock for the corresponding method.
 func (m *MockAlphaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0 string) error {
 	if m.DetachDiskHook != nil {
-		return m.DetachDiskHook(m, ctx, key, arg0)
+		return m.DetachDiskHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -9563,7 +9675,7 @@ func (m *MockAlphaInstances) DetachDisk(ctx context.Context, key *meta.Key, arg0
 // UpdateNetworkInterface is a mock for the corresponding method.
 func (m *MockAlphaInstances) UpdateNetworkInterface(ctx context.Context, key *meta.Key, arg0 string, arg1 *alpha.NetworkInterface) error {
 	if m.UpdateNetworkInterfaceHook != nil {
-		return m.UpdateNetworkInterfaceHook(m, ctx, key, arg0, arg1)
+		return m.UpdateNetworkInterfaceHook(ctx, key, arg0, arg1, m)
 	}
 	return nil
 }
@@ -9821,8 +9933,10 @@ type AlphaNetworkEndpointGroups interface {
 }
 
 // NewMockAlphaNetworkEndpointGroups returns a new mock for NetworkEndpointGroups.
-func NewMockAlphaNetworkEndpointGroups(objs map[meta.Key]*MockNetworkEndpointGroupsObj) *MockAlphaNetworkEndpointGroups {
+func NewMockAlphaNetworkEndpointGroups(pr ProjectRouter, objs map[meta.Key]*MockNetworkEndpointGroupsObj) *MockAlphaNetworkEndpointGroups {
 	mock := &MockAlphaNetworkEndpointGroups{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -9834,6 +9948,8 @@ func NewMockAlphaNetworkEndpointGroups(objs map[meta.Key]*MockNetworkEndpointGro
 // MockAlphaNetworkEndpointGroups is the mock for NetworkEndpointGroups.
 type MockAlphaNetworkEndpointGroups struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockNetworkEndpointGroupsObj
@@ -9850,14 +9966,14 @@ type MockAlphaNetworkEndpointGroups struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook                    func(m *MockAlphaNetworkEndpointGroups, ctx context.Context, key *meta.Key) (bool, *alpha.NetworkEndpointGroup, error)
-	ListHook                   func(m *MockAlphaNetworkEndpointGroups, ctx context.Context, zone string, fl *filter.F) (bool, []*alpha.NetworkEndpointGroup, error)
-	InsertHook                 func(m *MockAlphaNetworkEndpointGroups, ctx context.Context, key *meta.Key, obj *alpha.NetworkEndpointGroup) (bool, error)
-	DeleteHook                 func(m *MockAlphaNetworkEndpointGroups, ctx context.Context, key *meta.Key) (bool, error)
-	AggregatedListHook         func(m *MockAlphaNetworkEndpointGroups, ctx context.Context, fl *filter.F) (bool, map[string][]*alpha.NetworkEndpointGroup, error)
-	AttachNetworkEndpointsHook func(*MockAlphaNetworkEndpointGroups, context.Context, *meta.Key, *alpha.NetworkEndpointGroupsAttachEndpointsRequest) error
-	DetachNetworkEndpointsHook func(*MockAlphaNetworkEndpointGroups, context.Context, *meta.Key, *alpha.NetworkEndpointGroupsDetachEndpointsRequest) error
-	ListNetworkEndpointsHook   func(*MockAlphaNetworkEndpointGroups, context.Context, *meta.Key, *alpha.NetworkEndpointGroupsListEndpointsRequest, *filter.F) ([]*alpha.NetworkEndpointWithHealthStatus, error)
+	GetHook                    func(ctx context.Context, key *meta.Key, m *MockAlphaNetworkEndpointGroups) (bool, *alpha.NetworkEndpointGroup, error)
+	ListHook                   func(ctx context.Context, zone string, fl *filter.F, m *MockAlphaNetworkEndpointGroups) (bool, []*alpha.NetworkEndpointGroup, error)
+	InsertHook                 func(ctx context.Context, key *meta.Key, obj *alpha.NetworkEndpointGroup, m *MockAlphaNetworkEndpointGroups) (bool, error)
+	DeleteHook                 func(ctx context.Context, key *meta.Key, m *MockAlphaNetworkEndpointGroups) (bool, error)
+	AggregatedListHook         func(ctx context.Context, fl *filter.F, m *MockAlphaNetworkEndpointGroups) (bool, map[string][]*alpha.NetworkEndpointGroup, error)
+	AttachNetworkEndpointsHook func(context.Context, *meta.Key, *alpha.NetworkEndpointGroupsAttachEndpointsRequest, *MockAlphaNetworkEndpointGroups) error
+	DetachNetworkEndpointsHook func(context.Context, *meta.Key, *alpha.NetworkEndpointGroupsDetachEndpointsRequest, *MockAlphaNetworkEndpointGroups) error
+	ListNetworkEndpointsHook   func(context.Context, *meta.Key, *alpha.NetworkEndpointGroupsListEndpointsRequest, *filter.F, *MockAlphaNetworkEndpointGroups) ([]*alpha.NetworkEndpointWithHealthStatus, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -9867,7 +9983,7 @@ type MockAlphaNetworkEndpointGroups struct {
 // Get returns the object from the mock.
 func (m *MockAlphaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key) (*alpha.NetworkEndpointGroup, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaNetworkEndpointGroups.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -9900,7 +10016,7 @@ func (m *MockAlphaNetworkEndpointGroups) Get(ctx context.Context, key *meta.Key)
 // List all of the objects in the mock in the given zone.
 func (m *MockAlphaNetworkEndpointGroups) List(ctx context.Context, zone string, fl *filter.F) ([]*alpha.NetworkEndpointGroup, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, zone, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, zone, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaNetworkEndpointGroups.List(%v, %q, %v) = [%v items], %v", ctx, zone, fl, len(objs), err)
 			return objs, err
 		}
@@ -9934,7 +10050,7 @@ func (m *MockAlphaNetworkEndpointGroups) List(ctx context.Context, zone string, 
 // Insert is a mock for inserting/creating a new object.
 func (m *MockAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.Key, obj *alpha.NetworkEndpointGroup) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockAlphaNetworkEndpointGroups.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -9960,9 +10076,8 @@ func (m *MockAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.K
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionAlpha, "mock-project", "networkEndpointGroups", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "networkEndpointGroups")
+	obj.SelfLink = SelfLink(meta.VersionAlpha, projectID, "networkEndpointGroups", key)
 
 	m.Objects[*key] = &MockNetworkEndpointGroupsObj{obj}
 	glog.V(5).Infof("MockAlphaNetworkEndpointGroups.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -9972,7 +10087,7 @@ func (m *MockAlphaNetworkEndpointGroups) Insert(ctx context.Context, key *meta.K
 // Delete is a mock for deleting the object.
 func (m *MockAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockAlphaNetworkEndpointGroups.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -10005,7 +10120,7 @@ func (m *MockAlphaNetworkEndpointGroups) Delete(ctx context.Context, key *meta.K
 // AggregatedList is a mock for AggregatedList.
 func (m *MockAlphaNetworkEndpointGroups) AggregatedList(ctx context.Context, fl *filter.F) (map[string][]*alpha.NetworkEndpointGroup, error) {
 	if m.AggregatedListHook != nil {
-		if intercept, objs, err := m.AggregatedListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.AggregatedListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockAlphaNetworkEndpointGroups.AggregatedList(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -10045,7 +10160,7 @@ func (m *MockAlphaNetworkEndpointGroups) Obj(o *alpha.NetworkEndpointGroup) *Moc
 // AttachNetworkEndpoints is a mock for the corresponding method.
 func (m *MockAlphaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsAttachEndpointsRequest) error {
 	if m.AttachNetworkEndpointsHook != nil {
-		return m.AttachNetworkEndpointsHook(m, ctx, key, arg0)
+		return m.AttachNetworkEndpointsHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -10053,7 +10168,7 @@ func (m *MockAlphaNetworkEndpointGroups) AttachNetworkEndpoints(ctx context.Cont
 // DetachNetworkEndpoints is a mock for the corresponding method.
 func (m *MockAlphaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsDetachEndpointsRequest) error {
 	if m.DetachNetworkEndpointsHook != nil {
-		return m.DetachNetworkEndpointsHook(m, ctx, key, arg0)
+		return m.DetachNetworkEndpointsHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -10061,7 +10176,7 @@ func (m *MockAlphaNetworkEndpointGroups) DetachNetworkEndpoints(ctx context.Cont
 // ListNetworkEndpoints is a mock for the corresponding method.
 func (m *MockAlphaNetworkEndpointGroups) ListNetworkEndpoints(ctx context.Context, key *meta.Key, arg0 *alpha.NetworkEndpointGroupsListEndpointsRequest, fl *filter.F) ([]*alpha.NetworkEndpointWithHealthStatus, error) {
 	if m.ListNetworkEndpointsHook != nil {
-		return m.ListNetworkEndpointsHook(m, ctx, key, arg0, fl)
+		return m.ListNetworkEndpointsHook(ctx, key, arg0, fl, m)
 	}
 	return nil, nil
 }
@@ -10373,8 +10488,10 @@ type Projects interface {
 }
 
 // NewMockProjects returns a new mock for Projects.
-func NewMockProjects(objs map[meta.Key]*MockProjectsObj) *MockProjects {
+func NewMockProjects(pr ProjectRouter, objs map[meta.Key]*MockProjectsObj) *MockProjects {
 	mock := &MockProjects{
+		ProjectRouter: pr,
+
 		Objects: objs,
 	}
 	return mock
@@ -10383,6 +10500,8 @@ func NewMockProjects(objs map[meta.Key]*MockProjectsObj) *MockProjects {
 // MockProjects is the mock for Projects.
 type MockProjects struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockProjectsObj
@@ -10417,8 +10536,10 @@ type Regions interface {
 }
 
 // NewMockRegions returns a new mock for Regions.
-func NewMockRegions(objs map[meta.Key]*MockRegionsObj) *MockRegions {
+func NewMockRegions(pr ProjectRouter, objs map[meta.Key]*MockRegionsObj) *MockRegions {
 	mock := &MockRegions{
+		ProjectRouter: pr,
+
 		Objects:  objs,
 		GetError: map[meta.Key]error{},
 	}
@@ -10428,6 +10549,8 @@ func NewMockRegions(objs map[meta.Key]*MockRegionsObj) *MockRegions {
 // MockRegions is the mock for Regions.
 type MockRegions struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRegionsObj
@@ -10441,8 +10564,8 @@ type MockRegions struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook  func(m *MockRegions, ctx context.Context, key *meta.Key) (bool, *ga.Region, error)
-	ListHook func(m *MockRegions, ctx context.Context, fl *filter.F) (bool, []*ga.Region, error)
+	GetHook  func(ctx context.Context, key *meta.Key, m *MockRegions) (bool, *ga.Region, error)
+	ListHook func(ctx context.Context, fl *filter.F, m *MockRegions) (bool, []*ga.Region, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -10452,7 +10575,7 @@ type MockRegions struct {
 // Get returns the object from the mock.
 func (m *MockRegions) Get(ctx context.Context, key *meta.Key) (*ga.Region, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockRegions.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -10485,7 +10608,7 @@ func (m *MockRegions) Get(ctx context.Context, key *meta.Key) (*ga.Region, error
 // List all of the objects in the mock.
 func (m *MockRegions) List(ctx context.Context, fl *filter.F) ([]*ga.Region, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockRegions.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -10601,8 +10724,10 @@ type Routes interface {
 }
 
 // NewMockRoutes returns a new mock for Routes.
-func NewMockRoutes(objs map[meta.Key]*MockRoutesObj) *MockRoutes {
+func NewMockRoutes(pr ProjectRouter, objs map[meta.Key]*MockRoutesObj) *MockRoutes {
 	mock := &MockRoutes{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -10614,6 +10739,8 @@ func NewMockRoutes(objs map[meta.Key]*MockRoutesObj) *MockRoutes {
 // MockRoutes is the mock for Routes.
 type MockRoutes struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockRoutesObj
@@ -10629,10 +10756,10 @@ type MockRoutes struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockRoutes, ctx context.Context, key *meta.Key) (bool, *ga.Route, error)
-	ListHook   func(m *MockRoutes, ctx context.Context, fl *filter.F) (bool, []*ga.Route, error)
-	InsertHook func(m *MockRoutes, ctx context.Context, key *meta.Key, obj *ga.Route) (bool, error)
-	DeleteHook func(m *MockRoutes, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockRoutes) (bool, *ga.Route, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockRoutes) (bool, []*ga.Route, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.Route, m *MockRoutes) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockRoutes) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -10642,7 +10769,7 @@ type MockRoutes struct {
 // Get returns the object from the mock.
 func (m *MockRoutes) Get(ctx context.Context, key *meta.Key) (*ga.Route, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockRoutes.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -10675,7 +10802,7 @@ func (m *MockRoutes) Get(ctx context.Context, key *meta.Key) (*ga.Route, error) 
 // List all of the objects in the mock.
 func (m *MockRoutes) List(ctx context.Context, fl *filter.F) ([]*ga.Route, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockRoutes.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -10706,7 +10833,7 @@ func (m *MockRoutes) List(ctx context.Context, fl *filter.F) ([]*ga.Route, error
 // Insert is a mock for inserting/creating a new object.
 func (m *MockRoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockRoutes.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -10732,9 +10859,8 @@ func (m *MockRoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) e
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "routes", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "routes")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "routes", key)
 
 	m.Objects[*key] = &MockRoutesObj{obj}
 	glog.V(5).Infof("MockRoutes.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -10744,7 +10870,7 @@ func (m *MockRoutes) Insert(ctx context.Context, key *meta.Key, obj *ga.Route) e
 // Delete is a mock for deleting the object.
 func (m *MockRoutes) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockRoutes.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -10930,8 +11056,10 @@ type SslCertificates interface {
 }
 
 // NewMockSslCertificates returns a new mock for SslCertificates.
-func NewMockSslCertificates(objs map[meta.Key]*MockSslCertificatesObj) *MockSslCertificates {
+func NewMockSslCertificates(pr ProjectRouter, objs map[meta.Key]*MockSslCertificatesObj) *MockSslCertificates {
 	mock := &MockSslCertificates{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -10943,6 +11071,8 @@ func NewMockSslCertificates(objs map[meta.Key]*MockSslCertificatesObj) *MockSslC
 // MockSslCertificates is the mock for SslCertificates.
 type MockSslCertificates struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockSslCertificatesObj
@@ -10958,10 +11088,10 @@ type MockSslCertificates struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockSslCertificates, ctx context.Context, key *meta.Key) (bool, *ga.SslCertificate, error)
-	ListHook   func(m *MockSslCertificates, ctx context.Context, fl *filter.F) (bool, []*ga.SslCertificate, error)
-	InsertHook func(m *MockSslCertificates, ctx context.Context, key *meta.Key, obj *ga.SslCertificate) (bool, error)
-	DeleteHook func(m *MockSslCertificates, ctx context.Context, key *meta.Key) (bool, error)
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockSslCertificates) (bool, *ga.SslCertificate, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockSslCertificates) (bool, []*ga.SslCertificate, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.SslCertificate, m *MockSslCertificates) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockSslCertificates) (bool, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -10971,7 +11101,7 @@ type MockSslCertificates struct {
 // Get returns the object from the mock.
 func (m *MockSslCertificates) Get(ctx context.Context, key *meta.Key) (*ga.SslCertificate, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockSslCertificates.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -11004,7 +11134,7 @@ func (m *MockSslCertificates) Get(ctx context.Context, key *meta.Key) (*ga.SslCe
 // List all of the objects in the mock.
 func (m *MockSslCertificates) List(ctx context.Context, fl *filter.F) ([]*ga.SslCertificate, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockSslCertificates.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -11035,7 +11165,7 @@ func (m *MockSslCertificates) List(ctx context.Context, fl *filter.F) ([]*ga.Ssl
 // Insert is a mock for inserting/creating a new object.
 func (m *MockSslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga.SslCertificate) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockSslCertificates.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -11061,9 +11191,8 @@ func (m *MockSslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "sslCertificates", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "sslCertificates")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "sslCertificates", key)
 
 	m.Objects[*key] = &MockSslCertificatesObj{obj}
 	glog.V(5).Infof("MockSslCertificates.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -11073,7 +11202,7 @@ func (m *MockSslCertificates) Insert(ctx context.Context, key *meta.Key, obj *ga
 // Delete is a mock for deleting the object.
 func (m *MockSslCertificates) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockSslCertificates.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -11260,8 +11389,10 @@ type TargetHttpProxies interface {
 }
 
 // NewMockTargetHttpProxies returns a new mock for TargetHttpProxies.
-func NewMockTargetHttpProxies(objs map[meta.Key]*MockTargetHttpProxiesObj) *MockTargetHttpProxies {
+func NewMockTargetHttpProxies(pr ProjectRouter, objs map[meta.Key]*MockTargetHttpProxiesObj) *MockTargetHttpProxies {
 	mock := &MockTargetHttpProxies{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -11273,6 +11404,8 @@ func NewMockTargetHttpProxies(objs map[meta.Key]*MockTargetHttpProxiesObj) *Mock
 // MockTargetHttpProxies is the mock for TargetHttpProxies.
 type MockTargetHttpProxies struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockTargetHttpProxiesObj
@@ -11288,11 +11421,11 @@ type MockTargetHttpProxies struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook       func(m *MockTargetHttpProxies, ctx context.Context, key *meta.Key) (bool, *ga.TargetHttpProxy, error)
-	ListHook      func(m *MockTargetHttpProxies, ctx context.Context, fl *filter.F) (bool, []*ga.TargetHttpProxy, error)
-	InsertHook    func(m *MockTargetHttpProxies, ctx context.Context, key *meta.Key, obj *ga.TargetHttpProxy) (bool, error)
-	DeleteHook    func(m *MockTargetHttpProxies, ctx context.Context, key *meta.Key) (bool, error)
-	SetUrlMapHook func(*MockTargetHttpProxies, context.Context, *meta.Key, *ga.UrlMapReference) error
+	GetHook       func(ctx context.Context, key *meta.Key, m *MockTargetHttpProxies) (bool, *ga.TargetHttpProxy, error)
+	ListHook      func(ctx context.Context, fl *filter.F, m *MockTargetHttpProxies) (bool, []*ga.TargetHttpProxy, error)
+	InsertHook    func(ctx context.Context, key *meta.Key, obj *ga.TargetHttpProxy, m *MockTargetHttpProxies) (bool, error)
+	DeleteHook    func(ctx context.Context, key *meta.Key, m *MockTargetHttpProxies) (bool, error)
+	SetUrlMapHook func(context.Context, *meta.Key, *ga.UrlMapReference, *MockTargetHttpProxies) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -11302,7 +11435,7 @@ type MockTargetHttpProxies struct {
 // Get returns the object from the mock.
 func (m *MockTargetHttpProxies) Get(ctx context.Context, key *meta.Key) (*ga.TargetHttpProxy, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockTargetHttpProxies.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -11335,7 +11468,7 @@ func (m *MockTargetHttpProxies) Get(ctx context.Context, key *meta.Key) (*ga.Tar
 // List all of the objects in the mock.
 func (m *MockTargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*ga.TargetHttpProxy, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockTargetHttpProxies.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -11366,7 +11499,7 @@ func (m *MockTargetHttpProxies) List(ctx context.Context, fl *filter.F) ([]*ga.T
 // Insert is a mock for inserting/creating a new object.
 func (m *MockTargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetHttpProxy) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockTargetHttpProxies.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -11392,9 +11525,8 @@ func (m *MockTargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "targetHttpProxies", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "targetHttpProxies")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "targetHttpProxies", key)
 
 	m.Objects[*key] = &MockTargetHttpProxiesObj{obj}
 	glog.V(5).Infof("MockTargetHttpProxies.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -11404,7 +11536,7 @@ func (m *MockTargetHttpProxies) Insert(ctx context.Context, key *meta.Key, obj *
 // Delete is a mock for deleting the object.
 func (m *MockTargetHttpProxies) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockTargetHttpProxies.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -11442,7 +11574,7 @@ func (m *MockTargetHttpProxies) Obj(o *ga.TargetHttpProxy) *MockTargetHttpProxie
 // SetUrlMap is a mock for the corresponding method.
 func (m *MockTargetHttpProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg0 *ga.UrlMapReference) error {
 	if m.SetUrlMapHook != nil {
-		return m.SetUrlMapHook(m, ctx, key, arg0)
+		return m.SetUrlMapHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -11633,8 +11765,10 @@ type TargetHttpsProxies interface {
 }
 
 // NewMockTargetHttpsProxies returns a new mock for TargetHttpsProxies.
-func NewMockTargetHttpsProxies(objs map[meta.Key]*MockTargetHttpsProxiesObj) *MockTargetHttpsProxies {
+func NewMockTargetHttpsProxies(pr ProjectRouter, objs map[meta.Key]*MockTargetHttpsProxiesObj) *MockTargetHttpsProxies {
 	mock := &MockTargetHttpsProxies{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -11646,6 +11780,8 @@ func NewMockTargetHttpsProxies(objs map[meta.Key]*MockTargetHttpsProxiesObj) *Mo
 // MockTargetHttpsProxies is the mock for TargetHttpsProxies.
 type MockTargetHttpsProxies struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockTargetHttpsProxiesObj
@@ -11661,12 +11797,12 @@ type MockTargetHttpsProxies struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook                func(m *MockTargetHttpsProxies, ctx context.Context, key *meta.Key) (bool, *ga.TargetHttpsProxy, error)
-	ListHook               func(m *MockTargetHttpsProxies, ctx context.Context, fl *filter.F) (bool, []*ga.TargetHttpsProxy, error)
-	InsertHook             func(m *MockTargetHttpsProxies, ctx context.Context, key *meta.Key, obj *ga.TargetHttpsProxy) (bool, error)
-	DeleteHook             func(m *MockTargetHttpsProxies, ctx context.Context, key *meta.Key) (bool, error)
-	SetSslCertificatesHook func(*MockTargetHttpsProxies, context.Context, *meta.Key, *ga.TargetHttpsProxiesSetSslCertificatesRequest) error
-	SetUrlMapHook          func(*MockTargetHttpsProxies, context.Context, *meta.Key, *ga.UrlMapReference) error
+	GetHook                func(ctx context.Context, key *meta.Key, m *MockTargetHttpsProxies) (bool, *ga.TargetHttpsProxy, error)
+	ListHook               func(ctx context.Context, fl *filter.F, m *MockTargetHttpsProxies) (bool, []*ga.TargetHttpsProxy, error)
+	InsertHook             func(ctx context.Context, key *meta.Key, obj *ga.TargetHttpsProxy, m *MockTargetHttpsProxies) (bool, error)
+	DeleteHook             func(ctx context.Context, key *meta.Key, m *MockTargetHttpsProxies) (bool, error)
+	SetSslCertificatesHook func(context.Context, *meta.Key, *ga.TargetHttpsProxiesSetSslCertificatesRequest, *MockTargetHttpsProxies) error
+	SetUrlMapHook          func(context.Context, *meta.Key, *ga.UrlMapReference, *MockTargetHttpsProxies) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -11676,7 +11812,7 @@ type MockTargetHttpsProxies struct {
 // Get returns the object from the mock.
 func (m *MockTargetHttpsProxies) Get(ctx context.Context, key *meta.Key) (*ga.TargetHttpsProxy, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockTargetHttpsProxies.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -11709,7 +11845,7 @@ func (m *MockTargetHttpsProxies) Get(ctx context.Context, key *meta.Key) (*ga.Ta
 // List all of the objects in the mock.
 func (m *MockTargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*ga.TargetHttpsProxy, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockTargetHttpsProxies.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -11740,7 +11876,7 @@ func (m *MockTargetHttpsProxies) List(ctx context.Context, fl *filter.F) ([]*ga.
 // Insert is a mock for inserting/creating a new object.
 func (m *MockTargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetHttpsProxy) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockTargetHttpsProxies.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -11766,9 +11902,8 @@ func (m *MockTargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj 
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "targetHttpsProxies", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "targetHttpsProxies")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "targetHttpsProxies", key)
 
 	m.Objects[*key] = &MockTargetHttpsProxiesObj{obj}
 	glog.V(5).Infof("MockTargetHttpsProxies.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -11778,7 +11913,7 @@ func (m *MockTargetHttpsProxies) Insert(ctx context.Context, key *meta.Key, obj 
 // Delete is a mock for deleting the object.
 func (m *MockTargetHttpsProxies) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockTargetHttpsProxies.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -11816,7 +11951,7 @@ func (m *MockTargetHttpsProxies) Obj(o *ga.TargetHttpsProxy) *MockTargetHttpsPro
 // SetSslCertificates is a mock for the corresponding method.
 func (m *MockTargetHttpsProxies) SetSslCertificates(ctx context.Context, key *meta.Key, arg0 *ga.TargetHttpsProxiesSetSslCertificatesRequest) error {
 	if m.SetSslCertificatesHook != nil {
-		return m.SetSslCertificatesHook(m, ctx, key, arg0)
+		return m.SetSslCertificatesHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -11824,7 +11959,7 @@ func (m *MockTargetHttpsProxies) SetSslCertificates(ctx context.Context, key *me
 // SetUrlMap is a mock for the corresponding method.
 func (m *MockTargetHttpsProxies) SetUrlMap(ctx context.Context, key *meta.Key, arg0 *ga.UrlMapReference) error {
 	if m.SetUrlMapHook != nil {
-		return m.SetUrlMapHook(m, ctx, key, arg0)
+		return m.SetUrlMapHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -12048,8 +12183,10 @@ type TargetPools interface {
 }
 
 // NewMockTargetPools returns a new mock for TargetPools.
-func NewMockTargetPools(objs map[meta.Key]*MockTargetPoolsObj) *MockTargetPools {
+func NewMockTargetPools(pr ProjectRouter, objs map[meta.Key]*MockTargetPoolsObj) *MockTargetPools {
 	mock := &MockTargetPools{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -12061,6 +12198,8 @@ func NewMockTargetPools(objs map[meta.Key]*MockTargetPoolsObj) *MockTargetPools 
 // MockTargetPools is the mock for TargetPools.
 type MockTargetPools struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockTargetPoolsObj
@@ -12076,12 +12215,12 @@ type MockTargetPools struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook            func(m *MockTargetPools, ctx context.Context, key *meta.Key) (bool, *ga.TargetPool, error)
-	ListHook           func(m *MockTargetPools, ctx context.Context, region string, fl *filter.F) (bool, []*ga.TargetPool, error)
-	InsertHook         func(m *MockTargetPools, ctx context.Context, key *meta.Key, obj *ga.TargetPool) (bool, error)
-	DeleteHook         func(m *MockTargetPools, ctx context.Context, key *meta.Key) (bool, error)
-	AddInstanceHook    func(*MockTargetPools, context.Context, *meta.Key, *ga.TargetPoolsAddInstanceRequest) error
-	RemoveInstanceHook func(*MockTargetPools, context.Context, *meta.Key, *ga.TargetPoolsRemoveInstanceRequest) error
+	GetHook            func(ctx context.Context, key *meta.Key, m *MockTargetPools) (bool, *ga.TargetPool, error)
+	ListHook           func(ctx context.Context, region string, fl *filter.F, m *MockTargetPools) (bool, []*ga.TargetPool, error)
+	InsertHook         func(ctx context.Context, key *meta.Key, obj *ga.TargetPool, m *MockTargetPools) (bool, error)
+	DeleteHook         func(ctx context.Context, key *meta.Key, m *MockTargetPools) (bool, error)
+	AddInstanceHook    func(context.Context, *meta.Key, *ga.TargetPoolsAddInstanceRequest, *MockTargetPools) error
+	RemoveInstanceHook func(context.Context, *meta.Key, *ga.TargetPoolsRemoveInstanceRequest, *MockTargetPools) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -12091,7 +12230,7 @@ type MockTargetPools struct {
 // Get returns the object from the mock.
 func (m *MockTargetPools) Get(ctx context.Context, key *meta.Key) (*ga.TargetPool, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockTargetPools.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -12124,7 +12263,7 @@ func (m *MockTargetPools) Get(ctx context.Context, key *meta.Key) (*ga.TargetPoo
 // List all of the objects in the mock in the given region.
 func (m *MockTargetPools) List(ctx context.Context, region string, fl *filter.F) ([]*ga.TargetPool, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, region, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, region, fl, m); intercept {
 			glog.V(5).Infof("MockTargetPools.List(%v, %q, %v) = [%v items], %v", ctx, region, fl, len(objs), err)
 			return objs, err
 		}
@@ -12158,7 +12297,7 @@ func (m *MockTargetPools) List(ctx context.Context, region string, fl *filter.F)
 // Insert is a mock for inserting/creating a new object.
 func (m *MockTargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.TargetPool) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockTargetPools.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -12184,9 +12323,8 @@ func (m *MockTargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Tar
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "targetPools", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "targetPools")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "targetPools", key)
 
 	m.Objects[*key] = &MockTargetPoolsObj{obj}
 	glog.V(5).Infof("MockTargetPools.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -12196,7 +12334,7 @@ func (m *MockTargetPools) Insert(ctx context.Context, key *meta.Key, obj *ga.Tar
 // Delete is a mock for deleting the object.
 func (m *MockTargetPools) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockTargetPools.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -12234,7 +12372,7 @@ func (m *MockTargetPools) Obj(o *ga.TargetPool) *MockTargetPoolsObj {
 // AddInstance is a mock for the corresponding method.
 func (m *MockTargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddInstanceRequest) error {
 	if m.AddInstanceHook != nil {
-		return m.AddInstanceHook(m, ctx, key, arg0)
+		return m.AddInstanceHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -12242,7 +12380,7 @@ func (m *MockTargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *
 // RemoveInstance is a mock for the corresponding method.
 func (m *MockTargetPools) RemoveInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsRemoveInstanceRequest) error {
 	if m.RemoveInstanceHook != nil {
-		return m.RemoveInstanceHook(m, ctx, key, arg0)
+		return m.RemoveInstanceHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -12464,8 +12602,10 @@ type UrlMaps interface {
 }
 
 // NewMockUrlMaps returns a new mock for UrlMaps.
-func NewMockUrlMaps(objs map[meta.Key]*MockUrlMapsObj) *MockUrlMaps {
+func NewMockUrlMaps(pr ProjectRouter, objs map[meta.Key]*MockUrlMapsObj) *MockUrlMaps {
 	mock := &MockUrlMaps{
+		ProjectRouter: pr,
+
 		Objects:     objs,
 		GetError:    map[meta.Key]error{},
 		InsertError: map[meta.Key]error{},
@@ -12477,6 +12617,8 @@ func NewMockUrlMaps(objs map[meta.Key]*MockUrlMapsObj) *MockUrlMaps {
 // MockUrlMaps is the mock for UrlMaps.
 type MockUrlMaps struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockUrlMapsObj
@@ -12492,11 +12634,11 @@ type MockUrlMaps struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook    func(m *MockUrlMaps, ctx context.Context, key *meta.Key) (bool, *ga.UrlMap, error)
-	ListHook   func(m *MockUrlMaps, ctx context.Context, fl *filter.F) (bool, []*ga.UrlMap, error)
-	InsertHook func(m *MockUrlMaps, ctx context.Context, key *meta.Key, obj *ga.UrlMap) (bool, error)
-	DeleteHook func(m *MockUrlMaps, ctx context.Context, key *meta.Key) (bool, error)
-	UpdateHook func(*MockUrlMaps, context.Context, *meta.Key, *ga.UrlMap) error
+	GetHook    func(ctx context.Context, key *meta.Key, m *MockUrlMaps) (bool, *ga.UrlMap, error)
+	ListHook   func(ctx context.Context, fl *filter.F, m *MockUrlMaps) (bool, []*ga.UrlMap, error)
+	InsertHook func(ctx context.Context, key *meta.Key, obj *ga.UrlMap, m *MockUrlMaps) (bool, error)
+	DeleteHook func(ctx context.Context, key *meta.Key, m *MockUrlMaps) (bool, error)
+	UpdateHook func(context.Context, *meta.Key, *ga.UrlMap, *MockUrlMaps) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -12506,7 +12648,7 @@ type MockUrlMaps struct {
 // Get returns the object from the mock.
 func (m *MockUrlMaps) Get(ctx context.Context, key *meta.Key) (*ga.UrlMap, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockUrlMaps.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -12539,7 +12681,7 @@ func (m *MockUrlMaps) Get(ctx context.Context, key *meta.Key) (*ga.UrlMap, error
 // List all of the objects in the mock.
 func (m *MockUrlMaps) List(ctx context.Context, fl *filter.F) ([]*ga.UrlMap, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockUrlMaps.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}
@@ -12570,7 +12712,7 @@ func (m *MockUrlMaps) List(ctx context.Context, fl *filter.F) ([]*ga.UrlMap, err
 // Insert is a mock for inserting/creating a new object.
 func (m *MockUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap) error {
 	if m.InsertHook != nil {
-		if intercept, err := m.InsertHook(m, ctx, key, obj); intercept {
+		if intercept, err := m.InsertHook(ctx, key, obj, m); intercept {
 			glog.V(5).Infof("MockUrlMaps.Insert(%v, %v, %+v) = %v", ctx, key, obj, err)
 			return err
 		}
@@ -12596,9 +12738,8 @@ func (m *MockUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap)
 	}
 
 	obj.Name = key.Name
-	if obj.SelfLink == "" {
-		obj.SelfLink = SelfLink(meta.VersionGA, "mock-project", "urlMaps", key)
-	}
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "urlMaps")
+	obj.SelfLink = SelfLink(meta.VersionGA, projectID, "urlMaps", key)
 
 	m.Objects[*key] = &MockUrlMapsObj{obj}
 	glog.V(5).Infof("MockUrlMaps.Insert(%v, %v, %+v) = nil", ctx, key, obj)
@@ -12608,7 +12749,7 @@ func (m *MockUrlMaps) Insert(ctx context.Context, key *meta.Key, obj *ga.UrlMap)
 // Delete is a mock for deleting the object.
 func (m *MockUrlMaps) Delete(ctx context.Context, key *meta.Key) error {
 	if m.DeleteHook != nil {
-		if intercept, err := m.DeleteHook(m, ctx, key); intercept {
+		if intercept, err := m.DeleteHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockUrlMaps.Delete(%v, %v) = %v", ctx, key, err)
 			return err
 		}
@@ -12646,7 +12787,7 @@ func (m *MockUrlMaps) Obj(o *ga.UrlMap) *MockUrlMapsObj {
 // Update is a mock for the corresponding method.
 func (m *MockUrlMaps) Update(ctx context.Context, key *meta.Key, arg0 *ga.UrlMap) error {
 	if m.UpdateHook != nil {
-		return m.UpdateHook(m, ctx, key, arg0)
+		return m.UpdateHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -12833,8 +12974,10 @@ type Zones interface {
 }
 
 // NewMockZones returns a new mock for Zones.
-func NewMockZones(objs map[meta.Key]*MockZonesObj) *MockZones {
+func NewMockZones(pr ProjectRouter, objs map[meta.Key]*MockZonesObj) *MockZones {
 	mock := &MockZones{
+		ProjectRouter: pr,
+
 		Objects:  objs,
 		GetError: map[meta.Key]error{},
 	}
@@ -12844,6 +12987,8 @@ func NewMockZones(objs map[meta.Key]*MockZonesObj) *MockZones {
 // MockZones is the mock for Zones.
 type MockZones struct {
 	Lock sync.Mutex
+
+	ProjectRouter ProjectRouter
 
 	// Objects maintained by the mock.
 	Objects map[meta.Key]*MockZonesObj
@@ -12857,8 +13002,8 @@ type MockZones struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook  func(m *MockZones, ctx context.Context, key *meta.Key) (bool, *ga.Zone, error)
-	ListHook func(m *MockZones, ctx context.Context, fl *filter.F) (bool, []*ga.Zone, error)
+	GetHook  func(ctx context.Context, key *meta.Key, m *MockZones) (bool, *ga.Zone, error)
+	ListHook func(ctx context.Context, fl *filter.F, m *MockZones) (bool, []*ga.Zone, error)
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -12868,7 +13013,7 @@ type MockZones struct {
 // Get returns the object from the mock.
 func (m *MockZones) Get(ctx context.Context, key *meta.Key) (*ga.Zone, error) {
 	if m.GetHook != nil {
-		if intercept, obj, err := m.GetHook(m, ctx, key); intercept {
+		if intercept, obj, err := m.GetHook(ctx, key, m); intercept {
 			glog.V(5).Infof("MockZones.Get(%v, %s) = %+v, %v", ctx, key, obj, err)
 			return obj, err
 		}
@@ -12901,7 +13046,7 @@ func (m *MockZones) Get(ctx context.Context, key *meta.Key) (*ga.Zone, error) {
 // List all of the objects in the mock.
 func (m *MockZones) List(ctx context.Context, fl *filter.F) ([]*ga.Zone, error) {
 	if m.ListHook != nil {
-		if intercept, objs, err := m.ListHook(m, ctx, fl); intercept {
+		if intercept, objs, err := m.ListHook(ctx, fl, m); intercept {
 			glog.V(5).Infof("MockZones.List(%v, %v) = [%v items], %v", ctx, fl, len(objs), err)
 			return objs, err
 		}

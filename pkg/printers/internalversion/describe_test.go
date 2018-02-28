@@ -80,7 +80,8 @@ func TestDescribePodNode(t *testing.T) {
 			NodeName: "all-in-one",
 		},
 		Status: api.PodStatus{
-			HostIP: "127.0.0.1",
+			HostIP:            "127.0.0.1",
+			NominatedNodeName: "nodeA",
 		},
 	})
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
@@ -90,6 +91,9 @@ func TestDescribePodNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "all-in-one/127.0.0.1") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "nodeA") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -987,6 +991,106 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 			expectedElements: []string{"VolumeMode", "Block"},
 		},
+		{
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+				},
+			},
+			expectedElements:   []string{"Node Affinity:   <none>"},
+			unexpectedElements: []string{"Required Terms", "Term "},
+		},
+		{
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{},
+				},
+			},
+			expectedElements:   []string{"Node Affinity:   <none>"},
+			unexpectedElements: []string{"Required Terms", "Term "},
+		},
+		{
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{},
+					},
+				},
+			},
+			expectedElements:   []string{"Node Affinity", "Required Terms:  <none>"},
+			unexpectedElements: []string{"Term "},
+		},
+		{
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{},
+								},
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedElements: []string{"Node Affinity", "Required Terms", "Term 0", "Term 1"},
+		},
+		{
+			plugin: "local",
+			pv: &api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: api.PersistentVolumeSpec{
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					NodeAffinity: &api.VolumeNodeAffinity{
+						Required: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: "In",
+											Values:   []string{"val1", "val2"},
+										},
+										{
+											Key:      "foo",
+											Operator: "Exists",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedElements: []string{"Node Affinity", "Required Terms", "Term 0",
+				"foo in [val1, val2]",
+				"foo exists"},
+		},
 	}
 
 	for _, test := range testCases {
@@ -1205,6 +1309,158 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 				Status: autoscaling.HorizontalPodAutoscalerStatus{
 					CurrentReplicas: 4,
 					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"external source type, target average value (no current)",
+			autoscaling.HorizontalPodAutoscaler{
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:         "some-external-metric",
+								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"external source type, target average value (with current)",
+			autoscaling.HorizontalPodAutoscaler{
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:         "some-external-metric",
+								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricStatus{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:          "some-external-metric",
+								CurrentAverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			"external source type, target value (no current)",
+			autoscaling.HorizontalPodAutoscaler{
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:  "some-external-metric",
+								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"external source type, target value (with current)",
+			autoscaling.HorizontalPodAutoscaler{
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:  "some-external-metric",
+								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricStatus{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:   "some-external-metric",
+								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+							},
+						},
+					},
 				},
 			},
 		},
@@ -2100,6 +2356,32 @@ Tokens:              <none>
 Events:              <none>` + "\n"
 	if out != expectedOut {
 		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
+	}
+
+}
+
+func TestDescribeNode(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: api.NodeSpec{
+			Unschedulable: true,
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := []string{"Unschedulable", "true"}
+	for _, expected := range expectedOut {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
 	}
 
 }

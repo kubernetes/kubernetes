@@ -127,7 +127,6 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 			ae.ObjectRef.ResourceVersion = meta.GetResourceVersion()
 		}
 	}
-	// TODO: ObjectRef should include the API group.
 	if len(ae.ObjectRef.APIVersion) == 0 {
 		ae.ObjectRef.APIGroup = gvr.Group
 		ae.ObjectRef.APIVersion = gvr.Version
@@ -153,7 +152,7 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	}
 }
 
-// LogRquestPatch fills in the given patch as the request object into an audit event.
+// LogRequestPatch fills in the given patch as the request object into an audit event.
 func LogRequestPatch(ae *auditinternal.Event, patch []byte) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelRequest) {
 		return
@@ -203,4 +202,29 @@ func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime
 		}
 	}
 	return nil, fmt.Errorf("no json encoder found")
+}
+
+// LogAnnotation fills in the Annotations according to the key value pair.
+func LogAnnotation(ae *auditinternal.Event, key, value string) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
+		return
+	}
+	if ae.Annotations == nil {
+		ae.Annotations = make(map[string]string)
+	}
+	if v, ok := ae.Annotations[key]; ok && v != value {
+		glog.Warningf("Failed to set annotations[%q] to %q for audit:%q, it has already been set to %q", key, value, ae.AuditID, ae.Annotations[key])
+		return
+	}
+	ae.Annotations[key] = value
+}
+
+// LogAnnotations fills in the Annotations according to the annotations map.
+func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
+	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
+		return
+	}
+	for key, value := range annotations {
+		LogAnnotation(ae, key, value)
+	}
 }

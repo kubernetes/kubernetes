@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -90,52 +91,48 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	kubeClientConfigValue := atomic.Value{}
 	go func() {
-		for {
-			// always get a fresh port in case something claimed the old one
-			kubePort, err := framework.FindFreeLocalPort()
-			if err != nil {
-				t.Fatal(err)
-			}
+		listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			kubeAPIServerOptions := options.NewServerRunOptions()
-			kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
-			kubeAPIServerOptions.SecureServing.BindPort = kubePort
-			kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-			kubeAPIServerOptions.InsecureServing.BindPort = 0
-			kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
-			kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
-			kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
-			kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
-			kubeAPIServerOptions.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
-			kubeAPIServerOptions.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
-			kubeAPIServerOptions.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
-			kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
-			kubeAPIServerOptions.Authorization.Mode = "RBAC"
+		kubeAPIServerOptions := options.NewServerRunOptions()
+		kubeAPIServerOptions.SecureServing.Listener = listener
+		kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+		kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
+		kubeAPIServerOptions.InsecureServing.BindPort = 0
+		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
+		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+		kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
+		kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
+		kubeAPIServerOptions.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
+		kubeAPIServerOptions.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
+		kubeAPIServerOptions.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
+		kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
+		kubeAPIServerOptions.Authorization.Mode = "RBAC"
 
-			tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
-			if err != nil {
-				t.Fatal(err)
-			}
-			kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Adjust the loopback config for external use (external server name and CA)
-			kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
-			kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
-			kubeAPIServerClientConfig.CAData = nil
-			kubeAPIServerClientConfig.ServerName = ""
-			kubeClientConfigValue.Store(kubeAPIServerClientConfig)
+		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Adjust the loopback config for external use (external server name and CA)
+		kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
+		kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
+		kubeAPIServerClientConfig.CAData = nil
+		kubeAPIServerClientConfig.ServerName = ""
+		kubeClientConfigValue.Store(kubeAPIServerClientConfig)
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
-			if err != nil {
-				t.Fatal(err)
-			}
+		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-			if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
-				t.Log(err)
-			}
-			time.Sleep(100 * time.Millisecond)
+		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(wait.NeverStop); err != nil {
+			t.Fatal(err)
 		}
 	}()
 
@@ -154,9 +151,13 @@ func TestAggregatedAPIServer(t *testing.T) {
 			t.Log(err)
 			return false, nil
 		}
-		if _, err := kubeClient.Discovery().ServerVersion(); err != nil {
+
+		healthStatus := 0
+		kubeClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
 			return false, nil
 		}
+
 		return true, nil
 	})
 	if err != nil {
@@ -177,32 +178,30 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	// start the wardle server to prove we can aggregate it
 	go func() {
-		for {
-			// always get a fresh port in case something claimed the old one
-			wardlePortInt, err := framework.FindFreeLocalPort()
-			if err != nil {
-				t.Fatal(err)
-			}
-			atomic.StoreInt32(wardlePort, int32(wardlePortInt))
-			wardleCmd := sampleserver.NewCommandStartWardleServer(os.Stdout, os.Stderr, stopCh)
-			wardleCmd.SetArgs([]string{
-				"--bind-address", "127.0.0.1",
-				"--secure-port", strconv.Itoa(wardlePortInt),
-				"--requestheader-username-headers=X-Remote-User",
-				"--requestheader-group-headers=X-Remote-Group",
-				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-				"--requestheader-client-ca-file=" + proxyCACertFile.Name(),
-				"--requestheader-allowed-names=kube-aggregator",
-				"--authentication-kubeconfig", kubeconfigFile.Name(),
-				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURL(),
-				"--cert-dir", wardleCertDir,
-				"--kubeconfig", kubeconfigFile.Name(),
-			})
-			if err := wardleCmd.Execute(); err != nil {
-				t.Log(err)
-			}
-			time.Sleep(100 * time.Millisecond)
+		listener, port, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.StoreInt32(wardlePort, int32(port))
+
+		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
+		o.RecommendedOptions.SecureServing.Listener = listener
+		o.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+		wardleCmd := sampleserver.NewCommandStartWardleServer(o, stopCh)
+		wardleCmd.SetArgs([]string{
+			"--requestheader-username-headers=X-Remote-User",
+			"--requestheader-group-headers=X-Remote-Group",
+			"--requestheader-extra-headers-prefix=X-Remote-Extra-",
+			"--requestheader-client-ca-file=" + proxyCACertFile.Name(),
+			"--requestheader-allowed-names=kube-aggregator",
+			"--authentication-kubeconfig", kubeconfigFile.Name(),
+			"--authorization-kubeconfig", kubeconfigFile.Name(),
+			"--etcd-servers", framework.GetEtcdURL(),
+			"--cert-dir", wardleCertDir,
+			"--kubeconfig", kubeconfigFile.Name(),
+		})
+		if err := wardleCmd.Execute(); err != nil {
+			t.Fatal(err)
 		}
 	}()
 
@@ -220,8 +219,9 @@ func TestAggregatedAPIServer(t *testing.T) {
 			t.Log(err)
 			return false, nil
 		}
-		if _, err := wardleClient.Discovery().ServerVersion(); err != nil {
-			t.Log(err)
+		healthStatus := 0
+		wardleClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
 			return false, nil
 		}
 		return true, nil
@@ -255,30 +255,29 @@ func TestAggregatedAPIServer(t *testing.T) {
 	aggregatorPort := new(int32)
 
 	go func() {
-		for {
-			// always get a fresh port in case something claimed the old one
-			aggregatorPortInt, err := framework.FindFreeLocalPort()
-			if err != nil {
-				t.Fatal(err)
-			}
-			atomic.StoreInt32(aggregatorPort, int32(aggregatorPortInt))
-			aggregatorCmd := kubeaggregatorserver.NewCommandStartAggregator(os.Stdout, os.Stderr, stopCh)
-			aggregatorCmd.SetArgs([]string{
-				"--bind-address", "127.0.0.1",
-				"--secure-port", strconv.Itoa(aggregatorPortInt),
-				"--requestheader-username-headers", "",
-				"--proxy-client-cert-file", proxyClientCertFile.Name(),
-				"--proxy-client-key-file", proxyClientKeyFile.Name(),
-				"--kubeconfig", kubeconfigFile.Name(),
-				"--authentication-kubeconfig", kubeconfigFile.Name(),
-				"--authorization-kubeconfig", kubeconfigFile.Name(),
-				"--etcd-servers", framework.GetEtcdURL(),
-				"--cert-dir", aggregatorCertDir,
-			})
-			if err := aggregatorCmd.Execute(); err != nil {
-				t.Log(err)
-			}
-			time.Sleep(100 * time.Millisecond)
+		listener, port, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		atomic.StoreInt32(aggregatorPort, int32(port))
+
+		o := kubeaggregatorserver.NewDefaultOptions(os.Stdout, os.Stderr)
+		o.RecommendedOptions.SecureServing.Listener = listener
+		o.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+		aggregatorCmd := kubeaggregatorserver.NewCommandStartAggregator(o, stopCh)
+		aggregatorCmd.SetArgs([]string{
+			"--requestheader-username-headers", "",
+			"--proxy-client-cert-file", proxyClientCertFile.Name(),
+			"--proxy-client-key-file", proxyClientKeyFile.Name(),
+			"--kubeconfig", kubeconfigFile.Name(),
+			"--authentication-kubeconfig", kubeconfigFile.Name(),
+			"--authorization-kubeconfig", kubeconfigFile.Name(),
+			"--etcd-servers", framework.GetEtcdURL(),
+			"--cert-dir", aggregatorCertDir,
+		})
+
+		if err := aggregatorCmd.Execute(); err != nil {
+			t.Fatal(err)
 		}
 	}()
 
@@ -295,7 +294,9 @@ func TestAggregatedAPIServer(t *testing.T) {
 			// this happens if we race the API server for writing the cert
 			return false, nil
 		}
-		if _, err := aggregatorDiscoveryClient.Discovery().ServerVersion(); err != nil {
+		healthStatus := 0
+		aggregatorDiscoveryClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		if healthStatus != http.StatusOK {
 			return false, nil
 		}
 		return true, nil
@@ -304,7 +305,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// now we're finally ready to test. These are what's run by defautl now
+	// now we're finally ready to test. These are what's run by default now
 	testAPIGroupList(t, wardleClient.Discovery().RESTClient())
 	testAPIGroup(t, wardleClient.Discovery().RESTClient())
 	testAPIResourceList(t, wardleClient.Discovery().RESTClient())
@@ -342,8 +343,8 @@ func TestAggregatedAPIServer(t *testing.T) {
 	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
 		Spec: apiregistrationv1beta1.APIServiceSpec{
-			// register this as a loca service so it doesn't try to lookup the default kubernetes service
-			// which will have an unroutable IP address since its fake.
+			// register this as a local service so it doesn't try to lookup the default kubernetes service
+			// which will have an unroutable IP address since it's fake.
 			Group:                "",
 			Version:              "v1",
 			GroupPriorityMinimum: 100,
@@ -460,8 +461,3 @@ func testAPIResourceList(t *testing.T, client rest.Interface) {
 	assert.Equal(t, "flunders", apiResourceList.APIResources[1].Name)
 	assert.True(t, apiResourceList.APIResources[1].Namespaced)
 }
-
-const (
-	policyCachePollInterval = 100 * time.Millisecond
-	policyCachePollTimeout  = 5 * time.Second
-)

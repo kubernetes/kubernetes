@@ -71,14 +71,14 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 
 	node, err := latestNode(cc.informer.GetStore(), nodeName)
 	if err != nil {
-		cc.configOK.SetFailSyncCondition(status.FailSyncReasonInformer)
+		cc.configOk.SetFailSyncCondition(status.FailSyncReasonInformer)
 		syncerr = fmt.Errorf("%s, error: %v", status.FailSyncReasonInformer, err)
 		return
 	}
 
 	// check the Node and download any new config
 	if updated, cur, reason, err := cc.doSyncConfigSource(client, node.Spec.ConfigSource); err != nil {
-		cc.configOK.SetFailSyncCondition(reason)
+		cc.configOk.SetFailSyncCondition(reason)
 		syncerr = fmt.Errorf("%s, error: %v", reason, err)
 		return
 	} else if updated {
@@ -100,7 +100,7 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, eventClient v
 	// - there is no need to restart to update the current config
 	// - there was no error trying to sync configuration
 	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the condition
-	cc.configOK.ClearFailSyncCondition()
+	cc.configOk.ClearFailSyncCondition()
 }
 
 // doSyncConfigSource checkpoints and sets the store's current config to the new config or resets config,

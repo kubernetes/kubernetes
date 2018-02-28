@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -60,7 +59,7 @@ const (
 
 /*
    Test to verify the storage policy based management for dynamic volume provisioning inside kubernetes.
-   There are 2 ways to achive it:
+   There are 2 ways to achieve it:
    1. Specify VSAN storage capabilities in the storage-class.
    2. Use existing vCenter SPBM storage policies.
 
@@ -95,9 +94,11 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters map[string]string
 		policyName   string
 		tagPolicy    string
+		masterNode   string
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
@@ -108,6 +109,9 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		if !(len(nodeList.Items) > 0) {
 			framework.Failf("Unable to find ready and schedulable Node")
 		}
+		masternodes, _ := framework.GetMasterAndWorkerNodesOrDie(client)
+		Expect(masternodes).NotTo(BeEmpty())
+		masterNode = masternodes.List()[0]
 	})
 
 	// Valid policy.
@@ -221,7 +225,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Datastore] = VsanDatastore
 		framework.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
 		kubernetesClusterName := GetAndExpectStringEnvVar(KubernetesClusterName)
-		invokeStaleDummyVMTestWithStoragePolicy(client, namespace, kubernetesClusterName, scParameters)
+		invokeStaleDummyVMTestWithStoragePolicy(client, masterNode, namespace, kubernetesClusterName, scParameters)
 	})
 
 	It("verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass", func() {
@@ -289,16 +293,14 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 	Expect(err).NotTo(HaveOccurred())
 
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
 	By("Verify the volume is accessible and available in the pod")
-	verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
+	verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 	By("Deleting pod")
 	framework.DeletePodWithWait(f, client, pod)
 
 	By("Waiting for volumes to be detached from the node")
-	waitForVSphereDiskToDetach(client, vsp, persistentvolumes[0].Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+	waitForVSphereDiskToDetach(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 }
 
 func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
@@ -320,7 +322,7 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
-func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, namespace string, clusterName string, scParameters map[string]string) {
+func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterNode string, namespace string, clusterName string, scParameters map[string]string) {
 	By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters))
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
@@ -347,7 +349,6 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, namespa
 	fnvHash.Write([]byte(vmName))
 	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(vsp.IsDummyVMPresent(dummyVMFullName)).NotTo(BeTrue(), errorMsg)
+	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
+	Expect(nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)).NotTo(BeTrue(), errorMsg)
 }

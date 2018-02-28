@@ -32,7 +32,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -82,11 +82,7 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
-	if (spec.Volume != nil && spec.Volume.FC == nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC == nil) {
-		return false
-	}
-
-	return true
+	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
 }
 
 func (plugin *fcPlugin) RequiresRemount() bool {
@@ -137,7 +133,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 	}
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := volumehelper.GetVolumeMode(spec)
+		volumeMode, err := util.GetVolumeMode(spec)
 		if err != nil {
 			return nil, err
 		}
@@ -293,7 +289,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 }
 
 // ConstructBlockVolumeSpec creates a new volume.Spec with following steps.
-//   - Searchs a file whose name is {pod uuid} under volume plugin directory.
+//   - Searches a file whose name is {pod uuid} under volume plugin directory.
 //   - If a file is found, then retreives volumePluginDependentPath from globalMapPathUUID.
 //   - Once volumePluginDependentPath is obtained, store volume information to VolumeSource
 // examples:
@@ -301,20 +297,20 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 //   globalMapPathUUID : plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
 func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(fcPluginName)
-	blkutil := util.NewBlockVolumePathHandler()
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
 	if err != nil {
 		return nil, err
 	}
 	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 
-	// Retreive volumePluginDependentPath from globalMapPathUUID
+	// Retrieve volumePluginDependentPath from globalMapPathUUID
 	// globalMapPathUUID examples:
 	//   wwn+lun: plugins/kubernetes.io/fc/volumeDevices/50060e801049cfd1-lun-0/{pod uuid}
 	//   wwid: plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000/{pod uuid}
 	arr := strings.Split(globalMapPathUUID, "/")
 	if len(arr) < 2 {
-		return nil, fmt.Errorf("Fail to retreive volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
+		return nil, fmt.Errorf("Fail to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 	l := len(arr) - 2
 	volumeInfo := arr[l]

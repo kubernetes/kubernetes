@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/batch/job"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerapilatest "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	schedulerapivalidation "k8s.io/kubernetes/pkg/scheduler/api/validation"
 )
 
 func validateObject(obj runtime.Object) (errors field.ErrorList) {
@@ -144,6 +145,15 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 	return errors
 }
 
+func validateschedulerpolicy(obj runtime.Object) error {
+	switch t := obj.(type) {
+	case *schedulerapi.Policy:
+		return schedulerapivalidation.ValidatePolicy(*t)
+	default:
+		return fmt.Errorf("obj type is not schedulerapi.Policy")
+	}
+}
+
 func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error {
 	return filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -220,12 +230,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/volumes/rbd": {
 			"rbd":             &api.Pod{},
 			"rbd-with-secret": &api.Pod{},
-		},
-		"../examples/storage/cassandra": {
-			"cassandra-daemonset":   &extensions.DaemonSet{},
-			"cassandra-controller":  &api.ReplicationController{},
-			"cassandra-service":     &api.Service{},
-			"cassandra-statefulset": &apps.StatefulSet{},
 		},
 		"../examples/cluster-dns": {
 			"dns-backend-rc":      &api.ReplicationController{},
@@ -357,7 +361,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 					t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 					return
 				}
-				//TODO: Add validate method for &schedulerapi.Policy
+				if err := validateschedulerpolicy(expectedType); err != nil {
+					t.Errorf("%s did not validate correctly: %v\n%s", path, err, string(data))
+					return
+				}
 			} else {
 				codec, err := testapi.GetCodecForObject(expectedType)
 				if err != nil {

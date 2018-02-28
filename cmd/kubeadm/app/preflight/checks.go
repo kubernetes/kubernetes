@@ -99,7 +99,12 @@ func (CRICheck) Name() string {
 
 // Check validates the container runtime through the CRI.
 func (criCheck CRICheck) Check() (warnings, errors []error) {
-	if err := criCheck.exec.Command("sh", "-c", fmt.Sprintf("crictl -r %s info", criCheck.socket)).Run(); err != nil {
+	crictlPath, err := criCheck.exec.LookPath("crictl")
+	if err != nil {
+		errors = append(errors, fmt.Errorf("unable to find command crictl: %s", err))
+		return warnings, errors
+	}
+	if err := criCheck.exec.Command(fmt.Sprintf("%s -r %s info", crictlPath, criCheck.socket)).Run(); err != nil {
 		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.socket, err))
 		return warnings, errors
 	}
@@ -410,7 +415,6 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 type HTTPProxyCheck struct {
 	Proto string
 	Host  string
-	Port  int
 }
 
 // Name returns HTTPProxy as name for HTTPProxyCheck
@@ -421,9 +425,9 @@ func (hst HTTPProxyCheck) Name() string {
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 
-	url := fmt.Sprintf("%s://%s:%d", hst.Proto, hst.Host, hst.Port)
+	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, []error{err}
 	}
@@ -433,7 +437,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 		return nil, []error{err}
 	}
 	if proxy != nil {
-		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
+		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", u, proxy)}, nil
 	}
 	return nil, nil
 }
@@ -526,7 +530,7 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 	}
 	if len(eac.ControllerManagerExtraArgs) > 0 {
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := cmoptions.NewCMServer()
+		s := cmoptions.NewKubeControllerManagerOptions()
 		s.AddFlags(flags, []string{}, []string{})
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
@@ -642,6 +646,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
+	exec              utilsexec.Interface
 }
 
 // Name will return KubeletVersion as name for KubeletVersionCheck
@@ -651,7 +656,7 @@ func (KubeletVersionCheck) Name() string {
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
-	kubeletVersion, err := GetKubeletVersion()
+	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
 		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
 	}
@@ -846,7 +851,7 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 }
 
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, criSocket string, ignorePreflightErrors sets.String) error {
+func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -859,18 +864,17 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		exec:       execer,
 		suggestion: fmt.Sprintf("go get %v", kubeadmconstants.CRICtlPackage),
 	}
-	warns, _ := criCtlChecker.Check()
-	useCRI := len(warns) == 0
 
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		SystemVerificationCheck{CRISocket: criSocket},
+		SystemVerificationCheck{CRISocket: cfg.CRISocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
-		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion},
+		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
+		ServiceCheck{Service: "docker", CheckIfActive: true}, // assume docker
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 10250},
@@ -897,16 +901,9 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
 			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
 		},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
+		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
-	}
-
-	if useCRI {
-		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
-	} else {
-		// assume docker
-		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
@@ -952,7 +949,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, criSocket string, ignorePreflightErrors sets.String) error {
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -969,18 +966,19 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 	useCRI := len(warns) == 0
 
 	checks := []Checker{
-		SystemVerificationCheck{CRISocket: criSocket},
+		SystemVerificationCheck{CRISocket: cfg.CRISocket},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
-		KubeletVersionCheck{},
+		KubeletVersionCheck{exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 	}
 	if useCRI {
-		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
+		checks = append(checks, CRICheck{socket: cfg.CRISocket, exec: execer})
 	} else {
 		// assume docker
 		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
@@ -1002,15 +1000,27 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfigura
 			criCtlChecker)
 	}
 
-	if len(cfg.DiscoveryTokenAPIServers) > 0 {
-		if ip := net.ParseIP(cfg.DiscoveryTokenAPIServers[0]); ip != nil {
-			if ip.To4() == nil && ip.To16() != nil {
-				checks = append(checks,
-					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
-				)
+	var bridgenf6Check Checker
+	for _, server := range cfg.DiscoveryTokenAPIServers {
+		ipstr, _, err := net.SplitHostPort(server)
+		if err == nil {
+			checks = append(checks,
+				HTTPProxyCheck{Proto: "https", Host: ipstr},
+			)
+			if bridgenf6Check == nil {
+				if ip := net.ParseIP(ipstr); ip != nil {
+					if ip.To4() == nil && ip.To16() != nil {
+						// This check should be added only once
+						bridgenf6Check = FileContentCheck{Path: bridgenf6, Content: []byte{'1'}}
+					}
+				}
 			}
 		}
 	}
+	if bridgenf6Check != nil {
+		checks = append(checks, bridgenf6Check)
+	}
+
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 

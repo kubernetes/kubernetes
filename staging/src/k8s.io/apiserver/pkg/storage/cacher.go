@@ -131,7 +131,7 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	}
 }
 
-type watchFilterFunc func(key string, l labels.Set, f fields.Set, uninitialized bool) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, uninitialized bool) bool
 
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
@@ -333,7 +333,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(resourceVersion, chanSize, initEvents, watchFilterFunction(key, pred), forget, c.versioner)
+	watcher := newCacheWatcher(resourceVersion, chanSize, initEvents, filterWithAttrsFunction(key, pred), forget, c.versioner)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -424,7 +424,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 	if err != nil || listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	filter := filterFunction(key, pred)
+	filter := filterWithAttrsFunction(key, pred)
 
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(resourceVersion, key, trace)
 	if err != nil {
@@ -437,7 +437,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Key, elem.Object) {
+		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -488,7 +488,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	if err != nil || listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	filter := filterFunction(key, pred)
+	filter := filterWithAttrsFunction(key, pred)
 
 	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(resourceVersion, trace)
 	if err != nil {
@@ -506,7 +506,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Key, elem.Object) {
+		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -533,6 +533,10 @@ func (c *Cacher) GuaranteedUpdate(
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
+}
+
+func (c *Cacher) Count(pathPrefix string) (int64, error) {
+	return c.storage.Count(pathPrefix)
 }
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
@@ -660,22 +664,7 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 	}
 }
 
-func filterFunction(key string, p SelectionPredicate) func(string, runtime.Object) bool {
-	filterFunc := func(objKey string, obj runtime.Object) bool {
-		if !hasPathPrefix(objKey, key) {
-			return false
-		}
-		matches, err := p.Matches(obj)
-		if err != nil {
-			glog.Errorf("invalid object for matching. Obj: %v. Err: %v", obj, err)
-			return false
-		}
-		return matches
-	}
-	return filterFunc
-}
-
-func watchFilterFunction(key string, p SelectionPredicate) watchFilterFunc {
+func filterWithAttrsFunction(key string, p SelectionPredicate) filterWithAttrsFunc {
 	filterFunc := func(objKey string, label labels.Set, field fields.Set, uninitialized bool) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
@@ -768,13 +757,13 @@ type cacheWatcher struct {
 	input     chan *watchCacheEvent
 	result    chan watch.Event
 	done      chan struct{}
-	filter    watchFilterFunc
+	filter    filterWithAttrsFunc
 	stopped   bool
 	forget    func(bool)
 	versioner Versioner
 }
 
-func newCacheWatcher(resourceVersion string, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool), versioner Versioner) *cacheWatcher {
+func newCacheWatcher(resourceVersion string, chanSize int, initEvents []*watchCacheEvent, filter filterWithAttrsFunc, forget func(bool), versioner Versioner) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:     make(chan *watchCacheEvent, chanSize),
 		result:    make(chan watch.Event, chanSize),

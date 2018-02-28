@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/client/listers/extensions/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
@@ -35,12 +36,12 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/security/apparmor:go_default_library",

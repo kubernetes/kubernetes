@@ -19,9 +19,9 @@ package node
 import (
 	"github.com/golang/glog"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	storageinformers "k8s.io/client-go/informers/storage/v1alpha1"
+	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
@@ -129,10 +129,10 @@ func (g *graphPopulator) addVolumeAttachment(obj interface{}) {
 }
 
 func (g *graphPopulator) updateVolumeAttachment(oldObj, obj interface{}) {
-	attachment := obj.(*storagev1alpha1.VolumeAttachment)
+	attachment := obj.(*storagev1beta1.VolumeAttachment)
 	if oldObj != nil {
 		// skip add if node name is identical
-		oldAttachment := oldObj.(*storagev1alpha1.VolumeAttachment)
+		oldAttachment := oldObj.(*storagev1beta1.VolumeAttachment)
 		if oldAttachment.Spec.NodeName == attachment.Spec.NodeName {
 			return
 		}

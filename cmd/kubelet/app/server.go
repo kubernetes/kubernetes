@@ -18,6 +18,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -30,7 +31,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -65,7 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
@@ -83,6 +83,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/flock"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -153,9 +154,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// short-circuit on verflag
 			verflag.PrintAndExitIfRequested()
-
-			// log args (separate lines, so we don't overflow line-length limits in logging infrastructure)
-			glog.V(2).Infof("kubelet flags: %s", strings.Join(args, "\n"))
+			utilflag.PrintFlags(cleanFlagSet)
 
 			// set feature gates from initial flags-based config
 			if err := utilfeature.DefaultFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
@@ -392,7 +391,7 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 	if err != nil {
 		return err
 	}
-	versioned := kubeletconfigv1alpha1.KubeletConfiguration{}
+	versioned := kubeletconfigv1beta1.KubeletConfiguration{}
 	if err := scheme.Convert(kc, &versioned, nil); err != nil {
 		return err
 	}
@@ -528,9 +527,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 			if err != nil {
 				return err
 			}
-			// we set exitIfExpired to true because we use this client configuration to request new certs - if we are unable
-			// to request new certs, we will be unable to continue normal operation
-			if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, true); err != nil {
+
+			// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
+			// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
+			// or the bootstrapping credentials to potentially lay down new initial config.
+			if err := kubeletcertificate.UpdateTransport(wait.NeverStop, clientConfig, clientCertificateManager, 5*time.Minute); err != nil {
 				return err
 			}
 		}
@@ -653,7 +654,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				ExperimentalQOSReserved:               *experimentalQOSReserved,
 				ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
 				ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalPodPidsLimit:              *s.PodPidsLimit,
+				ExperimentalPodPidsLimit:              s.PodPidsLimit,
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,
@@ -712,7 +713,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 		return "", fmt.Errorf("failed to get instances from cloud provider")
 	}
 
-	nodeName, err := instances.CurrentNodeName(hostname)
+	nodeName, err := instances.CurrentNodeName(context.TODO(), hostname)
 	if err != nil {
 		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
 	}
@@ -929,18 +930,18 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		}
 		glog.Infof("Started kubelet as runonce")
 	} else {
-		startKubelet(k, podCfg, kubeCfg, kubeDeps)
+		startKubelet(k, podCfg, kubeCfg, kubeDeps, kubeFlags.EnableServer)
 		glog.Infof("Started kubelet")
 	}
 	return nil
 }
 
-func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies) {
+func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
 	// start the kubelet
 	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
 	// start the kubelet server
-	if kubeCfg.EnableServer {
+	if enableServer {
 		go wait.Until(func() {
 			k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
 		}, 0, wait.NeverStop)

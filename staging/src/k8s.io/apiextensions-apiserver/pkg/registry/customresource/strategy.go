@@ -17,12 +17,10 @@ limitations under the License.
 package customresource
 
 import (
-	"fmt"
-
 	"github.com/go-openapi/validate"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -31,63 +29,129 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/storage"
+	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
-type customResourceDefinitionStorageStrategy struct {
+// customResourceStrategy implements behavior for CustomResources.
+type customResourceStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 
 	namespaceScoped bool
 	validator       customResourceValidator
+	status          *apiextensions.CustomResourceSubresourceStatus
+	scale           *apiextensions.CustomResourceSubresourceScale
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, validator *validate.SchemaValidator) customResourceDefinitionStorageStrategy {
-	return customResourceDefinitionStorageStrategy{
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+	return customResourceStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
 		namespaceScoped: namespaceScoped,
+		status:          status,
+		scale:           scale,
 		validator: customResourceValidator{
-			namespaceScoped: namespaceScoped,
-			kind:            kind,
-			validator:       validator,
+			namespaceScoped:       namespaceScoped,
+			kind:                  kind,
+			schemaValidator:       schemaValidator,
+			statusSchemaValidator: statusSchemaValidator,
 		},
 	}
 }
 
-func (a customResourceDefinitionStorageStrategy) NamespaceScoped() bool {
+func (a customResourceStrategy) NamespaceScoped() bool {
 	return a.namespaceScoped
 }
 
-func (customResourceDefinitionStorageStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+// PrepareForCreate clears the status of a CustomResource before creation.
+func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
+		customResourceObject := obj.(*unstructured.Unstructured)
+		customResource := customResourceObject.UnstructuredContent()
+
+		// create cannot set status
+		if _, ok := customResource["status"]; ok {
+			delete(customResource, "status")
+		}
+	}
+
+	accessor, _ := meta.Accessor(obj)
+	accessor.SetGeneration(1)
 }
 
-func (customResourceDefinitionStorageStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (a customResourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
+		return
+	}
+
+	newCustomResourceObject := obj.(*unstructured.Unstructured)
+	oldCustomResourceObject := old.(*unstructured.Unstructured)
+
+	newCustomResource := newCustomResourceObject.UnstructuredContent()
+	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
+
+	// update is not allowed to set status
+	_, ok1 := newCustomResource["status"]
+	_, ok2 := oldCustomResource["status"]
+	switch {
+	case ok2:
+		newCustomResource["status"] = oldCustomResource["status"]
+	case ok1:
+		delete(newCustomResource, "status")
+	}
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object. We push
+	// the burden of managing the status onto the clients because we can't (in general)
+	// know here what version of spec the writer of the status has seen. It may seem like
+	// we can at first -- since obj contains spec -- but in the future we will probably make
+	// status its own object, and even if we don't, writes may be the result of a
+	// read-update-write loop, so the contents of spec may not actually be the spec that
+	// the CustomResource has *seen*.
+	newSpec, ok1 := newCustomResource["spec"]
+	oldSpec, ok2 := oldCustomResource["spec"]
+
+	// spec is changed, created or deleted
+	if (ok1 && ok2 && !apiequality.Semantic.DeepEqual(oldSpec, newSpec)) || (ok1 && !ok2) || (!ok1 && ok2) {
+		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
+		newAccessor, _ := meta.Accessor(newCustomResourceObject)
+		newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
+	}
 }
 
-func (a customResourceDefinitionStorageStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	return a.validator.Validate(ctx, obj)
+// Validate validates a new CustomResource.
+func (a customResourceStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+	return a.validator.Validate(ctx, obj, a.scale)
 }
 
-func (customResourceDefinitionStorageStrategy) AllowCreateOnUpdate() bool {
+// Canonicalize normalizes the object after validation.
+func (customResourceStrategy) Canonicalize(obj runtime.Object) {
+}
+
+// AllowCreateOnUpdate is false for CustomResources; this means a POST is
+// needed to create one.
+func (customResourceStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (customResourceDefinitionStorageStrategy) AllowUnconditionalUpdate() bool {
+// AllowUnconditionalUpdate is the default update policy for CustomResource objects.
+func (customResourceStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
-func (customResourceDefinitionStorageStrategy) Canonicalize(obj runtime.Object) {
+// ValidateUpdate is the default update validation for an end user updating status.
+func (a customResourceStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+	return a.validator.ValidateUpdate(ctx, obj, old, a.scale)
 }
 
-func (a customResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return a.validator.ValidateUpdate(ctx, obj, old)
-}
-
-func (a customResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, nil, false, err
@@ -108,80 +172,13 @@ func objectMetaFieldsSet(objectMeta metav1.Object, namespaceScoped bool) fields.
 	}
 }
 
-func (a customResourceDefinitionStorageStrategy) MatchCustomResourceDefinitionStorage(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
+// MatchCustomResourceDefinitionStorage is the filter used by the generic etcd backend to route
+// watch events from etcd to clients of the apiserver only interested in specific
+// labels/fields.
+func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label labels.Selector, field fields.Selector) apiserverstorage.SelectionPredicate {
+	return apiserverstorage.SelectionPredicate{
 		Label:    label,
 		Field:    field,
 		GetAttrs: a.GetAttrs,
 	}
-}
-
-type customResourceValidator struct {
-	namespaceScoped bool
-	kind            schema.GroupVersionKind
-	validator       *validate.SchemaValidator
-}
-
-func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
-	}
-	typeAccessor, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("kind"), nil, err.Error())}
-	}
-	if typeAccessor.GetKind() != a.kind.Kind {
-		return field.ErrorList{field.Invalid(field.NewPath("kind"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.kind.Kind))}
-	}
-	if typeAccessor.GetAPIVersion() != a.kind.Group+"/"+a.kind.Version {
-		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
-	}
-
-	customResourceObject, ok := obj.(*unstructured.Unstructured)
-	// this will never happen.
-	if !ok {
-		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
-	}
-
-	customResource := customResourceObject.UnstructuredContent()
-	if err = apiservervalidation.ValidateCustomResource(customResource, a.validator); err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath(""), customResource, err.Error())}
-	}
-
-	return validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
-}
-
-func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	objAccessor, err := meta.Accessor(obj)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
-	}
-	oldAccessor, err := meta.Accessor(old)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
-	}
-	typeAccessor, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath("kind"), nil, err.Error())}
-	}
-	if typeAccessor.GetKind() != a.kind.Kind {
-		return field.ErrorList{field.Invalid(field.NewPath("kind"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.kind.Kind))}
-	}
-	if typeAccessor.GetAPIVersion() != a.kind.Group+"/"+a.kind.Version {
-		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version))}
-	}
-
-	customResourceObject, ok := obj.(*unstructured.Unstructured)
-	// this will never happen.
-	if !ok {
-		return field.ErrorList{field.Invalid(field.NewPath(""), customResourceObject, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", customResourceObject))}
-	}
-
-	customResource := customResourceObject.UnstructuredContent()
-	if err = apiservervalidation.ValidateCustomResource(customResource, a.validator); err != nil {
-		return field.ErrorList{field.Invalid(field.NewPath(""), customResource, err.Error())}
-	}
-
-	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))
 }

@@ -233,6 +233,10 @@ func TestAddEntry(t *testing.T) {
 		SetType:  HashIPPort,
 	}
 
+	testSet := &IPSet{
+		Name: "FOOBAR",
+	}
+
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			// Success
@@ -254,7 +258,7 @@ func TestAddEntry(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Create with ignoreExistErr = false, expect success
-	err := runner.AddEntry(testEntry.String(), "FOOBAR", false)
+	err := runner.AddEntry(testEntry.String(), testSet, false)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -265,7 +269,7 @@ func TestAddEntry(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	// Create with ignoreExistErr = true, expect success
-	err = runner.AddEntry(testEntry.String(), "FOOBAR", true)
+	err = runner.AddEntry(testEntry.String(), testSet, true)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
@@ -276,7 +280,7 @@ func TestAddEntry(t *testing.T) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 	// Create with ignoreExistErr = false, expect failure
-	err = runner.AddEntry(testEntry.String(), "FOOBAR", false)
+	err = runner.AddEntry(testEntry.String(), testSet, false)
 	if err == nil {
 		t.Errorf("expected failure, got nil")
 	}
@@ -308,6 +312,7 @@ func TestDelEntry(t *testing.T) {
 		},
 	}
 	runner := New(&fexec)
+
 	err := runner.DelEntry(testEntry.String(), "FOOBAR")
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
@@ -479,5 +484,819 @@ baz`
 	}
 	if !reflect.DeepEqual(list, expected) {
 		t.Errorf("expected sets: %v, got: %v", expected, list)
+	}
+}
+
+func Test_validIPSetType(t *testing.T) {
+	testCases := []struct {
+		setType Type
+		valid   bool
+	}{
+		{ // case[0]
+			setType: Type("foo"),
+			valid:   false,
+		},
+		{ // case[1]
+			setType: HashIPPortNet,
+			valid:   true,
+		},
+		{ // case[2]
+			setType: HashIPPort,
+			valid:   true,
+		},
+		{ // case[3]
+			setType: HashIPPortIP,
+			valid:   true,
+		},
+		{ // case[4]
+			setType: BitmapPort,
+			valid:   true,
+		},
+		{ // case[5]
+			setType: Type(""),
+			valid:   false,
+		},
+	}
+	for i := range testCases {
+		valid := validateIPSetType(testCases[i].setType)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v]", i, testCases[i].valid, valid)
+		}
+	}
+}
+
+func Test_validatePortRange(t *testing.T) {
+	testCases := []struct {
+		portRange string
+		valid     bool
+		desc      string
+	}{
+		{ // case[0]
+			portRange: "a-b",
+			valid:     false,
+			desc:      "invalid port number",
+		},
+		{ // case[1]
+			portRange: "1-2",
+			valid:     true,
+			desc:      "valid",
+		},
+		{ // case[2]
+			portRange: "90-1",
+			valid:     true,
+			desc:      "ipset util can accept the input of begin port number can be less than end port number",
+		},
+		{ // case[3]
+			portRange: DefaultPortRange,
+			valid:     true,
+			desc:      "default port range is valid, of course",
+		},
+		{ // case[4]
+			portRange: "12",
+			valid:     false,
+			desc:      "a single number is invalid",
+		},
+		{ // case[5]
+			portRange: "1-",
+			valid:     false,
+			desc:      "should specify end port",
+		},
+		{ // case[6]
+			portRange: "-100",
+			valid:     false,
+			desc:      "should specify begin port",
+		},
+		{ // case[7]
+			portRange: "1:100",
+			valid:     false,
+			desc:      "delimiter should be -",
+		},
+		{ // case[8]
+			portRange: "1~100",
+			valid:     false,
+			desc:      "delimiter should be -",
+		},
+		{ // case[9]
+			portRange: "1,100",
+			valid:     false,
+			desc:      "delimiter should be -",
+		},
+		{ // case[10]
+			portRange: "100-100",
+			valid:     true,
+			desc:      "begin port number can be equal to end port number",
+		},
+		{ // case[11]
+			portRange: "",
+			valid:     false,
+			desc:      "empty string is invalid",
+		},
+		{ // case[12]
+			portRange: "-1-12",
+			valid:     false,
+			desc:      "port number can not be negative value",
+		},
+		{ // case[13]
+			portRange: "-1--8",
+			valid:     false,
+			desc:      "port number can not be negative value",
+		},
+	}
+	for i := range testCases {
+		valid := validatePortRange(testCases[i].portRange)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+		}
+	}
+}
+
+func Test_validateFamily(t *testing.T) {
+	testCases := []struct {
+		family string
+		valid  bool
+	}{
+		{ // case[0]
+			family: "foo",
+			valid:  false,
+		},
+		{ // case[1]
+			family: ProtocolFamilyIPV4,
+			valid:  true,
+		},
+		{ // case[2]
+			family: ProtocolFamilyIPV6,
+			valid:  true,
+		},
+		{ // case[3]
+			family: "ipv4",
+			valid:  false,
+		},
+		{ // case[4]
+			family: "ipv6",
+			valid:  false,
+		},
+		{ // case[5]
+			family: "tcp",
+			valid:  false,
+		},
+		{ // case[6]
+			family: "udp",
+			valid:  false,
+		},
+		{ // case[7]
+			family: "",
+			valid:  false,
+		},
+	}
+	for i := range testCases {
+		valid := validateHashFamily(testCases[i].family)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v]", i, testCases[i].valid, valid)
+		}
+	}
+}
+
+func Test_validateProtocol(t *testing.T) {
+	testCases := []struct {
+		protocol string
+		valid    bool
+		desc     string
+	}{
+		{ // case[0]
+			protocol: "foo",
+			valid:    false,
+		},
+		{ // case[1]
+			protocol: ProtocolTCP,
+			valid:    true,
+		},
+		{ // case[2]
+			protocol: ProtocolUDP,
+			valid:    true,
+		},
+		{ // case[3]
+			protocol: "ipv4",
+			valid:    false,
+		},
+		{ // case[4]
+			protocol: "ipv6",
+			valid:    false,
+		},
+		{ // case[5]
+			protocol: "TCP",
+			valid:    false,
+			desc:     "should be low case",
+		},
+		{ // case[6]
+			protocol: "UDP",
+			valid:    false,
+			desc:     "should be low case",
+		},
+		{ // case[7]
+			protocol: "",
+			valid:    false,
+		},
+	}
+	for i := range testCases {
+		valid := validateProtocol(testCases[i].protocol)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+		}
+	}
+}
+
+func TestValidateIPSet(t *testing.T) {
+	testCases := []struct {
+		ipset *IPSet
+		valid bool
+		desc  string
+	}{
+		{ // case[0]
+			ipset: &IPSet{
+				Name:       "test",
+				SetType:    HashIPPort,
+				HashFamily: ProtocolFamilyIPV4,
+				HashSize:   1024,
+				MaxElem:    1024,
+			},
+			valid: true,
+		},
+		{ // case[1]
+			ipset: &IPSet{
+				Name:       "SET",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    2048,
+				PortRange:  DefaultPortRange,
+			},
+			valid: true,
+		},
+		{ // case[2]
+			ipset: &IPSet{
+				Name:       "foo",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    2048,
+			},
+			valid: false,
+			desc:  "should specify right port range for bitmap type set",
+		},
+		{ // case[3]
+			ipset: &IPSet{
+				Name:       "bar",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   0,
+				MaxElem:    2048,
+			},
+			valid: false,
+			desc:  "wrong hash size number",
+		},
+		{ // case[4]
+			ipset: &IPSet{
+				Name:       "baz",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   1024,
+				MaxElem:    -1,
+			},
+			valid: false,
+			desc:  "wrong hash max elem number",
+		},
+		{ // case[5]
+			ipset: &IPSet{
+				Name:       "baz",
+				SetType:    HashIPPortNet,
+				HashFamily: "ip",
+				HashSize:   1024,
+				MaxElem:    1024,
+			},
+			valid: false,
+			desc:  "wrong protocol",
+		},
+		{ // case[6]
+			ipset: &IPSet{
+				Name:       "foo-bar",
+				SetType:    "xxx",
+				HashFamily: ProtocolFamilyIPV4,
+				HashSize:   1024,
+				MaxElem:    1024,
+			},
+			valid: false,
+			desc:  "wrong set type",
+		},
+	}
+	for i := range testCases {
+		valid := testCases[i].ipset.Validate()
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+		}
+	}
+}
+
+func Test_parsePortRange(t *testing.T) {
+	testCases := []struct {
+		portRange string
+		expectErr bool
+		beginPort int
+		endPort   int
+		desc      string
+	}{
+		{ // case[0]
+			portRange: "1-100",
+			expectErr: false,
+			beginPort: 1,
+			endPort:   100,
+		},
+		{ // case[1]
+			portRange: "0-0",
+			expectErr: false,
+			beginPort: 0,
+			endPort:   0,
+		},
+		{ // case[2]
+			portRange: "100-10",
+			expectErr: false,
+			beginPort: 10,
+			endPort:   100,
+		},
+		{ // case[3]
+			portRange: "1024",
+			expectErr: true,
+			desc:      "single port number is not allowed",
+		},
+		{ // case[4]
+			portRange: DefaultPortRange,
+			expectErr: false,
+			beginPort: 0,
+			endPort:   65535,
+		},
+		{ // case[5]
+			portRange: "1-",
+			expectErr: true,
+			desc:      "should specify end port",
+		},
+		{ // case[6]
+			portRange: "-100",
+			expectErr: true,
+			desc:      "should specify begin port",
+		},
+		{ // case[7]
+			portRange: "1:100",
+			expectErr: true,
+			desc:      "delimiter should be -",
+		},
+		{ // case[8]
+			portRange: "1~100",
+			expectErr: true,
+			desc:      "delimiter should be -",
+		},
+		{ // case[9]
+			portRange: "1,100",
+			expectErr: true,
+			desc:      "delimiter should be -",
+		},
+		{ // case[10]
+			portRange: "100-100",
+			expectErr: false,
+			desc:      "begin port number can be equal to end port number",
+			beginPort: 100,
+			endPort:   100,
+		},
+		{ // case[11]
+			portRange: "",
+			expectErr: false,
+			desc:      "empty string indicates default port range",
+			beginPort: 0,
+			endPort:   65535,
+		},
+		{ // case[12]
+			portRange: "-1-12",
+			expectErr: true,
+			desc:      "port number can not be negative value",
+		},
+		{ // case[13]
+			portRange: "-1--8",
+			expectErr: true,
+			desc:      "port number can not be negative value",
+		},
+	}
+	for i := range testCases {
+		begin, end, err := parsePortRange(testCases[i].portRange)
+		if err != nil {
+			if !testCases[i].expectErr {
+				t.Errorf("case [%d]: unexpected err: %v, desc: %s", i, err, testCases[i].desc)
+			}
+			continue
+		}
+		if begin != testCases[i].beginPort || end != testCases[i].endPort {
+			t.Errorf("case [%d]: unexpected mismatch [beginPort, endPort] pair, expect [%d, %d], got [%d, %d], desc: %s", i, testCases[i].beginPort, testCases[i].endPort, begin, end, testCases[i].desc)
+		}
+	}
+}
+
+// This is a coarse test, but it offers some modicum of confidence as the code is evolved.
+func TestValidateEntry(t *testing.T) {
+	testCases := []struct {
+		entry *Entry
+		set   *IPSet
+		valid bool
+		desc  string
+	}{
+		{ // case[0]
+			entry: &Entry{
+				SetType: BitmapPort,
+			},
+			set: &IPSet{
+				PortRange: DefaultPortRange,
+			},
+			valid: true,
+			desc:  "port number can be empty, default is 0. And port number is in the range of its ipset's port range",
+		},
+		{ // case[1]
+			entry: &Entry{
+				SetType: BitmapPort,
+				Port:    0,
+			},
+			set: &IPSet{
+				PortRange: DefaultPortRange,
+			},
+			valid: true,
+			desc:  "port number can be 0. And port number is in the range of its ipset's port range",
+		},
+		{ // case[2]
+			entry: &Entry{
+				SetType: BitmapPort,
+				Port:    -1,
+			},
+			valid: false,
+			desc:  "port number can not be negative value",
+		},
+		{ // case[3]
+			entry: &Entry{
+				SetType: BitmapPort,
+				Port:    1080,
+			},
+			set: &IPSet{
+				Name:      "baz",
+				PortRange: DefaultPortRange,
+			},
+			desc:  "port number is in the range of its ipset's port range",
+			valid: true,
+		},
+		{ // case[4]
+			entry: &Entry{
+				SetType: BitmapPort,
+				Port:    1080,
+			},
+			set: &IPSet{
+				Name:      "foo",
+				PortRange: "0-1079",
+			},
+			desc:  "port number is NOT in the range of its ipset's port range",
+			valid: false,
+		},
+		{ // case[5]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			set: &IPSet{
+				Name: "bar",
+			},
+			valid: true,
+		},
+		{ // case[6]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolUDP,
+				Port:     0,
+			},
+			set: &IPSet{
+				Name: "bar",
+			},
+			valid: true,
+		},
+		{ // case[7]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "FE80:0000:0000:0000:0202:B3FF:FE1E:8329",
+				Protocol: ProtocolTCP,
+				Port:     1111,
+			},
+			set: &IPSet{
+				Name: "ipv6",
+			},
+			valid: true,
+		},
+		{ // case[8]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "",
+				Protocol: ProtocolTCP,
+				Port:     1234,
+			},
+			set: &IPSet{
+				Name: "empty-ip",
+			},
+			valid: false,
+		},
+		{ // case[9]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1-2-3-4",
+				Protocol: ProtocolTCP,
+				Port:     8900,
+			},
+			set: &IPSet{
+				Name: "bad-ip",
+			},
+			valid: false,
+		},
+		{ // case[10]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "10.20.30.40",
+				Protocol: "",
+				Port:     8090,
+			},
+			set: &IPSet{
+				Name: "empty-protocol",
+			},
+			valid: true,
+		},
+		{ // case[11]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "10.20.30.40",
+				Protocol: "ICMP",
+				Port:     8090,
+			},
+			set: &IPSet{
+				Name: "unsupported-protocol",
+			},
+			valid: false,
+		},
+		{ // case[11]
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "10.20.30.40",
+				Protocol: "ICMP",
+				Port:     -1,
+			},
+			set: &IPSet{
+				// TODO: set name string with white space?
+				Name: "negative-port-number",
+			},
+			valid: false,
+		},
+		{ // case[12]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolUDP,
+				Port:     53,
+				IP2:      "10.20.30.40",
+			},
+			set: &IPSet{
+				Name: "LOOP-BACK",
+			},
+			valid: true,
+		},
+		{ // case[13]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolUDP,
+				Port:     53,
+				IP2:      "",
+			},
+			set: &IPSet{
+				Name: "empty IP2",
+			},
+			valid: false,
+		},
+		{ // case[14]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolUDP,
+				Port:     53,
+				IP2:      "foo",
+			},
+			set: &IPSet{
+				Name: "invalid IP2",
+			},
+			valid: false,
+		},
+		{ // case[15]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     0,
+				IP2:      "1.2.3.4",
+			},
+			set: &IPSet{
+				Name: "zero port",
+			},
+			valid: true,
+		},
+		{ // case[16]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10::40",
+				Protocol: ProtocolTCP,
+				Port:     10000,
+				IP2:      "1::4",
+			},
+			set: &IPSet{
+				Name: "IPV6",
+				// TODO: check set's hash family
+			},
+			valid: true,
+		},
+		{ // case[17]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "",
+				Protocol: ProtocolTCP,
+				Port:     1234,
+				IP2:      "1.2.3.4",
+			},
+			set: &IPSet{
+				Name: "empty-ip",
+			},
+			valid: false,
+		},
+		{ // case[18]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "1-2-3-4",
+				Protocol: ProtocolTCP,
+				Port:     8900,
+				IP2:      "10.20.30.41",
+			},
+			set: &IPSet{
+				Name: "bad-ip",
+			},
+			valid: false,
+		},
+		{ // case[19]
+			entry: &Entry{
+				SetType: HashIPPortIP,
+				IP:      "10.20.30.40",
+				Protocol: "SCTP	",
+				Port: 8090,
+				IP2:  "10.20.30.41",
+			},
+			set: &IPSet{
+				Name: "unsupported-protocol",
+			},
+			valid: false,
+		},
+		{ // case[20]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: "ICMP",
+				Port:     -1,
+				IP2:      "100.200.30.41",
+			},
+			set: &IPSet{
+				Name: "negative-port-number",
+			},
+			valid: false,
+		},
+		{ // case[21]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				// TODO: CIDR /32 may not be valid
+				Net: "10.20.30.0/24",
+			},
+			set: &IPSet{
+				Name: "abc",
+			},
+			valid: true,
+		},
+		{ // case[22]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "11.21.31.41",
+				Protocol: ProtocolUDP,
+				Port:     1122,
+				Net:      "",
+			},
+			set: &IPSet{
+				Name: "empty Net",
+			},
+			valid: false,
+		},
+		{ // case[23]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolUDP,
+				Port:     8080,
+				Net:      "x-y-z-w",
+			},
+			set: &IPSet{
+				Name: "invalid Net",
+			},
+			valid: false,
+		},
+		{ // case[24]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     0,
+				Net:      "10.1.0.0/16",
+			},
+			set: &IPSet{
+				Name: "zero port",
+			},
+			valid: true,
+		},
+		{ // case[25]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10::40",
+				Protocol: ProtocolTCP,
+				Port:     80,
+				Net:      "2001:db8::/32",
+			},
+			set: &IPSet{
+				Name: "IPV6",
+				// TODO: check set's hash family
+			},
+			valid: true,
+		},
+		{ // case[26]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "",
+				Protocol: ProtocolTCP,
+				Port:     1234,
+				Net:      "1.2.3.4/22",
+			},
+			set: &IPSet{
+				Name: "empty-ip",
+			},
+			valid: false,
+		},
+		{ // case[27]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "1-2-3-4",
+				Protocol: ProtocolTCP,
+				Port:     8900,
+				Net:      "10.20.30.41/31",
+			},
+			set: &IPSet{
+				Name: "bad-ip",
+			},
+			valid: false,
+		},
+		{ // case[28]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: "FOO",
+				Port:     8090,
+				IP2:      "10.20.30.0/10",
+			},
+			set: &IPSet{
+				Name: "unsupported-protocol",
+			},
+			valid: false,
+		},
+		{ // case[29]
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolUDP,
+				Port:     -1,
+				IP2:      "100.200.30.0/12",
+			},
+			set: &IPSet{
+				Name: "negative-port-number",
+			},
+			valid: false,
+		},
+	}
+	for i := range testCases {
+		valid := testCases[i].entry.Validate(testCases[i].set)
+		if valid != testCases[i].valid {
+			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].entry)
+		}
 	}
 }

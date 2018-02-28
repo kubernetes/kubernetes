@@ -26,14 +26,12 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utiluuid "k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,7 +53,6 @@ const (
 	MinSaturationThreshold     = 2 * time.Minute
 	MinPodsPerSecondThroughput = 8
 	DensityPollInterval        = 10 * time.Second
-	MaxLatencyPodCreationTries = 5
 )
 
 // Maximum container failures this test tolerates before failing.
@@ -351,14 +348,21 @@ var _ = SIGDescribe("Density", func() {
 	var nodeCpuCapacity int64
 	var nodeMemCapacity int64
 	var nodes *v1.NodeList
-	var masters sets.String
 
 	testCaseBaseName := "density"
 	missingMeasurements := 0
 	var testPhaseDurations *timer.TestPhaseTimer
+	var profileGathererStopCh chan struct{}
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
+		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
+		close(profileGathererStopCh)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		framework.GatherApiserverMemoryProfile(&wg, "density")
+		wg.Wait()
+
 		saturationThreshold := time.Duration((totalPods / MinPodsPerSecondThroughput)) * time.Second
 		if saturationThreshold < MinSaturationThreshold {
 			saturationThreshold = MinSaturationThreshold
@@ -411,7 +415,7 @@ var _ = SIGDescribe("Density", func() {
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
 
-		masters, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
+		_, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -442,6 +446,10 @@ var _ = SIGDescribe("Density", func() {
 			}
 			framework.Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
 		}
+
+		// Start apiserver CPU profile gatherer with frequency based on cluster size.
+		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
+		profileGathererStopCh = framework.StartApiserverCPUProfileGatherer(profileGatheringDelay)
 	})
 
 	type Density struct {
@@ -455,6 +463,7 @@ var _ = SIGDescribe("Density", func() {
 		secretsPerPod    int
 		configMapsPerPod int
 		daemonsPerNode   int
+		quotas           bool
 	}
 
 	densityTests := []Density{
@@ -473,13 +482,19 @@ var _ = SIGDescribe("Density", func() {
 		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Test with configmaps
 		{podsPerNode: 30, runLatencyTest: true, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
+		// Test with quotas
+		{podsPerNode: 30, runLatencyTest: true, kind: api.Kind("ReplicationController"), quotas: true},
+	}
+
+	isCanonical := func(test *Density) bool {
+		return test.kind == api.Kind("ReplicationController") && test.daemonsPerNode == 0 && test.secretsPerPod == 0 && test.configMapsPerPod == 0 && !test.quotas
 	}
 
 	for _, testArg := range densityTests {
 		feature := "ManualPerformance"
 		switch testArg.podsPerNode {
 		case 30:
-			if testArg.kind == api.Kind("ReplicationController") && testArg.daemonsPerNode == 0 && testArg.secretsPerPod == 0 && testArg.configMapsPerPod == 0 {
+			if isCanonical(&testArg) {
 				feature = "Performance"
 			}
 		case 95:
@@ -494,6 +509,9 @@ var _ = SIGDescribe("Density", func() {
 			testArg.configMapsPerPod,
 			testArg.daemonsPerNode,
 		)
+		if testArg.quotas {
+			name += " with quotas"
+		}
 		itArg := testArg
 		It(name, func() {
 			nodePrepPhase := testPhaseDurations.StartPhase(100, "node preparation")
@@ -519,6 +537,10 @@ var _ = SIGDescribe("Density", func() {
 			numberOfCollections := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
 			namespaces, err := CreateNamespaces(f, numberOfCollections, fmt.Sprintf("density-%v", testArg.podsPerNode), testPhaseDurations.StartPhase(200, "namespace creation"))
 			framework.ExpectNoError(err)
+			if itArg.quotas {
+				err := CreateQuotas(f, namespaces, totalPods+nodeCount, testPhaseDurations.StartPhase(210, "quota creation"))
+				framework.ExpectNoError(err)
+			}
 
 			configs := make([]testutils.RunObjectConfig, numberOfCollections)
 			secretConfigs := make([]*testutils.SecretConfig, 0, numberOfCollections*itArg.secretsPerPod)
@@ -875,13 +897,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 			},
 		},
 	}
-	for attempt := 1; attempt <= MaxLatencyPodCreationTries; attempt++ {
-		_, err := c.CoreV1().ReplicationControllers(ns).Create(rc)
-		if err == nil || apierrs.IsAlreadyExists(err) {
-			break
-		}
-		Expect(attempt < MaxLatencyPodCreationTries && framework.IsRetryableAPIError(err)).To(Equal(true))
-	}
+	framework.ExpectNoError(testutils.CreateRCWithRetries(c, ns, rc))
 	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	framework.Logf("Found pod '%s' running", name)
 }

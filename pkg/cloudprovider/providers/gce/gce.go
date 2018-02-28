@@ -107,6 +107,7 @@ type GCECloud struct {
 	serviceBeta      *computebeta.Service
 	serviceAlpha     *computealpha.Service
 	containerService *container.Service
+	tpuService       *tpuService
 	client           clientset.Interface
 	clientBuilder    controller.ControllerClientBuilder
 	eventBroadcaster record.EventBroadcaster
@@ -430,6 +431,11 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 	containerService.UserAgent = userAgent
 
+	tpuService, err := newTPUService(client)
+	if err != nil {
+		return nil, err
+	}
+
 	// ProjectID and.NetworkProjectID may be project number or name.
 	projID, netProjID := tryConvertToProjectNames(config.ProjectID, config.NetworkProjectID, service)
 	onXPN := projID != netProjID
@@ -496,6 +502,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
+		tpuService:               tpuService,
 		projectID:                projID,
 		networkProjectID:         netProjID,
 		onXPN:                    onXPN,
@@ -843,7 +850,13 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 		glog.Infof("Using existing Token Source %#v", tokenSource)
 	}
 
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+	backoff := wait.Backoff{
+		// These values will add up to about a minute. See #56293 for background.
+		Duration: time.Second,
+		Factor:   1.4,
+		Steps:    10,
+	}
+	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		if _, err := tokenSource.Token(); err != nil {
 			glog.Errorf("error fetching initial token: %v", err)
 			return false, nil

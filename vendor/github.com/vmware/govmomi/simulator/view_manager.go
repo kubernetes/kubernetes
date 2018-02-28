@@ -71,14 +71,14 @@ func NewViewManager(ref types.ManagedObjectReference) object.Reference {
 func destroyView(ref types.ManagedObjectReference) soap.HasFault {
 	m := Map.ViewManager()
 
-	m.ViewList = RemoveReference(ref, m.ViewList)
+	RemoveReference(&m.ViewList, ref)
 
 	return &methods.DestroyViewBody{
 		Res: &types.DestroyViewResponse{},
 	}
 }
 
-func (m *ViewManager) CreateContainerView(req *types.CreateContainerView) soap.HasFault {
+func (m *ViewManager) CreateContainerView(ctx *Context, req *types.CreateContainerView) soap.HasFault {
 	body := &methods.CreateContainerViewBody{}
 
 	root := Map.Get(req.Container)
@@ -117,7 +117,7 @@ func (m *ViewManager) CreateContainerView(req *types.CreateContainerView) soap.H
 		}
 	}
 
-	Map.Put(container)
+	ctx.Session.Put(container)
 
 	m.ViewList = append(m.ViewList, container.Reference())
 
@@ -125,7 +125,8 @@ func (m *ViewManager) CreateContainerView(req *types.CreateContainerView) soap.H
 		Returnval: container.Self,
 	}
 
-	container.add(root)
+	seen := make(map[types.ManagedObjectReference]bool)
+	container.add(root, seen)
 
 	return body
 }
@@ -148,11 +149,11 @@ func (v *ContainerView) include(o types.ManagedObjectReference) bool {
 	return v.types[o.Type]
 }
 
-func (v *ContainerView) add(root mo.Reference) {
+func walk(root mo.Reference, f func(child types.ManagedObjectReference)) {
 	var children []types.ManagedObjectReference
 
 	switch e := root.(type) {
-	case *mo.Datacenter:
+	case *Datacenter:
 		children = []types.ManagedObjectReference{e.VmFolder, e.HostFolder, e.DatastoreFolder, e.NetworkFolder}
 	case *Folder:
 		children = e.ChildEntity
@@ -173,12 +174,21 @@ func (v *ContainerView) add(root mo.Reference) {
 	}
 
 	for _, child := range children {
+		f(child)
+	}
+}
+
+func (v *ContainerView) add(root mo.Reference, seen map[types.ManagedObjectReference]bool) {
+	walk(root, func(child types.ManagedObjectReference) {
 		if v.include(child) {
-			v.View = AddReference(child, v.View)
+			if seen[child] == false {
+				seen[child] = true
+				v.View = append(v.View, child)
+			}
 		}
 
 		if v.Recursive {
-			v.add(Map.Get(child))
+			v.add(Map.Get(child), seen)
 		}
-	}
+	})
 }

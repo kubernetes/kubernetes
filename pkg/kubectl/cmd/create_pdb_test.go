@@ -25,12 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreatePdb(t *testing.T) {
 	pdbName := "my-pdb"
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "policy", Version: "v1beta1"},
 		NegotiatedSerializer: ns,
@@ -41,18 +44,17 @@ func TestCreatePdb(t *testing.T) {
 			}, nil
 		}),
 	}
-	tf.ClientConfig = &restclient.Config{}
-	tf.Printer = &testPrinter{}
+	tf.ClientConfigVal = &restclient.Config{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreatePodDisruptionBudget(f, buf)
+	cmd := NewCmdCreatePodDisruptionBudget(tf, buf)
 	cmd.Flags().Set("min-available", "1")
 	cmd.Flags().Set("selector", "app=rails")
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
-	CreatePodDisruptionBudget(f, buf, cmd, []string{pdbName})
-	expectedOutput := "poddisruptionbudget/" + pdbName + "\n"
+	CreatePodDisruptionBudget(tf, buf, cmd, []string{pdbName})
+	expectedOutput := "poddisruptionbudget.policy/" + pdbName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

@@ -65,6 +65,33 @@ const (
 	// APIServerKubeletClientCertCommonName defines kubelet client certificate common name (CN)
 	APIServerKubeletClientCertCommonName = "kube-apiserver-kubelet-client"
 
+	// EtcdServerCertAndKeyBaseName defines etcd's server certificate and key base name
+	EtcdServerCertAndKeyBaseName = "etcd/server"
+	// EtcdServerCertName defines etcd's server certificate name
+	EtcdServerCertName = "etcd/server.crt"
+	// EtcdServerKeyName defines etcd's server key name
+	EtcdServerKeyName = "etcd/server.key"
+	// EtcdServerCertCommonName defines etcd's server certificate common name (CN)
+	EtcdServerCertCommonName = "kube-etcd"
+
+	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
+	EtcdPeerCertAndKeyBaseName = "etcd/peer"
+	// EtcdPeerCertName defines etcd's peer certificate name
+	EtcdPeerCertName = "etcd/peer.crt"
+	// EtcdPeerKeyName defines etcd's peer key name
+	EtcdPeerKeyName = "etcd/peer.key"
+	// EtcdPeerCertCommonName defines etcd's peer certificate common name (CN)
+	EtcdPeerCertCommonName = "kube-etcd-peer"
+
+	// APIServerEtcdClientCertAndKeyBaseName defines etcd client certificate and key base name
+	APIServerEtcdClientCertAndKeyBaseName = "apiserver-etcd-client"
+	// APIServerEtcdClientCertName defines etcd client certificate name
+	APIServerEtcdClientCertName = "apiserver-etcd-client.crt"
+	// APIServerEtcdClientKeyName defines etcd client key name
+	APIServerEtcdClientKeyName = "apiserver-etcd-client.key"
+	// APIServerEtcdClientCertCommonName defines etcd client certificate common name (CN)
+	APIServerEtcdClientCertCommonName = "kube-apiserver-etcd-client"
+
 	// ServiceAccountKeyBaseName defines SA key base name
 	ServiceAccountKeyBaseName = "sa"
 	// ServiceAccountPublicKeyName defines SA public key base name
@@ -165,10 +192,10 @@ const (
 	KubeletBaseConfigurationFile = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.0.14"
+	MinExternalEtcdVersion = "3.1.11"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.1.10"
+	DefaultEtcdVersion = "3.2.14"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -203,6 +230,19 @@ const (
 
 	// CRICtlPackage defines the go package that installs crictl
 	CRICtlPackage = "github.com/kubernetes-incubator/cri-tools/cmd/crictl"
+
+	// KubeAuditPolicyVolumeName is the name of the volume that will contain the audit policy
+	KubeAuditPolicyVolumeName = "audit"
+	// AuditPolicyDir is the directory that will contain the audit policy
+	AuditPolicyDir = "audit"
+	// AuditPolicyFile is the name of the audit policy file itself
+	AuditPolicyFile = "audit.yaml"
+	// AuditPolicyLogFile is the name of the file audit logs get written to
+	AuditPolicyLogFile = "audit.log"
+	// KubeAuditPolicyLogVolumeName is the name of the volume that will contain the audit logs
+	KubeAuditPolicyLogVolumeName = "audit-log"
+	// StaticPodAuditPolicyLogDir is the name of the directory in the static pod that will have the audit logs
+	StaticPodAuditPolicyLogDir = "/var/log/kubernetes/audit"
 )
 
 var (
@@ -226,6 +266,9 @@ var (
 	// DefaultTokenUsages specifies the default functions a token will get
 	DefaultTokenUsages = bootstrapapi.KnownTokenUsages
 
+	// DefaultTokenGroups specifies the default groups that this token will authenticate as when used for authentication
+	DefaultTokenGroups = []string{NodeBootstrapTokenAuthGroup}
+
 	// MasterComponents defines the master component names
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
@@ -237,10 +280,9 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		8:  "3.0.17",
-		9:  "3.1.10",
-		10: "3.1.10",
-		11: "3.1.10",
+		9:  "3.1.11",
+		10: "3.2.14",
+		11: "3.2.14",
 	}
 )
 
@@ -311,4 +353,9 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	}
 
 	return dnsIP, nil
+}
+
+// GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
+func GetStaticPodAuditPolicyFile() string {
+	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
 }

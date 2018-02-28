@@ -635,6 +635,8 @@ items:
     - /apis
     - /apis/*
     - /healthz
+    - /openapi
+    - /openapi/*
     - /swagger-2.0.0.pb-v1
     - /swagger.json
     - /swaggerapi
@@ -1033,6 +1035,12 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - volumeattachments
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1165,6 +1173,34 @@ items:
     - create
     - patch
     - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:volume-scheduler
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumes
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - storageclasses
+    verbs:
+    - get
+    - list
+    - watch
 - aggregationRule:
     clusterRoleSelectors:
     - matchLabels:

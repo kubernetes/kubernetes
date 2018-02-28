@@ -56,8 +56,8 @@ type ImageGCManager interface {
 
 	GetImageList() ([]container.Image, error)
 
-	// Delete all unused images and returns the number of bytes freed. The number of bytes freed is always returned.
-	DeleteUnusedImages() (int64, error)
+	// Delete all unused images.
+	DeleteUnusedImages() error
 }
 
 // A policy for garbage collecting images. Policy defines an allowed band in
@@ -124,7 +124,7 @@ func (i *imageCache) set(images []container.Image) {
 func (i *imageCache) get() []container.Image {
 	i.RLock()
 	defer i.RUnlock()
-	return i.images
+	return append([]container.Image{}, i.images...)
 }
 
 // Information about the images we track.
@@ -308,8 +308,10 @@ func (im *realImageGCManager) GarbageCollect() error {
 	return nil
 }
 
-func (im *realImageGCManager) DeleteUnusedImages() (int64, error) {
-	return im.freeSpace(math.MaxInt64, time.Now())
+func (im *realImageGCManager) DeleteUnusedImages() error {
+	glog.Infof("attempting to delete unused images")
+	_, err := im.freeSpace(math.MaxInt64, time.Now())
+	return err
 }
 
 // Tries to free bytesToFree worth of images on the disk.
@@ -349,7 +351,7 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 		// Images that are currently in used were given a newer lastUsed.
 		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
 			glog.V(5).Infof("Image ID %s has lastUsed=%v which is >= freeTime=%v, not eligible for garbage collection", image.id, image.lastUsed, freeTime)
-			break
+			continue
 		}
 
 		// Avoid garbage collect the image if the image is not old enough.

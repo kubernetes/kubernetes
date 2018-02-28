@@ -43,7 +43,6 @@ go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/core/pod",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

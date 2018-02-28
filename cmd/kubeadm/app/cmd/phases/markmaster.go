@@ -75,7 +75,7 @@ func NewCmdMarkMaster() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			err = markmasterphase.MarkMaster(client, internalcfg.NodeName)
+			err = markmasterphase.MarkMaster(client, internalcfg.NodeName, !internalcfg.NoTaintMaster)
 			kubeadmutil.CheckErr(err)
 		},
 	}

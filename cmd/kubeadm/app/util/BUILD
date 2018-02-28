@@ -28,6 +28,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )
@@ -42,7 +43,6 @@ go_test(
         "version_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
@@ -61,6 +61,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/util/apiclient:all-srcs",
+        "//cmd/kubeadm/app/util/audit:all-srcs",
         "//cmd/kubeadm/app/util/config:all-srcs",
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",

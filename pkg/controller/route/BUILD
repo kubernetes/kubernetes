@@ -41,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["route_controller_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/route",
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",

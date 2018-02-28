@@ -36,10 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -81,7 +80,8 @@ type PersistentVolumeConfig struct {
 	NamePrefix       string
 	Labels           labels.Set
 	StorageClassName string
-	NodeAffinity     *v1.NodeAffinity
+	NodeAffinity     *v1.VolumeNodeAffinity
+	VolumeMode       *v1.PersistentVolumeMode
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
@@ -93,6 +93,7 @@ type PersistentVolumeClaimConfig struct {
 	Annotations      map[string]string
 	Selector         *metav1.LabelSelector
 	StorageClassName *string
+	VolumeMode       *v1.PersistentVolumeMode
 }
 
 // Clean up a pv and pvc in a single pv/pvc test case.
@@ -182,7 +183,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 
 	// Wait for the PV's phase to return to be `expectPVPhase`
 	Logf("Waiting for reclaim process to complete.")
-	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, 1*time.Second, 300*time.Second)
+	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, Poll, PVReclaimingTimeout)
 	if err != nil {
 		return fmt.Errorf("pv %q phase did not become %v: %v", pv.Name, expectPVPhase, err)
 	}
@@ -261,6 +262,11 @@ func createPV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVol
 		return nil, fmt.Errorf("PV Create API error: %v", err)
 	}
 	return pv, nil
+}
+
+// create the PV resource. Fails test on error.
+func CreatePV(c clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return createPV(c, pv)
 }
 
 // create the PVC resource. Fails test on error.
@@ -392,14 +398,14 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
 	Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
-	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 3*time.Second, 300*time.Second)
+	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, Poll, ClaimBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PVC %q did not become Bound: %v", pvc.Name, err)
 	}
 
 	// Wait for PersistentVolume.Status.Phase to be Bound, which it should be
 	// since the PVC is already bound.
-	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, 3*time.Second, 300*time.Second)
+	err = WaitForPersistentVolumePhase(v1.VolumeBound, c, pv.Name, Poll, PVBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PV %q did not become Bound: %v", pv.Name, err)
 	}
@@ -445,7 +451,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 	}
 
 	for pvName := range pvols {
-		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, 3*time.Second, 180*time.Second)
+		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
 		if err != nil && len(pvols) > len(claims) {
 			Logf("WARN: pv %v is not bound after max wait", pvName)
 			Logf("      This may be ok since there are more pvs than pvcs")
@@ -468,7 +474,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 				return fmt.Errorf("internal: claims map is missing pvc %q", pvcKey)
 			}
 
-			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, 3*time.Second, 180*time.Second)
+			err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, cr.Name, Poll, ClaimBindingTimeout)
 			if err != nil {
 				return fmt.Errorf("PVC %q did not become Bound: %v", cr.Name, err)
 			}
@@ -577,12 +583,12 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			Namespace: pvConfig.Prebind.Namespace,
 		}
 	}
-	pv := &v1.PersistentVolume{
+	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
 			Annotations: map[string]string{
-				volumehelper.VolumeGidAnnotationKey: "777",
+				util.VolumeGidAnnotationKey: "777",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -598,14 +604,10 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			},
 			ClaimRef:         claimRef,
 			StorageClassName: pvConfig.StorageClassName,
+			NodeAffinity:     pvConfig.NodeAffinity,
+			VolumeMode:       pvConfig.VolumeMode,
 		},
 	}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(pv.Annotations, pvConfig.NodeAffinity)
-	if err != nil {
-		Logf("Setting storage node affinity failed: %v", err)
-		return nil
-	}
-	return pv
 }
 
 // Returns a PVC definition based on the namespace.
@@ -635,6 +637,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 				},
 			},
 			StorageClassName: cfg.StorageClassName,
+			VolumeMode:       cfg.VolumeMode,
 		},
 	}
 }
@@ -868,14 +871,21 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
+	var volumeMounts = make([]v1.VolumeMount, 0)
+	var volumeDevices = make([]v1.VolumeDevice, 0)
 	var volumes = make([]v1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
+			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
+		} else {
+			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
+		}
+
 		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
 	}
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
+	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Spec.Volumes = volumes
 	podSpec.Spec.SecurityContext.SELinuxOptions = seLinuxLabel
 	return podSpec
@@ -924,6 +934,26 @@ func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.P
 // Define and create a pod with a mounted PV.  Pod runs infinite loop until killed.
 func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (*v1.Pod, error) {
 	return CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
+}
+
+// CreateUnschedulablePod with given claims based on node selector
+func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
+	pod, err := client.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
+		return nil, fmt.Errorf("pod Create API error: %v", err)
+	}
+	// Waiting for pod to become Unschedulable
+	err = WaitForPodNameUnschedulableInNamespace(client, pod.Name, namespace)
+	if err != nil {
+		return pod, fmt.Errorf("pod %q is not Unschedulable: %v", pod.Name, err)
+	}
+	// get fresh pod info
+	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return pod, fmt.Errorf("pod Get API error: %v", err)
+	}
+	return pod, nil
 }
 
 // wait until all pvcs phase set to bound

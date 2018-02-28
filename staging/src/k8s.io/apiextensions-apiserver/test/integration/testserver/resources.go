@@ -30,7 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/scale"
 )
 
 const (
@@ -69,6 +72,7 @@ func NewNoxuCustomResourceDefinition(scope apiextensionsv1beta1.ResourceScope) *
 				Kind:       "WishIHadChosenNoxu",
 				ShortNames: []string{"foo", "bar", "abc", "def"},
 				ListKind:   "NoxuItemList",
+				Categories: []string{"all"},
 			},
 			Scope: scope,
 		},
@@ -292,4 +296,35 @@ func DeleteCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefi
 
 func GetCustomResourceDefinition(crd *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1beta1.CustomResourceDefinition, error) {
 	return apiExtensionsClient.Apiextensions().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+}
+
+func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, config *rest.Config) (scale.ScalesGetter, error) {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	groupResource, err := discoveryClient.ServerResourcesForGroupVersion(crd.Spec.Group + "/" + crd.Spec.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := []*discovery.APIGroupResources{
+		{
+			Group: metav1.APIGroup{
+				Name: crd.Spec.Group,
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: crd.Spec.Version},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: crd.Spec.Version},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				crd.Spec.Version: groupResource.APIResources,
+			},
+		},
+	}
+
+	restMapper := discovery.NewRESTMapper(resources, nil)
+	resolver := scale.NewDiscoveryScaleKindResolver(discoveryClient)
+
+	return scale.NewForConfig(config, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 }

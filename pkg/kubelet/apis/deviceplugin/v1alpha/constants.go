@@ -17,9 +17,9 @@ limitations under the License.
 package deviceplugin
 
 const (
-	// Healthy means that the device is healty
+	// Healthy means that the device is healthy
 	Healthy = "Healthy"
-	// UnHealthy means that the device is unhealty
+	// Unhealthy means that the device is unhealthy
 	Unhealthy = "Unhealthy"
 
 	// Current version of the API supported by kubelet

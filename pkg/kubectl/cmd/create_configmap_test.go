@@ -24,14 +24,18 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateConfigMap(t *testing.T) {
 	configMap := &v1.ConfigMap{}
 	configMap.Name = "my-configmap"
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 		NegotiatedSerializer: ns,
@@ -47,7 +51,7 @@ func TestCreateConfigMap(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateConfigMap(f, buf)
+	cmd := NewCmdCreateConfigMap(tf, buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{configMap.Name})
 	expectedOutput := "configmap/" + configMap.Name + "\n"

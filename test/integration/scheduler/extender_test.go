@@ -47,9 +47,10 @@ import (
 )
 
 const (
-	filter     = "filter"
-	prioritize = "prioritize"
-	bind       = "bind"
+	filter               = "filter"
+	prioritize           = "prioritize"
+	bind                 = "bind"
+	extendedResourceName = "foo.com/bar"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -334,7 +335,7 @@ func TestSchedulerExtender(t *testing.T) {
 				FilterVerb:     filter,
 				PrioritizeVerb: prioritize,
 				Weight:         3,
-				EnableHttps:    false,
+				EnableHTTPS:    false,
 			},
 			{
 				URLPrefix:      es2.URL,
@@ -342,14 +343,20 @@ func TestSchedulerExtender(t *testing.T) {
 				PrioritizeVerb: prioritize,
 				BindVerb:       bind,
 				Weight:         4,
-				EnableHttps:    false,
+				EnableHTTPS:    false,
+				ManagedResources: []schedulerapi.ExtenderManagedResource{
+					{
+						Name:               extendedResourceName,
+						IgnoredByScheduler: true,
+					},
+				},
 			},
 			{
 				URLPrefix:        es3.URL,
 				FilterVerb:       filter,
 				PrioritizeVerb:   prioritize,
 				Weight:           10,
-				EnableHttps:      false,
+				EnableHTTPS:      false,
 				NodeCacheCapable: true,
 			},
 		},
@@ -420,7 +427,17 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "extender-test-pod"},
 		Spec: v1.PodSpec{
-			Containers: []v1.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
+			Containers: []v1.Container{
+				{
+					Name:  "container",
+					Image: e2e.GetPauseImageName(cs),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							extendedResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						},
+					},
+				},
+			},
 		},
 	}
 

@@ -24,14 +24,18 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateQuota(t *testing.T) {
 	resourceQuotaObject := &v1.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf := cmdtesting.NewTestFactory()
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
@@ -70,7 +74,7 @@ func TestCreateQuota(t *testing.T) {
 	}
 	for name, test := range tests {
 		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdCreateQuota(f, buf)
+		cmd := NewCmdCreateQuota(tf, buf)
 		cmd.Flags().Parse(test.flags)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{resourceQuotaObject.Name})

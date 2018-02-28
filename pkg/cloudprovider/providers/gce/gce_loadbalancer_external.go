@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
 	"github.com/golang/glog"
@@ -416,7 +417,7 @@ func (gce *GCECloud) DeleteExternalTargetPoolAndChecks(service *v1.Service, name
 // the verification failed. It also returns a boolean to indicate whether the
 // IP address is considered owned by the user (i.e., not managed by the
 // controller.
-func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP, lbRef string, desiredNetTier NetworkTier) (isUserOwnedIP bool, err error) {
+func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP, lbRef string, desiredNetTier cloud.NetworkTier) (isUserOwnedIP bool, err error) {
 	if requestedIP == "" {
 		return false, nil
 	}
@@ -439,7 +440,7 @@ func verifyUserRequestedIP(s CloudAddressService, region, requestedIP, fwdRuleIP
 		if err != nil {
 			return false, fmt.Errorf("failed to check the network tier of the IP %q: %v", requestedIP, err)
 		}
-		netTier := NetworkTierGCEValueToType(netTierStr)
+		netTier := cloud.NetworkTierGCEValueToType(netTierStr)
 		if netTier != desiredNetTier {
 			glog.Errorf("verifyUserRequestedIP: requested static IP %q (name: %s) for LB %s has network tier %s, need %s.", requestedIP, existingAddress.Name, lbRef, netTier, desiredNetTier)
 			return false, fmt.Errorf("requrested IP %q belongs to the %s network tier; expected %s", requestedIP, netTier, desiredNetTier)
@@ -535,7 +536,7 @@ func (gce *GCECloud) createTargetPoolAndHealthCheck(svc *v1.Service, name, servi
 
 	var instances []string
 	for _, host := range hosts {
-		instances = append(instances, makeHostURL(gce.service.BasePath, gce.projectID, host.Zone, host.Name))
+		instances = append(instances, host.makeComparableHostPath())
 	}
 	glog.Infof("Creating targetpool %v with %d healthchecks", name, len(hcLinks))
 	pool := &compute.TargetPool{
@@ -732,11 +733,6 @@ func nodeNames(nodes []*v1.Node) []string {
 	return ret
 }
 
-func makeHostURL(projectsApiEndpoint, projectID, zone, host string) string {
-	host = canonicalizeInstanceName(host)
-	return projectsApiEndpoint + strings.Join([]string{projectID, "zones", zone, "instances", host}, "/")
-}
-
 func hostURLToComparablePath(hostURL string) string {
 	idx := strings.Index(hostURL, "/zones/")
 	if idx < 0 {
@@ -857,7 +853,7 @@ func (gce *GCECloud) ensureHttpHealthCheckFirewall(svc *v1.Service, serviceName,
 	return nil
 }
 
-func createForwardingRule(s CloudForwardingRuleService, name, serviceName, region, ipAddress, target string, ports []v1.ServicePort, netTier NetworkTier) error {
+func createForwardingRule(s CloudForwardingRuleService, name, serviceName, region, ipAddress, target string, ports []v1.ServicePort, netTier cloud.NetworkTier) error {
 	portRange, err := loadBalancerPortRange(ports)
 	if err != nil {
 		return err
@@ -866,7 +862,7 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 	ipProtocol := string(ports[0].Protocol)
 
 	switch netTier {
-	case NetworkTierPremium:
+	case cloud.NetworkTierPremium:
 		rule := &compute.ForwardingRule{
 			Name:        name,
 			Description: desc,
@@ -969,7 +965,7 @@ func (gce *GCECloud) firewallObject(name, region, desc string, sourceRanges nets
 	return firewall, nil
 }
 
-func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP string, netTier NetworkTier) (ipAddress string, existing bool, err error) {
+func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP string, netTier cloud.NetworkTier) (ipAddress string, existing bool, err error) {
 	// If the address doesn't exist, this will create it.
 	// If the existingIP exists but is ephemeral, this will promote it to static.
 	// If the address already exists, this will harmlessly return a StatusConflict
@@ -979,7 +975,7 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 
 	var creationErr error
 	switch netTier {
-	case NetworkTierPremium:
+	case cloud.NetworkTierPremium:
 		addressObj := &compute.Address{
 			Name:        name,
 			Description: desc,
@@ -1017,19 +1013,19 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 	return addr.Address, existed, nil
 }
 
-func (gce *GCECloud) getServiceNetworkTier(svc *v1.Service) (NetworkTier, error) {
+func (gce *GCECloud) getServiceNetworkTier(svc *v1.Service) (cloud.NetworkTier, error) {
 	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return NetworkTierDefault, nil
+		return cloud.NetworkTierDefault, nil
 	}
 	tier, err := GetServiceNetworkTier(svc)
 	if err != nil {
 		// Returns an error if the annotation is invalid.
-		return NetworkTier(""), err
+		return cloud.NetworkTier(""), err
 	}
 	return tier, nil
 }
 
-func (gce *GCECloud) deleteWrongNetworkTieredResources(lbName, lbRef string, desiredNetTier NetworkTier) error {
+func (gce *GCECloud) deleteWrongNetworkTieredResources(lbName, lbRef string, desiredNetTier cloud.NetworkTier) error {
 	logPrefix := fmt.Sprintf("deleteWrongNetworkTieredResources:(%s)", lbRef)
 	if err := deleteFWDRuleWithWrongTier(gce, gce.region, lbName, logPrefix, desiredNetTier); err != nil {
 		return err
@@ -1042,14 +1038,14 @@ func (gce *GCECloud) deleteWrongNetworkTieredResources(lbName, lbRef string, des
 
 // deleteFWDRuleWithWrongTier checks the network tier of existing forwarding
 // rule and delete the rule if the tier does not matched the desired tier.
-func deleteFWDRuleWithWrongTier(s CloudForwardingRuleService, region, name, logPrefix string, desiredNetTier NetworkTier) error {
+func deleteFWDRuleWithWrongTier(s CloudForwardingRuleService, region, name, logPrefix string, desiredNetTier cloud.NetworkTier) error {
 	tierStr, err := s.getNetworkTierFromForwardingRule(name, region)
 	if isNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
-	existingTier := NetworkTierGCEValueToType(tierStr)
+	existingTier := cloud.NetworkTierGCEValueToType(tierStr)
 	if existingTier == desiredNetTier {
 		return nil
 	}
@@ -1061,7 +1057,7 @@ func deleteFWDRuleWithWrongTier(s CloudForwardingRuleService, region, name, logP
 
 // deleteAddressWithWrongTier checks the network tier of existing address
 // and delete the address if the tier does not matched the desired tier.
-func deleteAddressWithWrongTier(s CloudAddressService, region, name, logPrefix string, desiredNetTier NetworkTier) error {
+func deleteAddressWithWrongTier(s CloudAddressService, region, name, logPrefix string, desiredNetTier cloud.NetworkTier) error {
 	// We only check the IP address matching the reserved name that the
 	// controller assigned to the LB. We make the assumption that an address of
 	// such name is owned by the controller and is safe to release. Whether an
@@ -1077,7 +1073,7 @@ func deleteAddressWithWrongTier(s CloudAddressService, region, name, logPrefix s
 	} else if err != nil {
 		return err
 	}
-	existingTier := NetworkTierGCEValueToType(tierStr)
+	existingTier := cloud.NetworkTierGCEValueToType(tierStr)
 	if existingTier == desiredNetTier {
 		return nil
 	}

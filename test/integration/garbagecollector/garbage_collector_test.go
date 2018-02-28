@@ -851,7 +851,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 // between core and custom resources.
 //
 // TODO: Consider how this could be represented with table-style tests (e.g. a
-// before/after expected object graph given a delete operation targetting a
+// before/after expected object graph given a delete operation targeting a
 // specific node in the before graph with certain delete options).
 func TestMixedRelationships(t *testing.T) {
 	ctx := setup(t, 5)

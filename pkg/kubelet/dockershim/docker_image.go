@@ -25,7 +25,7 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	"golang.org/x/net/context"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -76,7 +76,11 @@ func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatu
 		return nil, err
 	}
 
-	return &runtimeapi.ImageStatusResponse{Image: imageStatus}, nil
+	res := runtimeapi.ImageStatusResponse{Image: imageStatus}
+	if r.GetVerbose() {
+		res.Info = imageInspect.Config.Labels
+	}
+	return &res, nil
 }
 
 // PullImage pulls an image with authentication config.

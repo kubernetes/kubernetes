@@ -52,9 +52,10 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"fmt"
-	"github.com/golang/glog"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 func init() {
@@ -83,6 +84,7 @@ var (
 		v1.NodeOutOfDisk:          algorithm.TaintNodeOutOfDisk,
 		v1.NodeDiskPressure:       algorithm.TaintNodeDiskPressure,
 		v1.NodeNetworkUnavailable: algorithm.TaintNodeNetworkUnavailable,
+		v1.NodePIDPressure:        algorithm.TaintNodePIDPressure,
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
@@ -90,6 +92,7 @@ var (
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
 		algorithm.TaintNodeDiskPressure:       v1.NodeDiskPressure,
+		algorithm.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
 )
 
@@ -813,6 +816,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		// remaining node conditions should also be set to Unknown
 		remainingNodeConditionTypes := []v1.NodeConditionType{
+			v1.NodeOutOfDisk,
 			v1.NodeMemoryPressure,
 			v1.NodeDiskPressure,
 			// We don't change 'NodeNetworkUnavailable' condition, as it's managed on a control plane level.

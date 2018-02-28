@@ -16,7 +16,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
-        "//pkg/util/labels:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -41,7 +41,6 @@ go_test(
     name = "go_default_test",
     srcs = ["daemonset_util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/daemon/util",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -28,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -44,7 +45,7 @@ func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
 
 func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
-	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23")
+	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23").WithRandSource(rand.NewSource(0))
 	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
 	return &dockerService{
 		client:            c,

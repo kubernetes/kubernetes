@@ -414,8 +414,8 @@ func TestRBAC(t *testing.T) {
 	for i, tc := range tests {
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
-		masterConfig.GenericConfig.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+		masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+		masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 			superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
 			"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
 			"any-rolebinding-writer-namespace": {Name: "any-rolebinding-writer-namespace"},
@@ -517,8 +517,8 @@ func TestBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(masterConfig)
-	masterConfig.GenericConfig.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
 	}))
 	_, s, closeFn := framework.RunAMaster(masterConfig)

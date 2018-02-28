@@ -32,6 +32,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -51,7 +52,8 @@ const (
 	pressureDelay  = 20 * time.Second
 	testContextFmt = "when we run containers that should cause %s"
 	noPressure     = v1.NodeConditionType("NoPressure")
-	lotsOfDisk     = 10240 // 10 Gb in Mb
+	lotsOfDisk     = 10240      // 10 Gb in Mb
+	lotsOfFiles    = 1000000000 // 1 billion
 )
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
@@ -75,15 +77,44 @@ var _ = framework.KubeDescribe("InodeEviction [Slow] [Serial] [Disruptive]", fun
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logInodeMetrics, []podEvictSpec{
 			{
 				evictionPriority: 1,
-				pod:              inodeConsumingPod("container-inode-hog", nil),
+				pod:              inodeConsumingPod("container-inode-hog", lotsOfFiles, nil),
 			},
 			{
 				evictionPriority: 1,
-				pod:              inodeConsumingPod("volume-inode-hog", &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}),
+				pod:              inodeConsumingPod("volume-inode-hog", lotsOfFiles, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}),
 			},
 			{
 				evictionPriority: 0,
 				pod:              innocentPod(),
+			},
+		})
+	})
+})
+
+// ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
+// Disk pressure is induced by pulling large images
+var _ = framework.KubeDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive]", func() {
+	f := framework.NewDefaultFramework("image-gc-eviction-test")
+	pressureTimeout := 10 * time.Minute
+	expectedNodeCondition := v1.NodeDiskPressure
+	inodesConsumed := uint64(100000)
+	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
+			summary := eventuallyGetSummary()
+			inodesFree := *summary.Node.Fs.InodesFree
+			if inodesFree <= inodesConsumed {
+				framework.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+			}
+			initialConfig.EvictionHard = map[string]string{"nodefs.inodesFree": fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+		})
+		// Consume enough inodes to induce disk pressure,
+		// but expect that image garbage collection can reduce it enough to avoid an eviction
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
+			{
+				evictionPriority: 0,
+				pod:              inodeConsumingPod("container-inode", 110000, nil),
 			},
 		})
 	})
@@ -169,7 +200,8 @@ var _ = framework.KubeDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disrup
 			initialConfig.EvictionMaxPodGracePeriod = 30
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 			// Ensure that pods are not evicted because of the eviction-hard threshold
-			initialConfig.EvictionHard = map[string]string{}
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logDiskMetrics, []podEvictSpec{
 			{
@@ -191,7 +223,8 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
-			initialConfig.EvictionHard = map[string]string{}
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
 		})
 		sizeLimit := resource.MustParse("100Mi")
 		useOverLimit := 101 /* Mb */
@@ -429,7 +462,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: framework.GetPauseImageNameForHostArch(),
+							Image: imageutils.GetPauseImageNameForHostArch(),
 							Name:  podName,
 						},
 					},
@@ -627,19 +660,19 @@ const (
 	volumeName      = "test-volume"
 )
 
-func inodeConsumingPod(name string, volumeSource *v1.VolumeSource) *v1.Pod {
+func inodeConsumingPod(name string, numFiles int, volumeSource *v1.VolumeSource) *v1.Pod {
 	// Each iteration creates an empty file
-	return podWithCommand(volumeSource, v1.ResourceRequirements{}, name, "i=0; while true; do touch %s${i}.txt; sleep 0.001; i=$((i+=1)); done;")
+	return podWithCommand(volumeSource, v1.ResourceRequirements{}, numFiles, name, "touch %s${i}.txt; sleep 0.001")
 }
 
 func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
-	return podWithCommand(volumeSource, resources, name, fmt.Sprintf("i=0; while [ $i -lt %d ];", diskConsumedMB)+" do dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null ; i=$(($i+1)); done; while true; do sleep 5; done")
+	return podWithCommand(volumeSource, resources, diskConsumedMB, name, "dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null")
 }
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.
 // If a volumeSource is provided, then the volumeMountPath to the volume is inserted into the provided command.
-func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, name, command string) *v1.Pod {
+func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, iterations int, name, command string) *v1.Pod {
 	path := ""
 	volumeMounts := []v1.VolumeMount{}
 	volumes := []v1.Volume{}
@@ -659,7 +692,7 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 					Command: []string{
 						"sh",
 						"-c",
-						fmt.Sprintf(command, filepath.Join(path, "file")),
+						fmt.Sprintf("i=0; while [ $i -lt %d ]; do %s; i=$(($i+1)); done; while true; do sleep 5; done", iterations, fmt.Sprintf(command, filepath.Join(path, "file"))),
 					},
 					Resources:    resources,
 					VolumeMounts: volumeMounts,

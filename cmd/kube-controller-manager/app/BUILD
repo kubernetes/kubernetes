@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -14,6 +8,7 @@ go_library(
         "batch.go",
         "bootstrap.go",
         "certificates.go",
+        "cloudproviders.go",
         "controllermanager.go",
         "core.go",
         "extensions.go",
@@ -23,8 +18,11 @@ go_library(
         "rbac.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
+    visibility = ["//visibility:public"],
     deps = [
+        "//cmd/controller-manager/app:go_default_library",
         "//cmd/controller-manager/app/options:go_default_library",
+        "//cmd/kube-controller-manager/app/config:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -76,11 +74,13 @@ go_library(
         "//pkg/controller/volume/expand:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/controller/volume/pvcprotection:go_default_library",
+        "//pkg/controller/volume/pvprotection:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/configz:go_default_library",
+        "//pkg/util/flag:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
@@ -108,7 +108,6 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -117,23 +116,30 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/discovery/cached:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/scale:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["controller_manager_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -148,18 +154,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/kube-controller-manager/app/config:all-srcs",
         "//cmd/kube-controller-manager/app/options:all-srcs",
     ],
     tags = ["automanaged"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["controller_manager_test.go"],
-    embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
-    deps = [
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-    ],
+    visibility = ["//visibility:public"],
 )

@@ -211,6 +211,11 @@ func (kl *Kubelet) GetNodeConfig() cm.NodeConfig {
 	return kl.containerManager.GetNodeConfig()
 }
 
+// GetPodCgroupRoot returns the listeral cgroupfs value for the cgroup containing all pods
+func (kl *Kubelet) GetPodCgroupRoot() string {
+	return kl.containerManager.GetPodCgroupRoot()
+}
+
 // GetHostIP returns host IP or nil in case of error.
 func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	node, err := kl.GetNode()

@@ -47,13 +47,14 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 }
 
 func TestIsPodUpdated(t *testing.T) {
-	templateGeneration := int64(12345)
+	templateGeneration := int64Ptr(12345)
+	badGeneration := int64Ptr(12345)
 	hash := "55555"
 	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
 	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
 	tests := []struct {
 		test               string
-		templateGeneration int64
+		templateGeneration *int64
 		pod                *v1.Pod
 		hash               string
 		isUpdated          bool
@@ -95,14 +96,14 @@ func TestIsPodUpdated(t *testing.T) {
 		},
 		{
 			"templateGeneration doesn't match, hash does",
-			templateGeneration + 1,
+			badGeneration,
 			newPod("pod1", "node1", labels),
 			hash,
 			true,
 		},
 		{
 			"templateGeneration and hash don't match",
-			templateGeneration + 1,
+			badGeneration,
 			newPod("pod1", "node1", labels),
 			hash + "123",
 			false,
@@ -130,7 +131,7 @@ func TestIsPodUpdated(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		updated := IsPodUpdated(test.templateGeneration, test.pod, test.hash)
+		updated := IsPodUpdated(test.pod, test.hash, test.templateGeneration)
 		if updated != test.isUpdated {
 			t.Errorf("%s: IsPodUpdated returned wrong value. Expected %t, got %t", test.test, test.isUpdated, updated)
 		}
@@ -139,19 +140,19 @@ func TestIsPodUpdated(t *testing.T) {
 
 func TestCreatePodTemplate(t *testing.T) {
 	tests := []struct {
-		templateGeneration int64
+		templateGeneration *int64
 		hash               string
 		expectUniqueLabel  bool
 	}{
-		{int64(1), "", false},
-		{int64(2), "3242341807", true},
+		{int64Ptr(1), "", false},
+		{int64Ptr(2), "3242341807", true},
 	}
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}
 		newPodTemplate := CreatePodTemplate(podTemplateSpec, test.templateGeneration, test.hash)
 		val, exists := newPodTemplate.ObjectMeta.Labels[extensions.DaemonSetTemplateGenerationKey]
-		if !exists || val != fmt.Sprint(test.templateGeneration) {
-			t.Errorf("Expected podTemplateSpec to have generation label value: %d, got: %s", test.templateGeneration, val)
+		if !exists || val != fmt.Sprint(*test.templateGeneration) {
+			t.Errorf("Expected podTemplateSpec to have generation label value: %d, got: %s", *test.templateGeneration, val)
 		}
 		val, exists = newPodTemplate.ObjectMeta.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		if test.expectUniqueLabel && (!exists || val != test.hash) {
@@ -161,4 +162,9 @@ func TestCreatePodTemplate(t *testing.T) {
 			t.Errorf("Expected podTemplateSpec to have no hash label, got: %s", val)
 		}
 	}
+}
+
+func int64Ptr(i int) *int64 {
+	li := int64(i)
+	return &li
 }

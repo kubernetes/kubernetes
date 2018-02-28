@@ -46,7 +46,6 @@ go_test(
     name = "go_default_test",
     srcs = ["disruption_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller/disruption",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core/install:go_default_library",

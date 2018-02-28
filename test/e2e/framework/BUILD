@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -10,6 +11,7 @@ go_library(
     srcs = [
         "authorizer_util.go",
         "cleanup.go",
+        "crd_util.go",
         "deployment_util.go",
         "exec_util.go",
         "firewall_util.go",
@@ -26,6 +28,7 @@ go_library(
         "nodes_util.go",
         "perf_util.go",
         "pods.go",
+        "profile_gatherer.go",
         "psp_util.go",
         "pv_util.go",
         "rc_util.go",
@@ -47,7 +50,6 @@ go_library(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/conditions:go_default_library",
@@ -60,6 +62,7 @@ go_library(
         "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubectl:go_default_library",
+        "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/dockershim/metrics:go_default_library",
@@ -77,7 +80,7 @@ go_library(
         "//pkg/util/system:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/util/version:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/manifest:go_default_library",
@@ -109,6 +112,9 @@ go_library(
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/test/integration/testserver:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -132,6 +138,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/discovery/cached:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
@@ -139,6 +146,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/scale:go_default_library",
@@ -167,4 +175,10 @@ filegroup(
         "//test/e2e/framework/timer:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["firewall_util_test.go"],
+    embed = [":go_default_library"],
 )

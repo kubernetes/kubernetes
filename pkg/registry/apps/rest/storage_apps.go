@@ -27,10 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	controllerrevisionsstore "k8s.io/kubernetes/pkg/registry/apps/controllerrevision/storage"
+	daemonsetstore "k8s.io/kubernetes/pkg/registry/apps/daemonset/storage"
+	deploymentstore "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
-	daemonsetstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
-	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
-	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
 )
 
 type RESTStorageProvider struct{}

@@ -270,7 +270,7 @@ def password_changed():
     elif password == "":
         # Password not initialised
         password = token_generator()
-    setup_basic_auth(password, "admin", "admin")
+    setup_basic_auth(password, "admin", "admin", "system:masters")
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
     set_state('client.password.initialised')
@@ -463,7 +463,7 @@ def start_master(etcd):
 def etcd_data_change(etcd):
     ''' Etcd scale events block master reconfiguration due to the
         kubernetes-master.components.started state. We need a way to
-        handle these events consistenly only when the number of etcd
+        handle these events consistently only when the number of etcd
         units has actually changed '''
 
     # key off of the connection string
@@ -838,7 +838,7 @@ def is_privileged():
     """Return boolean indicating whether or not to set allow-privileged=true.
 
     """
-    privileged = hookenv.config('allow-privileged')
+    privileged = hookenv.config('allow-privileged').lower()
     if privileged == 'auto':
         return is_state('kubernetes-master.gpu.enabled')
     else:
@@ -886,7 +886,7 @@ def on_gpu_available(kube_control):
 
     """
     config = hookenv.config()
-    if config['allow-privileged'] == "false":
+    if config['allow-privileged'].lower() == "false":
         hookenv.status_set(
             'active',
             'GPUs available. Set allow-privileged="auto" to enable.'
@@ -1169,7 +1169,7 @@ def configure_controller_manager():
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
 
-    # Default to 3 minute resync. TODO: Make this configureable?
+    # Default to 3 minute resync. TODO: Make this configurable?
     controller_opts['min-resync-period'] = '3m'
     controller_opts['v'] = '2'
     controller_opts['root-ca-file'] = ca_cert_path

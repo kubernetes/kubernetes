@@ -10,7 +10,7 @@ spec:
     - /bin/sh
     - -c
     - echo ok > /tmp/health; sleep 10; rm -rf /tmp/health; sleep 600
-    image: gcr.io/google_containers/busybox
+    image: k8s.gcr.io/busybox
     livenessProbe:
       exec:
         command:

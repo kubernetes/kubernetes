@@ -108,9 +108,9 @@ func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmd.Flags().StringVarP(&options.selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
-	cmd.Flags().BoolVar(&options.all, "all", false, "Select all nodes in the cluster")
+	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
+	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all nodes in the cluster")
 	return cmd
 }
 
@@ -274,13 +274,12 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		mapper, _ := o.f.Object()
 		outputFormat := cmdutil.GetFlagString(o.cmd, "output")
 		if outputFormat != "" {
-			return o.f.PrintObject(o.cmd, false, mapper, outputObj, o.out)
+			return cmdutil.PrintObject(o.cmd, outputObj, o.out)
 		}
 
-		o.f.PrintSuccess(mapper, false, o.out, info.Mapping.Resource, info.Name, false, operation)
+		cmdutil.PrintSuccess(false, o.out, info.Object, false, operation)
 		return nil
 	})
 }

@@ -56,7 +56,6 @@ func TestIsDefaultNamespaceResource(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
 			v := IsDefaultNamespaceResource(tc.resourceName)
@@ -97,7 +96,6 @@ func TestHugePageSizeFromResourceName(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
 			v, err := HugePageSizeFromResourceName(tc.resourceName)
@@ -142,7 +140,6 @@ func TestIsOvercommitAllowed(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
 			v := IsOvercommitAllowed(tc.resourceName)

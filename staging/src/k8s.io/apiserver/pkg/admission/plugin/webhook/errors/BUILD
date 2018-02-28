@@ -19,7 +19,6 @@ go_test(
     name = "go_default_test",
     srcs = ["statuserror_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/errors",
     deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 

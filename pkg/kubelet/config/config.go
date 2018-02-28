@@ -96,7 +96,7 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	if c.pods == nil {
 		return false
 	}
-	glog.V(6).Infof("Looking for %v, have seen %v", c.sources.List(), seenSources)
+	glog.V(5).Infof("Looking for %v, have seen %v", c.sources.List(), seenSources)
 	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
 }
 

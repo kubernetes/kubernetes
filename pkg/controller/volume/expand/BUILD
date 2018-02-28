@@ -17,13 +17,13 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/expand/cache:go_default_library",
-        "//pkg/controller/volume/expand/util:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
+        "//pkg/volume/util/volumepathhandler:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -53,7 +53,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/controller/volume/expand/cache:all-srcs",
-        "//pkg/controller/volume/expand/util:all-srcs",
     ],
     tags = ["automanaged"],
 )

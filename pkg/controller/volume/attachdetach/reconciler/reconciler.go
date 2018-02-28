@@ -147,7 +147,7 @@ func (rc *reconciler) isMultiAttachForbidden(volumeSpec *volume.Spec) bool {
 		}
 	}
 
-	// Only if this volume is a persistent volume, we have reliable information on wether it's allowed or not to
+	// Only if this volume is a persistent volume, we have reliable information on whether it's allowed or not to
 	// multi-attach. We trust in the individual volume implementations to not allow unsupported access modes
 	if volumeSpec.PersistentVolume != nil {
 		// Check for persistent volume types which do not fail when trying to multi-attach

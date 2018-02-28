@@ -2,6 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
     "go_test",
 )
 
@@ -10,11 +11,13 @@ go_test(
     size = "large",
     srcs = [
         "crd_test.go",
+        "kms_transformation_test.go",
         "kube_apiserver_test.go",
         "main_test.go",
+        "secrets_transformation_test.go",
         "synthetic_master_test.go",
     ],
-    importpath = "k8s.io/kubernetes/test/integration/master",
+    embed = [":go_default_library"],
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
@@ -43,6 +46,10 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:go_default_library",
@@ -65,4 +72,29 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "kms_plugin_mock.go",
+        "transformation_testcase.go",
+    ],
+    importpath = "k8s.io/kubernetes/test/integration/master",
+    deps = [
+        "//cmd/kube-apiserver/app/testing:go_default_library",
+        "//test/integration:go_default_library",
+        "//test/integration/framework:go_default_library",
+        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
+        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+    ],
 )

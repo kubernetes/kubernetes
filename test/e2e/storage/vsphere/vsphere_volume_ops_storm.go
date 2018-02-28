@@ -25,9 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	k8stype "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -59,16 +57,13 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		persistentvolumes []*v1.PersistentVolume
 		err               error
 		volume_ops_scale  int
-		vsp               *vsphere.VSphere
 	)
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) == 0 {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		Expect(GetReadySchedulableNodeInfos()).NotTo(BeEmpty())
 		if os.Getenv("VOLUME_OPS_SCALE") != "" {
 			volume_ops_scale, err = strconv.Atoi(os.Getenv("VOLUME_OPS_SCALE"))
 			Expect(err).NotTo(HaveOccurred())
@@ -76,8 +71,6 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 			volume_ops_scale = DEFAULT_VOLUME_OPS_SCALE
 		}
 		pvclaims = make([]*v1.PersistentVolumeClaim, volume_ops_scale)
-		vsp, err = getVSphere(client)
-		Expect(err).NotTo(HaveOccurred())
 	})
 	AfterEach(func() {
 		By("Deleting PVCs")
@@ -114,14 +107,14 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verify all volumes are accessible and available in the pod")
-		verifyVSphereVolumesAccessible(client, pod, persistentvolumes, vsp)
+		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		By("Deleting pod")
 		framework.ExpectNoError(framework.DeletePodWithWait(f, client, pod))
 
 		By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {
-			waitForVSphereDiskToDetach(client, vsp, pv.Spec.VsphereVolume.VolumePath, k8stype.NodeName(pod.Spec.NodeName))
+			waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 		}
 	})
 })

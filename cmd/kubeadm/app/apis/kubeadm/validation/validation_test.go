@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -54,6 +54,51 @@ func TestValidateTokenDiscovery(t *testing.T) {
 				"failed ValidateTokenDiscovery:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(err == nil),
+			)
+		}
+	}
+}
+
+func TestValidateValidateTokenUsages(t *testing.T) {
+	var tests = []struct {
+		u        []string
+		f        *field.Path
+		expected bool
+	}{
+		{[]string{}, nil, true},                            // supported (no usages)
+		{[]string{"signing", "authentication"}, nil, true}, // supported
+		{[]string{"something else"}, nil, false},           // usage not supported
+	}
+	for _, rt := range tests {
+		actual := ValidateTokenUsages(rt.u, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenUsages:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
+func TestValidateTokenGroups(t *testing.T) {
+	var tests = []struct {
+		u        []string
+		g        []string
+		f        *field.Path
+		expected bool
+	}{
+		{[]string{"some usage"}, []string{"some group"}, nil, false},                       // groups doesn't makes sense if usage authentication
+		{[]string{"authentication"}, []string{"some group"}, nil, false},                   // group not supported
+		{[]string{"authentication"}, []string{"system:bootstrappers:anygroup"}, nil, true}, // supported
+	}
+	for _, rt := range tests {
+		actual := ValidateTokenGroups(rt.u, rt.g, rt.f)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"failed ValidateTokenGroups:\n\texpected: %t\n\t  actual: %t",
+				rt.expected,
+				(len(actual) == 0),
 			)
 		}
 	}
@@ -134,7 +179,7 @@ func TestValidateCloudProvider(t *testing.T) {
 	}
 }
 
-func TestValidateAPIServerCertSANs(t *testing.T) {
+func TestValidateCertSANs(t *testing.T) {
 	var tests = []struct {
 		sans     []string
 		expected bool
@@ -148,10 +193,10 @@ func TestValidateAPIServerCertSANs(t *testing.T) {
 		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
 	}
 	for _, rt := range tests {
-		actual := ValidateAPIServerCertSANs(rt.sans, nil)
+		actual := ValidateCertSANs(rt.sans, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed ValidateAPIServerCertSANs:\n\texpected: %t\n\t  actual: %t",
+				"failed ValidateCertSANs:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)
@@ -568,12 +613,11 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(true),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 			SystemCgroups:               "",
 			CgroupRoot:                  "",
-			CAdvisorPort:                utilpointer.Int32Ptr(0),
 			EventBurst:                  10,
 			EventRecordQPS:              utilpointer.Int32Ptr(5),
 			HealthzPort:                 utilpointer.Int32Ptr(10248),
@@ -588,7 +632,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			OOMScoreAdj:                 utilpointer.Int32Ptr(-999),
 			PodsPerCore:                 100,
 			Port:                        65535,
-			ReadOnlyPort:                utilpointer.Int32Ptr(0),
+			ReadOnlyPort:                0,
 			RegistryBurst:               10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(5),
 			HairpinMode:                 "promiscuous-bridge",
@@ -599,12 +643,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}
 
 	errorCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(false),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 			SystemCgroups:               "/",
 			CgroupRoot:                  "",
-			CAdvisorPort:                utilpointer.Int32Ptr(-10),
 			EventBurst:                  -10,
 			EventRecordQPS:              utilpointer.Int32Ptr(-10),
 			HealthzPort:                 utilpointer.Int32Ptr(-10),
@@ -619,7 +662,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			OOMScoreAdj:                 utilpointer.Int32Ptr(-1001),
 			PodsPerCore:                 -10,
 			Port:                        0,
-			ReadOnlyPort:                utilpointer.Int32Ptr(-10),
+			ReadOnlyPort:                -10,
 			RegistryBurst:               -10,
 			RegistryPullQPS:             utilpointer.Int32Ptr(-10),
 		},

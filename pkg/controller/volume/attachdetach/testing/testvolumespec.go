@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const TestPluginName = "kubernetes.io/testPlugin"
@@ -142,7 +142,7 @@ func CreateTestClient() *fake.Clientset {
 						"name": nodeName,
 					},
 					Annotations: map[string]string{
-						volumehelper.ControllerManagedAttachAnnotation: "true",
+						util.ControllerManagedAttachAnnotation: "true",
 					},
 				},
 				Status: v1.NodeStatus{

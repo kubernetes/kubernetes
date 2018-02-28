@@ -125,6 +125,20 @@ func (_m *StatsProvider) GetNodeConfig() cm.NodeConfig {
 	return r0
 }
 
+// GetPodCgroupRoot provides a mock function with given fields:
+func (_m *StatsProvider) GetPodCgroupRoot() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // GetPodByName provides a mock function with given fields: namespace, name
 func (_m *StatsProvider) GetPodByName(namespace string, name string) (*corev1.Pod, bool) {
 	ret := _m.Called(namespace, name)
@@ -266,6 +280,29 @@ func (_m *StatsProvider) RootFsStats() (*v1alpha1.FsStats, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1alpha1.FsStats)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RlimitStats provides a mock function with given fields:
+func (_m *StatsProvider) RlimitStats() (*v1alpha1.RlimitStats, error) {
+	ret := _m.Called()
+
+	var r0 *v1alpha1.RlimitStats
+	if rf, ok := ret.Get(0).(func() *v1alpha1.RlimitStats); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1alpha1.RlimitStats)
 		}
 	}
 

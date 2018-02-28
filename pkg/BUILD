@@ -76,7 +76,6 @@ filegroup(
         "//pkg/client/metrics/prometheus:all-srcs",
         "//pkg/client/testdata:all-srcs",
         "//pkg/client/tests:all-srcs",
-        "//pkg/client/unversioned:all-srcs",
         "//pkg/cloudprovider:all-srcs",
         "//pkg/controller:all-srcs",
         "//pkg/credentialprovider:all-srcs",
@@ -103,7 +102,6 @@ filegroup(
         "//pkg/version:all-srcs",
         "//pkg/volume:all-srcs",
         "//pkg/watch/json:all-srcs",
-        "//pkg/watch/versioned:all-srcs",
     ],
     tags = ["automanaged"],
 )

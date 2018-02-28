@@ -125,7 +125,7 @@ func TestAssumePodScheduled(t *testing.T) {
 				Memory:   0,
 			},
 			nonzeroRequest: &Resource{
-				MilliCPU: priorityutil.DefaultMilliCpuRequest,
+				MilliCPU: priorityutil.DefaultMilliCPURequest,
 				Memory:   priorityutil.DefaultMemoryRequest,
 			},
 			allocatableResource: &Resource{},
@@ -575,6 +575,68 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	}
 }
 
+func makePodWithEphemeralStorage(nodeName, ephemeralStorage string) *v1.Pod {
+	req := v1.ResourceList{
+		v1.ResourceEphemeralStorage: resource.MustParse(ephemeralStorage),
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default-namespace",
+			Name:      "pod-with-ephemeral-storage",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: req,
+				},
+			}},
+			NodeName: nodeName,
+		},
+	}
+}
+
+func TestEphemeralStorageResource(t *testing.T) {
+	nodeName := "node"
+	podE := makePodWithEphemeralStorage(nodeName, "500")
+	tests := []struct {
+		pod       *v1.Pod
+		wNodeInfo *NodeInfo
+	}{
+		{
+			pod: podE,
+			wNodeInfo: &NodeInfo{
+				requestedResource: &Resource{
+					EphemeralStorage: 500,
+				},
+				nonzeroRequest: &Resource{
+					MilliCPU: priorityutil.DefaultMilliCPURequest,
+					Memory:   priorityutil.DefaultMemoryRequest,
+				},
+				allocatableResource: &Resource{},
+				pods:                []*v1.Pod{podE},
+				usedPorts:           schedutil.HostPortInfo{},
+			},
+		},
+	}
+	for i, tt := range tests {
+		cache := newSchedulerCache(time.Second, time.Second, nil)
+		if err := cache.AddPod(tt.pod); err != nil {
+			t.Fatalf("AddPod failed: %v", err)
+		}
+		n := cache.nodes[nodeName]
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
+
+		if err := cache.RemovePod(tt.pod); err != nil {
+			t.Fatalf("RemovePod failed: %v", err)
+		}
+
+		n = cache.nodes[nodeName]
+		if n != nil {
+			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
+		}
+	}
+}
+
 // TestRemovePod tests after added pod is removed, its information should also be subtracted.
 func TestRemovePod(t *testing.T) {
 	nodeName := "node"
@@ -710,10 +772,10 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *NodeInfo {
 func TestNodeOperators(t *testing.T) {
 	// Test datas
 	nodeName := "test-node"
-	cpu_1 := resource.MustParse("1000m")
-	mem_100m := resource.MustParse("100m")
-	cpu_half := resource.MustParse("500m")
-	mem_50m := resource.MustParse("50m")
+	cpu1 := resource.MustParse("1000m")
+	mem100m := resource.MustParse("100m")
+	cpuHalf := resource.MustParse("500m")
+	mem50m := resource.MustParse("50m")
 	resourceFooName := "example.com/foo"
 	resourceFoo := resource.MustParse("1")
 
@@ -728,8 +790,8 @@ func TestNodeOperators(t *testing.T) {
 				},
 				Status: v1.NodeStatus{
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:                   cpu_1,
-						v1.ResourceMemory:                mem_100m,
+						v1.ResourceCPU:                   cpu1,
+						v1.ResourceMemory:                mem100m,
 						v1.ResourceName(resourceFooName): resourceFoo,
 					},
 				},
@@ -754,8 +816,8 @@ func TestNodeOperators(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    cpu_half,
-										v1.ResourceMemory: mem_50m,
+										v1.ResourceCPU:    cpuHalf,
+										v1.ResourceMemory: mem50m,
 									},
 								},
 								Ports: []v1.ContainerPort{
@@ -778,8 +840,8 @@ func TestNodeOperators(t *testing.T) {
 				},
 				Status: v1.NodeStatus{
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:                   cpu_1,
-						v1.ResourceMemory:                mem_100m,
+						v1.ResourceCPU:                   cpu1,
+						v1.ResourceMemory:                mem100m,
 						v1.ResourceName(resourceFooName): resourceFoo,
 					},
 				},
@@ -804,8 +866,8 @@ func TestNodeOperators(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    cpu_half,
-										v1.ResourceMemory: mem_50m,
+										v1.ResourceCPU:    cpuHalf,
+										v1.ResourceMemory: mem50m,
 									},
 								},
 							},
@@ -822,8 +884,8 @@ func TestNodeOperators(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    cpu_half,
-										v1.ResourceMemory: mem_50m,
+										v1.ResourceCPU:    cpuHalf,
+										v1.ResourceMemory: mem50m,
 									},
 								},
 							},
@@ -866,8 +928,8 @@ func TestNodeOperators(t *testing.T) {
 		}
 
 		// Case 3: update node attribute successfully.
-		node.Status.Allocatable[v1.ResourceMemory] = mem_50m
-		expected.allocatableResource.Memory = mem_50m.Value()
+		node.Status.Allocatable[v1.ResourceMemory] = mem50m
+		expected.allocatableResource.Memory = mem50m.Value()
 		expected.generation++
 		cache.UpdateNode(nil, node)
 		got, found = cache.nodes[node.Name]

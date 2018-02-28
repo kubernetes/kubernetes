@@ -100,16 +100,11 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 	gceRegion := "fake-region"
 	zonesWithNodes := []string{"zone1", "zone3", "zone2"}
 	fakeManager := newFakeManager(gceProjectId, gceRegion)
-	alphaFeatureGate, featureGateErr := NewAlphaFeatureGate([]string{AlphaFeatureGCEDisk})
 
-	if featureGateErr != nil {
-		t.Error(featureGateErr)
-	}
 	gce := GCECloud{
 		manager:            fakeManager,
 		managedZones:       zonesWithNodes,
 		projectID:          gceProjectId,
-		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          createNodeZones(zonesWithNodes),
 		nodeInformerSynced: func() bool { return true },
 	}

@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -62,8 +61,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/transport"
-	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring0Factory struct {
@@ -202,16 +199,8 @@ func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return f.clientCache.KubernetesClientSetForVersion(nil)
 }
 
-func (f *ring0Factory) MetricsClientSet() (metricsclientset.Interface, error) {
-	return f.clientCache.MetricsClientSetForVersion(nil)
-}
-
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(nil)
-}
-
-func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return f.clientCache.ClientSetForVersion(requiredVersion)
 }
 
 func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
@@ -221,30 +210,12 @@ func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientConfig.ClientConfig()
 }
 
-func (f *ring0Factory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
-}
-
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
 	clientConfig, err := f.clientCache.ClientConfigForVersion(nil)
 	if err != nil {
 		return nil, err
 	}
 	return restclient.RESTClientFor(clientConfig)
-}
-
-func (f *ring0Factory) Decoder(toInternal bool) runtime.Decoder {
-	var decoder runtime.Decoder
-	if toInternal {
-		decoder = legacyscheme.Codecs.UniversalDecoder()
-	} else {
-		decoder = legacyscheme.Codecs.UniversalDeserializer()
-	}
-	return decoder
-}
-
-func (f *ring0Factory) JSONEncoder() runtime.Encoder {
-	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 }
 
 func (f *ring0Factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
@@ -446,12 +417,6 @@ func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	}
 }
 
-func (f *ring0Factory) Printer(mapping *meta.RESTMapping, options printers.PrintOptions) (printers.ResourcePrinter, error) {
-	p := printers.NewHumanReadablePrinter(f.JSONEncoder(), f.Decoder(true), options)
-	printersinternal.AddHandlers(p)
-	return p, nil
-}
-
 func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
@@ -459,7 +424,7 @@ func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 			return nil, errors.New("is already paused")
 		}
 		obj.Spec.Paused = true
-		return runtime.Encode(f.JSONEncoder(), info.Object)
+		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
 	default:
 		return nil, fmt.Errorf("pausing is not supported")
 	}
@@ -476,7 +441,7 @@ func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
 			return nil, errors.New("is not paused")
 		}
 		obj.Spec.Paused = false
-		return runtime.Encode(f.JSONEncoder(), info.Object)
+		return runtime.Encode(InternalVersionJSONEncoder(), info.Object)
 	default:
 		return nil, fmt.Errorf("resuming is not supported")
 	}
@@ -682,34 +647,6 @@ func (f *ring0Factory) EditorEnvs() []string {
 	return []string{"KUBE_EDITOR", "EDITOR"}
 }
 
-func (f *ring0Factory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
-	switch obj := obj.(type) {
-	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeNodePort {
-			msg := fmt.Sprintf(
-				`You have exposed your service on an external port on all nodes in your
-cluster.  If you want to expose this service to the external internet, you may
-need to set up firewall rules for the service port(s) (%s) to serve traffic.
-
-See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
-`,
-				makePortsString(obj.Spec.Ports, true))
-			out.Write([]byte(msg))
-		}
-
-		if _, ok := obj.Annotations[api.AnnotationLoadBalancerSourceRangesKey]; ok {
-			msg := fmt.Sprintf(
-				`You are using service annotation [service.beta.kubernetes.io/load-balancer-source-ranges].
-It has been promoted to field [loadBalancerSourceRanges] in service spec. This annotation will be deprecated in the future.
-Please use the loadBalancerSourceRanges field instead.
-
-See http://kubernetes.io/docs/user-guide/services-firewalls for more details.
-`)
-			out.Write([]byte(msg))
-		}
-	}
-}
-
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
 var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
 
@@ -721,4 +658,13 @@ func computeDiscoverCacheDir(parentDir, host string) string {
 	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
 
 	return filepath.Join(parentDir, safeHost)
+}
+
+// this method exists to help us find the points still relying on internal types.
+func InternalVersionDecoder() runtime.Decoder {
+	return legacyscheme.Codecs.UniversalDecoder()
+}
+
+func InternalVersionJSONEncoder() runtime.Encoder {
+	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 }

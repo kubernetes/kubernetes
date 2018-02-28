@@ -45,7 +45,7 @@ func InitNodeE2ERemote() TestSuite {
 func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	// Build the executables
 	if err := builder.BuildGo(); err != nil {
-		return fmt.Errorf("failed to build the depedencies: %v", err)
+		return fmt.Errorf("failed to build the dependencies: %v", err)
 	}
 
 	// Make sure we can find the newly built binaries

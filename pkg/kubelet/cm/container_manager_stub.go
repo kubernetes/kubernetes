@@ -90,6 +90,10 @@ func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLi
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
 }
 
+func (cm *containerManagerStub) GetPodCgroupRoot() string {
+	return ""
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{}
 }

@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -316,7 +316,8 @@ func TestGetResourcesAndSelector(t *testing.T) {
 }
 
 func TestSelectorTest(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -326,20 +327,18 @@ func TestSelectorTest(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdSelector(f, buf)
+	cmd := NewCmdSelector(tf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-service.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/service.yaml")
 
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 	cmd.Run(cmd, []string{"environment=qa"})
 
-	if !strings.Contains(buf.String(), "services/cassandra") {
+	if !strings.Contains(buf.String(), "service/cassandra") {
 		t.Errorf("did not set selector: %s", buf.String())
 	}
 }

@@ -37,7 +37,6 @@ go_test(
         "conversion_test.go",
         "defaults_test.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/core/v1_test",
     deps = [
         ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",

@@ -13,7 +13,6 @@ go_test(
         "controller_utils_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/controller",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -62,7 +61,7 @@ go_library(
         "//pkg/util/taints:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
-        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
@@ -136,6 +135,7 @@ filegroup(
         "//pkg/controller/volume/expand:all-srcs",
         "//pkg/controller/volume/persistentvolume:all-srcs",
         "//pkg/controller/volume/pvcprotection:all-srcs",
+        "//pkg/controller/volume/pvprotection:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -29,15 +29,12 @@ const (
 	// tier to use. Currently supports "Standard" and "Premium" (default).
 	AlphaFeatureNetworkTiers = "NetworkTiers"
 
-	AlphaFeatureGCEDisk = "DiskAlphaAPI"
-
 	AlphaFeatureNetworkEndpointGroup = "NetworkEndpointGroup"
 )
 
 // All known alpha features
 var knownAlphaFeatures = map[string]bool{
 	AlphaFeatureNetworkTiers:         true,
-	AlphaFeatureGCEDisk:              true,
 	AlphaFeatureNetworkEndpointGroup: true,
 }
 

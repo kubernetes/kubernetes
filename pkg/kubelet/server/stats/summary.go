@@ -67,6 +67,10 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pod stats: %v", err)
 	}
+	rlimit, err := sp.provider.RlimitStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
+	}
 
 	nodeStats := statsapi.NodeStats{
 		NodeName:  node.Name,
@@ -76,21 +80,26 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		StartTime: rootStats.StartTime,
 		Fs:        rootFsStats,
 		Runtime:   &statsapi.RuntimeStats{ImageFs: imageFsStats},
+		Rlimit:    rlimit,
 	}
 
-	systemContainers := map[string]string{
-		statsapi.SystemContainerKubelet: nodeConfig.KubeletCgroupsName,
-		statsapi.SystemContainerRuntime: nodeConfig.RuntimeCgroupsName,
-		statsapi.SystemContainerMisc:    nodeConfig.SystemCgroupsName,
+	systemContainers := map[string]struct {
+		name             string
+		forceStatsUpdate bool
+	}{
+		statsapi.SystemContainerKubelet: {nodeConfig.KubeletCgroupsName, false},
+		statsapi.SystemContainerRuntime: {nodeConfig.RuntimeCgroupsName, false},
+		statsapi.SystemContainerMisc:    {nodeConfig.SystemCgroupsName, false},
+		statsapi.SystemContainerPods:    {sp.provider.GetPodCgroupRoot(), updateStats},
 	}
-	for sys, name := range systemContainers {
+	for sys, cont := range systemContainers {
 		// skip if cgroup name is undefined (not all system containers are required)
-		if name == "" {
+		if cont.name == "" {
 			continue
 		}
-		s, _, err := sp.provider.GetCgroupStats(name, false)
+		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			glog.Errorf("Failed to get system container stats for %q: %v", name, err)
+			glog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
 			continue
 		}
 		// System containers don't have a filesystem associated with them.

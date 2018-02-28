@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	csiHostPathPluginImage string = "docker.io/k8scsi/hostpathplugin:0.1"
+	csiHostPathPluginImage string = "quay.io/k8scsi/hostpathplugin:v0.2.0"
 )
 
 func csiHostPathPod(

@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -57,10 +56,7 @@ type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool
 type SubjectOptions struct {
 	resource.FilenameOptions
 
-	Mapper            meta.RESTMapper
-	Typer             runtime.ObjectTyper
 	Infos             []*resource.Info
-	Encoder           runtime.Encoder
 	Out               io.Writer
 	Err               io.Writer
 	Selector          string
@@ -74,7 +70,7 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
-	PrintObject func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject func(obj runtime.Object, out io.Writer) error
 }
 
 func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
@@ -99,9 +95,9 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 	cmdutil.AddPrinterFlags(cmd)
 	usage := "the resource to update the subjects"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set subject will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringArrayVar(&options.Users, "user", []string{}, "Usernames to bind to the role")
 	cmd.Flags().StringArrayVar(&options.Groups, "group", []string{}, "Groups to bind to the role")
@@ -111,13 +107,10 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 }
 
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.Local = cmdutil.GetFlagBool(cmd, "local")
-	o.Mapper, o.Typer = f.Object()
-	o.Encoder = f.JSONEncoder()
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.PrintObject = func(mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error {
-		return f.PrintObject(cmd, o.Local, mapper, obj, out)
+	o.PrintObject = func(obj runtime.Object, out io.Writer) error {
+		return cmdutil.PrintObject(cmd, obj, out)
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -158,6 +151,9 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 }
 
 func (o *SubjectOptions) Validate() error {
+	if o.All && len(o.Selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
 	if len(o.Users) == 0 && len(o.Groups) == 0 && len(o.ServiceAccounts) == 0 {
 		return fmt.Errorf("you must specify at least one value of user, group or serviceaccount")
 	}
@@ -181,7 +177,7 @@ func (o *SubjectOptions) Validate() error {
 
 func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 	var err error
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
+	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		subjects := []rbac.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbac.Subject{
@@ -220,7 +216,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		transformed, err := updateSubjectForObject(info.Object, subjects, fn)
 		if transformed && err == nil {
 			// TODO: switch UpdatePodSpecForObject to work on v1.PodSpec
-			return runtime.Encode(o.Encoder, info.AsVersioned())
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.AsVersioned())
 		}
 		return nil, err
 	})
@@ -240,7 +236,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObject(o.Mapper, info.Object, o.Out); err != nil {
+			if err := o.PrintObject(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
@@ -255,9 +251,9 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 
 		shortOutput := o.Output == "name"
 		if len(o.Output) > 0 && !shortOutput {
-			return o.PrintObject(o.Mapper, info.AsVersioned(), o.Out)
+			return o.PrintObject(info.AsVersioned(), o.Out)
 		}
-		f.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "subjects updated")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "subjects updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
@@ -78,13 +77,11 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 // the built in mapper if necessary. It supports unstructured objects either way, since
 // the underlying Scheme supports Unstructured. The mapper will return converters that can
 // convert versioned types to unstructured and back.
-// It can return an error and the best effort unstructured mapper and typer.
 func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, error) {
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
-		unstructuredMapper := discovery.NewRESTMapper(nil, meta.InterfacesForUnstructured)
-		unstructuredTyper := discovery.NewUnstructuredObjectTyper(nil)
-		return unstructuredMapper, unstructuredTyper, err
+		glog.V(3).Infof("Unable to get a discovery client to find server resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
 
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
@@ -92,11 +89,9 @@ func (f *ring1Factory) objectLoader() (meta.RESTMapper, runtime.ObjectTyper, err
 		discoveryClient.Invalidate()
 		groupResources, err = discovery.GetAPIGroupResources(discoveryClient)
 	}
-	// even if we can't get all the results, we're better off continuing with what we can than not presenting
-	// anything.  This mirrors old behavior that used to fallback to a hardcoded list of API types compiled
-	// into kubernetes.
 	if err != nil {
-		glog.V(1).Infof("Unable to retrieve all API resources, continuing with partial results: %v", err)
+		glog.V(3).Infof("Unable to retrieve API resources, falling back to hardcoded types: %v", err)
+		return legacyscheme.Registry.RESTMapper(), legacyscheme.Scheme, nil
 	}
 
 	// allow conversion between typed and unstructured objects
@@ -136,7 +131,7 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	if err != nil {
 		return nil, err
 	}
-	if err := client.SetKubernetesDefaults(cfg); err != nil {
+	if err := setKubernetesDefaults(cfg); err != nil {
 		return nil, err
 	}
 	gvk := mapping.GroupVersionKind
@@ -170,9 +165,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 }
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		// if we can't make a client for this group/version, go generic if possible
 		if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
@@ -223,7 +216,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -286,8 +279,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 }
 
 func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -311,8 +303,7 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 }
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, clientsetErr := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
 	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 
 	if kubectl.IsNoSuchReaperError(reaperErr) {
@@ -371,7 +362,7 @@ func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*
 }
 
 func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -406,6 +397,13 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
 		}
+
+	case *api.Service:
+		namespace = t.Namespace
+		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
+			return nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
+		}
+		selector = labels.SelectorFromSet(t.Spec.Selector)
 
 	case *api.Pod:
 		return t, nil

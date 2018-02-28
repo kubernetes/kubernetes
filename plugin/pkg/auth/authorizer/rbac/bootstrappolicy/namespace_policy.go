@@ -87,6 +87,7 @@ func init() {
 	})
 	addNamespaceRole(metav1.NamespaceSystem, rbac.Role{
 		// role for the cloud providers to access/create kube-system configmaps
+		// Deprecated starting Kubernetes 1.10 and will be deleted according to GA deprecation policy.
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cloud-provider"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("create", "get", "list", "watch").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
@@ -123,6 +124,7 @@ func init() {
 		rbac.NewRoleBinding("system::leader-locking-kube-scheduler", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "kube-scheduler").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbac.NewRoleBinding(saRolePrefix+"bootstrap-signer", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "bootstrap-signer").BindingOrDie())
+	// cloud-provider is deprecated starting Kubernetes 1.10 and will be deleted according to GA deprecation policy.
 	addNamespaceRoleBinding(metav1.NamespaceSystem,
 		rbac.NewRoleBinding(saRolePrefix+"cloud-provider", metav1.NamespaceSystem).SAs(metav1.NamespaceSystem, "cloud-provider").BindingOrDie())
 	addNamespaceRoleBinding(metav1.NamespaceSystem,

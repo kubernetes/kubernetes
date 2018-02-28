@@ -26,7 +26,6 @@ go_test(
     name = "go_default_test",
     srcs = ["capabilities_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",

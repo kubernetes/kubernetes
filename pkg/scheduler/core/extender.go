@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -33,6 +34,7 @@ import (
 )
 
 const (
+	// DefaultExtenderTimeout defines the default extender timeout in second.
 	DefaultExtenderTimeout = 5 * time.Second
 )
 
@@ -45,6 +47,7 @@ type HTTPExtender struct {
 	weight           int
 	client           *http.Client
 	nodeCacheCapable bool
+	managedResources sets.String
 }
 
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
@@ -52,7 +55,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 	if config.TLSConfig != nil {
 		cfg.TLSClientConfig = *config.TLSConfig
 	}
-	if config.EnableHttps {
+	if config.EnableHTTPS {
 		hasCA := len(cfg.CAFile) > 0 || len(cfg.CAData) > 0
 		if !hasCA {
 			cfg.Insecure = true
@@ -70,6 +73,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 	return utilnet.SetTransportDefaults(&http.Transport{}), nil
 }
 
+// NewHTTPExtender creates an HTTPExtender object.
 func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerExtender, error) {
 	if config.HTTPTimeout.Nanoseconds() == 0 {
 		config.HTTPTimeout = time.Duration(DefaultExtenderTimeout)
@@ -83,6 +87,10 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		Transport: transport,
 		Timeout:   config.HTTPTimeout,
 	}
+	managedResources := sets.NewString()
+	for _, r := range config.ManagedResources {
+		managedResources.Insert(string(r.Name))
+	}
 	return &HTTPExtender{
 		extenderURL:      config.URLPrefix,
 		filterVerb:       config.FilterVerb,
@@ -91,6 +99,7 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		weight:           config.Weight,
 		client:           client,
 		nodeCacheCapable: config.NodeCacheCapable,
+		managedResources: managedResources,
 	}, nil
 }
 
@@ -249,4 +258,36 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
+}
+
+// IsInterested returns true if at least one extended resource requested by
+// this pod is managed by this extender.
+func (h *HTTPExtender) IsInterested(pod *v1.Pod) bool {
+	if h.managedResources.Len() == 0 {
+		return true
+	}
+	if h.hasManagedResources(pod.Spec.Containers) {
+		return true
+	}
+	if h.hasManagedResources(pod.Spec.InitContainers) {
+		return true
+	}
+	return false
+}
+
+func (h *HTTPExtender) hasManagedResources(containers []v1.Container) bool {
+	for i := range containers {
+		container := &containers[i]
+		for resourceName := range container.Resources.Requests {
+			if h.managedResources.Has(string(resourceName)) {
+				return true
+			}
+		}
+		for resourceName := range container.Resources.Limits {
+			if h.managedResources.Has(string(resourceName)) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -37,7 +37,8 @@ kube::golang::server_targets() {
   echo "${targets[@]}"
 }
 
-readonly KUBE_SERVER_TARGETS=($(kube::golang::server_targets))
+IFS=" " read -ra KUBE_SERVER_TARGETS <<< "$(kube::golang::server_targets)"
+readonly KUBE_SERVER_TARGETS
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 
 # The set of server targets that we are only building for Kubernetes nodes
@@ -51,15 +52,20 @@ kube::golang::node_targets() {
   echo "${targets[@]}"
 }
 
-readonly KUBE_NODE_TARGETS=($(kube::golang::node_targets))
+IFS=" " read -ra KUBE_NODE_TARGETS <<< "$(kube::golang::node_targets)"
+readonly KUBE_NODE_TARGETS
 readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
 if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
-  readonly KUBE_SERVER_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
-  readonly KUBE_NODE_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
-  readonly KUBE_TEST_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
-  readonly KUBE_CLIENT_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  IFS=" " read -ra KUBE_SERVER_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_NODE_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_TEST_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  IFS=" " read -ra KUBE_CLIENT_PLATFORMS <<< "$KUBE_BUILD_PLATFORMS"
+  readonly KUBE_SERVER_PLATFORMS
+  readonly KUBE_NODE_PLATFORMS
+  readonly KUBE_TEST_PLATFORMS
+  readonly KUBE_CLIENT_PLATFORMS
 elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
   readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
   readonly KUBE_NODE_PLATFORMS=(linux/amd64)
@@ -146,7 +152,8 @@ kube::golang::test_targets() {
   )
   echo "${targets[@]}"
 }
-readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
+IFS=" " read -ra KUBE_TEST_TARGETS <<< "$(kube::golang::test_targets)"
+readonly KUBE_TEST_TARGETS
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 # If you update this list, please also update build/BUILD.
@@ -177,7 +184,8 @@ kube::golang::server_test_targets() {
   echo "${targets[@]}"
 }
 
-readonly KUBE_TEST_SERVER_TARGETS=($(kube::golang::server_test_targets))
+IFS=" " read -ra KUBE_TEST_SERVER_TARGETS <<< "$(kube::golang::server_test_targets)"
+readonly KUBE_TEST_SERVER_TARGETS
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
 readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 
@@ -186,15 +194,11 @@ readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
 # Setting to 40 to provide some headroom
 readonly KUBE_PARALLEL_BUILD_MEMORY=40
 
-# TODO(pipejakob) gke-certificates-controller is included here to exercise its
-# compilation, but it doesn't need to be distributed in any of our tars. Its
-# code is only living in this repo temporarily until it finds a new home.
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
   "${KUBE_CLIENT_TARGETS[@]}"
   "${KUBE_TEST_TARGETS[@]}"
   "${KUBE_TEST_SERVER_TARGETS[@]}"
-  cmd/gke-certificates-controller
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
@@ -320,7 +324,7 @@ EOF
   fi
 
   local go_version
-  go_version=($(go version))
+  IFS=" " read -ra go_version <<< "$(go version)"
   local minimum_go_version
   minimum_go_version=go1.9.1
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
@@ -397,7 +401,7 @@ kube::golang::place_bins() {
     # The substitution on platform_src below will replace all slashes with
     # underscores.  It'll transform darwin/amd64 -> darwin_amd64.
     local platform_src="/${platform//\//_}"
-    if [[ $platform == $host_platform ]]; then
+    if [[ "$platform" == "$host_platform" ]]; then
       platform_src=""
       rm -f "${THIS_PLATFORM_BIN}"
       ln -s "${KUBE_OUTPUT_BINPATH}/${platform}" "${THIS_PLATFORM_BIN}"
@@ -461,7 +465,7 @@ kube::golang::output_filename_for_binary() {
   local binary=$1
   local platform=$2
   local output_path="${KUBE_GOPATH}/bin"
-  if [[ $platform != $host_platform ]]; then
+  if [[ "$platform" != "$host_platform" ]]; then
     output_path="${output_path}/${platform//\//_}"
   fi
   local bin=$(basename "${binary}")
@@ -644,7 +648,8 @@ kube::golang::build_binaries() {
       targets=("${KUBE_ALL_TARGETS[@]}")
     fi
 
-    local -a platforms=(${KUBE_BUILD_PLATFORMS:-})
+    local -a platforms
+    IFS=" " read -ra platforms <<< "${KUBE_BUILD_PLATFORMS:-}"
     if [[ ${#platforms[@]} -eq 0 ]]; then
       platforms=("${host_platform}")
     fi
@@ -670,7 +675,7 @@ kube::golang::build_binaries() {
     kube::golang::build_kube_toolchain
 
     kube::log::status "Generating bindata:" "${KUBE_BINDATAS[@]}"
-    for bindata in ${KUBE_BINDATAS[@]}; do
+    for bindata in "${KUBE_BINDATAS[@]}"; do
       # Only try to generate bindata if the file exists, since in some cases
       # one-off builds of individual directories may exclude some files.
       if [[ -f "${KUBE_ROOT}/${bindata}" ]]; then

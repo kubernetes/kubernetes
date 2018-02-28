@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	extensionsclient "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -66,6 +67,54 @@ func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {
 	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("replicaset %q never became ready", name)
+	}
+	return err
+}
+
+// WaitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
+func WaitForReplicaSetDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, replicaSet *extensions.ReplicaSet) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(Poll, pollShortTimeout, func() (bool, error) {
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
+	}
+	return err
+}
+
+// WaitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
+func WaitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *extensions.ReplicaSet, targetReplicaNum int32) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(Poll, pollShortTimeout, func() (bool, error) {
+		rs, err := c.ExtensionsV1beta1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
+	}
+	return err
+}
+
+// WaitForReplicaSetTargetAvailableReplicas waits for .status.availableReplicas of a RS to equal targetReplicaNum
+func WaitForReplicaSetTargetAvailableReplicas(c clientset.Interface, replicaSet *extensions.ReplicaSet, targetReplicaNum int32) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(Poll, pollShortTimeout, func() (bool, error) {
+		rs, err := c.ExtensionsV1beta1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.AvailableReplicas == targetReplicaNum, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of .status.availableReplicas", replicaSet.Name)
 	}
 	return err
 }

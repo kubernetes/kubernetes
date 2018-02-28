@@ -362,6 +362,18 @@ func waitForPodToSchedule(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodToScheduleWithTimeout(cs, pod, 30*time.Second)
 }
 
+// waitForPodUnscheduleWithTimeout waits for a pod to fail scheduling and returns
+// an error if it does not become unschedulable within the given timeout.
+func waitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.Poll(100*time.Millisecond, timeout, podUnschedulable(cs, pod.Namespace, pod.Name))
+}
+
+// waitForPodUnschedule waits for a pod to fail scheduling and returns
+// an error if it does not become unschedulable within the timeout duration (30 seconds).
+func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
+	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
+}
+
 // deletePod deletes the given pod in the given namespace.
 func deletePod(cs clientset.Interface, podName string, nsName string) error {
 	return cs.CoreV1().Pods(nsName).Delete(podName, metav1.NewDeleteOptions(0))
@@ -379,17 +391,5 @@ func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 		if err := wait.Poll(time.Second, wait.ForeverTestTimeout, podDeleted(cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
 		}
-	}
-}
-
-// printAllPods prints a list of all the pods and their node names. This is used
-// for debugging.
-func printAllPods(t *testing.T, cs clientset.Interface, nsName string) {
-	podList, err := cs.CoreV1().Pods(nsName).List(metav1.ListOptions{})
-	if err != nil {
-		t.Logf("Error getting pods: %v", err)
-	}
-	for _, pod := range podList.Items {
-		t.Logf("Pod:\n\tName:%v\n\tNamespace:%v\n\tNode Name:%v\n", pod.Name, pod.Namespace, pod.Spec.NodeName)
 	}
 }

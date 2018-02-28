@@ -3,16 +3,29 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "endpoints.go",
+        "service.go",
         "types.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/types:go_default_library"],
+    deps = [
+        "//pkg/api/service:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
+        "//pkg/proxy/util:go_default_library",
+        "//pkg/util/net:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/client-go/tools/record:go_default_library",
+    ],
 )
 
 filegroup(
@@ -38,4 +51,21 @@ filegroup(
         "//pkg/proxy/winuserspace:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "endpoints_test.go",
+        "service_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/apis/core:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+    ],
 )

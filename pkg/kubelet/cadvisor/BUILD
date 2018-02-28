@@ -101,7 +101,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/apis/core/v1/helper:go_default_library",

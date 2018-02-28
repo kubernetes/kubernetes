@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -66,14 +67,14 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 		},
 	}
 
-	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	ns := legacyscheme.Codecs
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := ns.EncoderForVersion(info.Serializer, groupVersion)
 	decoder := ns.DecoderToVersion(info.Serializer, groupVersion)
 
 	tf.Namespace = "test"
-	tf.Printer = &testPrinter{}
 	tf.Client = &ClusterRoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -107,9 +108,9 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 		},
 	}
 
-	expectedOutput := "clusterrolebinding/" + expectBinding.Name + "\n"
+	expectedOutput := "clusterrolebinding.rbac.authorization.k8s.io/" + expectBinding.Name + "\n"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateClusterRoleBinding(f, buf)
+	cmd := NewCmdCreateClusterRoleBinding(tf, buf)
 	cmd.Flags().Set("clusterrole", "fake-clusterrole")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")
@@ -140,5 +141,5 @@ func (c *ClusterRoleBindingRESTClient) Post() *restclient.Request {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer
 		serializers.Framer = info.StreamSerializer.Framer
 	}
-	return restclient.NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil)
+	return restclient.NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
 }

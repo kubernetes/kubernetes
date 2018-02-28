@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 const (
@@ -149,7 +150,10 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		new_node := &corev1.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
@@ -190,10 +194,10 @@ func TestCordon(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
-		cmd := test.cmd(f, buf)
+		cmd := test.cmd(tf, buf)
 
 		saw_fatal := false
 		func() {
@@ -216,7 +220,7 @@ func TestCordon(t *testing.T) {
 				t.Fatalf("%s: unexpected non-error", test.description)
 			}
 			if updated {
-				t.Fatalf("%s: unexpcted update", test.description)
+				t.Fatalf("%s: unexpected update", test.description)
 			}
 		}
 
@@ -596,7 +600,10 @@ func TestDrain(t *testing.T) {
 			new_node := &corev1.Node{}
 			deleted := false
 			evicted := false
-			f, tf, codec, ns := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
+
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 				NegotiatedSerializer: ns,
@@ -693,11 +700,11 @@ func TestDrain(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfig = defaultClientConfig()
+			tf.ClientConfigVal = defaultClientConfig()
 
 			buf := bytes.NewBuffer([]byte{})
 			errBuf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdDrain(f, buf, errBuf)
+			cmd := NewCmdDrain(tf, buf, errBuf)
 
 			saw_fatal := false
 			fatal_msg := ""
@@ -817,9 +824,9 @@ func TestDeletePods(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, _, _, _ := cmdtesting.NewAPIFactory()
-		o := DrainOptions{Factory: f}
-		o.mapper, _ = f.Object()
+		tf := cmdtesting.NewTestFactory()
+		o := DrainOptions{Factory: tf}
+		o.mapper, _ = tf.Object()
 		o.Out = os.Stdout
 		_, pods := createPods(false)
 		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)

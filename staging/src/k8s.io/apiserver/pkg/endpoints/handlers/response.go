@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -46,7 +46,7 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 	if target := mediaType.Convert; target != nil {
 		switch {
 
-		case target.Kind == "PartialObjectMetadata" && target.GroupVersion() == metav1alpha1.SchemeGroupVersion:
+		case target.Kind == "PartialObjectMetadata" && target.GroupVersion() == metav1beta1.SchemeGroupVersion:
 			if meta.IsListType(result) {
 				// TODO: this should be calculated earlier
 				err = newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadata, but the requested object is a list (%T)", result))
@@ -59,7 +59,7 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 				return
 			}
 			partial := meta.AsPartialObjectMetadata(m)
-			partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+			partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 
 			// renegotiate under the internal version
 			_, info, err := negotiation.NegotiateOutputMediaType(req, metainternalversion.Codecs, &scope)
@@ -67,25 +67,25 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 				scope.err(err, w, req)
 				return
 			}
-			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
+			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1beta1.SchemeGroupVersion)
 			responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, partial)
 			return
 
-		case target.Kind == "PartialObjectMetadataList" && target.GroupVersion() == metav1alpha1.SchemeGroupVersion:
+		case target.Kind == "PartialObjectMetadataList" && target.GroupVersion() == metav1beta1.SchemeGroupVersion:
 			if !meta.IsListType(result) {
 				// TODO: this should be calculated earlier
 				err = newNotAcceptableError(fmt.Sprintf("you requested PartialObjectMetadataList, but the requested object is not a list (%T)", result))
 				scope.err(err, w, req)
 				return
 			}
-			list := &metav1alpha1.PartialObjectMetadataList{}
+			list := &metav1beta1.PartialObjectMetadataList{}
 			err := meta.EachListItem(result, func(obj runtime.Object) error {
 				m, err := meta.Accessor(obj)
 				if err != nil {
 					return err
 				}
 				partial := meta.AsPartialObjectMetadata(m)
-				partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+				partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 				list.Items = append(list.Items, partial)
 				return nil
 			})
@@ -100,16 +100,16 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 				scope.err(err, w, req)
 				return
 			}
-			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
+			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1beta1.SchemeGroupVersion)
 			responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, list)
 			return
 
-		case target.Kind == "Table" && target.GroupVersion() == metav1alpha1.SchemeGroupVersion:
+		case target.Kind == "Table" && target.GroupVersion() == metav1beta1.SchemeGroupVersion:
 			// TODO: relax the version abstraction
 			// TODO: skip if this is a status response (delete without body)?
 
-			opts := &metav1alpha1.TableOptions{}
-			if err := metav1alpha1.ParameterCodec.DecodeParameters(req.URL.Query(), metav1alpha1.SchemeGroupVersion, opts); err != nil {
+			opts := &metav1beta1.TableOptions{}
+			if err := metav1beta1.ParameterCodec.DecodeParameters(req.URL.Query(), metav1beta1.SchemeGroupVersion, opts); err != nil {
 				scope.err(err, w, req)
 				return
 			}
@@ -123,14 +123,14 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 			for i := range table.Rows {
 				item := &table.Rows[i]
 				switch opts.IncludeObject {
-				case metav1alpha1.IncludeObject:
+				case metav1beta1.IncludeObject:
 					item.Object.Object, err = scope.Convertor.ConvertToVersion(item.Object.Object, scope.Kind.GroupVersion())
 					if err != nil {
 						scope.err(err, w, req)
 						return
 					}
 				// TODO: rely on defaulting for the value here?
-				case metav1alpha1.IncludeMetadata, "":
+				case metav1beta1.IncludeMetadata, "":
 					m, err := meta.Accessor(item.Object.Object)
 					if err != nil {
 						scope.err(err, w, req)
@@ -138,9 +138,9 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 					}
 					// TODO: turn this into an internal type and do conversion in order to get object kind automatically set?
 					partial := meta.AsPartialObjectMetadata(m)
-					partial.GetObjectKind().SetGroupVersionKind(metav1alpha1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
+					partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 					item.Object.Object = partial
-				case metav1alpha1.IncludeNone:
+				case metav1beta1.IncludeNone:
 					item.Object.Object = nil
 				default:
 					// TODO: move this to validation on the table options?
@@ -155,7 +155,7 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 				scope.err(err, w, req)
 				return
 			}
-			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1alpha1.SchemeGroupVersion)
+			encoder := metainternalversion.Codecs.EncoderForVersion(info.Serializer, metav1beta1.SchemeGroupVersion)
 			responsewriters.SerializeObject(info.MediaType, encoder, w, req, statusCode, table)
 			return
 

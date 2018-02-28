@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/registry/core/namespace/storage",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
@@ -31,10 +30,14 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/namespace/storage",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/core/namespace:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",

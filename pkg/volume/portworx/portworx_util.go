@@ -27,15 +27,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
-	osdMgmtPort      = "9001"
-	osdDriverVersion = "v1"
-	pxdDriverName    = "pxd"
-	pvcClaimLabel    = "pvc"
-	pxServiceName    = "portworx-service"
-	pxDriverName     = "pxd-sched"
+	osdMgmtPort       = "9001"
+	osdDriverVersion  = "v1"
+	pxdDriverName     = "pxd"
+	pvcClaimLabel     = "pvc"
+	pvcNamespaceLabel = "namespace"
+	pxServiceName     = "portworx-service"
+	pxDriverName      = "pxd-sched"
 )
 
 type PortworxVolumeUtil struct {
@@ -54,7 +56,7 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GB
-	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
+	requestGB := int(volutil.RoundUpSize(capacity.Value(), 1024*1024*1024))
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or
@@ -80,9 +82,20 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	// Add claim Name as a part of Portworx Volume Labels
 	locator.VolumeLabels[pvcClaimLabel] = p.options.PVC.Name
+	locator.VolumeLabels[pvcNamespaceLabel] = p.options.PVC.Namespace
+
+	for k, v := range p.options.PVC.Annotations {
+		if _, present := spec.VolumeLabels[k]; present {
+			glog.Warningf("not saving annotation: %s=%s in spec labels due to an existing key", k, v)
+			continue
+		}
+		spec.VolumeLabels[k] = v
+	}
+
 	volumeID, err := driver.Create(locator, source, spec)
 	if err != nil {
 		glog.Errorf("Error creating Portworx Volume : %v", err)
+		return "", 0, nil, err
 	}
 
 	glog.Infof("Successfully created Portworx volume for PVC: %v", p.options.PVC.Name)

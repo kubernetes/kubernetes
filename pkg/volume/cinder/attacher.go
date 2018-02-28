@@ -17,6 +17,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -30,12 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 type cinderDiskAttacher struct {
 	host           volume.VolumeHost
-	cinderProvider CinderProvider
+	cinderProvider BlockStorageProvider
 }
 
 var _ volume.Attacher = &cinderDiskAttacher{}
@@ -215,7 +215,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 	volumeID := volumeSource.VolumeID
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty.", volumeID)
+		return "", fmt.Errorf("WaitForAttach failed for Cinder disk %q: devicePath is empty", volumeID)
 	}
 
 	ticker := time.NewTicker(probeVolumeInitDelay)
@@ -237,16 +237,15 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 			if exists && err == nil {
 				glog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
-			} else {
-				// Log an error, and continue checking periodically
-				glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
-				// Using exponential backoff instead of linear
-				ticker.Stop()
-				duration = time.Duration(float64(duration) * probeVolumeFactor)
-				ticker = time.NewTicker(duration)
 			}
+			// Log an error, and continue checking periodically
+			glog.Errorf("Error: could not find attached Cinder disk %q (path: %q): %v", volumeID, devicePath, err)
+			// Using exponential backoff instead of linear
+			ticker.Stop()
+			duration = time.Duration(float64(duration) * probeVolumeFactor)
+			ticker = time.NewTicker(duration)
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)
+			return "", fmt.Errorf("could not find attached Cinder disk %q. Timeout waiting for mount paths to be created", volumeID)
 		}
 	}
 }
@@ -286,8 +285,8 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 		options = append(options, "ro")
 	}
 	if notMnt {
-		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(cinderVolumePluginName, attacher.host)
-		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		diskMounter := volumeutil.NewSafeFormatAndMountFromHost(cinderVolumePluginName, attacher.host)
+		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
@@ -299,7 +298,7 @@ func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath st
 
 type cinderDiskDetacher struct {
 	mounter        mount.Interface
-	cinderProvider CinderProvider
+	cinderProvider BlockStorageProvider
 }
 
 var _ volume.Detacher = &cinderDiskDetacher{}
@@ -402,7 +401,7 @@ func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (str
 	if !res {
 		return "", fmt.Errorf("failed to list openstack instances")
 	}
-	instanceID, err := instances.InstanceID(nodeName)
+	instanceID, err := instances.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		return "", err
 	}

@@ -36,8 +36,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. ThirdPartyResources).
-const defaultRetries = 2
+const (
+	// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. ThirdPartyResources).
+	defaultRetries = 2
+	// protobuf mime type
+	mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
+)
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
 // versions and resources.
@@ -145,9 +149,9 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 		apiGroupList = &metav1.APIGroupList{}
 	}
 
-	// append the group retrieved from /api to the list if not empty
+	// prepend the group retrieved from /api to the list if not empty
 	if len(v.Versions) != 0 {
-		apiGroupList.Groups = append(apiGroupList.Groups, apiGroup)
+		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
 	}
 	return apiGroupList, nil
 }
@@ -329,9 +333,18 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 
 // OpenAPISchema fetches the open api schema using a rest client and parses the proto.
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	data, err := d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
+	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do().Raw()
 	if err != nil {
-		return nil, err
+		if errors.IsForbidden(err) || errors.IsNotFound(err) {
+			// single endpoint not found/registered in old server, try to fetch old endpoint
+			// TODO(roycaihw): remove this in 1.11
+			data, err = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 	document := &openapi_v2.Document{}
 	err = proto.Unmarshal(data, document)

@@ -184,7 +184,7 @@ func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, 
 	if criSocketPath != "" {
 		fmt.Printf("[reset] Cleaning up running containers using crictl with socket %s\n", criSocketPath)
 		listcmd := fmt.Sprintf(crictlSandboxesParamsFormat, crictlPath, criSocketPath)
-		output, err := execer.Command("sh", "-c", listcmd).CombinedOutput()
+		output, err := execer.Command(listcmd).CombinedOutput()
 		if err != nil {
 			fmt.Println("[reset] Failed to list running pods using crictl. Trying using docker instead.")
 			resetWithDocker(execer, dockerCheck)
@@ -193,13 +193,13 @@ func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, 
 		sandboxes := strings.Split(string(output), " ")
 		for _, s := range sandboxes {
 			stopcmd := fmt.Sprintf(crictlStopParamsFormat, crictlPath, criSocketPath, s)
-			if err := execer.Command("sh", "-c", stopcmd).Run(); err != nil {
+			if err := execer.Command(stopcmd).Run(); err != nil {
 				fmt.Println("[reset] Failed to stop the running containers using crictl. Trying using docker instead.")
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
 			removecmd := fmt.Sprintf(crictlRemoveParamsFormat, crictlPath, criSocketPath, s)
-			if err := execer.Command("sh", "-c", removecmd).Run(); err != nil {
+			if err := execer.Command(removecmd).Run(); err != nil {
 				fmt.Println("[reset] Failed to remove the running containers using crictl. Trying using docker instead.")
 				resetWithDocker(execer, dockerCheck)
 				return
@@ -252,6 +252,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	filesToClean := []string{
 		filepath.Join(configPathDir, kubeadmconstants.AdminKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.KubeletKubeConfigFileName),
+		filepath.Join(configPathDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}

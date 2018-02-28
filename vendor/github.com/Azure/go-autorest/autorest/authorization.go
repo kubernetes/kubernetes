@@ -24,9 +24,12 @@ import (
 )
 
 const (
-	bearerChallengeHeader = "Www-Authenticate"
-	bearer                = "Bearer"
-	tenantID              = "tenantID"
+	bearerChallengeHeader       = "Www-Authenticate"
+	bearer                      = "Bearer"
+	tenantID                    = "tenantID"
+	apiKeyAuthorizerHeader      = "Ocp-Apim-Subscription-Key"
+	bingAPISdkHeader            = "X-BingApis-SDK-Client"
+	golangBingAPISdkHeaderValue = "Go-SDK"
 )
 
 // Authorizer is the interface that provides a PrepareDecorator used to supply request
@@ -42,6 +45,53 @@ type NullAuthorizer struct{}
 // WithAuthorization returns a PrepareDecorator that does nothing.
 func (na NullAuthorizer) WithAuthorization() PrepareDecorator {
 	return WithNothing()
+}
+
+// APIKeyAuthorizer implements API Key authorization.
+type APIKeyAuthorizer struct {
+	headers         map[string]interface{}
+	queryParameters map[string]interface{}
+}
+
+// NewAPIKeyAuthorizerWithHeaders creates an ApiKeyAuthorizer with headers.
+func NewAPIKeyAuthorizerWithHeaders(headers map[string]interface{}) *APIKeyAuthorizer {
+	return NewAPIKeyAuthorizer(headers, nil)
+}
+
+// NewAPIKeyAuthorizerWithQueryParameters creates an ApiKeyAuthorizer with query parameters.
+func NewAPIKeyAuthorizerWithQueryParameters(queryParameters map[string]interface{}) *APIKeyAuthorizer {
+	return NewAPIKeyAuthorizer(nil, queryParameters)
+}
+
+// NewAPIKeyAuthorizer creates an ApiKeyAuthorizer with headers.
+func NewAPIKeyAuthorizer(headers map[string]interface{}, queryParameters map[string]interface{}) *APIKeyAuthorizer {
+	return &APIKeyAuthorizer{headers: headers, queryParameters: queryParameters}
+}
+
+// WithAuthorization returns a PrepareDecorator that adds an HTTP headers and Query Paramaters
+func (aka *APIKeyAuthorizer) WithAuthorization() PrepareDecorator {
+	return func(p Preparer) Preparer {
+		return DecoratePreparer(p, WithHeaders(aka.headers), WithQueryParameters(aka.queryParameters))
+	}
+}
+
+// CognitiveServicesAuthorizer implements authorization for Cognitive Services.
+type CognitiveServicesAuthorizer struct {
+	subscriptionKey string
+}
+
+// NewCognitiveServicesAuthorizer is
+func NewCognitiveServicesAuthorizer(subscriptionKey string) *CognitiveServicesAuthorizer {
+	return &CognitiveServicesAuthorizer{subscriptionKey: subscriptionKey}
+}
+
+// WithAuthorization is
+func (csa *CognitiveServicesAuthorizer) WithAuthorization() PrepareDecorator {
+	headers := make(map[string]interface{})
+	headers[apiKeyAuthorizerHeader] = csa.subscriptionKey
+	headers[bingAPISdkHeader] = golangBingAPISdkHeaderValue
+
+	return NewAPIKeyAuthorizerWithHeaders(headers).WithAuthorization()
 }
 
 // BearerAuthorizer implements the bearer authorization
@@ -69,7 +119,11 @@ func (ba *BearerAuthorizer) WithAuthorization() PrepareDecorator {
 			if ok {
 				err := refresher.EnsureFresh()
 				if err != nil {
-					return r, NewErrorWithError(err, "azure.BearerAuthorizer", "WithAuthorization", nil,
+					var resp *http.Response
+					if tokError, ok := err.(adal.TokenRefreshError); ok {
+						resp = tokError.Response()
+					}
+					return r, NewErrorWithError(err, "azure.BearerAuthorizer", "WithAuthorization", resp,
 						"Failed to refresh the Token for request to %s", r.URL)
 				}
 			}
@@ -178,4 +232,23 @@ func newBearerChallenge(resp *http.Response) (bc bearerChallenge, err error) {
 	}
 
 	return bc, err
+}
+
+// EventGridKeyAuthorizer implements authorization for event grid using key authentication.
+type EventGridKeyAuthorizer struct {
+	topicKey string
+}
+
+// NewEventGridKeyAuthorizer creates a new EventGridKeyAuthorizer
+// with the specified topic key.
+func NewEventGridKeyAuthorizer(topicKey string) EventGridKeyAuthorizer {
+	return EventGridKeyAuthorizer{topicKey: topicKey}
+}
+
+// WithAuthorization returns a PrepareDecorator that adds the aeg-sas-key authentication header.
+func (egta EventGridKeyAuthorizer) WithAuthorization() PrepareDecorator {
+	headers := map[string]interface{}{
+		"aeg-sas-key": egta.topicKey,
+	}
+	return NewAPIKeyAuthorizerWithHeaders(headers).WithAuthorization()
 }

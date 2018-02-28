@@ -624,7 +624,7 @@ func TestSync(t *testing.T) {
 			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
 			VolumeBindingMode: &modeWait,
 		},
-	})
+	}, []*v1.Pod{})
 }
 
 func TestSyncAlphaBlockVolume(t *testing.T) {
@@ -776,7 +776,7 @@ func TestSyncAlphaBlockVolume(t *testing.T) {
 	}
 	defer utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
 
-	runSyncTests(t, tests, []*storage.StorageClass{})
+	runSyncTests(t, tests, []*storage.StorageClass{}, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all

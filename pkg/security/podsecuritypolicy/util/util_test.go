@@ -41,7 +41,7 @@ func TestVolumeSourceFSTypeDrift(t *testing.T) {
 
 		fsType, err := GetVolumeFSType(api.Volume{VolumeSource: volumeSource})
 		if err != nil {
-			t.Errorf("error getting fstype for field %s.  This likely means that drift has occured between FSType and VolumeSource.  Please update the api and getVolumeFSType", fieldVal.Name)
+			t.Errorf("error getting fstype for field %s.  This likely means that drift has occurred between FSType and VolumeSource.  Please update the api and getVolumeFSType", fieldVal.Name)
 		}
 
 		if !allFSTypes.Has(string(fsType)) {

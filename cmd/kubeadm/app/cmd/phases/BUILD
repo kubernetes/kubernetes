@@ -35,7 +35,6 @@ go_library(
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/node:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
-        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
@@ -47,7 +46,6 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
-        "//cmd/kubeadm/app/util/pubkeypin:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -57,7 +55,6 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
-        "//vendor/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -72,7 +69,6 @@ go_test(
         "kubeconfig_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",

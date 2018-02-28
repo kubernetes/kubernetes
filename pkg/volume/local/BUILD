@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -13,6 +7,7 @@ go_library(
         "local.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/local",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/events:go_default_library",
         "//pkg/util/keymutex:go_default_library",
@@ -32,17 +27,35 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["local_test.go"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "local_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "local_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/volume/local",
-    deps = [
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/testing:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/client-go/util/testing:go_default_library",
-    ],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/volume:go_default_library",
+            "//pkg/volume/testing:go_default_library",
+            "//vendor/k8s.io/api/core/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/client-go/util/testing:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/volume:go_default_library",
+            "//pkg/volume/testing:go_default_library",
+            "//vendor/k8s.io/api/core/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/client-go/util/testing:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -56,4 +69,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

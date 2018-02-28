@@ -40,7 +40,7 @@ function usage() {
   echo "  -N:  Upgrade nodes only"
   echo "  -P:  Node upgrade prerequisites only (create a new instance template)"
   echo "  -c:  Upgrade NODE_UPGRADE_PARALLELISM nodes in parallel (default=1) within a single instance group. The MIGs themselves are dealt serially."
-  echo "  -o:  Use os distro sepcified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'"
+  echo "  -o:  Use os distro specified in KUBE_NODE_OS_DISTRIBUTION for new nodes. Options include 'debian' or 'gci'"
   echo "  -l:  Use local(dev) binaries. This is only supported for master upgrades."
   echo ""
   echo '  Version number or publication is either a proper version number'
@@ -151,6 +151,7 @@ function prepare-upgrade() {
   detect-project
   detect-subnetworks
   detect-node-names # sets INSTANCE_GROUPS
+  write-cluster-location
   write-cluster-name
   tars_from_version
 }
@@ -190,7 +191,6 @@ function get-node-os() {
 #   ZONE
 #
 # Vars set:
-#   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
 #   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
@@ -230,7 +230,6 @@ function setup-base-image() {
 # Vars set:
 #   SANITIZED_VERSION
 #   INSTANCE_GROUPS
-#   KUBELET_TOKEN
 #   KUBE_PROXY_TOKEN
 #   NODE_PROBLEM_DETECTOR_TOKEN
 #   CA_CERT_BASE64
@@ -253,7 +252,6 @@ function prepare-node-upgrade() {
 
   # Get required node env vars from exiting template.
   local node_env=$(get-node-env)
-  KUBELET_TOKEN=$(get-env-val "${node_env}" "KUBELET_TOKEN")
   KUBE_PROXY_TOKEN=$(get-env-val "${node_env}" "KUBE_PROXY_TOKEN")
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${node_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${node_env}" "CA_CERT")

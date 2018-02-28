@@ -154,7 +154,6 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 }
 
 func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
-
 	// Skip the test if the base image is not COS.
 	// TODO: Add support for other base images.
 	// CUDA apps require host mounts which is not portable across base images (yet).

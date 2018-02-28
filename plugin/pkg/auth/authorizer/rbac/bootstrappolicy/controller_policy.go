@@ -265,7 +265,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcequota-controller"},
 		Rules: []rbac.PolicyRule{
-			// quota can count quota on anything for reconcilation, so it needs full viewing powers
+			// quota can count quota on anything for reconciliation, so it needs full viewing powers
 			rbac.NewRule("list", "watch").Groups("*").Resources("*").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("resourcequotas/status").RuleOrDie(),
 			eventsRule(),
@@ -318,18 +318,27 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "certificate-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 			rbac.NewRule("update").Groups(certificatesGroup).Resources("certificatesigningrequests/status", "certificatesigningrequests/approval").RuleOrDie(),
 			rbac.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 			eventsRule(),
 		},
 	})
-	if utilfeature.DefaultFeatureGate.Enabled(features.PVCProtection) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
 				rbac.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pv-protection-controller"},
+			Rules: []rbac.PolicyRule{
+				rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
 				eventsRule(),
 			},
 		})

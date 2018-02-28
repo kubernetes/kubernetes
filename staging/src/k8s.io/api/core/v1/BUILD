@@ -13,7 +13,6 @@ go_test(
         "toleration_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/api/core/v1",
 )
 
 go_library(

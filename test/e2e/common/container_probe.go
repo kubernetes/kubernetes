@@ -263,7 +263,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 							},
 							InitialDelaySeconds: 15,
 							TimeoutSeconds:      5,
-							FailureThreshold:    1,
+							FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
 						},
 					},
 				},

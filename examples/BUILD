@@ -26,7 +26,6 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["examples_test.go"],
-    importpath = "k8s.io/kubernetes/examples_test",
     tags = ["manual"],  # this test is broken and examples in-tree is deprecated
     deps = [
         "//pkg/api/testapi:go_default_library",
@@ -41,6 +40,7 @@ go_test(
         "//pkg/registry/batch/job:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",
+        "//pkg/scheduler/api/validation:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

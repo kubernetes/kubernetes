@@ -299,6 +299,45 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 					},
 				}
 			}
+		case autoscalingv2.ExternalMetricSourceType:
+			if metricSpec.External.TargetAverageValue != nil {
+				replicaCountProposal, utilizationProposal, timestampProposal, err = a.replicaCalc.GetExternalPerPodMetricReplicas(currentReplicas, metricSpec.External.TargetAverageValue.MilliValue(), metricSpec.External.MetricName, hpa.Namespace, metricSpec.External.MetricSelector)
+				if err != nil {
+					a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetExternalMetric", err.Error())
+					setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", err)
+					return 0, "", nil, time.Time{}, fmt.Errorf("failed to get %s external metric: %v", metricSpec.External.MetricName, err)
+				}
+				metricNameProposal = fmt.Sprintf("external metric %s(%+v)", metricSpec.External.MetricName, metricSpec.External.MetricSelector)
+				statuses[i] = autoscalingv2.MetricStatus{
+					Type: autoscalingv2.ExternalMetricSourceType,
+					External: &autoscalingv2.ExternalMetricStatus{
+						MetricSelector:      metricSpec.External.MetricSelector,
+						MetricName:          metricSpec.External.MetricName,
+						CurrentAverageValue: resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+					},
+				}
+			} else if metricSpec.External.TargetValue != nil {
+				replicaCountProposal, utilizationProposal, timestampProposal, err = a.replicaCalc.GetExternalMetricReplicas(currentReplicas, metricSpec.External.TargetValue.MilliValue(), metricSpec.External.MetricName, hpa.Namespace, metricSpec.External.MetricSelector)
+				if err != nil {
+					a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetExternalMetric", err.Error())
+					setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", err)
+					return 0, "", nil, time.Time{}, fmt.Errorf("failed to get external metric %s: %v", metricSpec.External.MetricName, err)
+				}
+				metricNameProposal = fmt.Sprintf("external metric %s(%+v)", metricSpec.External.MetricName, metricSpec.External.MetricSelector)
+				statuses[i] = autoscalingv2.MetricStatus{
+					Type: autoscalingv2.ExternalMetricSourceType,
+					External: &autoscalingv2.ExternalMetricStatus{
+						MetricSelector: metricSpec.External.MetricSelector,
+						MetricName:     metricSpec.External.MetricName,
+						CurrentValue:   *resource.NewMilliQuantity(utilizationProposal, resource.DecimalSI),
+					},
+				}
+			} else {
+				errMsg := "invalid external metric source: neither a value target nor an average value target was set"
+				a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetExternalMetric", errMsg)
+				setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "FailedGetExternalMetric", "the HPA was unable to compute the replica count: %v", err)
+				return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+			}
 		default:
 			errMsg := fmt.Sprintf("unknown metric source type %q", string(metricSpec.Type))
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidMetricSourceType", errMsg)
@@ -313,7 +352,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 		}
 	}
 
-	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionTrue, "ValidMetricFound", "the HPA was able to succesfully calculate a replica count from %s", metric)
+	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionTrue, "ValidMetricFound", "the HPA was able to successfully calculate a replica count from %s", metric)
 	return replicas, metric, statuses, timestamp, nil
 }
 

@@ -1,3 +1,5 @@
+// +build linux darwin
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -32,9 +34,11 @@ import (
 )
 
 const (
-	testPVName    = "pvA"
-	testMountPath = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
-	testNodeName  = "fakeNodeName"
+	testPVName     = "pvA"
+	testMountPath  = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
+	testGlobalPath = "plugins/kubernetes.io~local-volume/volumeDevices/pvA"
+	testPodPath    = "pods/poduid/volumeDevices/kubernetes.io~local-volume"
+	testNodeName   = "fakeNodeName"
 )
 
 func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
@@ -50,6 +54,25 @@ func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name")
+	}
+	if plug.GetPluginName() != localVolumePluginName {
+		t.Errorf("Wrong name: %s", plug.GetPluginName())
+	}
+	return tmpDir, plug
+}
+
+func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
+	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindMapperPluginByName(localVolumePluginName)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Can't find the plugin by name: %q", localVolumePluginName)
 	}
 	if plug.GetPluginName() != localVolumePluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -77,7 +100,7 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 	return tmpDir, plug
 }
 
-func getTestVolume(readOnly bool, path string) *volume.Spec {
+func getTestVolume(readOnly bool, path string, isBlock bool) *volume.Spec {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testPVName,
@@ -90,6 +113,11 @@ func getTestVolume(readOnly bool, path string) *volume.Spec {
 			},
 		},
 	}
+
+	if isBlock {
+		blockMode := v1.PersistentVolumeBlock
+		pv.Spec.VolumeMode = &blockMode
+	}
 	return volume.NewSpecFromPersistentVolume(pv, readOnly)
 }
 
@@ -97,7 +125,7 @@ func TestCanSupport(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
-	if !plug.CanSupport(getTestVolume(false, tmpDir)) {
+	if !plug.CanSupport(getTestVolume(false, tmpDir, false)) {
 		t.Errorf("Expected true")
 	}
 }
@@ -123,7 +151,7 @@ func TestGetVolumeName(t *testing.T) {
 	tmpDir, plug := getPersistentPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
-	volName, err := plug.GetVolumeName(getTestVolume(false, tmpDir))
+	volName, err := plug.GetVolumeName(getTestVolume(false, tmpDir, false))
 	if err != nil {
 		t.Errorf("Failed to get volume name: %v", err)
 	}
@@ -137,7 +165,7 @@ func TestInvalidLocalPath(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(getTestVolume(false, "/no/backsteps/allowed/.."), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(getTestVolume(false, "/no/backsteps/allowed/..", false), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +182,7 @@ func TestMountUnmount(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -197,8 +225,64 @@ func TestMountUnmount(t *testing.T) {
 	}
 }
 
+// TestMapUnmap tests block map and unmap interfaces.
+func TestMapUnmap(t *testing.T) {
+	tmpDir, plug := getBlockPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+	volSpec := getTestVolume(false, tmpDir, true /*isBlock*/)
+	mapper, err := plug.NewBlockVolumeMapper(volSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mapper == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
+
+	expectedGlobalPath := path.Join(tmpDir, testGlobalPath)
+	globalPath, err := mapper.GetGlobalMapPath(volSpec)
+	if err != nil {
+		t.Errorf("Failed to get global path: %v", err)
+	}
+	if globalPath != expectedGlobalPath {
+		t.Errorf("Got unexpected path: %s, expected %s", globalPath, expectedGlobalPath)
+	}
+	expectedPodPath := path.Join(tmpDir, testPodPath)
+	podPath, volName := mapper.GetPodDeviceMapPath()
+	if podPath != expectedPodPath {
+		t.Errorf("Got unexpected pod path: %s, expected %s", podPath, expectedPodPath)
+	}
+	if volName != testPVName {
+		t.Errorf("Got unexpected volNamne: %s, expected %s", volName, testPVName)
+	}
+	devPath, err := mapper.SetUpDevice()
+	if err != nil {
+		t.Errorf("Failed to SetUpDevice, err: %v", err)
+	}
+	if _, err := os.Stat(devPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("SetUpDevice() failed, volume path not created: %s", devPath)
+		} else {
+			t.Errorf("SetUpDevice() failed: %v", err)
+		}
+	}
+
+	unmapper, err := plug.NewBlockVolumeUnmapper(testPVName, pod.UID)
+	if err != nil {
+		t.Fatalf("Failed to make a new Unmapper: %v", err)
+	}
+	if unmapper == nil {
+		t.Fatalf("Got a nil Unmapper")
+	}
+
+	if err := unmapper.TearDownDevice(globalPath, devPath); err != nil {
+		t.Errorf("TearDownDevice failed, err: %v", err)
+	}
+}
+
 func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
-	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false), pod, volume.VolumeOptions{})
 	if err != nil {
 		return err
 	}
@@ -290,13 +374,54 @@ func TestConstructVolumeSpec(t *testing.T) {
 	}
 }
 
+func TestConstructBlockVolumeSpec(t *testing.T) {
+	tmpDir, plug := getBlockPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	podPath := path.Join(tmpDir, testPodPath)
+	spec, err := plug.ConstructBlockVolumeSpec(types.UID("poduid"), testPVName, podPath)
+	if err != nil {
+		t.Errorf("ConstructBlockVolumeSpec() failed: %v", err)
+	}
+	if spec == nil {
+		t.Fatalf("ConstructBlockVolumeSpec() returned nil")
+	}
+
+	volName := spec.Name()
+	if volName != testPVName {
+		t.Errorf("Expected volume name %q, got %q", testPVName, volName)
+	}
+
+	if spec.Volume != nil {
+		t.Errorf("Volume object returned, expected nil")
+	}
+
+	pv := spec.PersistentVolume
+	if pv == nil {
+		t.Fatalf("PersistentVolume object nil")
+	}
+
+	if spec.PersistentVolume.Spec.VolumeMode == nil {
+		t.Fatalf("Volume mode has not been set.")
+	}
+
+	if *spec.PersistentVolume.Spec.VolumeMode != v1.PersistentVolumeBlock {
+		t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+	}
+
+	ls := pv.Spec.PersistentVolumeSource.Local
+	if ls == nil {
+		t.Fatalf("LocalVolumeSource object nil")
+	}
+}
+
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
 	// Read only == true
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(getTestVolume(true, tmpDir), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(getTestVolume(true, tmpDir, false), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -308,7 +433,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 
 	// Read only == false
-	mounter, err = plug.NewMounter(getTestVolume(false, tmpDir), pod, volume.VolumeOptions{})
+	mounter, err = plug.NewMounter(getTestVolume(false, tmpDir, false), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -329,7 +454,7 @@ func TestUnsupportedPlugins(t *testing.T) {
 
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
-	spec := getTestVolume(false, tmpDir)
+	spec := getTestVolume(false, tmpDir, false)
 
 	recyclePlug, err := plugMgr.FindRecyclablePluginBySpec(spec)
 	if err == nil && recyclePlug != nil {

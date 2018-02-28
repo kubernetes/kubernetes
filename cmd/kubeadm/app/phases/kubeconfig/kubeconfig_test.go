@@ -71,8 +71,21 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 		NodeName:        "valid-node-name",
 	}
 
+	// Creates a Master Configuration pointing to the pkidir folder
+	cfgDNS := &kubeadmapi.MasterConfiguration{
+		API:             kubeadmapi.API{ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
+		CertificatesDir: pkidir,
+		NodeName:        "valid-node-name",
+	}
+
 	// Executes getKubeConfigSpecs
 	specs, err := getKubeConfigSpecs(cfg)
+	if err != nil {
+		t.Fatal("getKubeConfigSpecs failed!")
+	}
+
+	// Executes getKubeConfigSpecs
+	specsDNS, err := getKubeConfigSpecs(cfgDNS)
 	if err != nil {
 		t.Fatal("getKubeConfigSpecs failed!")
 	}
@@ -119,6 +132,39 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 
 			// Asserts MasterConfiguration values injected into spec
 			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+			if err != nil {
+				t.Error(err)
+			}
+			if spec.APIServer != masterEndpoint {
+				t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer endpoint into spec for %s", assertion.kubeConfigFile)
+			}
+
+			// Asserts CA certs and CA keys loaded into specs
+			if spec.CACert == nil {
+				t.Errorf("getKubeConfigSpecs didn't loaded CACert into spec for %s!", assertion.kubeConfigFile)
+			}
+			if spec.ClientCertAuth == nil || spec.ClientCertAuth.CAKey == nil {
+				t.Errorf("getKubeConfigSpecs didn't loaded CAKey into spec for %s!", assertion.kubeConfigFile)
+			}
+		} else {
+			t.Errorf("getKubeConfigSpecs didn't create spec for %s ", assertion.kubeConfigFile)
+		}
+
+		// assert the spec for the kubeConfigFile exists
+		if spec, ok := specsDNS[assertion.kubeConfigFile]; ok {
+
+			// Assert clientName
+			if spec.ClientName != assertion.clientName {
+				t.Errorf("getKubeConfigSpecs for %s clientName is %s, expected %s", assertion.kubeConfigFile, spec.ClientName, assertion.clientName)
+			}
+
+			// Assert Organizations
+			if spec.ClientCertAuth == nil || !reflect.DeepEqual(spec.ClientCertAuth.Organizations, assertion.organizations) {
+				t.Errorf("getKubeConfigSpecs for %s Organizations is %v, expected %v", assertion.kubeConfigFile, spec.ClientCertAuth.Organizations, assertion.organizations)
+			}
+
+			// Asserts MasterConfiguration values injected into spec
+			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfgDNS)
 			if err != nil {
 				t.Error(err)
 			}

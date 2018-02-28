@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -37,9 +38,7 @@ import (
 )
 
 const (
-	volumeAvailableStatus = "available"
-	volumeInUseStatus     = "in-use"
-	testClusterName       = "testCluster"
+	testClusterName = "testCluster"
 
 	volumeStatusTimeoutSeconds = 30
 	// volumeStatus* is configuration of exponential backoff for
@@ -68,9 +67,8 @@ func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status 
 				status,
 				volumeStatusTimeoutSeconds)
 			return true, nil
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 	if err == wait.ErrWaitTimeout {
 		t.Logf("Volume (%s) status did not change to %s after %v seconds\n",
@@ -116,12 +114,12 @@ func TestReadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
 	}
-	if cfg.Global.AuthUrl != "http://auth.url" {
-		t.Errorf("incorrect authurl: %s", cfg.Global.AuthUrl)
+	if cfg.Global.AuthURL != "http://auth.url" {
+		t.Errorf("incorrect authurl: %s", cfg.Global.AuthURL)
 	}
 
-	if cfg.Global.UserId != "user" {
-		t.Errorf("incorrect userid: %s", cfg.Global.UserId)
+	if cfg.Global.UserID != "user" {
+		t.Errorf("incorrect userid: %s", cfg.Global.UserID)
 	}
 
 	if cfg.Global.Password != "mypass" {
@@ -162,7 +160,11 @@ func TestReadConfig(t *testing.T) {
 func TestToAuthOptions(t *testing.T) {
 	cfg := Config{}
 	cfg.Global.Username = "user"
-	// etc.
+	cfg.Global.Password = "pass"
+	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainName = "local"
+	cfg.Global.AuthURL = "http://auth.url"
+	cfg.Global.UserID = "user"
 
 	ao := cfg.toAuthOptions()
 
@@ -171,6 +173,24 @@ func TestToAuthOptions(t *testing.T) {
 	}
 	if ao.Username != cfg.Global.Username {
 		t.Errorf("Username %s != %s", ao.Username, cfg.Global.Username)
+	}
+	if ao.Password != cfg.Global.Password {
+		t.Errorf("Password %s != %s", ao.Password, cfg.Global.Password)
+	}
+	if ao.DomainID != cfg.Global.DomainID {
+		t.Errorf("DomainID %s != %s", ao.DomainID, cfg.Global.DomainID)
+	}
+	if ao.IdentityEndpoint != cfg.Global.AuthURL {
+		t.Errorf("IdentityEndpoint %s != %s", ao.IdentityEndpoint, cfg.Global.AuthURL)
+	}
+	if ao.UserID != cfg.Global.UserID {
+		t.Errorf("UserID %s != %s", ao.UserID, cfg.Global.UserID)
+	}
+	if ao.DomainName != cfg.Global.DomainName {
+		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
+	}
+	if ao.TenantID != cfg.Global.TenantID {
+		t.Errorf("TenantID %s != %s", ao.TenantID, cfg.Global.TenantID)
 	}
 }
 
@@ -188,8 +208,8 @@ func TestCheckOpenStackOpts(t *testing.T) {
 				provider: nil,
 				lbOpts: LoadBalancerOpts{
 					LBVersion:            "v2",
-					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
-					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					SubnetID:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkID:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
 					LBProvider:           "haproxy",
 					CreateMonitor:        true,
@@ -210,7 +230,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 				provider: nil,
 				lbOpts: LoadBalancerOpts{
 					LBVersion:            "v2",
-					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					FloatingNetworkID:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
 					CreateMonitor:        true,
 					MonitorDelay:         delay,
@@ -230,10 +250,12 @@ func TestCheckOpenStackOpts(t *testing.T) {
 				provider: nil,
 				lbOpts: LoadBalancerOpts{
 					LBVersion:            "v2",
-					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
-					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					SubnetID:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkID:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
 					CreateMonitor:        true,
+					MonitorTimeout:       timeout,
+					MonitorMaxRetries:    uint(3),
 					ManageSecurityGroups: true,
 				},
 				metadataOpts: MetadataOpts{
@@ -273,6 +295,46 @@ func TestCheckOpenStackOpts(t *testing.T) {
 			expectedError: fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
 				"Supported elements include %q and %q", "value1", configDriveID, metadataID),
 		},
+		{
+			name: "test7",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetID:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkID:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorTimeout:       timeout,
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: fmt.Errorf("monitor-max-retries not set in cloud provider config"),
+		},
+		{
+			name: "test8",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				lbOpts: LoadBalancerOpts{
+					LBVersion:            "v2",
+					SubnetID:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
+					FloatingNetworkID:    "38b8b5f9-64dc-4424-bf86-679595714786",
+					LBMethod:             "ROUND_ROBIN",
+					CreateMonitor:        true,
+					MonitorDelay:         delay,
+					MonitorMaxRetries:    uint(3),
+					ManageSecurityGroups: true,
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
+			},
+			expectedError: fmt.Errorf("monitor-timeout not set in cloud provider config"),
+		},
 	}
 
 	for _, testcase := range tests {
@@ -292,39 +354,39 @@ func TestCaller(t *testing.T) {
 	called := false
 	myFunc := func() { called = true }
 
-	c := NewCaller()
-	c.Call(myFunc)
+	c := newCaller()
+	c.call(myFunc)
 
 	if !called {
-		t.Errorf("Caller failed to call function in default case")
+		t.Errorf("caller failed to call function in default case")
 	}
 
-	c.Disarm()
+	c.disarm()
 	called = false
-	c.Call(myFunc)
+	c.call(myFunc)
 
 	if called {
-		t.Error("Caller still called function when disarmed")
+		t.Error("caller still called function when disarmed")
 	}
 
-	// Confirm the "usual" deferred Caller pattern works as expected
+	// Confirm the "usual" deferred caller pattern works as expected
 
 	called = false
-	success_case := func() {
-		c := NewCaller()
-		defer c.Call(func() { called = true })
-		c.Disarm()
+	successCase := func() {
+		c := newCaller()
+		defer c.call(func() { called = true })
+		c.disarm()
 	}
-	if success_case(); called {
+	if successCase(); called {
 		t.Error("Deferred success case still invoked unwind")
 	}
 
 	called = false
-	failure_case := func() {
-		c := NewCaller()
-		defer c.Call(func() { called = true })
+	failureCase := func() {
+		c := newCaller()
+		defer c.call(func() { called = true })
 	}
-	if failure_case(); !called {
+	if failureCase(); !called {
 		t.Error("Deferred failure case failed to invoke unwind")
 	}
 }
@@ -400,7 +462,7 @@ func TestNodeAddresses(t *testing.T) {
 func TestNewOpenStack(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
-		t.Skipf("No config found in environment")
+		t.Skip("No config found in environment")
 	}
 
 	_, err := newOpenStack(cfg)
@@ -412,7 +474,7 @@ func TestNewOpenStack(t *testing.T) {
 func TestLoadBalancer(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
-		t.Skipf("No config found in environment")
+		t.Skip("No config found in environment")
 	}
 
 	versions := []string{"v2", ""}
@@ -431,7 +493,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 		}
 
-		_, exists, err := lb.GetLoadBalancer(testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+		_, exists, err := lb.GetLoadBalancer(context.TODO(), testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
 		if err != nil {
 			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 		}
@@ -457,7 +519,7 @@ func TestZones(t *testing.T) {
 		t.Fatalf("Zones() returned false")
 	}
 
-	zone, err := z.GetZone()
+	zone, err := z.GetZone(context.TODO())
 	if err != nil {
 		t.Fatalf("GetZone() returned error: %s", err)
 	}
@@ -476,7 +538,7 @@ var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
 func TestVolumes(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
-		t.Skipf("No config found in environment")
+		t.Skip("No config found in environment")
 	}
 
 	os, err := newOpenStack(cfg)
@@ -499,15 +561,15 @@ func TestVolumes(t *testing.T) {
 	if err != nil {
 		t.Logf("Cannot find instance id: %v - perhaps you are running this test outside a VM launched by OpenStack", err)
 	} else {
-		diskId, err := os.AttachDisk(id, vol)
+		diskID, err := os.AttachDisk(id, vol)
 		if err != nil {
 			t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
 		}
-		t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskId)
+		t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskID)
 
 		WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
 
-		devicePath := os.GetDevicePath(diskId)
+		devicePath := os.GetDevicePath(diskID)
 		if diskPathRegexp.FindString(devicePath) == "" {
 			t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
 		}
@@ -590,10 +652,10 @@ func TestToAuth3Options(t *testing.T) {
 	cfg := Config{}
 	cfg.Global.Username = "user"
 	cfg.Global.Password = "pass"
-	cfg.Global.DomainId = "2a73b8f597c04551a0fdc8e95544be8a"
+	cfg.Global.DomainID = "2a73b8f597c04551a0fdc8e95544be8a"
 	cfg.Global.DomainName = "local"
-	cfg.Global.AuthUrl = "http://auth.url"
-	cfg.Global.UserId = "user"
+	cfg.Global.AuthURL = "http://auth.url"
+	cfg.Global.UserID = "user"
 
 	ao := cfg.toAuth3Options()
 
@@ -606,14 +668,14 @@ func TestToAuth3Options(t *testing.T) {
 	if ao.Password != cfg.Global.Password {
 		t.Errorf("Password %s != %s", ao.Password, cfg.Global.Password)
 	}
-	if ao.DomainID != cfg.Global.DomainId {
-		t.Errorf("DomainID %s != %s", ao.DomainID, cfg.Global.DomainId)
+	if ao.DomainID != cfg.Global.DomainID {
+		t.Errorf("DomainID %s != %s", ao.DomainID, cfg.Global.DomainID)
 	}
-	if ao.IdentityEndpoint != cfg.Global.AuthUrl {
-		t.Errorf("IdentityEndpoint %s != %s", ao.IdentityEndpoint, cfg.Global.AuthUrl)
+	if ao.IdentityEndpoint != cfg.Global.AuthURL {
+		t.Errorf("IdentityEndpoint %s != %s", ao.IdentityEndpoint, cfg.Global.AuthURL)
 	}
-	if ao.UserID != cfg.Global.UserId {
-		t.Errorf("UserID %s != %s", ao.UserID, cfg.Global.UserId)
+	if ao.UserID != cfg.Global.UserID {
+		t.Errorf("UserID %s != %s", ao.UserID, cfg.Global.UserID)
 	}
 	if ao.DomainName != cfg.Global.DomainName {
 		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)

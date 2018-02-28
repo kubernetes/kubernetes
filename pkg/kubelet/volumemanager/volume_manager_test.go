@@ -41,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -168,7 +168,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pvA",
 				Annotations: map[string]string{
-					volumehelper.VolumeGidAnnotationKey: tc.gidAnnotation,
+					util.VolumeGidAnnotationKey: tc.gidAnnotation,
 				},
 			},
 			Spec: v1.PersistentVolumeSpec{
@@ -187,9 +187,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
 
 		stopCh := runVolumeManager(manager)
-		defer func() {
-			close(stopCh)
-		}()
+		defer close(stopCh)
 
 		podManager.SetPods([]*v1.Pod{pod})
 

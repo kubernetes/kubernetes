@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,12 +36,14 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 
 	"github.com/golang/glog"
 )
@@ -181,7 +183,10 @@ var _ rest.Exporter = &Store{}
 var _ rest.TableConvertor = &Store{}
 var _ GenericStore = &Store{}
 
-const OptimisticLockErrorMsg = "the object has been modified; please apply your changes to the latest version and try again"
+const (
+	OptimisticLockErrorMsg        = "the object has been modified; please apply your changes to the latest version and try again"
+	resourceCountPollPeriodJitter = 1.2
+)
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
@@ -1363,12 +1368,41 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			attrFunc,
 			triggerFunc,
 		)
+
+		if opts.CountMetricPollPeriod > 0 {
+			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod)
+			previousDestroy := e.DestroyFunc
+			e.DestroyFunc = func() {
+				stopFunc()
+				if previousDestroy != nil {
+					previousDestroy()
+				}
+			}
+		}
 	}
 
 	return nil
 }
 
-func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1alpha1.Table, error) {
+// startObservingCount starts monitoring given prefix and periodically updating metrics. It returns a function to stop collection.
+func (e *Store) startObservingCount(period time.Duration) func() {
+	prefix := e.KeyRootFunc(genericapirequest.NewContext())
+	resourceName := e.DefaultQualifiedResource.String()
+	glog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
+	stopCh := make(chan struct{})
+	go wait.JitterUntil(func() {
+		count, err := e.Storage.Count(prefix)
+		if err != nil {
+			glog.V(5).Infof("Failed to update storage count metric: %v", err)
+			metrics.UpdateObjectCount(resourceName, -1)
+		} else {
+			metrics.UpdateObjectCount(resourceName, count)
+		}
+	}, period, resourceCountPollPeriodJitter, true, stopCh)
+	return func() { close(stopCh) }
+}
+
+func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}

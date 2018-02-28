@@ -128,7 +128,7 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 	case types.Interface:
 		return false
 	default:
-		log.Printf("WARNING: type %q is not protable: %s", t.Kind, t.Name)
+		log.Printf("WARNING: type %q is not portable: %s", t.Kind, t.Name)
 		return false
 	}
 }

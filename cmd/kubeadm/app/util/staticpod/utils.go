@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -172,7 +173,7 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
-	if err := ioutil.WriteFile(filename, serialized, 0700); err != nil {
+	if err := ioutil.WriteFile(filename, serialized, 0600); err != nil {
 		return fmt.Errorf("failed to write static pod manifest file for %q (%q): %v", componentName, filename, err)
 	}
 
@@ -184,7 +185,16 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
 	switch {
 	case componentName == kubeadmconstants.KubeAPIServer:
-		if cfg.API.AdvertiseAddress != "" {
+		// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
+		// will generate a DaemonSet with a nodeSelector such that all nodes with the label
+		// node-role.kubernetes.io/master='' will have the API server deployed to it. Since the init
+		// is run only once on an initial host, the API advertise address will be invalid for any
+		// future hosts that do not have the same address. Furthermore, since liveness and readiness
+		// probes do not support the Downward API we cannot dynamically set the advertise address to
+		// the node's IP. The only option then is to use localhost.
+		if features.Enabled(cfg.FeatureGates, features.SelfHosting) {
+			return "127.0.0.1"
+		} else if cfg.API.AdvertiseAddress != "" {
 			return cfg.API.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:

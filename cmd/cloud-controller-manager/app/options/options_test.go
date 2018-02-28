@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -25,13 +26,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 func TestAddFlags(t *testing.T) {
 	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s := NewCloudControllerManagerServer()
+	s := NewCloudControllerManagerOptions()
 	s.AddFlags(f)
 
 	args := []string{
@@ -44,6 +46,7 @@ func TestAddFlags(t *testing.T) {
 		"--configure-cloud-routes=false",
 		"--contention-profiling=true",
 		"--controller-start-interval=2m",
+		"--http2-max-streams-per-connection=47",
 		"--min-resync-period=5m",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
@@ -62,16 +65,19 @@ func TestAddFlags(t *testing.T) {
 		"--route-reconciliation-period=30s",
 		"--min-resync-period=100m",
 		"--use-service-account-credentials=false",
+		"--cert-dir=/a/b/c",
+		"--bind-address=192.168.4.21",
+		"--secure-port=10001",
 	}
 	f.Parse(args)
 
-	expected := &CloudControllerManagerServer{
-		ControllerManagerServer: cmoptions.ControllerManagerServer{
-			KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
+	expected := &CloudControllerManagerOptions{
+		Generic: cmoptions.GenericControllerManagerOptions{
+			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
 				CloudProvider:                                   "gce",
 				CloudConfigFile:                                 "/cloud-config",
-				Port:                                            10000,
-				Address:                                         "192.168.4.10",
+				Port:                                            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				ConcurrentEndpointSyncs:                         5,
 				ConcurrentRSSyncs:                               5,
 				ConcurrentResourceQuotaSyncs:                    5,
@@ -85,7 +91,6 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentRCSyncs:                               5,
 				MinResyncPeriod:                                 metav1.Duration{Duration: 100 * time.Minute},
 				NodeMonitorPeriod:                               metav1.Duration{Duration: 5 * time.Second},
-				ServiceSyncPeriod:                               metav1.Duration{Duration: 5 * time.Minute},
 				ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
 				NamespaceSyncPeriod:                             metav1.Duration{Duration: 5 * time.Minute},
 				PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 15 * time.Second},
@@ -138,6 +143,20 @@ func TestAddFlags(t *testing.T) {
 				NodeCIDRMaskSize:          24,
 				CIDRAllocatorType:         "RangeAllocator",
 				Controllers:               []string{"*"},
+			},
+			SecureServing: &apiserveroptions.SecureServingOptions{
+				BindPort:    10001,
+				BindAddress: net.ParseIP("192.168.4.21"),
+				ServerCert: apiserveroptions.GeneratableKeyCert{
+					CertDirectory: "/a/b/c",
+					PairName:      "cloud-controller-manager",
+				},
+				HTTP2MaxStreamsPerConnection: 47,
+			},
+			InsecureServing: &cmoptions.InsecureServingOptions{
+				BindAddress: net.ParseIP("192.168.4.10"),
+				BindPort:    int(10000),
+				BindNetwork: "tcp",
 			},
 			Kubeconfig: "/kubeconfig",
 			Master:     "192.168.4.20",

@@ -272,6 +272,7 @@ var AllServices = []*ServiceInfo{
 		additionalMethods: []string{
 			"AttachDisk",
 			"DetachDisk",
+			"UpdateNetworkInterface",
 		},
 	},
 	{

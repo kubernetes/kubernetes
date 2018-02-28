@@ -26,24 +26,20 @@ retry() {
   "$@"
 }
 
-# Runs benchmark integration tests, producing JUnit-style XML test
-# reports in ${WORKSPACE}/artifacts. This script is intended to be run from
+# Runs benchmark integration tests, producing pretty-printed results
+# in ${WORKSPACE}/artifacts. This script can also be run within a
 # kubekins-test container with a kubernetes repo mounted (at the path
-# /go/src/k8s.io/kubernetes). See k8s.io/test-infra/scenarios/kubernetes_verify.py.
+# /go/src/k8s.io/kubernetes).
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/tools/godep && godep version
-retry go get github.com/jstemmer/go-junit-report
 retry go get github.com/cespare/prettybench
 
 # Disable the Go race detector.
 export KUBE_RACE=" "
 # Disable coverage report
 export KUBE_COVER="n"
-# Produce a JUnit-style XML test report.
-export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
-export ARTIFACTS_DIR=${WORKSPACE}/artifacts
+export ARTIFACTS_DIR=${WORKSPACE}/_artifacts
 
 mkdir -p "${ARTIFACTS_DIR}"
 cd /go/src/k8s.io/kubernetes
@@ -52,4 +48,6 @@ cd /go/src/k8s.io/kubernetes
 
 # Run the benchmark tests and pretty-print the results into a separate file.
 make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
-  | tee >(prettybench -no-passthrough > ${ARTIFACTS_DIR}/BenchmarkResults.txt)
+  | tee \
+   >(prettybench -no-passthrough > ${ARTIFACTS_DIR}/BenchmarkResults.txt) \
+   >(go run test/integration/benchmark/jsonify/main.go ${ARTIFACTS_DIR}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json || cat > /dev/null)

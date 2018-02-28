@@ -22,7 +22,7 @@ import (
 
 // ClientConnectionConfiguration contains details for constructing a client.
 type ClientConnectionConfiguration struct {
-	// kubeConfigFile is the path to a kubeconfig file.
+	// kubeconfig is the path to a kubeconfig file.
 	KubeConfigFile string `json:"kubeconfig"`
 	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
 	// default value of 'application/json'. This field will control all connections to the server used by a particular
@@ -30,7 +30,7 @@ type ClientConnectionConfiguration struct {
 	AcceptContentTypes string `json:"acceptContentTypes"`
 	// contentType is the content type used when sending data to the server from this client.
 	ContentType string `json:"contentType"`
-	// cps controls the number of queries per second allowed for this connection.
+	// qps controls the number of queries per second allowed for this connection.
 	QPS float32 `json:"qps"`
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int `json:"burst"`
@@ -93,14 +93,8 @@ type KubeProxyConntrackConfiguration struct {
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// featureGates is a comma-separated list of key=value pairs that control
-	// which alpha/beta features are enabled.
-	//
-	// TODO this really should be a map but that requires refactoring all
-	// components to use config files because local-up-cluster.sh only supports
-	// the --feature-gates flag right now, which is comma-separated key=value
-	// pairs.
-	FeatureGates string `json:"featureGates"`
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
@@ -140,22 +134,33 @@ type KubeProxyConfiguration struct {
 	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
-	UDPIdleTimeout metav1.Duration `json:"udpTimeoutMilliseconds"`
+	UDPIdleTimeout metav1.Duration `json:"udpIdleTimeout"`
 	// conntrack contains conntrack-related configuration options.
 	Conntrack KubeProxyConntrackConfiguration `json:"conntrack"`
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration `json:"configSyncPeriod"`
+	// nodePortAddresses is the --nodeport-addresses value for kube-proxy process. Values must be valid
+	// IP blocks. These values are as a parameter to select the interfaces where nodeport works.
+	// In case someone would like to expose a service on localhost for local visit and some other interfaces for
+	// particular purpose, a list of IP blocks would do that.
+	// If set it to "127.0.0.0/8", kube-proxy will only select the loopback interface for NodePort.
+	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
+	// An empty string slice is meant to select all network interfaces.
+	NodePortAddresses []string `json:"nodePortAddresses"`
 }
 
-// Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
-// (newer, faster). If blank, use the best-available proxy (currently iptables, but may
-// change in future versions).  If the iptables proxy is selected, regardless of how, but
-// the system's kernel or iptables versions are insufficient, this always falls back to the
-// userspace proxy.
-type ProxyMode string
+// Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
+// (newer, faster), 'ipvs'(newest, better in performance and scalability).
+//
+// Two modes of proxy are available in Windows platform: 'userspace'(older, stable) and 'kernelspace' (newer, faster).
+//
+// In Linux platform, if proxy mode is blank, use the best-available proxy (currently iptables, but may change in the
+// future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
+// insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
+// and the fall back path is firstly iptables and then userspace.
 
-const (
-	ProxyModeUserspace ProxyMode = "userspace"
-	ProxyModeIPTables  ProxyMode = "iptables"
-)
+// In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
+// future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
+// this always falls back to the userspace proxy.
+type ProxyMode string

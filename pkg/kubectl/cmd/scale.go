@@ -57,7 +57,7 @@ var (
 )
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
-func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "job", "statefulset"}
@@ -72,7 +72,7 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-			err := RunScale(f, out, cmd, args, shortOutput, options)
+			err := RunScale(f, out, errOut, cmd, args, shortOutput, options)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs:  validArgs,
@@ -95,18 +95,22 @@ func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // RunScale executes the scaling
-func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
+func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
+	count := cmdutil.GetFlagInt(cmd, "replicas")
+	if count < 0 {
+		return cmdutil.UsageErrorf(cmd, "The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
+	}
+
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	all := cmdutil.GetFlagBool(cmd, "all")
 
-	mapper, _ := f.Object()
 	r := f.NewBuilder().
-		Internal().
+		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -120,11 +124,6 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 	}
 	if err != nil {
 		return err
-	}
-
-	count := cmdutil.GetFlagInt(cmd, "replicas")
-	if count < 0 {
-		return cmdutil.UsageErrorf(cmd, "The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
 
 	infos := []*resource.Info{}
@@ -147,6 +146,10 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		}
 
 		mapping := info.ResourceMapping()
+		if mapping.Resource == "jobs" {
+			fmt.Fprintf(errOut, "%s scale job is DEPRECATED and will be removed in a future version.", cmd.Parent().Name())
+		}
+
 		scaler, err := f.Scaler(mapping)
 		if err != nil {
 			return err
@@ -170,7 +173,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			mapping := info.ResourceMapping()
-			client, err := f.ClientForMapping(mapping)
+			client, err := f.UnstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
@@ -181,7 +184,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 		}
 		counter++
-		f.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, false, "scaled")
+		cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "scaled")
 		return nil
 	})
 	if err != nil {

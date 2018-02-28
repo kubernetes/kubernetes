@@ -33,8 +33,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
 )
 
@@ -128,17 +130,20 @@ func TestPodAndContainer(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, _, ns := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 
 		cmd := &cobra.Command{}
 		options := test.p
-		err := options.Complete(f, cmd, test.args, test.argsLenAtDash)
+		options.Err = bytes.NewBuffer([]byte{})
+		err := options.Complete(tf, cmd, test.args, test.argsLenAtDash)
 		if test.expectError && err == nil {
 			t.Errorf("%s: unexpected non-error", test.name)
 		}
@@ -182,7 +187,10 @@ func TestExec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, ns := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
+		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		ns := legacyscheme.Codecs
+
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -198,7 +206,7 @@ func TestExec(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -218,7 +226,7 @@ func TestExec(t *testing.T) {
 		}
 		cmd := &cobra.Command{}
 		args := []string{"test", "command"}
-		if err := params.Complete(f, cmd, args, -1); err != nil {
+		if err := params.Complete(tf, cmd, args, -1); err != nil {
 			t.Fatal(err)
 		}
 		err := params.Run()

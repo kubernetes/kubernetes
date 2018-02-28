@@ -26,20 +26,39 @@ import (
 )
 
 const (
-	MaxUint          = ^uint(0)
-	MaxInt           = int(MaxUint >> 1)
+	// MaxUint defines the max unsigned int value.
+	MaxUint = ^uint(0)
+	// MaxInt defines the max signed int value.
+	MaxInt = int(MaxUint >> 1)
+	// MaxTotalPriority defines the max total priority value.
 	MaxTotalPriority = MaxInt
-	MaxPriority      = 10
-	MaxWeight        = MaxInt / MaxPriority
+	// MaxPriority defines the max priority value.
+	MaxPriority = 10
+	// MaxWeight defines the max weight value.
+	MaxWeight = MaxInt / MaxPriority
+	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
+	HighestUserDefinablePriority = int32(1000000000)
+	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
+	SystemCriticalPriority = 2 * HighestUserDefinablePriority
+	// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
+	// start with scheduling.SystemPriorityClassPrefix which is by default "system-".
+	SystemClusterCritical = "system-cluster-critical"
+	SystemNodeCritical    = "system-node-critical"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Policy describes a struct of a policy resource in api.
 type Policy struct {
 	metav1.TypeMeta
-	// Holds the information to configure the fit predicate functions
+	// Holds the information to configure the fit predicate functions.
+	// If unspecified, the default predicate functions will be applied.
+	// If empty list, all predicates (except the mandatory ones) will be
+	// bypassed.
 	Predicates []PredicatePolicy
-	// Holds the information to configure the priority functions
+	// Holds the information to configure the priority functions.
+	// If unspecified, the default priority functions will be applied.
+	// If empty list, all priority functions will be bypassed.
 	Priorities []PriorityPolicy
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig
@@ -55,6 +74,7 @@ type Policy struct {
 	AlwaysCheckAllPredicates bool
 }
 
+// PredicatePolicy describes a struct of a predicate policy.
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
@@ -64,6 +84,7 @@ type PredicatePolicy struct {
 	Argument *PredicateArgument
 }
 
+// PriorityPolicy describes a struct of a priority policy.
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
@@ -130,6 +151,16 @@ type LabelPreference struct {
 	Presence bool
 }
 
+// ExtenderManagedResource describes the arguments of extended resources
+// managed by an extender.
+type ExtenderManagedResource struct {
+	// Name is the extended resource name.
+	Name v1.ResourceName
+	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
+	// resource when applying predicates.
+	IgnoredByScheduler bool
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -146,8 +177,8 @@ type ExtenderConfig struct {
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string
-	// EnableHttps specifies whether https should be used to communicate with the extender
-	EnableHttps bool
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool
 	// TLSConfig specifies the transport layer security config
 	TLSConfig *restclient.TLSClientConfig
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
@@ -157,6 +188,16 @@ type ExtenderConfig struct {
 	// so the scheduler should only send minimal information about the eligible nodes
 	// assuming that the extender already cached full details of all nodes in the cluster
 	NodeCacheCapable bool
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	ManagedResources []ExtenderManagedResource
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
@@ -215,7 +256,14 @@ type HostPriority struct {
 	Score int
 }
 
+// HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
+
+// SystemPriorityClasses defines special priority classes which are used by system critical pods that should not be preempted by workload pods.
+var SystemPriorityClasses = map[string]int32{
+	SystemClusterCritical: SystemCriticalPriority,
+	SystemNodeCritical:    SystemCriticalPriority + 1000,
+}
 
 func (h HostPriorityList) Len() int {
 	return len(h)

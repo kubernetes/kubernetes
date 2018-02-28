@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -97,8 +98,11 @@ func NewCloudNodeController(
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 	}
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: cnc.AddCloudNode,
+	// Use shared informer to listen to add/update of nodes. Note that any nodes
+	// that exist before node controller starts will show up in the update method
+	cnc.nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    cnc.AddCloudNode,
+		UpdateFunc: cnc.UpdateCloudNode,
 	})
 
 	return cnc
@@ -276,19 +280,27 @@ func (cnc *CloudNodeController) MonitorNode() {
 	}
 }
 
+func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
+	if _, ok := newObj.(*v1.Node); !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		return
+	}
+	cnc.AddCloudNode(newObj)
+}
+
 // This processes nodes that were added into the cluster, and cloud initialize them if appropriate
 func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
-	instances, ok := cnc.cloud.Instances()
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
-		return
-	}
-
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
 		glog.V(2).Infof("This node %s is registered without the cloud taint. Will not process.", node.Name)
+		return
+	}
+
+	instances, ok := cnc.cloud.Instances()
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
 		return
 	}
 
@@ -299,7 +311,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		}
 
 		if curNode.Spec.ProviderID == "" {
-			providerID, err := cloudprovider.GetInstanceProviderID(cnc.cloud, types.NodeName(curNode.Name))
+			providerID, err := cloudprovider.GetInstanceProviderID(context.TODO(), cnc.cloud, types.NodeName(curNode.Name))
 			if err == nil {
 				curNode.Spec.ProviderID = providerID
 			} else {
@@ -402,10 +414,10 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 
 // ensureNodeExistsByProviderIDOrExternalID first checks if the instance exists by the provider id and then by calling external id with node name
 func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
-	exists, err := instances.InstanceExistsByProviderID(node.Spec.ProviderID)
+	exists, err := instances.InstanceExistsByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		_, err = instances.ExternalID(types.NodeName(node.Name))
+		_, err = instances.ExternalID(context.TODO(), types.NodeName(node.Name))
 		if err == nil {
 			return true, nil
 		}
@@ -420,10 +432,10 @@ func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances,
 }
 
 func getNodeAddressesByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) ([]v1.NodeAddress, error) {
-	nodeAddresses, err := instances.NodeAddressesByProviderID(node.Spec.ProviderID)
+	nodeAddresses, err := instances.NodeAddressesByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		nodeAddresses, err = instances.NodeAddresses(types.NodeName(node.Name))
+		nodeAddresses, err = instances.NodeAddresses(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
 			return nil, fmt.Errorf("NodeAddress: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
@@ -467,10 +479,10 @@ func ensureNodeProvidedIPExists(node *v1.Node, nodeAddresses []v1.NodeAddress) (
 }
 
 func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *v1.Node) (string, error) {
-	instanceType, err := instances.InstanceTypeByProviderID(node.Spec.ProviderID)
+	instanceType, err := instances.InstanceTypeByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		instanceType, err = instances.InstanceType(types.NodeName(node.Name))
+		instanceType, err = instances.InstanceType(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
 			return "", fmt.Errorf("InstanceType: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}
@@ -481,10 +493,10 @@ func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *
 // getZoneByProviderIDorName will attempt to get the zone of node using its providerID
 // then it's name. If both attempts fail, an error is returned
 func getZoneByProviderIDOrName(zones cloudprovider.Zones, node *v1.Node) (cloudprovider.Zone, error) {
-	zone, err := zones.GetZoneByProviderID(node.Spec.ProviderID)
+	zone, err := zones.GetZoneByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		zone, err = zones.GetZoneByNodeName(types.NodeName(node.Name))
+		zone, err = zones.GetZoneByNodeName(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
 			return cloudprovider.Zone{}, fmt.Errorf("Zone: Error fetching by providerID: %v Error fetching by NodeName: %v", providerIDErr, err)
 		}

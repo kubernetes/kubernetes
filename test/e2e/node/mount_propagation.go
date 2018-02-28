@@ -74,7 +74,7 @@ func preparePod(name string, node *v1.Node, propagation v1.MountPropagationMode,
 	return pod
 }
 
-var _ = SIGDescribe("Mount propagation [Feature:MountPropagation]", func() {
+var _ = SIGDescribe("Mount propagation", func() {
 	f := framework.NewDefaultFramework("mount-propagation")
 
 	It("should propagate mounts to the host", func() {

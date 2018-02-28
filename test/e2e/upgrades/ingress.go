@@ -32,6 +32,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// Dependent on "static-ip-2" manifests
+const path = "foo"
+const host = "ingress.test.com"
+
 // IngressUpgradeTest adapts the Ingress e2e for upgrade testing
 type IngressUpgradeTest struct {
 	gceController *framework.GCEIngressController
@@ -77,7 +81,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 		Client: jig.Client,
 		Cloud:  framework.TestContext.CloudConfig,
 	}
-	gceController.Init()
+	framework.ExpectNoError(gceController.Init())
 
 	t.gceController = gceController
 	t.jig = jig
@@ -90,13 +94,13 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	// Create a working basic Ingress
 	By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", t.ipName, t.ip))
 	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip-2"), ns.Name, map[string]string{
-		"kubernetes.io/ingress.global-static-ip-name": t.ipName,
-		"kubernetes.io/ingress.allow-http":            "false",
+		framework.IngressStaticIPKey:  t.ipName,
+		framework.IngressAllowHTTPKey: "false",
 	}, map[string]string{})
-	jig.AddHTTPS("tls-secret", "ingress.test.com")
+	t.jig.AddHTTPS("tls-secret", "ingress.test.com")
 
 	By("waiting for Ingress to come up with ip: " + t.ip)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, t.httpClient, false))
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
 
 	By("keeping track of GCP resources created by Ingress")
 	t.resourceStore = &GCPResourceStore{}
@@ -138,42 +142,32 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 	}
 
 	By("Cleaning up cloud resources")
-	framework.CleanupGCEIngressController(t.gceController)
+	framework.ExpectNoError(t.gceController.CleanupGCEIngressController())
 }
 
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
 	if testDuringDisruption {
 		By("continuously hitting the Ingress IP")
 		wait.Until(func() {
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
 		}, t.jig.PollInterval, done)
 	} else {
 		By("waiting for upgrade to finish without checking if Ingress remains up")
 		<-done
 	}
 	By("hitting the Ingress IP " + t.ip)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
 
 	// We want to manually trigger a sync because then we can easily verify
 	// a correct sync completed after update.
 	By("updating ingress spec to manually trigger a sync")
 	t.jig.Update(func(ing *extensions.Ingress) {
-		ing.Spec.TLS[0].Hosts = append(ing.Spec.TLS[0].Hosts, "ingress.test.com")
-		ing.Spec.Rules = append(
-			ing.Spec.Rules,
-			extensions.IngressRule{
-				Host: "ingress.test.com",
-				IngressRuleValue: extensions.IngressRuleValue{
-					HTTP: &extensions.HTTPIngressRuleValue{
-						Paths: []extensions.HTTPIngressPath{
-							{
-								Path: "/test",
-								// Note: Dependant on using "static-ip-2" manifest.
-								Backend: *(ing.Spec.Backend),
-							},
-						},
-					},
-				},
+		ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths = append(
+			ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths,
+			extensions.HTTPIngressPath{
+				Path: "/test",
+				// Note: Dependant on using "static-ip-2" manifest.
+				Backend: ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend,
 			})
 	})
 	// WaitForIngress() tests that all paths are pinged, which is how we know
@@ -182,6 +176,15 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	By("comparing GCP resources post-upgrade")
 	postUpgradeResourceStore := &GCPResourceStore{}
 	t.populateGCPResourceStore(postUpgradeResourceStore)
+
+	// Ignore certain fields in compute.Firewall that we know will change
+	// due to the upgrade/downgrade.
+	// TODO(rramkumar): Remove this once glbc 0.9.8 is released.
+	t.resourceStore.Fw.Allowed = nil
+	t.resourceStore.Fw.SourceRanges = nil
+	postUpgradeResourceStore.Fw.Allowed = nil
+	postUpgradeResourceStore.Fw.SourceRanges = nil
+
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()
 		i2 := v2.Interface()

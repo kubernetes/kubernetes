@@ -38,8 +38,8 @@ type Provider interface {
 	// DefaultContainerSecurityContext sets the default values of the required but not filled fields.
 	// It modifies the SecurityContext of the container and annotations of the pod.
 	DefaultContainerSecurityContext(pod *api.Pod, container *api.Container) error
-	// Ensure a pod's SecurityContext is in compliance with the given constraints.
-	ValidatePodSecurityContext(pod *api.Pod, fldPath *field.Path) field.ErrorList
+	// Ensure a pod is in compliance with the given constraints.
+	ValidatePod(pod *api.Pod, fldPath *field.Path) field.ErrorList
 	// Ensure a container's SecurityContext is in compliance with the given constraints
 	ValidateContainerSecurityContext(pod *api.Pod, container *api.Container, fldPath *field.Path) field.ErrorList
 	// Get the name of the PSP that this provider was initialized with.

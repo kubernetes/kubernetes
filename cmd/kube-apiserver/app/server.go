@@ -44,22 +44,23 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
-	openapi "k8s.io/kube-openapi/pkg/common"
-
-	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
-	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	certutil "k8s.io/client-go/util/cert"
+	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
+	openapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -69,12 +70,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
@@ -88,12 +91,14 @@ import (
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
-	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const etcdRetryLimit = 60
@@ -110,6 +115,7 @@ others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
+			utilflag.PrintFlags(cmd.Flags())
 
 			stopCh := server.SetupSignalHandler()
 			if err := Run(s, stopCh); err != nil {
@@ -319,6 +325,28 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		return nil, nil, nil, nil, nil, err
 	}
 
+	var issuer serviceaccount.TokenGenerator
+	var apiAudiences []string
+	if s.ServiceAccountSigningKeyFile != "" ||
+		s.Authentication.ServiceAccounts.Issuer != "" ||
+		len(s.Authentication.ServiceAccounts.APIAudiences) > 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+			return nil, nil, nil, nil, nil, fmt.Errorf("the TokenRequest feature is not enabled but --service-account-signing-key-file and/or --service-account-issuer-id flags were passed")
+		}
+		if s.ServiceAccountSigningKeyFile == "" ||
+			s.Authentication.ServiceAccounts.Issuer == "" ||
+			len(s.Authentication.ServiceAccounts.APIAudiences) == 0 ||
+			len(s.Authentication.ServiceAccounts.KeyFiles) == 0 {
+			return nil, nil, nil, nil, nil, fmt.Errorf("service-account-signing-key-file, service-account-issuer, service-account-api-audiences and service-account-key-file should be specified together")
+		}
+		sk, err := certutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
+		if err != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
+		}
+		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
+	}
+
 	config := &master.Config{
 		GenericConfig: genericConfig,
 		ExtraConfig: master.ExtraConfig{
@@ -336,7 +364,6 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 			EnableCoreControllers:   true,
 			EventTTL:                s.EventTTL,
 			KubeletClientConfig:     s.KubeletConfig,
-			EnableUISupport:         true,
 			EnableLogsSupport:       s.EnableLogsHandler,
 			ProxyTransport:          proxyTransport,
 
@@ -351,6 +378,9 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 
 			EndpointReconcilerType: reconcilers.Type(s.EndpointReconcilerType),
 			MasterCount:            s.MasterCount,
+
+			ServiceAccountIssuer:       issuer,
+			ServiceAccountAPIAudiences: apiAudiences,
 		},
 	}
 
@@ -450,12 +480,12 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		)
 	}
 
-	genericConfig.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, sharedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, clientgoExternalClient, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
-	genericConfig.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers, versionedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
@@ -534,25 +564,10 @@ func BuildAdmissionPluginInitializers(s *options.ServerRunOptions, client intern
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorage.StorageFactory, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorage.StorageFactory, client internalclientset.Interface, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
-		// we have to go direct to storage because the clientsets fail when they're initialized with some API versions excluded
-		// we should stop trying to control them like that.
-		storageConfigServiceAccounts, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to get serviceaccounts storage: %v", err)
-		}
-		storageConfigSecrets, err := storageFactory.NewConfig(api.Resource("secrets"))
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to get secrets storage: %v", err)
-		}
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(
-			storageConfigServiceAccounts,
-			storageFactory.ResourcePrefix(api.Resource("serviceaccounts")),
-			storageConfigSecrets,
-			storageFactory.ResourcePrefix(api.Resource("secrets")),
-		)
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
 	}
 	if client == nil || reflect.ValueOf(client).IsNil() {
 		// TODO: Remove check once client can never be nil.
@@ -586,7 +601,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 		// FIXME (soltysh): this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{
 			batch.Resource("cronjobs").WithVersion("v1beta1"),
-			storage.Resource("volumeattachments").WithVersion("v1alpha1"),
+			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
 		apiResourceConfig)
@@ -595,12 +610,12 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 	}
 
 	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))
-
-	// keep Deployments, Daemonsets and ReplicaSets in extensions for backwards compatibility, we'll have to migrate at some point, eventually
-	storageFactory.AddCohabitatingResources(extensions.Resource("deployments"), apps.Resource("deployments"))
-	storageFactory.AddCohabitatingResources(extensions.Resource("daemonsets"), apps.Resource("daemonsets"))
-	storageFactory.AddCohabitatingResources(extensions.Resource("replicasets"), apps.Resource("replicasets"))
+	storageFactory.AddCohabitatingResources(apps.Resource("deployments"), extensions.Resource("deployments"))
+	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
+	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
 	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
+	// TODO(#54933): 1.11: switch to using policy storage and flip the order here
+	storageFactory.AddCohabitatingResources(extensions.Resource("podsecuritypolicies"), policy.Resource("podsecuritypolicies"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
@@ -636,7 +651,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 
 func defaultOptions(s *options.ServerRunOptions) error {
 	// set defaults
-	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
+	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing.SecureServingOptions); err != nil {
 		return err
 	}
 	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
@@ -666,12 +681,19 @@ func defaultOptions(s *options.ServerRunOptions) error {
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 
-	// Default to the private server key for service account token signing
-	if len(s.Authentication.ServiceAccounts.KeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
-		if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
-			s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
-		} else {
-			glog.Warning("No TLS key provided, service account token authentication disabled")
+	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling
+	// TokenRequest functionality. This defaulting was convenient, but messed up
+	// a lot of people when they rotated their serving cert with no idea it was
+	// connected to their service account keys. We are taking this oppurtunity to
+	// remove this problematic defaulting.
+	if s.ServiceAccountSigningKeyFile == "" {
+		// Default to the private server key for service account token signing
+		if len(s.Authentication.ServiceAccounts.KeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
+			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
+				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
+			} else {
+				glog.Warning("No TLS key provided, service account token authentication disabled")
+			}
 		}
 	}
 

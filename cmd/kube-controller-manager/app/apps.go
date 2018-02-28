@@ -21,9 +21,30 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
+
+func startDaemonSetController(ctx ControllerContext) (bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
+		return false, nil
+	}
+	dsc, err := daemon.NewDaemonSetsController(
+		ctx.InformerFactory.Apps().V1().DaemonSets(),
+		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating DaemonSets controller: %v", err)
+	}
+	go dsc.Run(int(ctx.ComponentConfig.ConcurrentDaemonSetSyncs), ctx.Stop)
+	return true, nil
+}
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "statefulsets"}] {

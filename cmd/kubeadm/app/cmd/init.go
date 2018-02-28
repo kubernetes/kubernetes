@@ -30,13 +30,14 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -45,7 +46,6 @@ import (
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -56,10 +56,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	auditutil "k8s.io/kubernetes/cmd/kubeadm/app/util/audit"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -81,7 +81,7 @@ var (
 		You can now join any number of machines by running the following on each node
 		as root:
 
-		  kubeadm join --token {{.Token}} {{.MasterHostPort}} --discovery-token-ca-cert-hash {{.CAPubKeyPin}}
+		  {{.joinCommand}}
 
 		`)))
 
@@ -92,10 +92,12 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- There is no internet connection, so the kubelet cannot pull the following control plane images:
+			- Either there is no internet connection, or imagePullPolicy is set to "Never",
+			  so the kubelet cannot pull or find the following control plane images:
 				- {{ .APIServerImage }}
 				- {{ .ControllerManagerImage }}
 				- {{ .SchedulerImage }}
+				- {{ .EtcdImage }} (only if no external etcd endpoints are configured)
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -113,7 +115,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipTokenPrint bool
 	var dryRun bool
 	var featureGatesString string
-	var criSocket string
 	var ignorePreflightErrors []string
 
 	cmd := &cobra.Command{
@@ -132,7 +133,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 
-			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun, criSocket)
+			i, err := NewInit(cfgPath, internalcfg, ignorePreflightErrorsSet, skipTokenPrint, dryRun)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
@@ -140,7 +141,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &criSocket, &ignorePreflightErrors)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
 
 	return cmd
 }
@@ -191,16 +192,17 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
 		"The duration before the bootstrap token is automatically deleted. If set to '0', the token will never expire.",
 	)
+	flagSet.StringVar(
+		&cfg.CRISocket, "cri-socket", cfg.CRISocket,
+		`Specify the CRI socket to connect to.`,
+	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 
-	flagSet.Var(utilflag.NewMapStringString(&cfg.APIServerExtraArgs), "apiserver-extra-args", "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
-	flagSet.Var(utilflag.NewMapStringString(&cfg.ControllerManagerExtraArgs), "controller-manager-extra-args", "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
-	flagSet.Var(utilflag.NewMapStringString(&cfg.SchedulerExtraArgs), "scheduler-extra-args", "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, criSocket *string, ignorePreflightErrors *[]string) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -225,14 +227,10 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		dryRun, "dry-run", *dryRun,
 		"Don't apply any changes; just output what would be done.",
 	)
-	flagSet.StringVar(
-		criSocket, "cri-socket", "/var/run/dockershim.sock",
-		`Specify the CRI socket to connect to.`,
-	)
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePreflightErrors sets.String, skipTokenPrint, dryRun bool) (*Init, error) {
 
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
@@ -265,7 +263,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, ignorePrefligh
 
 	fmt.Println("[preflight] Running pre-flight checks.")
 
-	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket, ignorePreflightErrors); err != nil {
+	if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, ignorePreflightErrors); err != nil {
 		return nil, err
 	}
 
@@ -319,6 +317,21 @@ func (i *Init) Run(out io.Writer) error {
 		fmt.Println("[externalca] The file 'ca.key' was not found, yet all other certificates are present. Using external CA mode - certificates or kubeconfig will not be generated.")
 	}
 
+	if features.Enabled(i.cfg.FeatureGates, features.Auditing) {
+		// Setup the AuditPolicy (either it was passed in and exists or it wasn't passed in and generate a default policy)
+		if i.cfg.AuditPolicyConfiguration.Path != "" {
+			// TODO(chuckha) ensure passed in audit policy is valid so users don't have to find the error in the api server log.
+			if _, err := os.Stat(i.cfg.AuditPolicyConfiguration.Path); err != nil {
+				return fmt.Errorf("error getting file info for audit policy file %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+			}
+		} else {
+			i.cfg.AuditPolicyConfiguration.Path = filepath.Join(kubeConfigDir, kubeadmconstants.AuditPolicyDir, kubeadmconstants.AuditPolicyFile)
+			if err := auditutil.CreateDefaultAuditLogPolicy(i.cfg.AuditPolicyConfiguration.Path); err != nil {
+				return fmt.Errorf("error creating default audit policy %q [%v]", i.cfg.AuditPolicyConfiguration.Path, err)
+			}
+		}
+	}
+
 	// Temporarily set cfg.CertificatesDir to the "real value" when writing controlplane manifests
 	// This is needed for writing the right kind of manifests
 	i.cfg.CertificatesDir = realCertsDir
@@ -357,7 +370,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	waiter := getWaiter(i.dryRun, client)
+	waiter := getWaiter(i, client)
 
 	if err := waitForAPIAndKubelet(waiter); err != nil {
 		ctx := map[string]string{
@@ -365,6 +378,7 @@ func (i *Init) Run(out io.Writer) error {
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
+			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Image),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
@@ -388,7 +402,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
-	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
+	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName, !i.cfg.NoTaintMaster); err != nil {
 		return fmt.Errorf("error marking master: %v", err)
 	}
 
@@ -399,7 +413,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Create the default node bootstrap token
 	tokenDescription := "The default bootstrap token generated by 'kubeadm init'."
-	if err := nodebootstraptokenphase.UpdateOrCreateToken(client, i.cfg.Token, false, i.cfg.TokenTTL.Duration, kubeadmconstants.DefaultTokenUsages, []string{kubeadmconstants.NodeBootstrapTokenAuthGroup}, tokenDescription); err != nil {
+	if err := nodebootstraptokenphase.UpdateOrCreateToken(client, i.cfg.Token, false, i.cfg.TokenTTL.Duration, i.cfg.TokenUsages, i.cfg.TokenGroups, tokenDescription); err != nil {
 		return fmt.Errorf("error updating or creating token: %v", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
@@ -448,26 +462,15 @@ func (i *Init) Run(out io.Writer) error {
 		return nil
 	}
 
-	// Load the CA certificate from so we can pin its public key
-	caCert, err := pkiutil.TryLoadCertFromDisk(i.cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	// Gets the join command
+	joinCommand, err := cmdutil.GetJoinCommand(kubeadmconstants.GetAdminKubeConfigPath(), i.cfg.Token, i.skipTokenPrint)
 	if err != nil {
-		return fmt.Errorf("error loading ca cert from disk: %v", err)
-	}
-
-	// Generate the Master host/port pair used by initDoneTempl
-	masterHostPort, err := kubeadmutil.GetMasterHostPort(i.cfg)
-	if err != nil {
-		return fmt.Errorf("error getting master host port: %v", err)
+		return fmt.Errorf("failed to get join command: %v", err)
 	}
 
 	ctx := map[string]string{
 		"KubeConfigPath": adminKubeConfigPath,
-		"Token":          i.cfg.Token,
-		"CAPubKeyPin":    pubkeypin.Hash(caCert),
-		"MasterHostPort": masterHostPort,
-	}
-	if i.skipTokenPrint {
-		ctx["Token"] = "<value withheld>"
+		"joinCommand":    joinCommand,
 	}
 
 	return initDoneTempl.Execute(out, ctx)
@@ -522,11 +525,18 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 }
 
 // getWaiter gets the right waiter implementation for the right occasion
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
-	if dryRun {
+func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
+	if i.dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
+
+	timeout := 30 * time.Minute
+
+	// No need for a large timeout if we don't expect downloads
+	if i.cfg.ImagePullPolicy == v1.PullNever {
+		timeout = 60 * time.Second
+	}
+	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 
 // waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet

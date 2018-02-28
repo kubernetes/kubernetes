@@ -44,10 +44,11 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: metrics-server
       containers:
       - name: metrics-server
-        image: gcr.io/google_containers/metrics-server-amd64:v0.2.1
+        image: k8s.gcr.io/metrics-server-amd64:v0.2.1
         command:
         - /metrics-server
         - --source=kubernetes.summary_api:''
@@ -56,7 +57,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: gcr.io/google_containers/addon-resizer:1.8.1
+        image: k8s.gcr.io/addon-resizer:1.8.1
         resources:
           limits:
             cpu: 100m

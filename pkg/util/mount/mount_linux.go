@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -69,7 +70,7 @@ func New(mounterPath string) Interface {
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
-// be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
+// be an empty string in case it's not required, e.g. for remount, or for auto filesystem
 // type, where kernel handles fstype for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
@@ -265,7 +266,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	rootStat, err := os.Lstat(file + "/..")
+	rootStat, err := os.Lstat(filepath.Dir(strings.TrimSuffix(file, "/")))
 	if err != nil {
 		return true, err
 	}
@@ -313,7 +314,7 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 
 	if !isDevice {
-		glog.Errorf("Path %q is not refering to a device.", pathname)
+		glog.Errorf("Path %q is not referring to a device.", pathname)
 		return false, nil
 	}
 	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
@@ -431,7 +432,7 @@ func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
 	case syscall.S_IFBLK:
 		return FileTypeBlockDev, nil
 	case syscall.S_IFCHR:
-		return FileTypeBlockDev, nil
+		return FileTypeCharDev, nil
 	case syscall.S_IFDIR:
 		return FileTypeDirectory, nil
 	case syscall.S_IFREG:
@@ -472,23 +473,33 @@ func (mounter *Mounter) ExistsPath(pathname string) bool {
 
 // formatAndMount uses unix utils to format and mount the given disk
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+	readOnly := false
+	for _, option := range options {
+		if option == "ro" {
+			readOnly = true
+			break
+		}
+	}
+
 	options = append(options, "defaults")
 
-	// Run fsck on the disk to fix repairable issues
-	glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
-	args := []string{"-a", source}
-	out, err := mounter.Exec.Run("fsck", args...)
-	if err != nil {
-		ee, isExitError := err.(utilexec.ExitError)
-		switch {
-		case err == utilexec.ErrExecutableNotFound:
-			glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
-		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-			glog.Infof("Device %s has errors which were corrected by fsck.", source)
-		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-			return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
-		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
-			glog.Infof("`fsck` error %s", string(out))
+	if !readOnly {
+		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
+		glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
+		args := []string{"-a", source}
+		out, err := mounter.Exec.Run("fsck", args...)
+		if err != nil {
+			ee, isExitError := err.(utilexec.ExitError)
+			switch {
+			case err == utilexec.ErrExecutableNotFound:
+				glog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
+			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
+				glog.Infof("Device %s has errors which were corrected by fsck.", source)
+			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
+				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
+				glog.Infof("`fsck` error %s", string(out))
+			}
 		}
 	}
 
@@ -503,8 +514,13 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			return err
 		}
 		if existingFormat == "" {
+			if readOnly {
+				// Don't attempt to format if mounting as readonly, return an error to reflect this.
+				return errors.New("failed to mount unformatted volume as read only")
+			}
+
 			// Disk is unformatted so format it.
-			args = []string{source}
+			args := []string{source}
 			// Use 'ext4' as the default
 			if len(fstype) == 0 {
 				fstype = "ext4"
@@ -536,36 +552,57 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// GetDiskFormat uses 'lsblk' to see if the given disk is unformated
+// GetDiskFormat uses 'blkid' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
-	args := []string{"-n", "-o", "FSTYPE", disk}
-	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
-	dataOut, err := mounter.Exec.Run("lsblk", args...)
+	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
+	dataOut, err := mounter.Exec.Run("blkid", args...)
 	output := string(dataOut)
-	glog.V(4).Infof("Output: %q", output)
+	glog.V(4).Infof("Output: %q, err: %v", output, err)
 
 	if err != nil {
+		if exit, ok := err.(utilexec.ExitError); ok {
+			if exit.ExitStatus() == 2 {
+				// Disk device is unformatted.
+				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
+				// not found, or no (specified) devices could be identified, an
+				// exit code of 2 is returned.
+				return "", nil
+			}
+		}
 		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return "", err
 	}
 
-	// Split lsblk output into lines. Unformatted devices should contain only
-	// "\n". Beware of "\n\n", that's a device with one empty partition.
-	output = strings.TrimSuffix(output, "\n") // Avoid last empty line
+	var fstype, pttype string
+
 	lines := strings.Split(output, "\n")
-	if lines[0] != "" {
-		// The device is formatted
-		return lines[0], nil
+	for _, l := range lines {
+		if len(l) <= 0 {
+			// Ignore empty line.
+			continue
+		}
+		cs := strings.Split(l, "=")
+		if len(cs) != 2 {
+			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+		}
+		// TYPE is filesystem type, and PTTYPE is partition table type, according
+		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
+		if cs[0] == "TYPE" {
+			fstype = cs[1]
+		} else if cs[0] == "PTTYPE" {
+			pttype = cs[1]
+		}
 	}
 
-	if len(lines) == 1 {
-		// The device is unformatted and has no dependent devices
-		return "", nil
+	if len(pttype) > 0 {
+		glog.V(4).Infof("Disk %s detected partition table type: %s", pttype)
+		// Returns a special non-empty string as filesystem type, then kubelet
+		// will not format it.
+		return "unknown data, probably partitions", nil
 	}
 
-	// The device has dependent devices, most probably partitions (LVM, LUKS
-	// and MD RAID are reported as FSTYPE and caught above).
-	return "unknown data, probably partitions", nil
+	return fstype, nil
 }
 
 // isShared returns true, if given path is on a mount point that has shared

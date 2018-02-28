@@ -39,8 +39,9 @@ func NewCRIStatsProvider(
 	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
+	logMetricsService LogMetricsService,
 ) *StatsProvider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer, runtimeService, imageService))
+	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer, runtimeService, imageService, logMetricsService))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -77,6 +78,7 @@ type StatsProvider struct {
 	podManager   kubepod.Manager
 	runtimeCache kubecontainer.RuntimeCache
 	containerStatsProvider
+	rlimitStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
@@ -85,6 +87,10 @@ type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
 	ImageFsDevice() (string, error)
+}
+
+type rlimitStatsProvider interface {
+	RlimitStats() (*statsapi.RlimitStats, error)
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that

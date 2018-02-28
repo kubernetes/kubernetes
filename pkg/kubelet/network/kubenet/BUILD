@@ -133,7 +133,6 @@ go_test(
         "//conditions:default": [],
     }),
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/network/kubenet",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/apis/kubeletconfig:go_default_library",

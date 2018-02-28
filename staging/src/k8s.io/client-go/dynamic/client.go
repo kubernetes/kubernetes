@@ -47,7 +47,7 @@ type Interface interface {
 	GetRateLimiter() flowcontrol.RateLimiter
 	// Resource returns an API interface to the specified resource for this client's
 	// group and version.  If resource is not a namespaced resource, then namespace
-	// is ignored.  The ResourceInterface inherits the paramater codec of this client.
+	// is ignored.  The ResourceInterface inherits the parameter codec of this client.
 	Resource(resource *metav1.APIResource, namespace string) ResourceInterface
 	// ParameterCodec returns a client with the provided parameter codec.
 	ParameterCodec(parameterCodec runtime.ParameterCodec) Interface
@@ -145,6 +145,19 @@ type ResourceClient struct {
 	parameterCodec runtime.ParameterCodec
 }
 
+func (rc *ResourceClient) parseResourceSubresourceName() (string, []string) {
+	var resourceName string
+	var subresourceName []string
+	if strings.Contains(rc.resource.Name, "/") {
+		resourceName = strings.Split(rc.resource.Name, "/")[0]
+		subresourceName = strings.Split(rc.resource.Name, "/")[1:]
+	} else {
+		resourceName = rc.resource.Name
+	}
+
+	return resourceName, subresourceName
+}
+
 // List returns a list of objects for this resource.
 func (rc *ResourceClient) List(opts metav1.ListOptions) (runtime.Object, error) {
 	parameterEncoder := rc.parameterCodec
@@ -166,9 +179,11 @@ func (rc *ResourceClient) Get(name string, opts metav1.GetOptions) (*unstructure
 		parameterEncoder = defaultParameterEncoder
 	}
 	result := new(unstructured.Unstructured)
+	resourceName, subresourceName := rc.parseResourceSubresourceName()
 	err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
-		Resource(rc.resource.Name).
+		Resource(resourceName).
+		SubResource(subresourceName...).
 		VersionedParams(&opts, parameterEncoder).
 		Name(name).
 		Do().
@@ -205,11 +220,26 @@ func (rc *ResourceClient) DeleteCollection(deleteOptions *metav1.DeleteOptions, 
 // Create creates the provided resource.
 func (rc *ResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	result := new(unstructured.Unstructured)
-	err := rc.cl.Post().
+	resourceName, subresourceName := rc.parseResourceSubresourceName()
+	req := rc.cl.Post().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
-		Resource(rc.resource.Name).
-		Body(obj).
-		Do().
+		Resource(resourceName).
+		Body(obj)
+	if len(subresourceName) > 0 {
+		// If the provided resource is a subresource, the POST request should contain
+		// object name. Examples of subresources that support Create operation:
+		//	core/v1/pods/{name}/binding
+		//	core/v1/pods/{name}/eviction
+		//	extensions/v1beta1/deployments/{name}/rollback
+		//	apps/v1beta1/deployments/{name}/rollback
+		// NOTE: Currently our system assumes every subresource object has the same
+		//	 name as the parent resource object. E.g. a pods/binding object having
+		//	 metadada.name "foo" means pod "foo" is being bound. We may need to
+		//	 change this if we break the assumption in the future.
+		req = req.SubResource(subresourceName...).
+			Name(obj.GetName())
+	}
+	err := req.Do().
 		Into(result)
 	return result, err
 }
@@ -220,9 +250,15 @@ func (rc *ResourceClient) Update(obj *unstructured.Unstructured) (*unstructured.
 	if len(obj.GetName()) == 0 {
 		return result, errors.New("object missing name")
 	}
+	resourceName, subresourceName := rc.parseResourceSubresourceName()
 	err := rc.cl.Put().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
-		Resource(rc.resource.Name).
+		Resource(resourceName).
+		SubResource(subresourceName...).
+		// NOTE: Currently our system assumes every subresource object has the same
+		//	 name as the parent resource object. E.g. a pods/binding object having
+		//	 metadada.name "foo" means pod "foo" is being bound. We may need to
+		//	 change this if we break the assumption in the future.
 		Name(obj.GetName()).
 		Body(obj).
 		Do().
@@ -244,11 +280,14 @@ func (rc *ResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 		Watch()
 }
 
+// Patch applies the patch and returns the patched resource.
 func (rc *ResourceClient) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
 	result := new(unstructured.Unstructured)
+	resourceName, subresourceName := rc.parseResourceSubresourceName()
 	err := rc.cl.Patch(pt).
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
-		Resource(rc.resource.Name).
+		Resource(resourceName).
+		SubResource(subresourceName...).
 		Name(name).
 		Body(data).
 		Do().

@@ -17,6 +17,7 @@ limitations under the License.
 package ovirt
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -154,7 +155,7 @@ func (v *OVirtCloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // NodeAddresses returns the NodeAddresses of the instance with the specified nodeName.
-func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, error) {
+func (v *OVirtCloud) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]v1.NodeAddress, error) {
 	name := mapNodeNameToInstanceName(nodeName)
 	instance, err := v.fetchInstance(name)
 	if err != nil {
@@ -185,7 +186,7 @@ func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]v1.NodeAddress, e
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
-func (v *OVirtCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (v *OVirtCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, cloudprovider.NotImplemented
 }
 
@@ -196,7 +197,7 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 }
 
 // ExternalID returns the cloud provider ID of the specified node with the specified NodeName (deprecated).
-func (v *OVirtCloud) ExternalID(nodeName types.NodeName) (string, error) {
+func (v *OVirtCloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	name := mapNodeNameToInstanceName(nodeName)
 	instance, err := v.fetchInstance(name)
 	if err != nil {
@@ -207,12 +208,12 @@ func (v *OVirtCloud) ExternalID(nodeName types.NodeName) (string, error) {
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-func (v *OVirtCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (v *OVirtCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, cloudprovider.NotImplemented
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
-func (v *OVirtCloud) InstanceID(nodeName types.NodeName) (string, error) {
+func (v *OVirtCloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	name := mapNodeNameToInstanceName(nodeName)
 	instance, err := v.fetchInstance(name)
 	if err != nil {
@@ -226,12 +227,12 @@ func (v *OVirtCloud) InstanceID(nodeName types.NodeName) (string, error) {
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
-func (v *OVirtCloud) InstanceTypeByProviderID(providerID string) (string, error) {
+func (v *OVirtCloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	return "", cloudprovider.NotImplemented
 }
 
 // InstanceType returns the type of the specified instance.
-func (v *OVirtCloud) InstanceType(name types.NodeName) (string, error) {
+func (v *OVirtCloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	return "", nil
 }
 
@@ -310,10 +311,10 @@ func (m *OVirtInstanceMap) ListSortedNames() []string {
 }
 
 // Implementation of Instances.CurrentNodeName
-func (v *OVirtCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (v *OVirtCloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
-func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
+func (v *OVirtCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return cloudprovider.NotImplemented
 }

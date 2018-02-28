@@ -17,13 +17,13 @@ limitations under the License.
 package azure_dd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -36,8 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type azureDiskDetacher struct {
@@ -64,13 +63,10 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 		return "", err
 	}
 
-	instanceid, err := a.cloud.InstanceID(nodeName)
+	instanceid, err := a.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		glog.Warningf("failed to get azure instance id (%v)", err)
 		return "", fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
-	}
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
 	}
 
 	diskController, err := getDiskController(a.plugin.host)
@@ -180,7 +176,7 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 
 		// did we find it?
 		if newDevicePath != "" {
-			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
+			// the current sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
 			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
 			// the root case on Azure.
 			formatIfNotFormatted(newDevicePath, *volumeSource.FSType, exec)
@@ -252,8 +248,8 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	options := []string{}
 	if notMnt {
-		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
-		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
+		mountOptions := util.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
 			if cleanErr := os.Remove(deviceMountPath); cleanErr != nil {
@@ -271,13 +267,10 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 		return fmt.Errorf("invalid disk to detach: %q", diskURI)
 	}
 
-	instanceid, err := d.cloud.InstanceID(nodeName)
+	instanceid, err := d.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		glog.Warningf("no instance id for node %q, skip detaching (%v)", nodeName, err)
 		return nil
-	}
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
 	}
 
 	glog.V(4).Infof("detach %v from node %q", diskURI, nodeName)
@@ -286,6 +279,10 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 	if err != nil {
 		return err
 	}
+
+	getLunMutex.LockKey(instanceid)
+	defer getLunMutex.UnlockKey(instanceid)
+
 	err = diskController.DetachDiskByName("", diskURI, nodeName)
 	if err != nil {
 		glog.Errorf("failed to detach azure disk %q, err %v", diskURI, err)
@@ -297,7 +294,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
+	err := util.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
 	if err == nil {
 		glog.V(4).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {

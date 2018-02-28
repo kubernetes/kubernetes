@@ -28,9 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 )
 
-// TopOptions contains all the options for running the top cli command.
-type TopOptions struct{}
-
 var (
 	supportedMetricsAPIVersions = []string{
 		"v1beta1",
@@ -54,6 +51,7 @@ func NewCmdTop(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	// create subcommands
 	cmd.AddCommand(NewCmdTopNode(f, nil, out))
 	cmd.AddCommand(NewCmdTopPod(f, nil, out))
+
 	return cmd
 }
 

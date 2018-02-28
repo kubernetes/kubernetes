@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["basicauth_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth",
     deps = [
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",

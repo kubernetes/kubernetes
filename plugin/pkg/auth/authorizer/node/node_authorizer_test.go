@@ -24,7 +24,7 @@ import (
 
 	"os"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -38,6 +38,8 @@ import (
 var (
 	csiEnabledFeature  = utilfeature.NewFeatureGate()
 	csiDisabledFeature = utilfeature.NewFeatureGate()
+	trEnabledFeature   = utilfeature.NewFeatureGate()
+	trDisabledFeature  = utilfeature.NewFeatureGate()
 )
 
 func init() {
@@ -45,6 +47,12 @@ func init() {
 		panic(err)
 	}
 	if err := csiDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSIPersistentVolume: {Default: false}}); err != nil {
+		panic(err)
+	}
+	if err := trEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := trDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -151,6 +159,36 @@ func TestAuthorizer(t *testing.T) {
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
 			features: csiEnabledFeature,
 			expect:   authorizer.DecisionAllow,
+		},
+		{
+			name:     "allowed svcacct token create - feature enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			features: trEnabledFeature,
+			expect:   authorizer.DecisionAllow,
+		},
+		{
+			name:     "disallowed svcacct token create - serviceaccount not attached to node",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node1", Namespace: "ns0"},
+			features: trEnabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "disallowed svcacct token create - feature disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			features: trDisabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "disallowed svcacct token create - no subresource",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
+			features: trEnabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "disallowed svcacct token create - non create",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			features: trEnabledFeature,
+			expect:   authorizer.DecisionNoOpinion,
 		},
 	}
 
@@ -429,7 +467,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1alpha1.VolumeAttachment) {
+func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
@@ -447,10 +485,10 @@ func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attach
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*storagev1alpha1.VolumeAttachment) {
+func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
 	pods := make([]*api.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*api.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
-	attachments := make([]*storagev1alpha1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
+	attachments := make([]*storagev1beta1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 
 	for n := 0; n < opts.nodes; n++ {
 		nodeName := fmt.Sprintf("node%d", n)
@@ -459,6 +497,7 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*stor
 			pod.Namespace = fmt.Sprintf("ns%d", p%opts.namespaces)
 			pod.Name = fmt.Sprintf("pod%d-%s", p, nodeName)
 			pod.Spec.NodeName = nodeName
+			pod.Spec.ServiceAccountName = fmt.Sprintf("svcacct%d-%s", p, nodeName)
 
 			for i := 0; i < opts.uniqueSecretsPerPod; i++ {
 				pod.Spec.Volumes = append(pod.Spec.Volumes, api.Volume{VolumeSource: api.VolumeSource{
@@ -508,7 +547,7 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*stor
 			pods = append(pods, pod)
 		}
 		for a := 0; a < opts.attachmentsPerNode; a++ {
-			attachment := &storagev1alpha1.VolumeAttachment{}
+			attachment := &storagev1beta1.VolumeAttachment{}
 			attachment.Name = fmt.Sprintf("attachment%d-%s", a, nodeName)
 			attachment.Spec.NodeName = nodeName
 			attachments = append(attachments, attachment)

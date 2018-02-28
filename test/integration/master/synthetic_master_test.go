@@ -134,7 +134,7 @@ func TestEmptyList(t *testing.T) {
 
 func initStatusForbiddenMasterCongfig() *master.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return masterConfig
 }
 
@@ -143,8 +143,8 @@ func initUnauthorizedMasterCongfig() *master.Config {
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
-	masterConfig.GenericConfig.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
-	masterConfig.GenericConfig.Authorizer = allowAliceAuthorizer{}
+	masterConfig.GenericConfig.Authentication.Authenticator = group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
+	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
 	return masterConfig
 }
 
@@ -279,7 +279,7 @@ var deploymentExtensions string = `
       "spec": {
         "containers": [{
           "name": "nginx",
-          "image": "gcr.io/google-containers/nginx:1.7.9"
+          "image": "k8s.gcr.io/nginx:1.7.9"
         }]
       }
     }
@@ -306,7 +306,7 @@ var deploymentApps string = `
       "spec": {
         "containers": [{
           "name": "nginx",
-          "image": "gcr.io/google-containers/nginx:1.7.9"
+          "image": "k8s.gcr.io/nginx:1.7.9"
         }]
       }
     }

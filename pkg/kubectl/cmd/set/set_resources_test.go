@@ -37,16 +37,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 func TestResourcesLocal(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -56,25 +57,23 @@ func TestResourcesLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(f, buf, buf)
+	cmd := NewCmdResources(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 
 	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../examples/storage/cassandra/cassandra-controller.yaml"}},
+		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Out:               buf,
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",
 		ContainerSelector: "*"}
 
-	err := opts.Complete(f, cmd, []string{})
+	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -84,13 +83,15 @@ func TestResourcesLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "replicationcontrollers/cassandra") {
+	if !strings.Contains(buf.String(), "replicationcontroller/cassandra") {
 		t.Errorf("did not set resources: %s", buf.String())
 	}
 }
 
 func TestSetMultiResourcesLimitsLocal(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
+	ns := legacyscheme.Codecs
+
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
 		NegotiatedSerializer: ns,
@@ -100,15 +101,13 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(f, buf, buf)
+	cmd := NewCmdResources(tf, buf, buf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
-	mapper, typer := f.Object()
-	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
 
 	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
@@ -118,7 +117,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 		Requests:          "cpu=200m,memory=512Mi",
 		ContainerSelector: "*"}
 
-	err := opts.Complete(f, cmd, []string{})
+	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -128,7 +127,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	expectedOut := "replicationcontroller/first-rc\nreplicationcontroller/second-rc\n"
 	if buf.String() != expectedOut {
 		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
 	}
@@ -446,12 +445,10 @@ func TestSetResourcesRemote(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
-			f, tf, _, ns := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-			mapper, typer := f.Object()
-			tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{testapi.Default.Codec()}, Typer: typer, Mapper: mapper}
+			ns := legacyscheme.Codecs
 			tf.Namespace = "test"
-			tf.CategoryExpander = categories.LegacyCategoryExpander
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         groupVersion,
 				NegotiatedSerializer: ns,
@@ -479,15 +476,14 @@ func TestSetResourcesRemote(t *testing.T) {
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
 			buf := new(bytes.Buffer)
-			cmd := NewCmdResources(f, buf, buf)
+			cmd := NewCmdResources(tf, buf, buf)
 			cmd.SetOutput(buf)
 			cmd.Flags().Set("output", "yaml")
 			opts := ResourcesOptions{
 				Out:               buf,
-				Local:             true,
 				Limits:            "cpu=200m,memory=512Mi",
 				ContainerSelector: "*"}
-			err := opts.Complete(f, cmd, input.args)
+			err := opts.Complete(tf, cmd, input.args)
 			if err == nil {
 				err = opts.Validate()
 			}

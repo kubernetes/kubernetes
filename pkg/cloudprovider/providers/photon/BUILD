@@ -26,7 +26,6 @@ go_test(
     name = "go_default_test",
     srcs = ["photon_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",

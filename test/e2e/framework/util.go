@@ -50,6 +50,7 @@ import (
 	. "github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
+	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -90,6 +92,7 @@ import (
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubectl"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -153,6 +156,21 @@ const (
 
 	// How long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
+
+	// How long claims have to become bound
+	ClaimBindingTimeout = 3 * time.Minute
+
+	// How long claims have to become deleted
+	ClaimDeletingTimeout = 3 * time.Minute
+
+	// How long PVs have to beome reclaimed
+	PVReclaimingTimeout = 3 * time.Minute
+
+	// How long PVs have to become bound
+	PVBindingTimeout = 3 * time.Minute
+
+	// How long PVs have to become deleted
+	PVDeletingTimeout = 3 * time.Minute
 
 	// How long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
@@ -227,12 +245,6 @@ func GetServerArchitecture(c clientset.Interface) string {
 // GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
 func GetPauseImageName(c clientset.Interface) string {
 	return imageutils.GetE2EImageWithArch(imageutils.Pause, GetServerArchitecture(c))
-}
-
-// GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
-// TODO: move this function to the test/utils
-func GetPauseImageNameForHostArch() string {
-	return imageutils.GetE2EImage(imageutils.Pause)
 }
 
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
@@ -324,6 +336,16 @@ func SkipUnlessSSHKeyPresent() {
 func SkipUnlessProviderIs(supportedProviders ...string) {
 	if !ProviderIs(supportedProviders...) {
 		Skipf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
+	}
+}
+
+func SkipUnlessMultizone(c clientset.Interface) {
+	zones, err := GetClusterZones(c)
+	if err != nil {
+		Skipf("Error listing cluster zones")
+	}
+	if zones.Len() <= 1 {
+		Skipf("Requires more than one zone")
 	}
 }
 
@@ -886,6 +908,26 @@ func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.In
 		}
 	}
 	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
+}
+
+// WaitForStatefulSetReplicasReady waits for all replicas of a StatefulSet to become ready or until timeout occurs, whichever comes first.
+func WaitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Interface, Poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for StatefulSet %s to have all replicas ready", timeout, statefulSetName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		sts, err := c.AppsV1().StatefulSets(ns).Get(statefulSetName, metav1.GetOptions{})
+		if err != nil {
+			Logf("Get StatefulSet %s failed, ignoring for %v: %v", statefulSetName, Poll, err)
+			continue
+		} else {
+			if sts.Status.ReadyReplicas == *sts.Spec.Replicas {
+				Logf("All %d replicas of StatefulSet %s are ready. (%v)", sts.Status.ReadyReplicas, statefulSetName, time.Since(start))
+				return nil
+			} else {
+				Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
+			}
+		}
+	}
+	return fmt.Errorf("StatefulSet %s still has unready pods within %v", statefulSetName, timeout)
 }
 
 // WaitForPersistentVolumeDeleted waits for a PersistentVolume to get deleted or until timeout occurs, whichever comes first.
@@ -1551,6 +1593,28 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 	})
 }
 
+// WaitForPodNameUnschedulableInNamespace returns an error if it takes too long for the pod to become Pending
+// and have condition Status equal to Unschedulable,
+// if the pod Get api returns an error (IsNotFound or other), or if the pod failed with an unexpected reason.
+// Typically called to test that the passed-in pod is Pending and Unschedulable.
+func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, namespace string) error {
+	return WaitForPodCondition(c, namespace, podName, "Unschedulable", PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+		// Only consider Failed pods. Successful pods will be deleted and detected in
+		// waitForPodCondition's Get call returning `IsNotFound`
+		if pod.Status.Phase == v1.PodPending {
+			for _, cond := range pod.Status.Conditions {
+				if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" {
+					return true, nil
+				}
+			}
+		}
+		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+			return true, fmt.Errorf("Expected pod %q in namespace %q to be in phase Pending, but got phase: %v", podName, namespace, pod.Status.Phase)
+		}
+		return false, nil
+	})
+}
+
 // WaitForService waits until the service appears (exist == true), or disappears (exist == false)
 func WaitForService(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
@@ -1649,7 +1713,7 @@ func WaitForEndpoint(c clientset.Interface, ns, name string) error {
 }
 
 // Context for checking pods responses by issuing GETs to them (via the API
-// proxy) and verifying that they answer with ther own pod name.
+// proxy) and verifying that they answer with there own pod name.
 type podProxyResponseChecker struct {
 	c              clientset.Interface
 	ns             string
@@ -2159,6 +2223,26 @@ func RunKubectl(args ...string) (string, error) {
 // RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
 func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
+}
+
+// runKubemciWithKubeconfig is a convenience wrapper over runKubemciCmd
+func runKubemciWithKubeconfig(args ...string) (string, error) {
+	if TestContext.KubeConfig != "" {
+		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
+	}
+	return runKubemciCmd(args...)
+}
+
+// runKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
+// It assumes that kubemci exists in PATH.
+func runKubemciCmd(args ...string) (string, error) {
+	// kubemci is assumed to be in PATH.
+	kubemci := "kubemci"
+	b := new(kubectlBuilder)
+	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
+
+	b.cmd = exec.Command(kubemci, args...)
+	return b.Exec()
 }
 
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
@@ -2699,9 +2783,7 @@ func ScaleResource(
 ) error {
 	By(fmt.Sprintf("Scaling %v %s in namespace %s to %d", kind, name, ns, size))
 	scaler := kubectl.ScalerFor(kind, internalClientset.Batch(), scalesGetter, gr)
-	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
-	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
-	if err := scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
+	if err := testutil.ScaleResourceWithRetries(scaler, ns, name, size); err != nil {
 		return fmt.Errorf("error while scaling RC %s to %d replicas: %v", name, size, err)
 	}
 	if !wait {
@@ -3125,10 +3207,10 @@ func WaitForPartialEvents(c clientset.Interface, ns string, objOrRef runtime.Obj
 	})
 }
 
-type updateDSFunc func(*extensions.DaemonSet)
+type updateDSFunc func(*apps.DaemonSet)
 
-func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *extensions.DaemonSet, err error) {
-	daemonsets := c.ExtensionsV1beta1().DaemonSets(namespace)
+func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *apps.DaemonSet, err error) {
+	daemonsets := c.AppsV1().DaemonSets(namespace)
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {
@@ -3936,7 +4018,7 @@ func RestartControllerManager() error {
 }
 
 func WaitForControllerManagerUp() error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.ControllerManagerPort) + "/healthz"
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
@@ -4016,7 +4098,7 @@ func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) e
 			Logf("Cluster has reached the desired number of ready nodes %d", size)
 			return nil
 		}
-		Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numNodes, numNodes-numReady)
+		Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numReady, numNodes-numReady)
 	}
 	return fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
 }
@@ -4138,42 +4220,6 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	cfg.TlsConfig = tlsConfig
 	cfg.Protocol = protocols
 	return websocket.DialConfig(cfg)
-}
-
-// getIngressAddress returns the ips/hostnames associated with the Ingress.
-func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
-	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	addresses := []string{}
-	for _, a := range ing.Status.LoadBalancer.Ingress {
-		if a.IP != "" {
-			addresses = append(addresses, a.IP)
-		}
-		if a.Hostname != "" {
-			addresses = append(addresses, a.Hostname)
-		}
-	}
-	return addresses, nil
-}
-
-// WaitForIngressAddress waits for the Ingress to acquire an address.
-func WaitForIngressAddress(c clientset.Interface, ns, ingName string, timeout time.Duration) (string, error) {
-	var address string
-	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
-		ipOrNameList, err := getIngressAddress(c, ns, ingName)
-		if err != nil || len(ipOrNameList) == 0 {
-			Logf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
-			if IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		address = ipOrNameList[0]
-		return true, nil
-	})
-	return address, err
 }
 
 // Looks for the given string in the log of a specific pod container
@@ -4797,6 +4843,22 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 	return encounteredError
 }
 
+func GetClusterID(c clientset.Interface) (string, error) {
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
+	if err != nil || cm == nil {
+		return "", fmt.Errorf("error getting cluster ID: %v", err)
+	}
+	clusterID, clusterIDExists := cm.Data[gcecloud.UIDCluster]
+	providerID, providerIDExists := cm.Data[gcecloud.UIDProvider]
+	if !clusterIDExists {
+		return "", fmt.Errorf("cluster ID not set")
+	}
+	if providerIDExists {
+		return providerID, nil
+	}
+	return clusterID, nil
+}
+
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
@@ -4947,6 +5009,7 @@ func PollURL(route, host string, timeout time.Duration, interval time.Duration, 
 			Logf("host %v path %v: %v unreachable", host, route, err)
 			return expectUnreachable, nil
 		}
+		Logf("host %v path %v: reached", host, route)
 		return !expectUnreachable, nil
 	})
 	if pollErr != nil {
@@ -5046,8 +5109,9 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 	}
 }
 
+// TODO: Get rid of this duplicate function in favour of the one in test/utils.
 func IsRetryableAPIError(err error) bool {
-	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || apierrs.IsInternalError(err)
+	return apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) || apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err)
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
@@ -5111,4 +5175,36 @@ func waitForServerPreferredNamespacedResources(d discovery.DiscoveryInterface, t
 		return nil, err
 	}
 	return resources, nil
+}
+
+// WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
+func WaitForPersistentVolumeClaimDeleted(c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for PersistentVolumeClaim %s to be removed", timeout, pvcName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		_, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				Logf("Claim %q in namespace %q doesn't exist in the system", pvcName, ns)
+				return nil
+			}
+			Logf("Failed to get claim %q in namespace %q, retrying in %v. Error: %v", pvcName, ns, Poll, err)
+		}
+	}
+	return fmt.Errorf("PersistentVolumeClaim %s is not removed from the system within %v", pvcName, timeout)
+}
+
+func GetClusterZones(c clientset.Interface) (sets.String, error) {
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
+	}
+
+	// collect values of zone label from all nodes
+	zones := sets.NewString()
+	for _, node := range nodes.Items {
+		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
+			zones.Insert(zone)
+		}
+	}
+	return zones, nil
 }

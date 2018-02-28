@@ -13,6 +13,8 @@ aliases:
     - resouer
     - timothysc
     - wojtek-t
+    - aveshagarwal
+    - ravisantoshgudimetla
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -223,3 +225,7 @@ aliases:
     - piosz
     - jsafrane
     - jbeda
+  dep-approvers:
+    - cblecker
+    - thockin
+    - sttts

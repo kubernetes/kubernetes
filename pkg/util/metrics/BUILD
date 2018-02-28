@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
@@ -22,7 +21,6 @@ go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/util/metrics",
     deps = [
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],

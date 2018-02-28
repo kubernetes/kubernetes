@@ -8,7 +8,6 @@ load("//pkg/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kubectl",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubectl",
     pure = "on",
     visibility = ["//visibility:public"],
     x_defs = version_x_defs(),
@@ -24,6 +23,7 @@ go_library(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/logs:go_default_library",
+        "//vendor/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
     ],
 )
 

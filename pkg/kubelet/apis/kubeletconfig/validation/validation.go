@@ -30,74 +30,74 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	allErrors := []error{}
 
 	if !kc.CgroupsPerQOS && len(kc.EnforceNodeAllocatable) > 0 {
-		allErrors = append(allErrors, fmt.Errorf("EnforceNodeAllocatable (--enforce-node-allocatable) is not supported unless CgroupsPerQOS (--cgroups-per-qos) feature is turned on"))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) is not supported unless CgroupsPerQOS (--cgroups-per-qos) feature is turned on"))
 	}
 	if kc.SystemCgroups != "" && kc.CgroupRoot == "" {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: SystemCgroups (--system-cgroups) was specified and CgroupRoot (--cgroup-root) was not specified"))
-	}
-	if kc.CAdvisorPort != 0 && utilvalidation.IsValidPortNum(int(kc.CAdvisorPort)) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: CAdvisorPort (--cadvisor-port) %v must be between 0 and 65535, inclusive", kc.CAdvisorPort))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: SystemCgroups (--system-cgroups) was specified and CgroupRoot (--cgroup-root) was not specified"))
 	}
 	if kc.EventBurst < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: EventBurst (--event-burst) %v must not be a negative number", kc.EventBurst))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EventBurst (--event-burst) %v must not be a negative number", kc.EventBurst))
 	}
 	if kc.EventRecordQPS < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: EventRecordQPS (--event-qps) %v must not be a negative number", kc.EventRecordQPS))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EventRecordQPS (--event-qps) %v must not be a negative number", kc.EventRecordQPS))
 	}
 	if kc.HealthzPort != 0 && utilvalidation.IsValidPortNum(int(kc.HealthzPort)) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: HealthzPort (--healthz-port) %v must be between 1 and 65535, inclusive", kc.HealthzPort))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: HealthzPort (--healthz-port) %v must be between 1 and 65535, inclusive", kc.HealthzPort))
 	}
 	if utilvalidation.IsInRange(int(kc.ImageGCHighThresholdPercent), 0, 100) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: ImageGCHighThresholdPercent (--image-gc-high-threshold) %v must be between 0 and 100, inclusive", kc.ImageGCHighThresholdPercent))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageGCHighThresholdPercent (--image-gc-high-threshold) %v must be between 0 and 100, inclusive", kc.ImageGCHighThresholdPercent))
 	}
 	if utilvalidation.IsInRange(int(kc.ImageGCLowThresholdPercent), 0, 100) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: ImageGCLowThresholdPercent (--image-gc-low-threshold) %v must be between 0 and 100, inclusive", kc.ImageGCLowThresholdPercent))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageGCLowThresholdPercent (--image-gc-low-threshold) %v must be between 0 and 100, inclusive", kc.ImageGCLowThresholdPercent))
 	}
 	if utilvalidation.IsInRange(int(kc.IPTablesDropBit), 0, 31) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: IPTablesDropBit (--iptables-drop-bit) %v must be between 0 and 31, inclusive", kc.IPTablesDropBit))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: IPTablesDropBit (--iptables-drop-bit) %v must be between 0 and 31, inclusive", kc.IPTablesDropBit))
 	}
 	if utilvalidation.IsInRange(int(kc.IPTablesMasqueradeBit), 0, 31) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: IPTablesMasqueradeBit (--iptables-masquerade-bit) %v must be between 0 and 31, inclusive", kc.IPTablesMasqueradeBit))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: IPTablesMasqueradeBit (--iptables-masquerade-bit) %v must be between 0 and 31, inclusive", kc.IPTablesMasqueradeBit))
 	}
 	if kc.KubeAPIBurst < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: KubeAPIBurst (--kube-api-burst) %v must not be a negative number", kc.KubeAPIBurst))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: KubeAPIBurst (--kube-api-burst) %v must not be a negative number", kc.KubeAPIBurst))
 	}
 	if kc.KubeAPIQPS < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: KubeAPIQPS (--kube-api-qps) %v must not be a negative number", kc.KubeAPIQPS))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: KubeAPIQPS (--kube-api-qps) %v must not be a negative number", kc.KubeAPIQPS))
 	}
 	if kc.MaxOpenFiles < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: MaxOpenFiles (--max-open-files) %v must not be a negative number", kc.MaxOpenFiles))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxOpenFiles (--max-open-files) %v must not be a negative number", kc.MaxOpenFiles))
 	}
 	if kc.MaxPods < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: MaxPods (--max-pods) %v must not be a negative number", kc.MaxPods))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxPods (--max-pods) %v must not be a negative number", kc.MaxPods))
 	}
 	if utilvalidation.IsInRange(int(kc.OOMScoreAdj), -1000, 1000) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: OOMScoreAdj (--oom-score-adj) %v must be between -1000 and 1000, inclusive", kc.OOMScoreAdj))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: OOMScoreAdj (--oom-score-adj) %v must be between -1000 and 1000, inclusive", kc.OOMScoreAdj))
 	}
 	if kc.PodsPerCore < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: PodsPerCore (--pods-per-core) %v must not be a negative number", kc.PodsPerCore))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: PodsPerCore (--pods-per-core) %v must not be a negative number", kc.PodsPerCore))
 	}
 	if utilvalidation.IsValidPortNum(int(kc.Port)) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: Port (--port) %v must be between 1 and 65535, inclusive", kc.Port))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Port (--port) %v must be between 1 and 65535, inclusive", kc.Port))
 	}
 	if kc.ReadOnlyPort != 0 && utilvalidation.IsValidPortNum(int(kc.ReadOnlyPort)) != nil {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: ReadOnlyPort (--read-only-port) %v must be between 0 and 65535, inclusive", kc.ReadOnlyPort))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ReadOnlyPort (--read-only-port) %v must be between 0 and 65535, inclusive", kc.ReadOnlyPort))
 	}
 	if kc.RegistryBurst < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: RegistryBurst (--registry-burst) %v must not be a negative number", kc.RegistryBurst))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: RegistryBurst (--registry-burst) %v must not be a negative number", kc.RegistryBurst))
 	}
 	if kc.RegistryPullQPS < 0 {
-		allErrors = append(allErrors, fmt.Errorf("Invalid configuration: RegistryPullQPS (--registry-qps) %v must not be a negative number", kc.RegistryPullQPS))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: RegistryPullQPS (--registry-qps) %v must not be a negative number", kc.RegistryPullQPS))
 	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
 		case kubetypes.SystemReservedEnforcementKey:
 		case kubetypes.KubeReservedEnforcementKey:
-			continue
+		case kubetypes.NodeAllocatableNoneKey:
+			if len(kc.EnforceNodeAllocatable) > 1 {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when '%s' is specified", kubetypes.NodeAllocatableNoneKey))
+			}
 		default:
-			allErrors = append(allErrors, fmt.Errorf("Invalid option %q specified for EnforceNodeAllocatable (--enforce-node-allocatable) setting. Valid options are %q, %q or %q",
-				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for EnforceNodeAllocatable (--enforce-node-allocatable). Valid options are %q, %q, %q, or %q",
+				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey, kubetypes.NodeAllocatableEnforcementKey))
 		}
 	}
 	switch kc.HairpinMode {
@@ -105,7 +105,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	case kubeletconfig.HairpinVeth:
 	case kubeletconfig.PromiscuousBridge:
 	default:
-		allErrors = append(allErrors, fmt.Errorf("Invalid option %q specified for HairpinMode (--hairpin-mode) setting. Valid options are %q, %q or %q",
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for HairpinMode (--hairpin-mode). Valid options are %q, %q or %q",
 			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
 	}
 	return utilerrors.NewAggregate(allErrors)

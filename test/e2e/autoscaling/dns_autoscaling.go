@@ -104,7 +104,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		err := updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams_1)))
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
-			By("Restoring intial dns autoscaling parameters")
+			By("Restoring initial dns autoscaling parameters")
 			Expect(updateDNSScalingConfigMap(c, packDNSScalingConfigMap(previousParams))).NotTo(HaveOccurred())
 
 			By("Wait for number of running and ready kube-dns pods recover")
@@ -164,7 +164,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		err := updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams_1)))
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
-			By("Restoring intial dns autoscaling parameters")
+			By("Restoring initial dns autoscaling parameters")
 			Expect(updateDNSScalingConfigMap(c, packDNSScalingConfigMap(previousParams))).NotTo(HaveOccurred())
 		}()
 		By("Wait for kube-dns scaled to expected number")

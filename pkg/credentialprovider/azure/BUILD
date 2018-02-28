@@ -31,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_credentials_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/credentialprovider/azure",
     deps = [
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/containerregistry:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",

@@ -15,7 +15,6 @@ go_test(
         "handler_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/admission",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "attributes.go",
         "chain.go",
         "config.go",
+        "decorator.go",
         "errors.go",
         "handler.go",
         "interfaces.go",

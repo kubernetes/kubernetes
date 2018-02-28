@@ -114,7 +114,20 @@ func TestMatchPod(t *testing.T) {
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
 			expectMatch:   false,
 		},
-	}
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{NominatedNodeName: "node1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node1"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Status: api.PodStatus{NominatedNodeName: "node1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node2"),
+			expectMatch:   false,
+		}}
 	for _, testCase := range testCases {
 		m := MatchPod(labels.Everything(), testCase.fieldSelector)
 		result, err := m.Matches(testCase.in)

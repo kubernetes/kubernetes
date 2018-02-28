@@ -90,6 +90,7 @@ func TestUpdateCachedPredicateItem(t *testing.T) {
 			test.fit,
 			test.reasons,
 			test.equivalenceHash,
+			true,
 		)
 
 		value, ok := ecache.algorithmCache[test.nodeName].predicatesCache.Get(test.predicateKey)
@@ -201,6 +202,7 @@ func TestPredicateWithECache(t *testing.T) {
 			test.cachedItem.fit,
 			test.cachedItem.reasons,
 			test.equivalenceHashForUpdatePredicate,
+			true,
 		)
 		// if we want to do invalid, invalid the cached item
 		if test.expectedInvalidPredicateKey {
@@ -213,6 +215,7 @@ func TestPredicateWithECache(t *testing.T) {
 			test.nodeName,
 			test.predicateKey,
 			test.equivalenceHashForCalPredicate,
+			true,
 		)
 		// returned invalid should match expectedInvalidPredicateKey or expectedInvalidEquivalenceHash
 		if test.equivalenceHashForUpdatePredicate != test.equivalenceHashForCalPredicate {
@@ -487,19 +490,22 @@ func TestGetHashEquivalencePod(t *testing.T) {
 	for _, test := range tests {
 		for i, podInfo := range test.podInfoList {
 			testPod := podInfo.pod
-			hash, isValid := ecache.getHashEquivalencePod(testPod)
-			if isValid != podInfo.hashIsValid {
+			eclassInfo := ecache.getEquivalenceClassInfo(testPod)
+			if eclassInfo == nil && podInfo.hashIsValid {
 				t.Errorf("Failed: pod %v is expected to have valid hash", testPod)
 			}
-			// NOTE(harry): the first element will be used as target so
-			// this logic can't verify more than two inequivalent pods
-			if i == 0 {
-				targetHash = hash
-				targetPodInfo = podInfo
-			} else {
-				if targetHash != hash {
-					if test.isEquivalent {
-						t.Errorf("Failed: pod: %v is expected to be equivalent to: %v", testPod, targetPodInfo.pod)
+
+			if eclassInfo != nil {
+				// NOTE(harry): the first element will be used as target so
+				// this logic can't verify more than two inequivalent pods
+				if i == 0 {
+					targetHash = eclassInfo.hash
+					targetPodInfo = podInfo
+				} else {
+					if targetHash != eclassInfo.hash {
+						if test.isEquivalent {
+							t.Errorf("Failed: pod: %v is expected to be equivalent to: %v", testPod, targetPodInfo.pod)
+						}
 					}
 				}
 			}
@@ -561,6 +567,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			test.cachedItem.fit,
 			test.cachedItem.reasons,
 			test.equivalenceHashForUpdatePredicate,
+			true,
 		)
 	}
 
@@ -629,6 +636,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			test.cachedItem.fit,
 			test.cachedItem.reasons,
 			test.equivalenceHashForUpdatePredicate,
+			true,
 		)
 	}
 

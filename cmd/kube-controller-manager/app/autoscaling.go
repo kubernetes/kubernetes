@@ -24,13 +24,14 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-	discocache "k8s.io/client-go/discovery/cached" // Saturday Night Fever
+	discocache "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
 func startHPAController(ctx ControllerContext) (bool, error) {
@@ -38,7 +39,7 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 
-	if ctx.Options.HorizontalPodAutoscalerUseRESTClients {
+	if ctx.ComponentConfig.HorizontalPodAutoscalerUseRESTClients {
 		// use the new-style clients if support for custom metrics is enabled
 		return startHPAControllerWithRESTClient(ctx)
 	}
@@ -51,6 +52,7 @@ func startHPAControllerWithRESTClient(ctx ControllerContext) (bool, error) {
 	metricsClient := metrics.NewRESTMetricsClient(
 		resourceclient.NewForConfigOrDie(clientConfig),
 		custom_metrics.NewForConfigOrDie(clientConfig),
+		external_metrics.NewForConfigOrDie(clientConfig),
 	)
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }
@@ -88,7 +90,7 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 	replicaCalc := podautoscaler.NewReplicaCalculator(
 		metricsClient,
 		hpaClient.CoreV1(),
-		ctx.Options.HorizontalPodAutoscalerTolerance,
+		ctx.ComponentConfig.HorizontalPodAutoscalerTolerance,
 	)
 	go podautoscaler.NewHorizontalController(
 		hpaClientGoClient.CoreV1(),
@@ -97,9 +99,9 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		restMapper,
 		replicaCalc,
 		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
-		ctx.Options.HorizontalPodAutoscalerSyncPeriod.Duration,
-		ctx.Options.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration,
-		ctx.Options.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration,
+		ctx.ComponentConfig.HorizontalPodAutoscalerSyncPeriod.Duration,
+		ctx.ComponentConfig.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration,
+		ctx.ComponentConfig.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration,
 	).Run(ctx.Stop)
 	return true, nil
 }

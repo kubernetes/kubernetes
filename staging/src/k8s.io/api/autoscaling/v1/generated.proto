@@ -44,6 +44,49 @@ message CrossVersionObjectReference {
   optional string apiVersion = 3;
 }
 
+// ExternalMetricSource indicates how to scale on a metric not associated with
+// any Kubernetes object (for example length of queue in cloud
+// messaging service, or QPS from loadbalancer running outside of cluster).
+message ExternalMetricSource {
+  // metricName is the name of the metric in question.
+  optional string metricName = 1;
+
+  // metricSelector is used to identify a specific time series
+  // within a given metric.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector metricSelector = 2;
+
+  // targetValue is the target value of the metric (as a quantity).
+  // Mutually exclusive with TargetAverageValue.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity targetValue = 3;
+
+  // targetAverageValue is the target per-pod value of global metric (as a quantity).
+  // Mutually exclusive with TargetValue.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity targetAverageValue = 4;
+}
+
+// ExternalMetricStatus indicates the current value of a global metric
+// not associated with any Kubernetes object.
+message ExternalMetricStatus {
+  // metricName is the name of a metric used for autoscaling in
+  // metric system.
+  optional string metricName = 1;
+
+  // metricSelector is used to identify a specific time series
+  // within a given metric.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector metricSelector = 2;
+
+  // currentValue is the current value of the metric (as a quantity)
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity currentValue = 3;
+
+  // currentAverageValue is the current value of metric averaged over autoscaled pods.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 4;
+}
+
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
   // Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -160,6 +203,14 @@ message MetricSpec {
   // to normal per-pod metrics using the "pods" source.
   // +optional
   optional ResourceMetricSource resource = 4;
+
+  // external refers to a global metric that is not associated
+  // with any Kubernetes object. It allows autoscaling based on information
+  // coming from components running outside of cluster
+  // (for example length of queue in cloud messaging service, or
+  // QPS from loadbalancer running outside of cluster).
+  // +optional
+  optional ExternalMetricSource external = 5;
 }
 
 // MetricStatus describes the last-read state of a single metric.
@@ -186,6 +237,14 @@ message MetricStatus {
   // to normal per-pod metrics using the "pods" source.
   // +optional
   optional ResourceMetricStatus resource = 4;
+
+  // external refers to a global metric that is not associated
+  // with any Kubernetes object. It allows autoscaling based on information
+  // coming from components running outside of cluster
+  // (for example length of queue in cloud messaging service, or
+  // QPS from loadbalancer running outside of cluster).
+  // +optional
+  optional ExternalMetricStatus external = 5;
 }
 
 // ObjectMetricSource indicates how to scale on a metric describing a

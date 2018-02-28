@@ -89,7 +89,7 @@ DisruptionController should create a PodDisruptionBudget,rkouj,0,scheduling
 DisruptionController should update PodDisruptionBudget status,rkouj,0,scheduling
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0,node
 Docker Containers should be able to override the image's default command and arguments,maisem,0,node
-Docker Containers should be able to override the image's default commmand (docker entrypoint),maisem,0,node
+Docker Containers should be able to override the image's default command (docker entrypoint),maisem,0,node
 Docker Containers should use the image defaults if command and args are blank,vishh,0,node
 Downward API should create a pod that prints his name and namespace,nhlfr,0,node
 Downward API should provide container's limits.cpu/memory and requests.cpu/memory as env vars,deads2k,1,node

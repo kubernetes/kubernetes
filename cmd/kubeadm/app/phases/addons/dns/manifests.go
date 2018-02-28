@@ -224,7 +224,11 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   selector:
     matchLabels:
       k8s-app: kube-dns
@@ -239,6 +243,18 @@ spec:
         operator: Exists
       - key: {{ .MasterTaintKey }}
         effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values:
+                  - coredns
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: coredns
         image: coredns/coredns:{{ .Version }}
@@ -259,9 +275,6 @@ spec:
           protocol: UDP
         - containerPort: 53
           name: dns-tcp
-          protocol: TCP
-        - containerPort: 9153
-          name: metrics
           protocol: TCP
         livenessProbe:
           httpGet:
@@ -293,12 +306,13 @@ data:
   Corefile: |
     .:53 {
         errors
-        log
         health
         kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
            pods insecure
+           upstream /etc/resolv.conf
+           fallthrough in-addr.arpa ip6.arpa
         }
-        prometheus
+        prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
     }

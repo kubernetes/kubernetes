@@ -74,6 +74,17 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 					"v1",
 				},
 			}
+		case "/apis":
+			obj = &metav1.APIGroupList{
+				Groups: []metav1.APIGroup{
+					{
+						Name: "extensions",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{GroupVersion: "extensions/v1beta1"},
+						},
+					},
+				},
+			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -95,8 +106,8 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	groupVersions := metav1.ExtractGroupVersions(apiGroupList)
-	if !reflect.DeepEqual(groupVersions, []string{"v1"}) {
-		t.Errorf("expected: %q, got: %q", []string{"v1"}, groupVersions)
+	if !reflect.DeepEqual(groupVersions, []string{"v1", "extensions/v1beta1"}) {
+		t.Errorf("expected: %q, got: %q", []string{"v1", "extensions/v1beta1"}, groupVersions)
 	}
 }
 
@@ -315,9 +326,14 @@ var returnedOpenAPI = openapi_v2.Document{
 	},
 }
 
-func openapiSchemaFakeServer() (*httptest.Server, error) {
+func openapiSchemaDeprecatedFakeServer() (*httptest.Server, error) {
 	var sErr error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// old server returns 403 on new endpoint request
+		if req.URL.Path == "/openapi/v2" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
 			sErr = fmt.Errorf("Unexpected url %v", req.URL)
 		}
@@ -338,8 +354,52 @@ func openapiSchemaFakeServer() (*httptest.Server, error) {
 	return server, sErr
 }
 
+func openapiSchemaFakeServer() (*httptest.Server, error) {
+	var sErr error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/openapi/v2" {
+			sErr = fmt.Errorf("Unexpected url %v", req.URL)
+		}
+		if req.Method != "GET" {
+			sErr = fmt.Errorf("Unexpected method %v", req.Method)
+		}
+		decipherableFormat := req.Header.Get("Accept")
+		if decipherableFormat != "application/com.github.proto-openapi.spec.v2@v1.0+protobuf" {
+			sErr = fmt.Errorf("Unexpected accept mime type %v", decipherableFormat)
+		}
+
+		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
+
+		output, err := proto.Marshal(&returnedOpenAPI)
+		if err != nil {
+			sErr = err
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	return server, sErr
+}
+
 func TestGetOpenAPISchema(t *testing.T) {
 	server, err := openapiSchemaFakeServer()
+	if err != nil {
+		t.Errorf("unexpected error starting fake server: %v", err)
+	}
+	defer server.Close()
+
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	got, err := client.OpenAPISchema()
+	if err != nil {
+		t.Fatalf("unexpected error getting openapi: %v", err)
+	}
+	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGetOpenAPISchemaFallback(t *testing.T) {
+	server, err := openapiSchemaDeprecatedFakeServer()
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}

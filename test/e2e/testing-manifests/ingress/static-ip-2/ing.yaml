@@ -6,6 +6,11 @@ metadata:
   # annotations:
   #  kubernetes.io/ingress.global-static-ip-name: "staticip"
 spec:
-  backend:
-    serviceName: echoheaders-https
-    servicePort: 80
+  rules:
+  - host: ingress.test.com
+    http:
+      paths:
+      - path: /foo
+        backend:
+          serviceName: echoheaders-https
+          servicePort: 80

@@ -24,24 +24,31 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/client-go/dynamic"
+
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/test/integration/testserver"
 )
 
 func TestYAML(t *testing.T) {
-	config, err := testserver.DefaultServerConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartServer(config)
+	stopCh, config, err := testserver.StartDefaultServer()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer close(stopCh)
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientPool := dynamic.NewDynamicClientPool(config)
 
 	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
@@ -232,7 +239,7 @@ values:
 			Param("watch", "true").
 			DoRaw()
 		if !errors.IsNotAcceptable(err) {
-			t.Fatal("expected not acceptable error, got %v (%s)", err, string(result))
+			t.Fatalf("expected not acceptable error, got %v (%s)", err, string(result))
 		}
 		obj, err := decodeYAML(result)
 		if err != nil {
@@ -294,7 +301,7 @@ values:
 			t.Fatal(v, ok, err, string(result))
 		}
 		if obj.GetUID() != uid {
-			t.Fatal("uid changed: %v vs %v", uid, obj.GetUID())
+			t.Fatalf("uid changed: %v vs %v", uid, obj.GetUID())
 		}
 	}
 
@@ -302,7 +309,7 @@ values:
 	{
 		yamlBody := []byte(fmt.Sprintf(`
 values:
-  numVal: 3`, apiVersion, kind, uid, resourceVersion))
+  numVal: 3`))
 		result, err := rest.Patch(types.MergePatchType).
 			SetHeader("Accept", "application/yaml").
 			SetHeader("Content-Type", "application/yaml").
@@ -341,6 +348,179 @@ values:
 			t.Fatalf("unexpected response: %s", string(result))
 		}
 		if v, ok, err := unstructured.NestedString(obj.Object, "status"); v != "Success" || !ok || err != nil {
+			t.Fatal(v, ok, err, string(result))
+		}
+	}
+}
+
+func TestYAMLSubresource(t *testing.T) {
+	// enable alpha feature CustomResourceSubresources
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
+
+	stopCh, config, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientPool := dynamic.NewDynamicClientPool(config)
+
+	noxuDefinition := NewNoxuSubresourcesCRD(apiextensionsv1beta1.ClusterScoped)
+	_, err = testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+
+	uid := types.UID("")
+	resourceVersion := ""
+
+	// Create
+	{
+		yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: mytest
+spec:
+  replicas: 3`, apiVersion, kind))
+
+		result, err := rest.Post().
+			SetHeader("Accept", "application/yaml").
+			SetHeader("Content-Type", "application/yaml").
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+			Body(yamlBody).
+			DoRaw()
+		if err != nil {
+			t.Fatal(err, string(result))
+		}
+		obj, err := decodeYAML(result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if obj.GetName() != "mytest" {
+			t.Fatalf("expected mytest, got %s", obj.GetName())
+		}
+		if obj.GetAPIVersion() != apiVersion {
+			t.Fatalf("expected %s, got %s", apiVersion, obj.GetAPIVersion())
+		}
+		if obj.GetKind() != kind {
+			t.Fatalf("expected %s, got %s", kind, obj.GetKind())
+		}
+		if v, ok, err := unstructured.NestedFloat64(obj.Object, "spec", "replicas"); v != 3 || !ok || err != nil {
+			t.Fatal(v, ok, err, string(result))
+		}
+		uid = obj.GetUID()
+		resourceVersion = obj.GetResourceVersion()
+	}
+
+	// Get at /status
+	{
+		result, err := rest.Get().
+			SetHeader("Accept", "application/yaml").
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest", "status").
+			DoRaw()
+		if err != nil {
+			t.Fatal(err)
+		}
+		obj, err := decodeYAML(result)
+		if err != nil {
+			t.Fatal(err, string(result))
+		}
+		if obj.GetName() != "mytest" {
+			t.Fatalf("expected mytest, got %s", obj.GetName())
+		}
+		if obj.GetAPIVersion() != apiVersion {
+			t.Fatalf("expected %s, got %s", apiVersion, obj.GetAPIVersion())
+		}
+		if obj.GetKind() != kind {
+			t.Fatalf("expected %s, got %s", kind, obj.GetKind())
+		}
+		if v, ok, err := unstructured.NestedFloat64(obj.Object, "spec", "replicas"); v != 3 || !ok || err != nil {
+			t.Fatal(v, ok, err, string(result))
+		}
+	}
+
+	// Update at /status
+	{
+		yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: mytest
+  uid: %s
+  resourceVersion: "%s"
+spec:
+  replicas: 5
+status:
+  replicas: 3`, apiVersion, kind, uid, resourceVersion))
+		result, err := rest.Put().
+			SetHeader("Accept", "application/yaml").
+			SetHeader("Content-Type", "application/yaml").
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest", "status").
+			Body(yamlBody).
+			DoRaw()
+		if err != nil {
+			t.Fatal(err, string(result))
+		}
+		obj, err := decodeYAML(result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if obj.GetName() != "mytest" {
+			t.Fatalf("expected mytest, got %s", obj.GetName())
+		}
+		if obj.GetAPIVersion() != apiVersion {
+			t.Fatalf("expected %s, got %s", apiVersion, obj.GetAPIVersion())
+		}
+		if obj.GetKind() != kind {
+			t.Fatalf("expected %s, got %s", kind, obj.GetKind())
+		}
+		if v, ok, err := unstructured.NestedFloat64(obj.Object, "spec", "replicas"); v != 3 || !ok || err != nil {
+			t.Fatal(v, ok, err, string(result))
+		}
+		if v, ok, err := unstructured.NestedFloat64(obj.Object, "status", "replicas"); v != 3 || !ok || err != nil {
+			t.Fatal(v, ok, err, string(result))
+		}
+		if obj.GetUID() != uid {
+			t.Fatalf("uid changed: %v vs %v", uid, obj.GetUID())
+		}
+	}
+
+	// Get at /scale
+	{
+		result, err := rest.Get().
+			SetHeader("Accept", "application/yaml").
+			AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "mytest", "scale").
+			DoRaw()
+		if err != nil {
+			t.Fatal(err)
+		}
+		obj, err := decodeYAML(result)
+		if err != nil {
+			t.Fatal(err, string(result))
+		}
+		if obj.GetName() != "mytest" {
+			t.Fatalf("expected mytest, got %s", obj.GetName())
+		}
+		if obj.GetAPIVersion() != "autoscaling/v1" {
+			t.Fatalf("expected %s, got %s", apiVersion, obj.GetAPIVersion())
+		}
+		if obj.GetKind() != "Scale" {
+			t.Fatalf("expected %s, got %s", kind, obj.GetKind())
+		}
+		if v, ok, err := unstructured.NestedFloat64(obj.Object, "spec", "replicas"); v != 3 || !ok || err != nil {
+			t.Fatal(v, ok, err, string(result))
+		}
+		if v, ok, err := unstructured.NestedFloat64(obj.Object, "status", "replicas"); v != 3 || !ok || err != nil {
 			t.Fatal(v, ok, err, string(result))
 		}
 	}

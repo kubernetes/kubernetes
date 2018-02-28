@@ -19,35 +19,39 @@ package azure
 import (
 	"fmt"
 	"strings"
+
+	"github.com/Azure/azure-sdk-for-go/arm/storage"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/glog"
 )
 
 type accountWithLocation struct {
 	Name, StorageType, Location string
 }
 
-// getStorageAccounts gets the storage accounts' name, type, location in a resource group
-func (az *Cloud) getStorageAccounts() ([]accountWithLocation, error) {
+// getStorageAccounts gets name, type, location of all storage accounts in a resource group which matches matchingAccountType, matchingLocation
+func (az *Cloud) getStorageAccounts(matchingAccountType, matchingLocation string) ([]accountWithLocation, error) {
 	result, err := az.StorageAccountClient.ListByResourceGroup(az.ResourceGroup)
 	if err != nil {
 		return nil, err
 	}
 	if result.Value == nil {
-		return nil, fmt.Errorf("no storage accounts from resource group %s", az.ResourceGroup)
+		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", az.ResourceGroup)
 	}
 
 	accounts := []accountWithLocation{}
 	for _, acct := range *result.Value {
-		if acct.Name != nil {
-			name := *acct.Name
-			loc := ""
-			if acct.Location != nil {
-				loc = *acct.Location
+		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
+			storageType := string((*acct.Sku).Name)
+			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {
+				continue
 			}
-			storageType := ""
-			if acct.Sku != nil {
-				storageType = string((*acct.Sku).Name)
+
+			location := *acct.Location
+			if matchingLocation != "" && !strings.EqualFold(matchingLocation, location) {
+				continue
 			}
-			accounts = append(accounts, accountWithLocation{Name: name, StorageType: storageType, Location: loc})
+			accounts = append(accounts, accountWithLocation{Name: *acct.Name, StorageType: storageType, Location: location})
 		}
 	}
 
@@ -74,4 +78,53 @@ func (az *Cloud) getStorageAccesskey(account string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no valid keys")
+}
+
+// ensureStorageAccount search storage account, create one storage account(with genAccountNamePrefix) if not found, return accountName, accountKey
+func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAccountNamePrefix string) (string, string, error) {
+	if len(accountName) == 0 {
+		// find a storage account that matches accountType
+		accounts, err := az.getStorageAccounts(accountType, location)
+		if err != nil {
+			return "", "", fmt.Errorf("could not list storage accounts for account type %s: %v", accountType, err)
+		}
+
+		if len(accounts) > 0 {
+			accountName = accounts[0].Name
+			glog.V(4).Infof("found a matching account %s type %s location %s", accounts[0].Name, accounts[0].StorageType, accounts[0].Location)
+		}
+
+		if len(accountName) == 0 {
+			// not found a matching account, now create a new account in current resource group
+			accountName = generateStorageAccountName(genAccountNamePrefix)
+			if location == "" {
+				location = az.Location
+			}
+			if accountType == "" {
+				accountType = defaultStorageAccountType
+			}
+
+			glog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s",
+				accountName, az.ResourceGroup, location, accountType)
+			cp := storage.AccountCreateParameters{
+				Sku:      &storage.Sku{Name: storage.SkuName(accountType)},
+				Tags:     &map[string]*string{"created-by": to.StringPtr("azure")},
+				Location: &location}
+			cancel := make(chan struct{})
+
+			_, errchan := az.StorageAccountClient.Create(az.ResourceGroup, accountName, cp, cancel)
+			err := <-errchan
+			if err != nil {
+				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %s", accountName, err))
+			}
+		}
+	}
+
+	// find the access key with this account
+	accountKey, err := az.getStorageAccesskey(accountName)
+	if err != nil {
+		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
+	}
+
+	return accountName, accountKey, nil
 }

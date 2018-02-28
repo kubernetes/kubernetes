@@ -27,6 +27,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Policy describes a struct for a policy resource used in api.
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Holds the information to configure the fit predicate functions
@@ -47,6 +48,7 @@ type Policy struct {
 	AlwaysCheckAllPredicates bool `json:"alwaysCheckAllPredicates"`
 }
 
+// PredicatePolicy describes a struct of a predicate policy.
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
@@ -56,6 +58,7 @@ type PredicatePolicy struct {
 	Argument *PredicateArgument `json:"argument"`
 }
 
+// PriorityPolicy describes a struct of a priority policy.
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
@@ -122,6 +125,16 @@ type LabelPreference struct {
 	Presence bool `json:"presence"`
 }
 
+// ExtenderManagedResource describes the arguments of extended resources
+// managed by an extender.
+type ExtenderManagedResource struct {
+	// Name is the extended resource name.
+	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
+	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
+	// resource when applying predicates.
+	IgnoredByScheduler bool `json:"ignoredByScheduler,omitempty"`
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -138,8 +151,8 @@ type ExtenderConfig struct {
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
 	BindVerb string
-	// EnableHttps specifies whether https should be used to communicate with the extender
-	EnableHttps bool `json:"enableHttps,omitempty"`
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
 	TLSConfig *restclient.TLSClientConfig `json:"tlsConfig,omitempty"`
 	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
@@ -149,6 +162,16 @@ type ExtenderConfig struct {
 	// so the scheduler should only send minimal information about the eligible nodes
 	// assuming that the extender already cached full details of all nodes in the cluster
 	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	ManagedResources []ExtenderManagedResource `json:"managedResources,omitempty"`
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
@@ -207,6 +230,7 @@ type HostPriority struct {
 	Score int `json:"score"`
 }
 
+// HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
 
 func (h HostPriorityList) Len() int {

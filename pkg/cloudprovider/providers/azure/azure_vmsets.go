@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 
 	"k8s.io/api/core/v1"
@@ -24,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-// VMSet defines functions all vmsets (including scale set and availabitlity
+// VMSet defines functions all vmsets (including scale set and availability
 // set) should be implemented.
 type VMSet interface {
 	// GetInstanceIDByNodeName gets the cloud provider ID by node name.
@@ -48,7 +49,7 @@ type VMSet interface {
 	GetPrimaryVMSetName() string
 	// GetVMSetNames selects all possible availability sets or scale sets
 	// (depending vmType configured) for service load balancer, if the service has
-	// no loadbalancer mode annotaion returns the primary VMSet. If service annotation
+	// no loadbalancer mode annotation returns the primary VMSet. If service annotation
 	// for loadbalancer exists then return the eligible VMSet.
 	GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error)
 	// EnsureHostsInPool ensures the given Node's primary IP configurations are
@@ -56,4 +57,15 @@ type VMSet interface {
 	EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string) error
 	// EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified vmSet.
 	EnsureBackendPoolDeleted(poolID, vmSetName string) error
+
+	// AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI, and lun.
+	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
+	// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
+	DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error
+	// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI.
+	GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error)
+	// GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
+	GetNextDiskLun(nodeName types.NodeName) (int32, error)
+	// DisksAreAttached checks if a list of volumes are attached to the node with the specified NodeName.
+	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
 }

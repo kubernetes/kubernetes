@@ -112,37 +112,11 @@ func isPrettyPrint(req *http.Request) bool {
 		}
 	}
 	userAgent := req.UserAgent()
-	// This covers basic all browers and cli http tools
+	// This covers basic all browsers and cli http tools
 	if strings.HasPrefix(userAgent, "curl") || strings.HasPrefix(userAgent, "Wget") || strings.HasPrefix(userAgent, "Mozilla/5.0") {
 		return true
 	}
 	return false
-}
-
-// negotiate the most appropriate content type given the accept header and a list of
-// alternatives.
-func negotiate(header string, alternatives []string) (goautoneg.Accept, bool) {
-	alternates := make([][]string, 0, len(alternatives))
-	for _, alternate := range alternatives {
-		alternates = append(alternates, strings.SplitN(alternate, "/", 2))
-	}
-	for _, clause := range goautoneg.ParseAccept(header) {
-		for _, alternate := range alternates {
-			if clause.Type == alternate[0] && clause.SubType == alternate[1] {
-				return clause, true
-			}
-			if clause.Type == alternate[0] && clause.SubType == "*" {
-				clause.SubType = alternate[1]
-				return clause, true
-			}
-			if clause.Type == "*" && clause.SubType == "*" {
-				clause.Type = alternate[0]
-				clause.SubType = alternate[1]
-				return clause, true
-			}
-		}
-	}
-	return goautoneg.Accept{}, false
 }
 
 // EndpointRestrictions is an interface that allows content-type negotiation
