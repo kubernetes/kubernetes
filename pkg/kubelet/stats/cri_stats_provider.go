@@ -84,6 +84,10 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
 	}
+	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
+	}
 
 	containers, err := p.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
 	if err != nil {
@@ -162,7 +166,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
-		p.makePodStorageStats(s, &rootFsInfo)
+		p.makePodStorageStats(s, &rootFsInfo, &imageFsInfo)
 		result = append(result, *s)
 	}
 	return result, nil
@@ -253,13 +257,13 @@ func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
 	}
 }
 
-func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.PodStats {
+func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo, imageFsInfo *cadvisorapiv2.FsInfo) *statsapi.PodStats {
 	podUID := types.UID(s.PodRef.UID)
 	if vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID); found {
 		ephemeralStats := make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
 		copy(ephemeralStats, vstats.EphemeralVolumes)
 		s.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
-		s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo)
+		s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, imageFsInfo)
 	}
 	return s
 }

@@ -131,7 +131,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			copy(ephemeralStats, vstats.EphemeralVolumes)
 			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
 		}
-		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo)
+		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, &imageFsInfo)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {
@@ -145,11 +145,17 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	return result, nil
 }
 
-func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo, imageFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	capacity := &rootFsInfo.Capacity
+	available := &rootFsInfo.Available
+	if rootFsInfo.Mountpoint != imageFsInfo.Mountpoint {
+		capacity = addUsage(capacity, &imageFsInfo.Capacity)
+		available = addUsage(available, &imageFsInfo.Available)
+	}
 	result := &statsapi.FsStats{
 		Time:           metav1.NewTime(rootFsInfo.Timestamp),
-		AvailableBytes: &rootFsInfo.Available,
-		CapacityBytes:  &rootFsInfo.Capacity,
+		AvailableBytes: available,
+		CapacityBytes:  capacity,
 		InodesFree:     rootFsInfo.InodesFree,
 		Inodes:         rootFsInfo.Inodes,
 	}
