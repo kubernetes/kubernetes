@@ -76,7 +76,11 @@ func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatu
 		return nil, err
 	}
 
-	return &runtimeapi.ImageStatusResponse{Image: imageStatus}, nil
+	res := runtimeapi.ImageStatusResponse{Image: imageStatus}
+	if r.GetVerbose() {
+		res.Info = imageInspect.Config.Labels
+	}
+	return &res, nil
 }
 
 // PullImage pulls an image with authentication config.
