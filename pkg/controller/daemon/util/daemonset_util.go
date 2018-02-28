@@ -32,6 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
+// LabelHostName is the hostname label of node
+var LabelHostName = "kubernetes.io/hostname"
+
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
 // deprecated annotation. If no annotation is found nil is returned. If the annotation is found and fails to parse
 // nil is returned with an error. If the generation can be parsed from the annotation, a pointer to the parsed int64
@@ -132,4 +135,49 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 		}
 	}
 	return availablePods, unavailablePods
+}
+
+// AppendDaemonSetPodNodeAffinity adds a NodeAffinity term with the given "nodeName" to the "affinity" terms.
+func AppendDaemonSetPodNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
+	nodeSelector := &v1.NodeSelector{
+		NodeSelectorTerms: []v1.NodeSelectorTerm{
+			{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{
+						Key:      LabelHostName,
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{nodename},
+					},
+				},
+			},
+		},
+	}
+
+	if affinity == nil {
+		return &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+			},
+		}
+	}
+
+	if affinity.NodeAffinity == nil {
+		affinity.NodeAffinity = &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: nodeSelector,
+		}
+		return affinity
+	}
+
+	if affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+		return affinity
+	}
+
+	// TODO(k82cn): merge duplicate selector terms.
+	affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+		nodeSelector.NodeSelectorTerms[0],
+	)
+
+	return affinity
 }

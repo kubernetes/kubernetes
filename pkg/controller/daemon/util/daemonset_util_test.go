@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -167,4 +168,137 @@ func TestCreatePodTemplate(t *testing.T) {
 func int64Ptr(i int) *int64 {
 	li := int64(i)
 	return &li
+}
+
+func TestAppendDaemonSetPodNodeAffinity(t *testing.T) {
+	tests := []struct {
+		affinity *v1.Affinity
+		hostname string
+		expected *v1.Affinity
+	}{
+		{
+			affinity: nil,
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      LabelHostName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+						{
+							Preference: v1.NodeSelectorTerm{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      LabelHostName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+						{
+							Preference: v1.NodeSelectorTerm{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      LabelHostName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      LabelHostName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "HostLabel_1",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"label_value_1", "label_value_2"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "HostLabel_1",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"label_value_1", "label_value_2"},
+									},
+								},
+							},
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      LabelHostName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		got := AppendDaemonSetPodNodeAffinity(test.affinity, test.hostname)
+		if !reflect.DeepEqual(test.expected, got) {
+			t.Errorf("Failed to append NodeAffinity, got: %v, expected: %v", got, test.expected)
+		}
+	}
 }
