@@ -21,12 +21,22 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 type FileType int
@@ -495,5 +505,74 @@ func TestClean(t *testing.T) {
 		if out != test.cleaned {
 			t.Errorf("Expected: %s, saw %s", test.cleaned, out)
 		}
+	}
+}
+
+func TestCopyToPod(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	tf.Namespace = "test"
+	ns := legacyscheme.Codecs
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			responsePod := &v1.Pod{}
+			return &http.Response{StatusCode: http.StatusNotFound, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
+		}),
+	}
+
+	tf.ClientConfigVal = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdCp(tf, buf, errBuf)
+
+	srcFile, err := ioutil.TempDir("", "test")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(srcFile)
+
+	tests := map[string]struct {
+		dest        string
+		expectedErr bool
+	}{
+		"copy to directory": {
+			dest:        "/tmp/",
+			expectedErr: false,
+		},
+		"copy to root": {
+			dest:        "/",
+			expectedErr: false,
+		},
+		"copy to empty file name": {
+			dest:        "",
+			expectedErr: true,
+		},
+	}
+
+	for name, test := range tests {
+		src := fileSpec{
+			File: srcFile,
+		}
+		dest := fileSpec{
+			PodNamespace: "pod-ns",
+			PodName:      "pod-name",
+			File:         test.dest,
+		}
+		t.Run(name, func(t *testing.T) {
+			err = copyToPod(tf, cmd, buf, errBuf, src, dest)
+			//If error is NotFound error , it indicates that the
+			//request has been sent correctly.
+			//Treat this as no error.
+			if test.expectedErr && errors.IsNotFound(err) {
+				t.Errorf("expected error but didn't get one")
+			}
+			if !test.expectedErr && !errors.IsNotFound(err) {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
