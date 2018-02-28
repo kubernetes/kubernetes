@@ -777,13 +777,21 @@ func TestServiceCache(t *testing.T) {
 //Test a utility functions as its not easy to unit test nodeSyncLoop directly
 func TestNodeSlicesEqualForLB(t *testing.T) {
 	numNodes := 10
-	nArray := make([]*v1.Node, 10)
-
+	nArray := make([]*v1.Node, numNodes)
+	mArray := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nArray[i] = &v1.Node{}
-		nArray[i].Name = fmt.Sprintf("node1")
+		nArray[i].Name = fmt.Sprintf("node%d", i)
 	}
+	for i := 0; i < numNodes; i++ {
+		mArray[i] = &v1.Node{}
+		mArray[i].Name = fmt.Sprintf("node%d", i+1)
+	}
+
 	if !nodeSlicesEqualForLB(nArray, nArray) {
 		t.Errorf("nodeSlicesEqualForLB() Expected=true Obtained=false")
+	}
+	if nodeSlicesEqualForLB(nArray, mArray) {
+		t.Errorf("nodeSlicesEqualForLB() Expected=false Obtained=true")
 	}
 }

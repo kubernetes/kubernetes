@@ -125,7 +125,8 @@ NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
 # Extra docker options for nodes.
 EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
 
-VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec}"
+VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/home/kubernetes/flexvolume}"
+REMOUNT_VOLUME_PLUGIN_DIR="${REMOUNT_VOLUME_PLUGIN_DIR:-true}"
 
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
