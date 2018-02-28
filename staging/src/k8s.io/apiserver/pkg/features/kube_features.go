@@ -63,6 +63,12 @@ const (
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
 	APIListChunking utilfeature.Feature = "APIListChunking"
+
+	// owner: @anjensan
+	// alpha: v1.11
+	//
+	// Enables bulk API group.
+	BulkAPI utilfeature.Feature = "BulkAPI"
 )
 
 func init() {
@@ -78,4 +84,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	BulkAPI:                 {Default: false, PreRelease: utilfeature.Alpha},
 }
