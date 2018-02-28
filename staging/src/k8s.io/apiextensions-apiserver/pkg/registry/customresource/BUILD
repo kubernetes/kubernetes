@@ -65,10 +65,10 @@ go_test(
     name = "go_default_xtest",
     srcs = ["etcd_test.go"],
     deps = [
+        ":go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

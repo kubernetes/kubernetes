@@ -46,6 +46,7 @@ func (reader *teeReaderCloser) Close() error {
 
 func logRequest(r *request.Request) {
 	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
+	bodySeekable := aws.IsReaderSeekable(r.Body)
 	dumpedBody, err := httputil.DumpRequestOut(r.HTTPRequest, logBody)
 	if err != nil {
 		r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg, r.ClientInfo.ServiceName, r.Operation.Name, err))
@@ -53,6 +54,9 @@ func logRequest(r *request.Request) {
 	}
 
 	if logBody {
+		if !bodySeekable {
+			r.SetReaderBody(aws.ReadSeekCloser(r.HTTPRequest.Body))
+		}
 		// Reset the request body because dumpRequest will re-wrap the r.HTTPRequest's
 		// Body as a NoOpCloser and will not be reset after read by the HTTP
 		// client reader.

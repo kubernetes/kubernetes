@@ -26,12 +26,12 @@ go_test(
     name = "go_default_xtest",
     srcs = ["admission_test.go"],
     deps = [
+        ":go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion/fake:go_default_library",

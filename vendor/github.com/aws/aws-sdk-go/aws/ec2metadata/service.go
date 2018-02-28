@@ -1,5 +1,10 @@
 // Package ec2metadata provides the client for making API calls to the
 // EC2 Metadata service.
+//
+// This package's client can be disabled completely by setting the environment
+// variable "AWS_EC2_METADATA_DISABLED=true". This environment variable set to
+// true instructs the SDK to disable the EC2 Metadata client. The client cannot
+// be used while the environemnt variable is set to true, (case insensitive).
 package ec2metadata
 
 import (
@@ -7,17 +12,21 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
+	"github.com/aws/aws-sdk-go/aws/corehandlers"
 	"github.com/aws/aws-sdk-go/aws/request"
 )
 
 // ServiceName is the name of the service.
 const ServiceName = "ec2metadata"
+const disableServiceEnvVar = "AWS_EC2_METADATA_DISABLED"
 
 // A EC2Metadata is an EC2 Metadata service Client.
 type EC2Metadata struct {
@@ -74,6 +83,21 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	svc.Handlers.UnmarshalError.PushBack(unmarshalError)
 	svc.Handlers.Validate.Clear()
 	svc.Handlers.Validate.PushBack(validateEndpointHandler)
+
+	// Disable the EC2 Metadata service if the environment variable is set.
+	// This shortcirctes the service's functionality to always fail to send
+	// requests.
+	if strings.ToLower(os.Getenv(disableServiceEnvVar)) == "true" {
+		svc.Handlers.Send.SwapNamed(request.NamedHandler{
+			Name: corehandlers.SendHandler.Name,
+			Fn: func(r *request.Request) {
+				r.Error = awserr.New(
+					request.CanceledErrorCode,
+					"EC2 IMDS access disabled via "+disableServiceEnvVar+" env var",
+					nil)
+			},
+		})
+	}
 
 	// Add additional options to the service config
 	for _, option := range opts {

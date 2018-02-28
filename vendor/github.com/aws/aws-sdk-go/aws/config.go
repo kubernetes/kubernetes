@@ -168,7 +168,7 @@ type Config struct {
 	//
 	EC2MetadataDisableTimeoutOverride *bool
 
-	// Instructs the endpiont to be generated for a service client to
+	// Instructs the endpoint to be generated for a service client to
 	// be the dual stack endpoint. The dual stack endpoint will support
 	// both IPv4 and IPv6 addressing.
 	//

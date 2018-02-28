@@ -35,7 +35,7 @@ const opAssumeRole = "AssumeRole"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRole
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRole
 func (c *STS) AssumeRoleRequest(input *AssumeRoleInput) (req *request.Request, output *AssumeRoleOutput) {
 	op := &request.Operation{
 		Name:       opAssumeRole,
@@ -121,7 +121,12 @@ func (c *STS) AssumeRoleRequest(input *AssumeRoleInput) (req *request.Request, o
 // the user to call AssumeRole on the ARN of the role in the other account.
 // If the user is in the same account as the role, then you can either attach
 // a policy to the user (identical to the previous different account user),
-// or you can add the user as a principal directly in the role's trust policy
+// or you can add the user as a principal directly in the role's trust policy.
+// In this case, the trust policy acts as the only resource-based policy in
+// IAM, and users in the same account as the role do not need explicit permission
+// to assume the role. For more information about trust policies and resource-based
+// policies, see IAM Policies (http://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html)
+// in the IAM User Guide.
 //
 // Using MFA with AssumeRole
 //
@@ -168,7 +173,7 @@ func (c *STS) AssumeRoleRequest(input *AssumeRoleInput) (req *request.Request, o
 //   and Deactivating AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 //   in the IAM User Guide.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRole
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRole
 func (c *STS) AssumeRole(input *AssumeRoleInput) (*AssumeRoleOutput, error) {
 	req, out := c.AssumeRoleRequest(input)
 	return out, req.Send()
@@ -215,7 +220,7 @@ const opAssumeRoleWithSAML = "AssumeRoleWithSAML"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithSAML
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithSAML
 func (c *STS) AssumeRoleWithSAMLRequest(input *AssumeRoleWithSAMLInput) (req *request.Request, output *AssumeRoleWithSAMLOutput) {
 	op := &request.Operation{
 		Name:       opAssumeRoleWithSAML,
@@ -341,7 +346,7 @@ func (c *STS) AssumeRoleWithSAMLRequest(input *AssumeRoleWithSAMLInput) (req *re
 //   and Deactivating AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 //   in the IAM User Guide.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithSAML
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithSAML
 func (c *STS) AssumeRoleWithSAML(input *AssumeRoleWithSAMLInput) (*AssumeRoleWithSAMLOutput, error) {
 	req, out := c.AssumeRoleWithSAMLRequest(input)
 	return out, req.Send()
@@ -388,7 +393,7 @@ const opAssumeRoleWithWebIdentity = "AssumeRoleWithWebIdentity"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithWebIdentity
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithWebIdentity
 func (c *STS) AssumeRoleWithWebIdentityRequest(input *AssumeRoleWithWebIdentityInput) (req *request.Request, output *AssumeRoleWithWebIdentityOutput) {
 	op := &request.Operation{
 		Name:       opAssumeRoleWithWebIdentity,
@@ -492,7 +497,7 @@ func (c *STS) AssumeRoleWithWebIdentityRequest(input *AssumeRoleWithWebIdentityI
 //    the information from these providers to get and use temporary security
 //    credentials.
 //
-//    * Web Identity Federation with Mobile Applications (http://aws.amazon.com/articles/4617974389850313).
+//    * Web Identity Federation with Mobile Applications (http://aws.amazon.com/articles/web-identity-federation-with-mobile-applications).
 //    This article discusses web identity federation and shows an example of
 //    how to use web identity federation to get access to content in Amazon
 //    S3.
@@ -543,7 +548,7 @@ func (c *STS) AssumeRoleWithWebIdentityRequest(input *AssumeRoleWithWebIdentityI
 //   and Deactivating AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 //   in the IAM User Guide.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithWebIdentity
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithWebIdentity
 func (c *STS) AssumeRoleWithWebIdentity(input *AssumeRoleWithWebIdentityInput) (*AssumeRoleWithWebIdentityOutput, error) {
 	req, out := c.AssumeRoleWithWebIdentityRequest(input)
 	return out, req.Send()
@@ -590,7 +595,7 @@ const opDecodeAuthorizationMessage = "DecodeAuthorizationMessage"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/DecodeAuthorizationMessage
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/DecodeAuthorizationMessage
 func (c *STS) DecodeAuthorizationMessageRequest(input *DecodeAuthorizationMessageInput) (req *request.Request, output *DecodeAuthorizationMessageOutput) {
 	op := &request.Operation{
 		Name:       opDecodeAuthorizationMessage,
@@ -655,7 +660,7 @@ func (c *STS) DecodeAuthorizationMessageRequest(input *DecodeAuthorizationMessag
 //   invalid. This can happen if the token contains invalid characters, such as
 //   linebreaks.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/DecodeAuthorizationMessage
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/DecodeAuthorizationMessage
 func (c *STS) DecodeAuthorizationMessage(input *DecodeAuthorizationMessageInput) (*DecodeAuthorizationMessageOutput, error) {
 	req, out := c.DecodeAuthorizationMessageRequest(input)
 	return out, req.Send()
@@ -702,7 +707,7 @@ const opGetCallerIdentity = "GetCallerIdentity"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetCallerIdentity
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetCallerIdentity
 func (c *STS) GetCallerIdentityRequest(input *GetCallerIdentityInput) (req *request.Request, output *GetCallerIdentityOutput) {
 	op := &request.Operation{
 		Name:       opGetCallerIdentity,
@@ -730,7 +735,7 @@ func (c *STS) GetCallerIdentityRequest(input *GetCallerIdentityInput) (req *requ
 //
 // See the AWS API reference guide for AWS Security Token Service's
 // API operation GetCallerIdentity for usage and error information.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetCallerIdentity
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetCallerIdentity
 func (c *STS) GetCallerIdentity(input *GetCallerIdentityInput) (*GetCallerIdentityOutput, error) {
 	req, out := c.GetCallerIdentityRequest(input)
 	return out, req.Send()
@@ -777,7 +782,7 @@ const opGetFederationToken = "GetFederationToken"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetFederationToken
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetFederationToken
 func (c *STS) GetFederationTokenRequest(input *GetFederationTokenInput) (req *request.Request, output *GetFederationTokenOutput) {
 	op := &request.Operation{
 		Name:       opGetFederationToken,
@@ -899,7 +904,7 @@ func (c *STS) GetFederationTokenRequest(input *GetFederationTokenInput) (req *re
 //   and Deactivating AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 //   in the IAM User Guide.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetFederationToken
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetFederationToken
 func (c *STS) GetFederationToken(input *GetFederationTokenInput) (*GetFederationTokenOutput, error) {
 	req, out := c.GetFederationTokenRequest(input)
 	return out, req.Send()
@@ -946,7 +951,7 @@ const opGetSessionToken = "GetSessionToken"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetSessionToken
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetSessionToken
 func (c *STS) GetSessionTokenRequest(input *GetSessionTokenInput) (req *request.Request, output *GetSessionTokenOutput) {
 	op := &request.Operation{
 		Name:       opGetSessionToken,
@@ -1027,7 +1032,7 @@ func (c *STS) GetSessionTokenRequest(input *GetSessionTokenInput) (req *request.
 //   and Deactivating AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 //   in the IAM User Guide.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetSessionToken
+// See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetSessionToken
 func (c *STS) GetSessionToken(input *GetSessionTokenInput) (*GetSessionTokenOutput, error) {
 	req, out := c.GetSessionTokenRequest(input)
 	return out, req.Send()
@@ -1049,7 +1054,6 @@ func (c *STS) GetSessionTokenWithContext(ctx aws.Context, input *GetSessionToken
 	return out, req.Send()
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleRequest
 type AssumeRoleInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1241,7 +1245,6 @@ func (s *AssumeRoleInput) SetTokenCode(v string) *AssumeRoleInput {
 
 // Contains the response to a successful AssumeRole request, including temporary
 // AWS credentials that can be used to make AWS requests.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleResponse
 type AssumeRoleOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1295,7 +1298,6 @@ func (s *AssumeRoleOutput) SetPackedPolicySize(v int64) *AssumeRoleOutput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithSAMLRequest
 type AssumeRoleWithSAMLInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1436,7 +1438,6 @@ func (s *AssumeRoleWithSAMLInput) SetSAMLAssertion(v string) *AssumeRoleWithSAML
 
 // Contains the response to a successful AssumeRoleWithSAML request, including
 // temporary AWS credentials that can be used to make AWS requests.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithSAMLResponse
 type AssumeRoleWithSAMLOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1548,7 +1549,6 @@ func (s *AssumeRoleWithSAMLOutput) SetSubjectType(v string) *AssumeRoleWithSAMLO
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithWebIdentityRequest
 type AssumeRoleWithWebIdentityInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1711,7 +1711,6 @@ func (s *AssumeRoleWithWebIdentityInput) SetWebIdentityToken(v string) *AssumeRo
 
 // Contains the response to a successful AssumeRoleWithWebIdentity request,
 // including temporary AWS credentials that can be used to make AWS requests.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRoleWithWebIdentityResponse
 type AssumeRoleWithWebIdentityOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1804,7 +1803,6 @@ func (s *AssumeRoleWithWebIdentityOutput) SetSubjectFromWebIdentityToken(v strin
 
 // The identifiers for the temporary security credentials that the operation
 // returns.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumedRoleUser
 type AssumedRoleUser struct {
 	_ struct{} `type:"structure"`
 
@@ -1847,7 +1845,6 @@ func (s *AssumedRoleUser) SetAssumedRoleId(v string) *AssumedRoleUser {
 }
 
 // AWS credentials for API authentication.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/Credentials
 type Credentials struct {
 	_ struct{} `type:"structure"`
 
@@ -1906,7 +1903,6 @@ func (s *Credentials) SetSessionToken(v string) *Credentials {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/DecodeAuthorizationMessageRequest
 type DecodeAuthorizationMessageInput struct {
 	_ struct{} `type:"structure"`
 
@@ -1951,7 +1947,6 @@ func (s *DecodeAuthorizationMessageInput) SetEncodedMessage(v string) *DecodeAut
 // A document that contains additional information about the authorization status
 // of a request from an encoded message that is returned in response to an AWS
 // request.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/DecodeAuthorizationMessageResponse
 type DecodeAuthorizationMessageOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -1976,7 +1971,6 @@ func (s *DecodeAuthorizationMessageOutput) SetDecodedMessage(v string) *DecodeAu
 }
 
 // Identifiers for the federated user that is associated with the credentials.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/FederatedUser
 type FederatedUser struct {
 	_ struct{} `type:"structure"`
 
@@ -2017,7 +2011,6 @@ func (s *FederatedUser) SetFederatedUserId(v string) *FederatedUser {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetCallerIdentityRequest
 type GetCallerIdentityInput struct {
 	_ struct{} `type:"structure"`
 }
@@ -2034,7 +2027,6 @@ func (s GetCallerIdentityInput) GoString() string {
 
 // Contains the response to a successful GetCallerIdentity request, including
 // information about the entity making the request.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetCallerIdentityResponse
 type GetCallerIdentityOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -2080,7 +2072,6 @@ func (s *GetCallerIdentityOutput) SetUserId(v string) *GetCallerIdentityOutput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetFederationTokenRequest
 type GetFederationTokenInput struct {
 	_ struct{} `type:"structure"`
 
@@ -2189,7 +2180,6 @@ func (s *GetFederationTokenInput) SetPolicy(v string) *GetFederationTokenInput {
 
 // Contains the response to a successful GetFederationToken request, including
 // temporary AWS credentials that can be used to make AWS requests.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetFederationTokenResponse
 type GetFederationTokenOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -2242,7 +2232,6 @@ func (s *GetFederationTokenOutput) SetPackedPolicySize(v int64) *GetFederationTo
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetSessionTokenRequest
 type GetSessionTokenInput struct {
 	_ struct{} `type:"structure"`
 
@@ -2327,7 +2316,6 @@ func (s *GetSessionTokenInput) SetTokenCode(v string) *GetSessionTokenInput {
 
 // Contains the response to a successful GetSessionToken request, including
 // temporary AWS credentials that can be used to make AWS requests.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/GetSessionTokenResponse
 type GetSessionTokenOutput struct {
 	_ struct{} `type:"structure"`
 

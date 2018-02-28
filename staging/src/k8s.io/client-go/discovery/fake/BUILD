@@ -38,8 +38,8 @@ go_test(
     name = "go_default_xtest",
     srcs = ["discovery_test.go"],
     deps = [
+        ":go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//vendor/k8s.io/client-go/discovery/fake:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )
