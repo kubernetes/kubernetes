@@ -162,9 +162,9 @@ var _ = SIGDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 
 	/*
-		    Testname: pods-prestop-handler-invoked
-		    Description: Makes sure a pod's preStop handler is successfully
-			invoked immediately before a container is terminated.
+		Release : v1.9
+		Testname: Pods, prestop hook
+		Description: Create a server pod with a rest endpoint '/write' that changes state.Received field. Create a Pod with a pre-stop handle that posts to the /write endpoint on the server Pod. Verify that the Pod with pre-stop hook is running. Delete the Pod with the pre-stop hook. Before the Pod is deleted, pre-stop handler MUST be called when configured. Verify that the Pod is deleted and a call to prestop hook is verified by checking the status received on the server Pod.
 	*/
 	framework.ConformanceIt("should call prestop when killing a pod ", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
