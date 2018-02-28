@@ -175,17 +175,8 @@ CONTROLLER_MANAGER_TEST_LOG_LEVEL="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-$TEST_CL
 SCHEDULER_TEST_LOG_LEVEL="${SCHEDULER_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 KUBEPROXY_TEST_LOG_LEVEL="${KUBEPROXY_TEST_LOG_LEVEL:-$TEST_CLUSTER_LOG_LEVEL}"
 
-VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/etc/srv/kubernetes/kubelet-plugins/volume/exec}"
-
-# TODO: change this and flex e2e test when default flex volume install path is changed for GCI
-# Set flex dir to one that's readable from controller-manager container and writable by the flex e2e test.
-if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
-    CONTROLLER_MANAGER_TEST_VOLUME_PLUGIN_DIR="--flex-volume-plugin-dir=/etc/srv/kubernetes/kubelet-plugins/volume/exec"
-fi
-# Set flex dir to one that's readable from kubelet and writable by the flex e2e test.
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || ([[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] && [[ "${REGISTER_MASTER_KUBELET}" == "false" ]]); then
-    KUBELET_TEST_VOLUME_PLUGIN_DIR="--volume-plugin-dir=/etc/srv/kubernetes/kubelet-plugins/volume/exec"
-fi
+VOLUME_PLUGIN_DIR="${VOLUME_PLUGIN_DIR:-/home/kubernetes/flexvolume}"
+REMOUNT_VOLUME_PLUGIN_DIR="${REMOUNT_VOLUME_PLUGIN_DIR:-true}"
 
 TEST_CLUSTER_DELETE_COLLECTION_WORKERS="${TEST_CLUSTER_DELETE_COLLECTION_WORKERS:---delete-collection-workers=1}"
 TEST_CLUSTER_MAX_REQUESTS_INFLIGHT="${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT:-}"
@@ -194,7 +185,7 @@ TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m
 # ContentType used by all components to communicate with apiserver.
 TEST_CLUSTER_API_CONTENT_TYPE="${TEST_CLUSTER_API_CONTENT_TYPE:-}"
 
-KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --max-pods=110 --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE} ${KUBELET_TEST_VOLUME_PLUGIN_DIR:-}"
+KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --max-pods=110 --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE}"
 if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
   NODE_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
 fi
@@ -202,7 +193,7 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || [[ "${MASTER_OS_DISTRIBUTION}" 
   MASTER_KUBELET_TEST_ARGS=" --experimental-kernel-memcg-notification=true"
 fi
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
-CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE} ${CONTROLLER_MANAGER_TEST_VOLUME_PLUGIN_DIR:-}"
+CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 
