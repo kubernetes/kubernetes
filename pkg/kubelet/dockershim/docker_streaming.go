@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -27,7 +28,6 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"

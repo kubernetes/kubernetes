@@ -40,7 +40,6 @@ go_library(
         "//vendor/github.com/docker/docker/pkg/stdcopy:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],

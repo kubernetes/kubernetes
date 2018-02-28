@@ -17,9 +17,8 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
-
-	"golang.org/x/net/context"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )

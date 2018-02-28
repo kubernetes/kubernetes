@@ -20,7 +20,6 @@ go_library(
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],

@@ -17,10 +17,10 @@ limitations under the License.
 package rkt
 
 import (
+	"context"
 	"fmt"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"golang.org/x/net/context"
 )
 
 // Config stores the global configuration for the rkt runtime.

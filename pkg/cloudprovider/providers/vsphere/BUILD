@@ -23,7 +23,6 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -39,7 +38,6 @@ go_test(
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
     ],

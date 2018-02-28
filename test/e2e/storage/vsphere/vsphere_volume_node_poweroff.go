@@ -17,15 +17,15 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"golang.org/x/net/context"
-
 	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
+
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,7 +111,8 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
 		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
-		ctx, _ := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		_, err = vm.PowerOff(ctx)
 		Expect(err).NotTo(HaveOccurred())
 		defer vm.PowerOn(ctx)

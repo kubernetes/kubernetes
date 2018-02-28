@@ -17,12 +17,12 @@ limitations under the License.
 package etcd3
 
 import (
+	"context"
 	"testing"
 
 	"github.com/coreos/etcd/clientv3"
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/coreos/etcd/integration"
-	"golang.org/x/net/context"
 )
 
 func TestCompact(t *testing.T) {

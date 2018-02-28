@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"net"
 	"strings"
 	"testing"
@@ -30,8 +31,6 @@ import (
 	allocatorstore "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-
-	"golang.org/x/net/context"
 )
 
 func newStorage(t *testing.T) (*etcdtesting.EtcdTestServer, ipallocator.Interface, allocator.Interface, storage.Interface, factory.DestroyFunc) {

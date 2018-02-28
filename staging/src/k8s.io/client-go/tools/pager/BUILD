@@ -11,7 +11,6 @@ go_library(
     srcs = ["pager.go"],
     importpath = "k8s.io/client-go/tools/pager",
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
@@ -39,7 +38,6 @@ go_test(
     srcs = ["pager_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -37,7 +37,6 @@ go_library(
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/types:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

@@ -17,9 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -17,10 +17,10 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	grpctx "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
@@ -60,7 +60,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
 		err := client.NodePublishVolume(
-			grpctx.Background(),
+			context.Background(),
 			tc.volID,
 			false,
 			"",
@@ -97,7 +97,7 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
-		err := client.NodeUnpublishVolume(grpctx.Background(), tc.volID, tc.targetPath)
+		err := client.NodeUnpublishVolume(context.Background(), tc.volID, tc.targetPath)
 		if tc.mustFail && err == nil {
 			t.Error("test must fail, but err is nil")
 		}
@@ -127,7 +127,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 		t.Logf("Running test case: %s", tc.name)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
 		err := client.NodeStageVolume(
-			grpctx.Background(),
+			context.Background(),
 			tc.volID,
 			map[string]string{"device": "/dev/null"},
 			tc.stagingTargetPath,
@@ -163,7 +163,7 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		t.Logf("Running test case: %s", tc.name)
 		client.nodeClient.(*fake.NodeClient).SetNextError(tc.err)
 		err := client.NodeUnstageVolume(
-			grpctx.Background(),
+			context.Background(),
 			tc.volID, tc.stagingTargetPath,
 		)
 		if tc.mustFail && err == nil {

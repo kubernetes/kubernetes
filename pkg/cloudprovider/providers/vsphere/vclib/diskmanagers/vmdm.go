@@ -17,6 +17,7 @@ limitations under the License.
 package diskmanagers
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 )
 

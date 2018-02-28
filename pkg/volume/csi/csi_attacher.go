@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -27,7 +28,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	grpctx "golang.org/x/net/context"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"k8s.io/api/core/v1"
@@ -284,7 +284,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	csi := c.csiClient
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
@@ -475,7 +475,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 	csi := c.csiClient
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := hasStageUnstageCapability(ctx, csi)
@@ -502,7 +502,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func hasStageUnstageCapability(ctx grpctx.Context, csi csiClient) (bool, error) {
+func hasStageUnstageCapability(ctx context.Context, csi csiClient) (bool, error) {
 	capabilities, err := csi.NodeGetCapabilities(ctx)
 	if err != nil {
 		return false, err

@@ -17,9 +17,9 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"path"
 
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
