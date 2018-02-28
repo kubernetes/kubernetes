@@ -48,7 +48,6 @@ attach() {
 
 detach() {
 	debug "detach $@"
-	# TODO issue 44737 detach is passed PV name, not mount device
 	log "{\"status\":\"Success\"}"
 	exit 0
 }

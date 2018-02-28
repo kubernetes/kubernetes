@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dummy-attachable
+  namespace: default
+spec:
+  containers:
+  - name: nginx-dummy-attachable
+    image: nginx
+    volumeMounts:
+    - name: dummy-attachable
+      mountPath: /data
+    ports:
+    - containerPort: 80
+  volumes:
+  - name: dummy-attachable
+    flexVolume:
+      driver: "k8s/dummy-attachable"
