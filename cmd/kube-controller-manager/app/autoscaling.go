@@ -39,7 +39,7 @@ func startHPAController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 
-	if ctx.ComponentConfig.HorizontalPodAutoscalerUseRESTClients {
+	if ctx.ComponentConfig.HPAControllerConfig.HorizontalPodAutoscalerUseRESTClients {
 		// use the new-style clients if support for custom metrics is enabled
 		return startHPAControllerWithRESTClient(ctx)
 	}
@@ -90,7 +90,7 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 	replicaCalc := podautoscaler.NewReplicaCalculator(
 		metricsClient,
 		hpaClient.CoreV1(),
-		ctx.ComponentConfig.HorizontalPodAutoscalerTolerance,
+		ctx.ComponentConfig.HPAControllerConfig.HorizontalPodAutoscalerTolerance,
 	)
 	go podautoscaler.NewHorizontalController(
 		hpaClientGoClient.CoreV1(),
@@ -99,9 +99,9 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		restMapper,
 		replicaCalc,
 		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
-		ctx.ComponentConfig.HorizontalPodAutoscalerSyncPeriod.Duration,
-		ctx.ComponentConfig.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration,
-		ctx.ComponentConfig.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration,
+		ctx.ComponentConfig.HPAControllerConfig.HorizontalPodAutoscalerSyncPeriod.Duration,
+		ctx.ComponentConfig.HPAControllerConfig.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration,
+		ctx.ComponentConfig.HPAControllerConfig.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration,
 	).Run(ctx.Stop)
 	return true, nil
 }

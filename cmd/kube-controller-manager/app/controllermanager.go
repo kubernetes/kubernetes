@@ -43,7 +43,6 @@ import (
 	genericcontrollerconfig "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -106,7 +105,7 @@ controller, and serviceaccounts controller.`,
 func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
-		return time.Duration(float64(c.Generic.ComponentConfig.MinResyncPeriod.Nanoseconds()) * factor)
+		return time.Duration(float64(c.Generic.ComponentConfig.GenericConfig.MinResyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
@@ -139,8 +138,8 @@ func Run(c *config.CompletedConfig) error {
 			ClientConfig: c.Generic.Kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if c.Generic.ComponentConfig.UseServiceAccountCredentials {
-			if len(c.Generic.ComponentConfig.ServiceAccountKeyFile) == 0 {
+		if c.Generic.ComponentConfig.GenericConfig.UseServiceAccountCredentials {
+			if len(c.Generic.ComponentConfig.GenericConfig.ServiceAccountKeyFile) == 0 {
 				// It'c possible another controller process is creating the tokens for us.
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
 				glog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
@@ -170,7 +169,7 @@ func Run(c *config.CompletedConfig) error {
 		select {}
 	}
 
-	if !c.Generic.ComponentConfig.LeaderElection.LeaderElect {
+	if !c.Generic.ComponentConfig.GenericConfig.LeaderElection.LeaderElect {
 		run(wait.NeverStop)
 		panic("unreachable")
 	}
@@ -182,7 +181,7 @@ func Run(c *config.CompletedConfig) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
-	rl, err := resourcelock.New(c.Generic.ComponentConfig.LeaderElection.ResourceLock,
+	rl, err := resourcelock.New(c.Generic.ComponentConfig.GenericConfig.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
 		c.Generic.LeaderElectionClient.CoreV1(),
@@ -196,9 +195,9 @@ func Run(c *config.CompletedConfig) error {
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: c.Generic.ComponentConfig.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.Generic.ComponentConfig.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.Generic.ComponentConfig.LeaderElection.RetryPeriod.Duration,
+		LeaseDuration: c.Generic.ComponentConfig.GenericConfig.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.Generic.ComponentConfig.GenericConfig.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.Generic.ComponentConfig.GenericConfig.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -216,8 +215,8 @@ type ControllerContext struct {
 	// InformerFactory gives access to informers for the controller.
 	InformerFactory informers.SharedInformerFactory
 
-	// Options provides access to init options for a given controller
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	// ComponentConfigInfo provides access to init options for a given controller
+	ComponentConfig genericcontrollerconfig.ComponentConfigInfo
 
 	// AvailableResources is a map listing currently available resources
 	AvailableResources map[schema.GroupVersionResource]bool
@@ -390,8 +389,8 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		return ControllerContext{}, err
 	}
 
-	cloud, loopMode, err := createCloudProvider(s.Generic.ComponentConfig.CloudProvider, s.Generic.ComponentConfig.ExternalCloudVolumePlugin,
-		s.Generic.ComponentConfig.CloudConfigFile, s.Generic.ComponentConfig.AllowUntaggedCloud, sharedInformers)
+	cloud, loopMode, err := createCloudProvider(s.Generic.ComponentConfig.GenericConfig.CloudProvider, s.Generic.ComponentConfig.ExternalCloudVolumePlugin,
+		s.Generic.ComponentConfig.GenericConfig.CloudConfigFile, s.Generic.ComponentConfig.GenericConfig.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
 		return ControllerContext{}, err
 	}
@@ -429,7 +428,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			continue
 		}
 
-		time.Sleep(wait.Jitter(ctx.ComponentConfig.ControllerStartInterval.Duration, ControllerStartJitter))
+		time.Sleep(wait.Jitter(ctx.ComponentConfig.GenericConfig.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		glog.V(1).Infof("Starting %q", controllerName)
 		started, err := initFn(ctx)
@@ -460,11 +459,11 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		return false, nil
 	}
 
-	if len(ctx.ComponentConfig.ServiceAccountKeyFile) == 0 {
+	if len(ctx.ComponentConfig.GenericConfig.ServiceAccountKeyFile) == 0 {
 		glog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
 		return false, nil
 	}
-	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.ServiceAccountKeyFile)
+	privateKey, err := certutil.PrivateKeyFromFile(ctx.ComponentConfig.GenericConfig.ServiceAccountKeyFile)
 	if err != nil {
 		return true, fmt.Errorf("error reading key for service account token controller: %v", err)
 	}
@@ -494,7 +493,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	if err != nil {
 		return true, fmt.Errorf("error creating Tokens controller: %v", err)
 	}
-	go controller.Run(int(ctx.ComponentConfig.ConcurrentSATokenSyncs), ctx.Stop)
+	go controller.Run(int(ctx.ComponentConfig.ConcurrentResourcesSyncsConfig.ConcurrentSATokenSyncs), ctx.Stop)
 
 	// start the first set of informers now so that other controllers can start
 	ctx.InformerFactory.Start(ctx.Stop)

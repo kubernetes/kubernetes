@@ -86,13 +86,13 @@ the cloud specific control loops shipped with Kubernetes.`,
 func resyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
-		return time.Duration(float64(c.Generic.ComponentConfig.MinResyncPeriod.Nanoseconds()) * factor)
+		return time.Duration(float64(c.Generic.ComponentConfig.GenericConfig.MinResyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(c *cloudcontrollerconfig.CompletedConfig) error {
-	cloud, err := cloudprovider.InitCloudProvider(c.Generic.ComponentConfig.CloudProvider, c.Generic.ComponentConfig.CloudConfigFile)
+	cloud, err := cloudprovider.InitCloudProvider(c.Generic.ComponentConfig.GenericConfig.CloudProvider, c.Generic.ComponentConfig.GenericConfig.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
@@ -101,7 +101,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	}
 
 	if cloud.HasClusterID() == false {
-		if c.Generic.ComponentConfig.AllowUntaggedCloud == true {
+		if c.Generic.ComponentConfig.GenericConfig.AllowUntaggedCloud == true {
 			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
 			glog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
@@ -133,7 +133,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 			ClientConfig: c.Generic.Kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if c.Generic.ComponentConfig.UseServiceAccountCredentials {
+		if c.Generic.ComponentConfig.GenericConfig.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(c.Generic.Kubeconfig),
 				CoreClient:           c.Generic.Client.CoreV1(),
@@ -149,7 +149,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 		}
 	}
 
-	if !c.Generic.ComponentConfig.LeaderElection.LeaderElect {
+	if !c.Generic.ComponentConfig.GenericConfig.LeaderElection.LeaderElect {
 		run(nil)
 		panic("unreachable")
 	}
@@ -163,7 +163,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	id = id + "_" + string(uuid.NewUUID())
 
 	// Lock required for leader election
-	rl, err := resourcelock.New(c.Generic.ComponentConfig.LeaderElection.ResourceLock,
+	rl, err := resourcelock.New(c.Generic.ComponentConfig.GenericConfig.LeaderElection.ResourceLock,
 		"kube-system",
 		"cloud-controller-manager",
 		c.Generic.LeaderElectionClient.CoreV1(),
@@ -178,9 +178,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 	// Try and become the leader and start cloud controller manager loops
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: c.Generic.ComponentConfig.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.Generic.ComponentConfig.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.Generic.ComponentConfig.LeaderElection.RetryPeriod.Duration,
+		LeaseDuration: c.Generic.ComponentConfig.GenericConfig.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.Generic.ComponentConfig.GenericConfig.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.Generic.ComponentConfig.GenericConfig.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
@@ -210,17 +210,17 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *rest
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		sharedInformers.Core().V1().Nodes(),
 		client("cloud-node-controller"), cloud,
-		c.Generic.ComponentConfig.NodeMonitorPeriod.Duration,
+		c.Generic.ComponentConfig.GenericConfig.NodeMonitorPeriod.Duration,
 		c.Extra.NodeStatusUpdateFrequency)
 
 	nodeController.Run()
-	time.Sleep(wait.Jitter(c.Generic.ComponentConfig.ControllerStartInterval.Duration, ControllerStartJitter))
+	time.Sleep(wait.Jitter(c.Generic.ComponentConfig.GenericConfig.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the PersistentVolumeLabelController
 	pvlController := cloudcontrollers.NewPersistentVolumeLabelController(client("pvl-controller"), cloud)
 	threads := 5
 	go pvlController.Run(threads, stop)
-	time.Sleep(wait.Jitter(c.Generic.ComponentConfig.ControllerStartInterval.Duration, ControllerStartJitter))
+	time.Sleep(wait.Jitter(c.Generic.ComponentConfig.GenericConfig.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
@@ -228,34 +228,34 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *rest
 		client("service-controller"),
 		sharedInformers.Core().V1().Services(),
 		sharedInformers.Core().V1().Nodes(),
-		c.Generic.ComponentConfig.ClusterName,
+		c.Generic.ComponentConfig.GenericConfig.ClusterName,
 	)
 	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	} else {
-		go serviceController.Run(stop, int(c.Generic.ComponentConfig.ConcurrentServiceSyncs))
-		time.Sleep(wait.Jitter(c.Generic.ComponentConfig.ControllerStartInterval.Duration, ControllerStartJitter))
+		go serviceController.Run(stop, int(c.Generic.ComponentConfig.GenericConfig.ConcurrentServiceSyncs))
+		time.Sleep(wait.Jitter(c.Generic.ComponentConfig.GenericConfig.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 
 	// If CIDRs should be allocated for pods and set on the CloudProvider, then start the route controller
-	if c.Generic.ComponentConfig.AllocateNodeCIDRs && c.Generic.ComponentConfig.ConfigureCloudRoutes {
+	if c.Generic.ComponentConfig.GenericConfig.AllocateNodeCIDRs && c.Generic.ComponentConfig.GenericConfig.ConfigureCloudRoutes {
 		if routes, ok := cloud.Routes(); !ok {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
 			var clusterCIDR *net.IPNet
-			if len(strings.TrimSpace(c.Generic.ComponentConfig.ClusterCIDR)) != 0 {
-				_, clusterCIDR, err = net.ParseCIDR(c.Generic.ComponentConfig.ClusterCIDR)
+			if len(strings.TrimSpace(c.Generic.ComponentConfig.GenericConfig.ClusterCIDR)) != 0 {
+				_, clusterCIDR, err = net.ParseCIDR(c.Generic.ComponentConfig.GenericConfig.ClusterCIDR)
 				if err != nil {
-					glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", c.Generic.ComponentConfig.ClusterCIDR, err)
+					glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", c.Generic.ComponentConfig.GenericConfig.ClusterCIDR, err)
 				}
 			}
 
-			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), c.Generic.ComponentConfig.ClusterName, clusterCIDR)
-			go routeController.Run(stop, c.Generic.ComponentConfig.RouteReconciliationPeriod.Duration)
-			time.Sleep(wait.Jitter(c.Generic.ComponentConfig.ControllerStartInterval.Duration, ControllerStartJitter))
+			routeController := routecontroller.New(routes, client("route-controller"), sharedInformers.Core().V1().Nodes(), c.Generic.ComponentConfig.GenericConfig.ClusterName, clusterCIDR)
+			go routeController.Run(stop, c.Generic.ComponentConfig.GenericConfig.RouteReconciliationPeriod.Duration)
+			time.Sleep(wait.Jitter(c.Generic.ComponentConfig.GenericConfig.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
-		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", c.Generic.ComponentConfig.AllocateNodeCIDRs, c.Generic.ComponentConfig.ConfigureCloudRoutes)
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", c.Generic.ComponentConfig.GenericConfig.AllocateNodeCIDRs, c.Generic.ComponentConfig.GenericConfig.ConfigureCloudRoutes)
 	}
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly

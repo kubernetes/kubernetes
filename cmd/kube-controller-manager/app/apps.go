@@ -42,7 +42,7 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating DaemonSets controller: %v", err)
 	}
-	go dsc.Run(int(ctx.ComponentConfig.ConcurrentDaemonSetSyncs), ctx.Stop)
+	go dsc.Run(int(ctx.ComponentConfig.ConcurrentResourcesSyncsConfig.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }
 

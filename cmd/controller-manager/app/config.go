@@ -17,26 +17,157 @@ limitations under the License.
 package app
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserver "k8s.io/apiserver/pkg/server"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	kubeconfig "k8s.io/kubernetes/pkg/kubeapiserver/config"
 )
+
+//GenericConfigInfo is the main context object for the controller manager.
+type GenericConfigInfo struct {
+	Port            int32
+	Address         string
+	CloudConfigFile string
+	CloudProvider   string
+
+	UseServiceAccountCredentials bool
+	MinResyncPeriod              metav1.Duration
+	ControllerStartInterval      metav1.Duration
+	LeaderElection               componentconfig.LeaderElectionConfiguration
+
+	ConcurrentServiceSyncs    int32
+	ServiceAccountKeyFile     string
+	AllowUntaggedCloud        bool
+	RouteReconciliationPeriod metav1.Duration
+	NodeMonitorPeriod         metav1.Duration
+	ClusterName               string
+	ClusterCIDR               string
+	AllocateNodeCIDRs         bool
+	CIDRAllocatorType         string
+	ConfigureCloudRoutes      bool
+	ContentType               string
+	KubeAPIQPS                float32
+	KubeAPIBurst              int32
+}
+
+//PersistentVolumeBinderControllerConfigInfo is the main context object for the controller manager.
+type PersistentVolumeBinderControllerConfigInfo struct {
+	PVClaimBinderSyncPeriod metav1.Duration
+	VolumeConfiguration     componentconfig.VolumeConfiguration
+}
+
+//HPAControllerConfigInfo is the main context object for the controller manager.
+type HPAControllerConfigInfo struct {
+	HorizontalPodAutoscalerUseRESTClients           bool
+	HorizontalPodAutoscalerTolerance                float64
+	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
+	HorizontalPodAutoscalerUpscaleForbiddenWindow   metav1.Duration
+	HorizontalPodAutoscalerSyncPeriod               metav1.Duration
+}
+
+//NamespaceControllerConfigInfo is the main context object for the controller manager.
+type NamespaceControllerConfigInfo struct {
+	NamespaceSyncPeriod metav1.Duration
+}
+
+//NodeLifecycleControllerConfigInfo is the main context object for the controller manager.
+type NodeLifecycleControllerConfigInfo struct {
+	EnableTaintManager        bool
+	NodeEvictionRate          float32
+	SecondaryNodeEvictionRate float32
+	NodeStartupGracePeriod    metav1.Duration
+	NodeMonitorGracePeriod    metav1.Duration
+	PodEvictionTimeout        metav1.Duration
+	LargeClusterSizeThreshold int32
+	UnhealthyZoneThreshold    float32
+}
+
+//CSRSigningControllerConfigInfo is the main context object for the controller manager.
+type CSRSigningControllerConfigInfo struct {
+	ClusterSigningDuration metav1.Duration
+	ClusterSigningKeyFile  string
+	ClusterSigningCertFile string
+}
+
+//AttachDetachControllerConfigInfo is the main context object for the controller manager.
+type AttachDetachControllerConfigInfo struct {
+	ReconcilerSyncLoopPeriod          metav1.Duration
+	DisableAttachDetachReconcilerSync bool
+}
+
+//PodGCControllerConfigInfo is the main context object for the controller manager.
+type PodGCControllerConfigInfo struct {
+	TerminatedPodGCThreshold int32
+}
+
+//ResourceQuotaControllerConfigInfo is the main context object for the controller manager.
+type ResourceQuotaControllerConfigInfo struct {
+	ResourceQuotaSyncPeriod metav1.Duration
+}
+
+//GarbageCollectorControllerConfigInfo is the main context object for the controller manager.
+type GarbageCollectorControllerConfigInfo struct {
+	ConcurrentGCSyncs      int32
+	GCIgnoredResources     []componentconfig.GroupResource
+	EnableGarbageCollector bool
+}
+
+//ConcurrentResourcesSyncsConfigInfo is the main context object for the controller manager.
+type ConcurrentResourcesSyncsConfigInfo struct {
+	ConcurrentJobSyncs           int32
+	ConcurrentDaemonSetSyncs     int32
+	ConcurrentEndpointSyncs      int32
+	ConcurrentRCSyncs            int32
+	ConcurrentRSSyncs            int32
+	ConcurrentDeploymentSyncs    int32
+	ConcurrentSATokenSyncs       int32
+	ConcurrentNamespaceSyncs     int32
+	ConcurrentResourceQuotaSyncs int32
+}
+
+// ComponentConfigInfo is the main context object for the controller manager.
+type ComponentConfigInfo struct {
+	GenericConfig                          GenericConfigInfo
+	PersistentVolumeBinderControllerConfig PersistentVolumeBinderControllerConfigInfo
+	HPAControllerConfig                    HPAControllerConfigInfo
+	NamespaceControllerConfig              NamespaceControllerConfigInfo
+	NodeLifecycleControllerConfig          NodeLifecycleControllerConfigInfo
+	CSRSigningControllerConfig             CSRSigningControllerConfigInfo
+	AttachDetachControllerConfig           AttachDetachControllerConfigInfo
+	PodGCControllerConfig                  PodGCControllerConfigInfo
+	ResourceQuotaControllerConfig          ResourceQuotaControllerConfigInfo
+	GarbageCollectorControllerConfig       GarbageCollectorControllerConfigInfo
+	ConcurrentResourcesSyncsConfig         ConcurrentResourcesSyncsConfigInfo
+	CloudProviderConfig                    kubeconfig.CloudProviderInfo
+
+	// external config parameters
+	Controllers                    []string
+	ExternalCloudVolumePlugin      string
+	NodeSyncPeriod                 metav1.Duration
+	DeploymentControllerSyncPeriod metav1.Duration
+	DeletingPodsQPS                float32
+	DeletingPodsBurst              int32
+	RegisterRetryCount             int32
+	ServiceCIDR                    string
+	NodeCIDRMaskSize               int32
+	RootCAFile                     string
+
+	EnableProfiling           bool
+	EnableContentionProfiling bool
+}
 
 // Config is the main context object for the controller manager.
 type Config struct {
-	// TODO: split up the component config. This is not generic.
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	ComponentConfig ComponentConfigInfo
 
 	SecureServing *apiserver.SecureServingInfo
 	// TODO: remove deprecated insecure serving
 	InsecureServing *InsecureServingInfo
 	Authentication  apiserver.AuthenticationInfo
 	Authorization   apiserver.AuthorizationInfo
-
-	CloudProvider *kubeoptions.CloudProviderOptions
 
 	// the general kube client
 	Client *clientset.Clientset
@@ -49,9 +180,6 @@ type Config struct {
 
 	// the event sink
 	EventRecorder record.EventRecorder
-
-	EnableProfiling           bool
-	EnableContentionProfiling bool
 }
 
 type completedConfig struct {

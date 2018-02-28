@@ -41,7 +41,7 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(ctx.ComponentConfig.ConcurrentDeploymentSyncs), ctx.Stop)
+	go dc.Run(int(ctx.ComponentConfig.ConcurrentResourcesSyncsConfig.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -54,6 +54,6 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-	).Run(int(ctx.ComponentConfig.ConcurrentRSSyncs), ctx.Stop)
+	).Run(int(ctx.ComponentConfig.ConcurrentResourcesSyncsConfig.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }

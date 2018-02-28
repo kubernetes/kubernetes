@@ -18,7 +18,8 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
+	kubeconfig "k8s.io/kubernetes/pkg/kubeapiserver/config"
 )
 
 type CloudProviderOptions struct {
@@ -43,12 +44,12 @@ func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 		"The path to the cloud provider configuration file. Empty string for no configuration file.")
 }
 
-func (s *CloudProviderOptions) ApplyTo(c **CloudProviderOptions, cfg *componentconfig.KubeControllerManagerConfiguration) error {
+func (s *CloudProviderOptions) ApplyTo(c *kubeconfig.CloudProviderInfo, cfg *genericcontrollermanager.GenericConfigInfo) error {
 	if s == nil {
 		return nil
 	}
 
-	*c = &CloudProviderOptions{
+	c = &kubeconfig.CloudProviderInfo{
 		CloudProvider:   s.CloudProvider,
 		CloudConfigFile: s.CloudConfigFile,
 	}

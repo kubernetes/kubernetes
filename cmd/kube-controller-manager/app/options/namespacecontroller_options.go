@@ -18,41 +18,38 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 )
 
-// DebuggingOptions is part of context object for the controller manager.
-type DebuggingOptions struct {
-	EnableProfiling           bool
-	EnableContentionProfiling bool
+// NamespaceControllerOptions is part of context object for the controller manager.
+type NamespaceControllerOptions struct {
+	NamespaceSyncPeriod metav1.Duration
 }
 
 // AddFlags adds flags related to debugging for controller manager to the specified FlagSet
-func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
+func (o *NamespaceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
 
-	fs.BoolVar(&o.EnableProfiling, "profiling", o.EnableProfiling,
-		"Enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", o.EnableContentionProfiling,
-		"Enable lock contention profiling, if profiling is enabled")
+	fs.DurationVar(&o.NamespaceSyncPeriod.Duration, "namespace-sync-period", o.NamespaceSyncPeriod.Duration, "The period for syncing namespace life-cycle updates")
+
 }
 
 // ApplyTo fills up parts of controller manager config with options.
-func (o *DebuggingOptions) ApplyTo(c *genericcontrollermanager.Config) error {
+func (o *NamespaceControllerOptions) ApplyTo(c *genericcontrollermanager.Config) error {
 	if o == nil {
 		return nil
 	}
 
-	c.ComponentConfig.EnableProfiling = o.EnableProfiling
-	c.ComponentConfig.EnableContentionProfiling = o.EnableContentionProfiling
+	c.ComponentConfig.NamespaceControllerConfig.NamespaceSyncPeriod = o.NamespaceSyncPeriod
 
 	return nil
 }
 
-// Validate checks validation of DebuggingOptions
-func (o *DebuggingOptions) Validate() []error {
+// Validate checks validation of HPAControllerOptions.
+func (o *NamespaceControllerOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
