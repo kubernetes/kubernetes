@@ -1273,6 +1273,34 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			},
 			expectedElements: []string{"Driver", "VolumeHandle", "ReadOnly", "VolumeAttributes"},
 		},
+		// Tests for mount options.
+		{
+			name:   "test18",
+			plugin: "hostpath-with-mount-options",
+			pv: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{Type: new(corev1.HostPathType)},
+					},
+					MountOptions: []string{"test", "mount", "options"},
+				},
+			},
+			expectedElements: []string{"MountOptions:", "test, mount, options"},
+		},
+		{
+			name:   "test19",
+			plugin: "hostpath-without-mount-options",
+			pv: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{Type: new(corev1.HostPathType)},
+					},
+				},
+			},
+			expectedElements: []string{"MountOptions:", "<none>"},
+		},
 	}
 
 	for _, test := range testCases {

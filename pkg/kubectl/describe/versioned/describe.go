@@ -1327,6 +1327,11 @@ func describePersistentVolume(pv *corev1.PersistentVolume, events *corev1.EventL
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", storageutil.GetAccessModesAsString(pv.Spec.AccessModes))
+		if len(pv.Spec.MountOptions) == 0 {
+			w.Write(LEVEL_0, "MountOptions:\t<none>\n")
+		} else {
+			w.Write(LEVEL_0, "MountOptions:\t%s\n", strings.Join(pv.Spec.MountOptions, ", "))
+		}
 		if pv.Spec.VolumeMode != nil {
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
 		}
