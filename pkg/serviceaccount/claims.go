@@ -17,8 +17,11 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
+	"github.com/golang/glog"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core"
 
@@ -75,4 +78,109 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 		}
 	}
 	return sc, pc
+}
+
+func NewValidator(audiences []string, getter ServiceAccountTokenGetter) Validator {
+	return &validator{
+		auds:   audiences,
+		getter: getter,
+	}
+}
+
+type validator struct {
+	auds   []string
+	getter ServiceAccountTokenGetter
+}
+
+var _ = Validator(&validator{})
+
+func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{}) (string, string, string, error) {
+	private, ok := privateObj.(*privateClaims)
+	if !ok {
+		glog.Errorf("jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
+		return "", "", "", errors.New("Token could not be validated.")
+	}
+	err := public.Validate(jwt.Expected{
+		Time: now(),
+	})
+	switch {
+	case err == nil:
+	case err == jwt.ErrExpired:
+		return "", "", "", errors.New("Token has expired.")
+	default:
+		glog.Errorf("unexpected validation error: %T", err)
+		return "", "", "", errors.New("Token could not be validated.")
+	}
+
+	var audValid bool
+
+	for _, aud := range v.auds {
+		audValid = public.Audience.Contains(aud)
+		if audValid {
+			break
+		}
+	}
+
+	if !audValid {
+		return "", "", "", errors.New("Token is invalid for this audience.")
+	}
+
+	namespace := private.Kubernetes.Namespace
+	saref := private.Kubernetes.Svcacct
+	podref := private.Kubernetes.Pod
+	secref := private.Kubernetes.Secret
+	// Make sure service account still exists (name and UID)
+	serviceAccount, err := v.getter.GetServiceAccount(namespace, saref.Name)
+	if err != nil {
+		glog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, saref.Name, err)
+		return "", "", "", err
+	}
+	if serviceAccount.DeletionTimestamp != nil {
+		glog.V(4).Infof("Service account has been deleted %s/%s", namespace, saref.Name)
+		return "", "", "", fmt.Errorf("ServiceAccount %s/%s has been deleted", namespace, saref.Name)
+	}
+	if string(serviceAccount.UID) != saref.UID {
+		glog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, saref.Name, string(serviceAccount.UID), saref.UID)
+		return "", "", "", fmt.Errorf("ServiceAccount UID (%s) does not match claim (%s)", serviceAccount.UID, saref.UID)
+	}
+
+	if secref != nil {
+		// Make sure token hasn't been invalidated by deletion of the secret
+		secret, err := v.getter.GetSecret(namespace, secref.Name)
+		if err != nil {
+			glog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, secref.Name, namespace, saref.Name, err)
+			return "", "", "", errors.New("Token has been invalidated")
+		}
+		if secret.DeletionTimestamp != nil {
+			glog.V(4).Infof("Bound secret is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secref.Name, namespace, saref.Name)
+			return "", "", "", errors.New("Token has been invalidated")
+		}
+		if string(secref.UID) != secref.UID {
+			glog.V(4).Infof("Secret UID no longer matches %s/%s: %q != %q", namespace, secref.Name, string(serviceAccount.UID), secref.UID)
+			return "", "", "", fmt.Errorf("Secret UID (%s) does not match claim (%s)", secret.UID, secref.UID)
+		}
+	}
+
+	if podref != nil {
+		// Make sure token hasn't been invalidated by deletion of the pod
+		pod, err := v.getter.GetPod(namespace, podref.Name)
+		if err != nil {
+			glog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
+			return "", "", "", errors.New("Token has been invalidated")
+		}
+		if pod.DeletionTimestamp != nil {
+			glog.V(4).Infof("Bound pod is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, podref.Name, namespace, saref.Name)
+			return "", "", "", errors.New("Token has been invalidated")
+		}
+		if string(podref.UID) != podref.UID {
+			glog.V(4).Infof("Pod UID no longer matches %s/%s: %q != %q", namespace, podref.Name, string(serviceAccount.UID), podref.UID)
+			return "", "", "", fmt.Errorf("Pod UID (%s) does not match claim (%s)", pod.UID, podref.UID)
+		}
+	}
+
+	return private.Kubernetes.Namespace, private.Kubernetes.Svcacct.Name, private.Kubernetes.Svcacct.UID, nil
+}
+
+func (v *validator) NewPrivateClaims() interface{} {
+	return &privateClaims{}
 }

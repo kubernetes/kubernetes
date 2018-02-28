@@ -31,6 +31,7 @@ go_test(
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
+        "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/master:go_default_library",
