@@ -333,6 +333,10 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 }
 
 func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
+	if pod == nil {
+		return nil
+	}
+
 	expectedVolumes := getExpectedVolumes(pod)
 	if len(expectedVolumes) == 0 {
 		// No volumes to verify
@@ -423,9 +427,6 @@ func filterUnmountedVolumes(mountedVolumes sets.String, expectedVolumes []string
 // consider the volume setup step for this pod satisfied.
 func getExpectedVolumes(pod *v1.Pod) []string {
 	expectedVolumes := []string{}
-	if pod == nil {
-		return expectedVolumes
-	}
 
 	for _, podVolume := range pod.Spec.Volumes {
 		expectedVolumes = append(expectedVolumes, podVolume.Name)
