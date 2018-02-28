@@ -372,7 +372,6 @@ var _ = SIGDescribe("kubelet", func() {
 			var (
 				nfsServerPod *v1.Pod
 				nfsIP        string
-				NFSconfig    framework.VolumeTestConfig
 				pod          *v1.Pod // client pod
 			)
 
@@ -390,7 +389,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			BeforeEach(func() {
 				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				NFSconfig, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+				_, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 
 			AfterEach(func() {

@@ -45,9 +45,7 @@ func TestNewWithDelegate(t *testing.T) {
 		t.Fatal("unable to create fake client set")
 	}
 
-	delegateHealthzCalled := false
 	delegateConfig.HealthzChecks = append(delegateConfig.HealthzChecks, healthz.NamedCheck("delegate-health", func(r *http.Request) error {
-		delegateHealthzCalled = true
 		return fmt.Errorf("delegate failed healthcheck")
 	}))
 
@@ -74,9 +72,7 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingConfig.LoopbackClientConfig = &rest.Config{}
 	wrappingConfig.SwaggerConfig = DefaultSwaggerConfig()
 
-	wrappingHealthzCalled := false
 	wrappingConfig.HealthzChecks = append(wrappingConfig.HealthzChecks, healthz.NamedCheck("wrapping-health", func(r *http.Request) error {
-		wrappingHealthzCalled = true
 		return fmt.Errorf("wrapping failed healthcheck")
 	}))
 

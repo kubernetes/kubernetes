@@ -27,6 +27,7 @@ import (
 	// util.go uses api.Codecs.LegacyCodec so import this package to do some
 	// resource initialization.
 	"hash/fnv"
+
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -547,12 +548,12 @@ func createVolumeSpecWithMountOption(name string, mountOptions string, spec v1.P
 	return &volume.Spec{PersistentVolume: pv}
 }
 
-func checkFnv32(t *testing.T, s string, expected int) {
+func checkFnv32(t *testing.T, s string, expected uint32) {
 	h := fnv.New32()
 	h.Write([]byte(s))
 	h.Sum32()
 
-	if int(h.Sum32()) != expected {
+	if h.Sum32() != expected {
 		t.Fatalf("hash of %q was %v, expected %v", s, h.Sum32(), expected)
 	}
 }

@@ -202,7 +202,7 @@ func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.Ku
 }
 
 func runCPUManagerTests(f *framework.Framework) {
-	var cpuCap, cpuAlloc, cpuRes int64
+	var cpuCap, cpuAlloc int64
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
@@ -213,7 +213,7 @@ func runCPUManagerTests(f *framework.Framework) {
 	var pod, pod1, pod2 *v1.Pod
 
 	It("should assign CPUs as expected based on the Pod spec", func() {
-		cpuCap, cpuAlloc, cpuRes = getLocalNodeCPUDetails(f)
+		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 
 		// Skip CPU Manager tests altogether if the CPU capacity < 2.
 		if cpuCap < 2 {
