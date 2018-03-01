@@ -107,7 +107,7 @@ type Config struct {
 	Ecache     *core.EquivalenceCache
 	NodeLister algorithm.NodeLister
 	Algorithm  algorithm.ScheduleAlgorithm
-	Binder     Binder
+	GetBinder  func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -403,7 +403,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	bindingStart := time.Now()
 	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 	// it's atomic with setting host.
-	err := sched.config.Binder.Bind(b)
+	err := sched.config.GetBinder(assumed).Bind(b)
 	if err := sched.config.SchedulerCache.FinishBinding(assumed); err != nil {
 		glog.Errorf("scheduler cache FinishBinding failed: %v", err)
 	}

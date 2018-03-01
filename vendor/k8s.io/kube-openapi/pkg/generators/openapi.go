@@ -634,6 +634,8 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 		return fmt.Errorf("please add type %v to getOpenAPITypeFormat function", elemType)
 	case types.Struct:
 		g.generateReferenceProperty(elemType)
+	case types.Slice, types.Array:
+		g.generateSliceProperty(elemType)
 	default:
 		return fmt.Errorf("slice Element kind %v is not supported in %v", elemType.Kind, t)
 	}

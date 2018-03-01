@@ -278,7 +278,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 	if err != nil {
 		return fmt.Errorf("failed to tail %d lines of log file %q: %v", opts.tail, path, err)
 	}
-	if _, err := f.Seek(start, os.SEEK_SET); err != nil {
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
 		return fmt.Errorf("failed to seek %d in log file %q: %v", start, path, err)
 	}
 
@@ -303,7 +303,7 @@ func ReadLogs(path, containerID string, opts *LogOptions, runtimeService interna
 			if opts.follow {
 				// Reset seek so that if this is an incomplete line,
 				// it will be read again.
-				if _, err := f.Seek(-int64(len(l)), os.SEEK_CUR); err != nil {
+				if _, err := f.Seek(-int64(len(l)), io.SeekCurrent); err != nil {
 					return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
 				}
 				if watcher == nil {

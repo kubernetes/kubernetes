@@ -46,6 +46,10 @@ message Empty {
 
 // DevicePlugin is the service advertised by Device Plugins
 service DevicePlugin {
+	// GetDevicePluginOptions returns options to be communicated with Device
+        // Manager
+	rpc GetDevicePluginOptions(Empty) returns (DevicePluginOptions) {}
+
 	// ListAndWatch returns a stream of List of Devices
 	// Whenever a Device state change or a Device disapears, ListAndWatch
 	// returns the new list
@@ -102,6 +106,10 @@ message PreStartContainerResponse {
 // - Allocate allows Device Plugin to run device specific operations on
 //   the Devices requested
 message AllocateRequest {
+	repeated ContainerAllocateRequest container_requests = 1;
+}
+
+message ContainerAllocateRequest {
 	repeated string devicesIDs = 1;
 }
 
@@ -114,6 +122,10 @@ message AllocateRequest {
 // The Device plugin should send a ListAndWatch update and fail the
 // Allocation request
 message AllocateResponse {
+	repeated ContainerAllocateResponse container_responses = 1;
+}
+
+message ContainerAllocateResponse {
   	// List of environment variable to be set in the container to access one of more devices.
 	map<string, string> envs = 1;
 	// Mounts for the container.

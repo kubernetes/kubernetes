@@ -31,7 +31,7 @@ import (
 
 func TestCreatePriorityClass(t *testing.T) {
 	pcName := "my-pc"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -44,16 +44,16 @@ func TestCreatePriorityClass(t *testing.T) {
 			}, nil
 		}),
 	}
-	tf.ClientConfig = &restclient.Config{}
+	tf.ClientConfigVal = &restclient.Config{}
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreatePriorityClass(f, buf)
+	cmd := NewCmdCreatePriorityClass(tf, buf)
 	cmd.Flags().Set("value", "1000")
 	cmd.Flags().Set("global-default", "true")
 	cmd.Flags().Set("description", "my priority")
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
-	CreatePriorityClass(f, buf, cmd, []string{pcName})
+	CreatePriorityClass(tf, buf, cmd, []string{pcName})
 	expectedOutput := "priorityclass.scheduling.k8s.io/" + pcName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())

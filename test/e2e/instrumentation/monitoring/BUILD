@@ -15,6 +15,7 @@ go_library(
         "influxdb.go",
         "metrics_grabber.go",
         "stackdriver.go",
+        "stackdriver_metadata_agent.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/instrumentation/monitoring",
     deps = [
@@ -40,7 +41,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
     ],
 )

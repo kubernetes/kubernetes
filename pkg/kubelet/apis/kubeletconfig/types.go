@@ -44,9 +44,9 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
-	// podManifestPath is the path to the directory containing pod manifests to
-	// run, or the path to a single manifest file
-	PodManifestPath string
+	// staticPodPath is the path to the directory containing local (static) pods to
+	// run, or the path to a single static pod file.
+	StaticPodPath string
 	// syncFrequency is the max period between synchronizing running
 	// containers and config
 	SyncFrequency metav1.Duration
@@ -55,10 +55,10 @@ type KubeletConfiguration struct {
 	FileCheckFrequency metav1.Duration
 	// httpCheckFrequency is the duration between checking http for new data
 	HTTPCheckFrequency metav1.Duration
-	// manifestURL is the URL for accessing the container manifest
-	ManifestURL string
-	// manifestURLHeader is a map of slices with HTTP headers to use when accessing the manifestURL
-	ManifestURLHeader map[string][]string
+	// staticPodURL is the URL for accessing static pods to run
+	StaticPodURL string
+	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
+	StaticPodURLHeader map[string][]string
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
@@ -240,6 +240,10 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
+	ContainerLogMaxSize string
+	// Maximum number of container log files that can be present for a container.
+	ContainerLogMaxFiles int32
 
 	/* following flags are meant for Node Allocatable */
 

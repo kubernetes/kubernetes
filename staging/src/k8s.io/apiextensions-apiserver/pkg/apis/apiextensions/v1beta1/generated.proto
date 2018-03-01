@@ -88,6 +88,10 @@ message CustomResourceDefinitionNames {
 
   // ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
   optional string listKind = 5;
+
+  // Categories is a list of grouped resources custom resources belong to (e.g. 'all')
+  // +optional
+  repeated string categories = 6;
 }
 
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
@@ -107,6 +111,12 @@ message CustomResourceDefinitionSpec {
   // Validation describes the validation methods for CustomResources
   // +optional
   optional CustomResourceValidation validation = 5;
+
+  // Subresources describes the subresources for CustomResources
+  // This field is alpha-level and should only be sent to servers that enable
+  // subresources via the CustomResourceSubresources feature gate.
+  // +optional
+  optional CustomResourceSubresources subresources = 6;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition
@@ -117,6 +127,48 @@ message CustomResourceDefinitionStatus {
   // AcceptedNames are the names that are actually being used to serve discovery
   // They may be different than the names in spec.
   optional CustomResourceDefinitionNames acceptedNames = 2;
+}
+
+// CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
+message CustomResourceSubresourceScale {
+  // SpecReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Spec.Replicas.
+  // Only JSON paths without the array notation are allowed.
+  // Must be a JSON Path under .spec.
+  // If there is no value under the given path in the CustomResource, the /scale subresource will return an error on GET.
+  optional string specReplicasPath = 1;
+
+  // StatusReplicasPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Replicas.
+  // Only JSON paths without the array notation are allowed.
+  // Must be a JSON Path under .status.
+  // If there is no value under the given path in the CustomResource, the status replica value in the /scale subresource
+  // will default to 0.
+  optional string statusReplicasPath = 2;
+
+  // LabelSelectorPath defines the JSON path inside of a CustomResource that corresponds to Scale.Status.Selector.
+  // Only JSON paths without the array notation are allowed.
+  // Must be a JSON Path under .status.
+  // Must be set to work with HPA.
+  // If there is no value under the given path in the CustomResource, the status label selector value in the /scale
+  // subresource will default to the empty string.
+  // +optional
+  optional string labelSelectorPath = 3;
+}
+
+// CustomResourceSubresourceStatus defines how to serve the status subresource for CustomResources.
+// Status is represented by the `.status` JSON path inside of a CustomResource. When set,
+// * exposes a /status subresource for the custom resource
+// * PUT requests to the /status subresource take a custom resource object, and ignore changes to anything except the status stanza
+// * PUT/POST/PATCH requests to the custom resource ignore changes to the status stanza
+message CustomResourceSubresourceStatus {
+}
+
+// CustomResourceSubresources defines the status and scale subresources for CustomResources.
+message CustomResourceSubresources {
+  // Status denotes the status subresource for CustomResources
+  optional CustomResourceSubresourceStatus status = 1;
+
+  // Scale denotes the scale subresource for CustomResources
+  optional CustomResourceSubresourceScale scale = 2;
 }
 
 // CustomResourceValidation is a list of validation methods for CustomResources.

@@ -466,7 +466,7 @@ func TestRunExposeService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 		ns := legacyscheme.Codecs
 
@@ -488,7 +488,7 @@ func TestRunExposeService(t *testing.T) {
 		tf.Namespace = test.ns
 		buf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdExposeService(f, buf)
+		cmd := NewCmdExposeService(tf, buf)
 		cmd.SetOutput(buf)
 		for flag, value := range test.flags {
 			cmd.Flags().Set(flag, value)

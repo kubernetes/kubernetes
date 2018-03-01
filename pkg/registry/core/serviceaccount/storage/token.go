@@ -41,6 +41,7 @@ type TokenREST struct {
 	pods     getter
 	secrets  getter
 	issuer   token.TokenGenerator
+	auds     []string
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -74,6 +75,9 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 				return nil, err
 			}
 			pod = podObj.(*api.Pod)
+			if name != pod.Spec.ServiceAccountName {
+				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with serviceaccount %q", name, pod.Spec.ServiceAccountName))
+			}
 			uid = pod.UID
 		case gvk.Group == "" && gvk.Kind == "Secret":
 			secretObj, err := r.secrets.Get(ctx, ref.Name, &metav1.GetOptions{})
@@ -88,6 +92,9 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 		if ref.UID != "" && uid != ref.UID {
 			return nil, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, ref.Name, fmt.Errorf("the UID in the bound object reference (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", ref.UID, uid))
 		}
+	}
+	if len(out.Spec.Audiences) == 0 {
+		out.Spec.Audiences = r.auds
 	}
 	sc, pc := token.Claims(*svcacct, pod, secret, out.Spec.ExpirationSeconds, out.Spec.Audiences)
 	tokdata, err := r.issuer.GenerateToken(sc, pc)

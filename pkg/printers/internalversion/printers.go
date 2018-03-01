@@ -40,6 +40,7 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -500,7 +501,7 @@ func translateTimestamp(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
-	return printers.ShortHumanDuration(time.Now().Sub(timestamp.Time))
+	return duration.ShortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 
 var (
@@ -1036,7 +1037,7 @@ func printNamespace(obj *api.Namespace, options printers.PrintOptions) ([]metav1
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, translateTimestamp(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(obj.Status.Phase), translateTimestamp(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -1490,6 +1491,20 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	count := 0
 	for i, spec := range specs {
 		switch spec.Type {
+		case autoscaling.ExternalMetricSourceType:
+			if spec.External.TargetAverageValue != nil {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].External != nil && statuses[i].External.CurrentAverageValue != nil {
+					current = statuses[i].External.CurrentAverageValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.External.TargetAverageValue.String()))
+			} else {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].External != nil {
+					current = statuses[i].External.CurrentValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.TargetValue.String()))
+			}
 		case autoscaling.PodsMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Pods != nil {

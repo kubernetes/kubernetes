@@ -120,7 +120,7 @@ func TestRunAccessCheck(t *testing.T) {
 		test.o.Out = ioutil.Discard
 		test.o.Err = ioutil.Discard
 
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		ns := legacyscheme.Codecs
 
 		tf.Client = &fake.RESTClient{
@@ -155,9 +155,9 @@ func TestRunAccessCheck(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
+		tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
 
-		if err := test.o.Complete(f, test.args); err != nil {
+		if err := test.o.Complete(tf, test.args); err != nil {
 			t.Errorf("%s: %v", test.name, err)
 			continue
 		}

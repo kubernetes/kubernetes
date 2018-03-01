@@ -23,9 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,12 +42,10 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 )
 
 // +k8s:deepcopy-gen=true
@@ -235,221 +231,72 @@ func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList
 }
 
 type TestFactory struct {
+	cmdutil.Factory
+
 	Client             kubectl.RESTClient
 	UnstructuredClient kubectl.RESTClient
-	Describer          printers.Describer
-	Validator          validation.Schema
+	DescriberVal       printers.Describer
 	Namespace          string
-	ClientConfig       *restclient.Config
-	Err                error
-	Command            string
-	TmpDir             string
-	CategoryExpander   categories.CategoryExpander
-	MetricsClientSet   metricsclientset.Interface
+	ClientConfigVal    *restclient.Config
+	CommandVal         string
 
-	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
-type FakeFactory struct {
-	tf *TestFactory
-}
-
-func NewTestFactory() (cmdutil.Factory, *TestFactory) {
-	t := &TestFactory{
-		Validator: validation.NullSchema{},
+func NewTestFactory() *TestFactory {
+	return &TestFactory{
+		Factory: cmdutil.NewFactory(nil),
 	}
-	return &FakeFactory{
-		tf: t,
-	}, t
 }
 
-func (f *FakeFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(f.tf.ClientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &fakeCachedDiscoveryClient{DiscoveryInterface: discoveryClient}, nil
-}
-
-func (f *FakeFactory) FlagSet() *pflag.FlagSet {
-	return nil
-}
-
-func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructuredConversion(legacyscheme.Registry.InterfacesFor))
-	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
-
-	fakeDs := &fakeCachedDiscoveryClient{}
-	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander, typer
-}
-
-func (f *FakeFactory) CategoryExpander() categories.CategoryExpander {
+func (f *TestFactory) CategoryExpander() categories.CategoryExpander {
 	return categories.LegacyCategoryExpander
 }
 
-func (f *FakeFactory) RESTClient() (*restclient.RESTClient, error) {
-	return nil, nil
+func (f *TestFactory) ClientConfig() (*restclient.Config, error) {
+	return f.ClientConfigVal, nil
 }
 
-func (f *FakeFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	return nil, nil
+func (f *TestFactory) BareClientConfig() (*restclient.Config, error) {
+	return f.ClientConfigVal, nil
 }
 
-func (f *FakeFactory) MetricsClientSet() (metricsclientset.Interface, error) {
-	return f.tf.MetricsClientSet, f.tf.Err
+func (f *TestFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	return f.Client, nil
 }
 
-func (f *FakeFactory) ClientSet() (internalclientset.Interface, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) ClientConfig() (*restclient.Config, error) {
-	return f.tf.ClientConfig, f.tf.Err
-}
-
-func (f *FakeFactory) BareClientConfig() (*restclient.Config, error) {
-	return f.tf.ClientConfig, f.tf.Err
-}
-
-func (f *FakeFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	if f.tf.ClientForMappingFunc != nil {
-		return f.tf.ClientForMappingFunc(mapping)
+func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+	if f.UnstructuredClientForMappingFunc != nil {
+		return f.UnstructuredClientForMappingFunc(mapping)
 	}
-	return f.tf.Client, f.tf.Err
+	return f.UnstructuredClient, nil
 }
 
-func (f *FakeFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return nil, nil
-}
-func (f *FakeFactory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	return nil, nil
+func (f *TestFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
+	return f.DescriberVal, nil
 }
 
-func (f *FakeFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-	if f.tf.UnstructuredClientForMappingFunc != nil {
-		return f.tf.UnstructuredClientForMappingFunc(mapping)
+func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
+	return validation.NullSchema{}, nil
+}
+
+func (f *TestFactory) DefaultNamespace() (string, bool, error) {
+	return f.Namespace, false, nil
+}
+
+func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
+	if f.OpenAPISchemaFunc != nil {
+		return f.OpenAPISchemaFunc()
 	}
-	return f.tf.UnstructuredClient, f.tf.Err
+	return openapitesting.EmptyResources{}, nil
 }
 
-func (f *FakeFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
-	return f.tf.Describer, f.tf.Err
+func (f *TestFactory) Command(*cobra.Command, bool) string {
+	return f.CommandVal
 }
 
-func (f *FakeFactory) Scaler(*meta.RESTMapping) (kubectl.Scaler, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) Reaper(*meta.RESTMapping) (kubectl.Reaper, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) HistoryViewer(*meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) Rollbacker(*meta.RESTMapping) (kubectl.Rollbacker, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) StatusViewer(*meta.RESTMapping) (kubectl.StatusViewer, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) MapBasedSelectorForObject(runtime.Object) (string, error) {
-	return "", nil
-}
-
-func (f *FakeFactory) PortsForObject(runtime.Object) ([]string, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) ProtocolsForObject(runtime.Object) (map[string]string, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) LabelsForObject(runtime.Object) (map[string]string, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) Pauser(info *resource.Info) ([]byte, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) Resumer(info *resource.Info) ([]byte, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) ResolveImage(name string) (string, error) {
-	return name, nil
-}
-
-func (f *FakeFactory) Validator(validate bool) (validation.Schema, error) {
-	return f.tf.Validator, f.tf.Err
-}
-
-func (f *FakeFactory) OpenAPISchema() (openapi.Resources, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
-	return f.tf.Namespace, false, f.tf.Err
-}
-
-func (f *FakeFactory) Generators(cmdName string) map[string]kubectl.Generator {
-	var generator map[string]kubectl.Generator
-	switch cmdName {
-	case "run":
-		generator = map[string]kubectl.Generator{
-			cmdutil.DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
-		}
-	}
-	return generator
-}
-
-func (f *FakeFactory) CanBeExposed(schema.GroupKind) error {
-	return nil
-}
-
-func (f *FakeFactory) CanBeAutoscaled(schema.GroupKind) error {
-	return nil
-}
-
-func (f *FakeFactory) AttachablePodForObject(ob runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	return nil, nil
-}
-
-func (f *FakeFactory) ApproximatePodTemplateForObject(obj runtime.Object) (*api.PodTemplateSpec, error) {
-	return f.ApproximatePodTemplateForObject(obj)
-}
-
-func (f *FakeFactory) UpdatePodSpecForObject(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error) {
-	return false, nil
-}
-
-func (f *FakeFactory) EditorEnvs() []string {
-	return nil
-}
-
-func (f *FakeFactory) Command(*cobra.Command, bool) string {
-	return f.tf.Command
-}
-
-func (f *FakeFactory) BindFlags(flags *pflag.FlagSet) {
-}
-
-func (f *FakeFactory) BindExternalFlags(flags *pflag.FlagSet) {
-}
-
-func (f *FakeFactory) NewBuilder() *resource.Builder {
+func (f *TestFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
 	return resource.NewBuilder(
@@ -469,68 +316,9 @@ func (f *FakeFactory) NewBuilder() *resource.Builder {
 	)
 }
 
-func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
-	return &printers.PrintOptions{}
-}
-
-func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
-	return nil
-}
-
-func (f *FakeFactory) SuggestedPodTemplateResources() []schema.GroupResource {
-	return []schema.GroupResource{}
-}
-
-func (f *FakeFactory) PluginLoader() plugins.PluginLoader {
-	return &plugins.DummyPluginLoader{}
-}
-
-func (f *FakeFactory) PluginRunner() plugins.PluginRunner {
-	return &plugins.ExecPluginRunner{}
-}
-
-type fakeAPIFactory struct {
-	cmdutil.Factory
-	tf *TestFactory
-}
-
-func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(
-		groupResources,
-		meta.InterfacesForUnstructuredConversion(func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-			switch version {
-			// provide typed objects for these two versions
-			case ValidVersionGV, UnlikelyGV:
-				return &meta.VersionInterfaces{
-					ObjectConvertor:  scheme.Scheme,
-					MetadataAccessor: meta.NewAccessor(),
-				}, nil
-			// otherwise fall back to the legacy scheme
-			default:
-				return legacyscheme.Registry.InterfacesFor(version)
-			}
-		}),
-	)
-	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
-	// TODO: make this opt-in?
-	mapper = meta.FirstHitRESTMapper{
-		MultiRESTMapper: meta.MultiRESTMapper{
-			mapper,
-			legacyscheme.Registry.RESTMapper(),
-		},
-	}
-
-	// TODO: should probably be the external scheme
-	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
-	fakeDs := &fakeCachedDiscoveryClient{}
-	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
-	return expander, typer
-}
-
-func (f *fakeAPIFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	fakeClient := f.tf.Client.(*fake.RESTClient)
-	clientset := kubernetes.NewForConfigOrDie(f.tf.ClientConfig)
+func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
+	fakeClient := f.Client.(*fake.RESTClient)
+	clientset := kubernetes.NewForConfigOrDie(f.ClientConfigVal)
 
 	clientset.CoreV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AuthorizationV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -552,18 +340,14 @@ func (f *fakeAPIFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.PolicyV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
-	return clientset, f.tf.Err
+	return clientset, nil
 }
 
-func (f *fakeAPIFactory) MetricsClientSet() (metricsclientset.Interface, error) {
-	return f.tf.MetricsClientSet, f.tf.Err
-}
-
-func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
+func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
 	// Swap the HTTP client out of the REST client with the fake
 	// version.
-	fakeClient := f.tf.Client.(*fake.RESTClient)
-	clientset := internalclientset.NewForConfigOrDie(f.tf.ClientConfig)
+	fakeClient := f.Client.(*fake.RESTClient)
+	clientset := internalclientset.NewForConfigOrDie(f.ClientConfigVal)
 	clientset.Core().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.Authentication().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.Authorization().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
@@ -576,63 +360,68 @@ func (f *fakeAPIFactory) ClientSet() (internalclientset.Interface, error) {
 	clientset.Apps().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	return clientset, f.tf.Err
+	return clientset, nil
 }
 
-func (f *fakeAPIFactory) RESTClient() (*restclient.RESTClient, error) {
+func (f *TestFactory) RESTClient() (*restclient.RESTClient, error) {
 	// Swap out the HTTP client out of the client with the fake's version.
-	fakeClient := f.tf.Client.(*fake.RESTClient)
-	restClient, err := restclient.RESTClientFor(f.tf.ClientConfig)
+	fakeClient := f.Client.(*fake.RESTClient)
+	restClient, err := restclient.RESTClientFor(f.ClientConfigVal)
 	if err != nil {
 		panic(err)
 	}
 	restClient.Client = fakeClient.Client
-	return restClient, f.tf.Err
+	return restClient, nil
 }
 
-func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	fakeClient := f.tf.Client.(*fake.RESTClient)
-	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.tf.ClientConfig)
+func (f *TestFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	fakeClient := f.Client.(*fake.RESTClient)
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(f.ClientConfigVal)
 	discoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
-	cacheDir := filepath.Join(f.tf.TmpDir, ".kube", "cache", "discovery")
+	cacheDir := filepath.Join("", ".kube", "cache", "discovery")
 	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
-func (f *fakeAPIFactory) CategoryExpander() categories.CategoryExpander {
-	if f.tf.CategoryExpander != nil {
-		return f.tf.CategoryExpander
-	}
-	return f.Factory.CategoryExpander()
-}
-
-func (f *fakeAPIFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
+func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
 	return f.ClientSet()
 }
 
-func (f *fakeAPIFactory) ClientConfig() (*restclient.Config, error) {
-	return f.tf.ClientConfig, f.tf.Err
-}
-
-func (f *fakeAPIFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
-	if f.tf.ClientForMappingFunc != nil {
-		return f.tf.ClientForMappingFunc(m)
+func (f *TestFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
+	groupResources := testDynamicResources()
+	mapper := discovery.NewRESTMapper(
+		groupResources,
+		meta.InterfacesForUnstructuredConversion(func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
+			switch version {
+			// provide typed objects for these two versions
+			case ValidVersionGV, UnlikelyGV:
+				return &meta.VersionInterfaces{
+					ObjectConvertor:  scheme.Scheme,
+					MetadataAccessor: meta.NewAccessor(),
+				}, nil
+				// otherwise fall back to the legacy scheme
+			default:
+				return legacyscheme.Registry.InterfacesFor(version)
+			}
+		}),
+	)
+	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
+	// TODO: make this opt-in?
+	mapper = meta.FirstHitRESTMapper{
+		MultiRESTMapper: meta.MultiRESTMapper{
+			mapper,
+			legacyscheme.Registry.RESTMapper(),
+		},
 	}
-	return f.tf.Client, f.tf.Err
+
+	// TODO: should probably be the external scheme
+	typer := discovery.NewUnstructuredObjectTyper(groupResources, legacyscheme.Scheme)
+	fakeDs := &fakeCachedDiscoveryClient{}
+	expander := cmdutil.NewShortcutExpander(mapper, fakeDs)
+	return expander, typer
 }
 
-func (f *fakeAPIFactory) UnstructuredClientForMapping(m *meta.RESTMapping) (resource.RESTClient, error) {
-	if f.tf.UnstructuredClientForMappingFunc != nil {
-		return f.tf.UnstructuredClientForMappingFunc(m)
-	}
-	return f.tf.UnstructuredClient, f.tf.Err
-}
-
-func (f *fakeAPIFactory) Describer(*meta.RESTMapping) (printers.Describer, error) {
-	return f.tf.Describer, f.tf.Err
-}
-
-func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
+func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
 	c, err := f.ClientSet()
 	if err != nil {
 		panic(err)
@@ -644,81 +433,10 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object, timeout t
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		return c.Core().Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
+		return c.Core().Pods(f.Namespace).GetLogs(t.Name, opts), nil
 	default:
 		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
-}
-
-func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	switch t := object.(type) {
-	case *api.Pod:
-		return t, nil
-	default:
-		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
-	}
-}
-
-func (f *fakeAPIFactory) ApproximatePodTemplateForObject(obj runtime.Object) (*api.PodTemplateSpec, error) {
-	return f.Factory.ApproximatePodTemplateForObject(obj)
-}
-
-func (f *fakeAPIFactory) Validator(validate bool) (validation.Schema, error) {
-	return f.tf.Validator, f.tf.Err
-}
-
-func (f *fakeAPIFactory) DefaultNamespace() (string, bool, error) {
-	return f.tf.Namespace, false, f.tf.Err
-}
-
-func (f *fakeAPIFactory) Command(*cobra.Command, bool) string {
-	return f.tf.Command
-}
-
-func (f *fakeAPIFactory) Generators(cmdName string) map[string]kubectl.Generator {
-	return cmdutil.DefaultGenerators(cmdName)
-}
-
-func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
-	mapper, typer := f.Object()
-
-	return resource.NewBuilder(
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
-		},
-		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
-			Decoder:      unstructured.UnstructuredJSONScheme,
-		},
-		f.CategoryExpander(),
-	)
-}
-
-func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {
-	return []schema.GroupResource{}
-}
-
-func (f *fakeAPIFactory) OpenAPISchema() (openapi.Resources, error) {
-	if f.tf.OpenAPISchemaFunc != nil {
-		return f.tf.OpenAPISchemaFunc()
-	}
-	return openapitesting.EmptyResources{}, nil
-}
-
-func NewAPIFactory() (cmdutil.Factory, *TestFactory) {
-	t := &TestFactory{
-		Validator: validation.NullSchema{},
-	}
-	rf := cmdutil.NewFactory(nil)
-	return &fakeAPIFactory{
-		Factory: rf,
-		tf:      t,
-	}, t
 }
 
 func testDynamicResources() []*discovery.APIGroupResources {

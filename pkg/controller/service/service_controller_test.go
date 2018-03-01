@@ -308,7 +308,6 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 func TestProcessServiceUpdate(t *testing.T) {
 
 	var controller *ServiceController
-	var cloud *fakecloud.FakeCloud
 
 	//A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
@@ -327,7 +326,7 @@ func TestProcessServiceUpdate(t *testing.T) {
 			svc:      defaultExternalService(),
 			updateFn: func(svc *v1.Service) *v1.Service {
 
-				controller, cloud, _ = newController()
+				controller, _, _ = newController()
 				controller.cache.getOrCreate("validKey")
 				return svc
 
@@ -398,7 +397,6 @@ func TestProcessServiceUpdate(t *testing.T) {
 func TestSyncService(t *testing.T) {
 
 	var controller *ServiceController
-	var cloud *fakecloud.FakeCloud
 
 	testCases := []struct {
 		testName   string
@@ -410,7 +408,7 @@ func TestSyncService(t *testing.T) {
 			testName: "if an invalid service name is synced",
 			key:      "invalid/key/string",
 			updateFn: func() {
-				controller, cloud, _ = newController()
+				controller, _, _ = newController()
 
 			},
 			expectedFn: func(e error) error {
@@ -429,7 +427,7 @@ func TestSyncService(t *testing.T) {
 			testName: "if an invalid service is synced",
 			key: "somethingelse",
 			updateFn: func() {
-				controller, cloud, _ = newController()
+				controller, _, _ = newController()
 				srv := controller.cache.getOrCreate("external-balancer")
 				srv.state = defaultExternalService()
 			},
@@ -443,7 +441,7 @@ func TestSyncService(t *testing.T) {
 			key:      "external-balancer",
 			updateFn: func() {
 				testSvc := defaultExternalService()
-				controller, cloud, _ = newController()
+				controller, _, _ = newController()
 				controller.enqueueService(testSvc)
 				svc := controller.cache.getOrCreate("external-balancer")
 				svc.state = testSvc
@@ -779,13 +777,21 @@ func TestServiceCache(t *testing.T) {
 //Test a utility functions as its not easy to unit test nodeSyncLoop directly
 func TestNodeSlicesEqualForLB(t *testing.T) {
 	numNodes := 10
-	nArray := make([]*v1.Node, 10)
-
+	nArray := make([]*v1.Node, numNodes)
+	mArray := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		nArray[i] = &v1.Node{}
-		nArray[i].Name = fmt.Sprintf("node1")
+		nArray[i].Name = fmt.Sprintf("node%d", i)
 	}
+	for i := 0; i < numNodes; i++ {
+		mArray[i] = &v1.Node{}
+		mArray[i].Name = fmt.Sprintf("node%d", i+1)
+	}
+
 	if !nodeSlicesEqualForLB(nArray, nArray) {
 		t.Errorf("nodeSlicesEqualForLB() Expected=true Obtained=false")
+	}
+	if nodeSlicesEqualForLB(nArray, mArray) {
+		t.Errorf("nodeSlicesEqualForLB() Expected=false Obtained=true")
 	}
 }

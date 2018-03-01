@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // OperationExecutor defines a set of operations for attaching, detaching,
@@ -708,7 +708,7 @@ func (oe *operationExecutor) MountVolume(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	isRemount bool) error {
-	fsVolume, err := volumehelper.CheckVolumeModeFilesystem(volumeToMount.VolumeSpec)
+	fsVolume, err := util.CheckVolumeModeFilesystem(volumeToMount.VolumeSpec)
 	if err != nil {
 		return err
 	}
@@ -736,7 +736,7 @@ func (oe *operationExecutor) MountVolume(
 	if !volumeToMount.PluginIsAttachable {
 		// Non-attachable volume plugins can execute mount for multiple pods
 		// referencing the same volume in parallel
-		podName = volumehelper.GetUniquePodName(volumeToMount.Pod)
+		podName = util.GetUniquePodName(volumeToMount.Pod)
 	}
 
 	// TODO mount_device
@@ -747,7 +747,7 @@ func (oe *operationExecutor) MountVolume(
 func (oe *operationExecutor) UnmountVolume(
 	volumeToUnmount MountedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	fsVolume, err := volumehelper.CheckVolumeModeFilesystem(volumeToUnmount.VolumeSpec)
+	fsVolume, err := util.CheckVolumeModeFilesystem(volumeToUnmount.VolumeSpec)
 	if err != nil {
 		return err
 	}
@@ -778,7 +778,7 @@ func (oe *operationExecutor) UnmountDevice(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
 	mounter mount.Interface) error {
-	fsVolume, err := volumehelper.CheckVolumeModeFilesystem(deviceToDetach.VolumeSpec)
+	fsVolume, err := util.CheckVolumeModeFilesystem(deviceToDetach.VolumeSpec)
 	if err != nil {
 		return err
 	}
@@ -881,7 +881,7 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 	podName volumetypes.UniquePodName,
 	podUID types.UID,
 	attachable volume.AttachableVolumePlugin) (bool, error) {
-	fsVolume, err := volumehelper.CheckVolumeModeFilesystem(volumeSpec)
+	fsVolume, err := util.CheckVolumeModeFilesystem(volumeSpec)
 	if err != nil {
 		return false, err
 	}
@@ -913,7 +913,7 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 	// is there. Either plugin is attachable or non-attachable, the plugin should
 	// have symbolic link associated to raw block device under pod device map
 	// if volume exists.
-	blkutil := util.NewBlockVolumePathHandler()
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 	var islinkExist bool
 	var checkErr error
 	if islinkExist, checkErr = blkutil.IsSymlinkExist(mountPath); checkErr != nil {

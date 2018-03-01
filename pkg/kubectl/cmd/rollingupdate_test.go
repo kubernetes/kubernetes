@@ -24,7 +24,7 @@ import (
 )
 
 func TestValidateArgs(t *testing.T) {
-	f, _ := cmdtesting.NewAPIFactory()
+	f := cmdtesting.NewTestFactory()
 
 	tests := []struct {
 		testName  string

@@ -118,7 +118,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().BoolVar(&options.overwrite, "overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().BoolVar(&options.list, "list", options.list, "If true, display the labels for a given resource.")
 	cmd.Flags().BoolVar(&options.local, "local", options.local, "If true, label will NOT contact api-server but run locally.")
 	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")

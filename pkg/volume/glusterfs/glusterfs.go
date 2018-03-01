@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -178,7 +177,7 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *v1.Endp
 		hosts:        ep,
 		path:         source.Path,
 		readOnly:     readOnly,
-		mountOptions: volume.MountOptionFromSpec(spec),
+		mountOptions: volutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -328,7 +327,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 	}
 	options = append(options, "backup-volfile-servers="+dstrings.Join(addrlist[:], ":"))
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+	mountOptions := volutil.JoinMountOptions(b.mountOptions, options)
 
 	// with `backup-volfile-servers` mount option in place, it is not required to
 	// iterate over all the servers in the addrlist. A mount attempt with this option
@@ -502,7 +501,7 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 
 		pvName := pv.ObjectMeta.Name
 
-		gidStr, ok := pv.Annotations[volumehelper.VolumeGidAnnotationKey]
+		gidStr, ok := pv.Annotations[volutil.VolumeGidAnnotationKey]
 
 		if !ok {
 			glog.Warningf("no GID found in pv %v", pvName)
@@ -583,7 +582,7 @@ func (plugin *glusterfsPlugin) getGidTable(className string, min int, max int) (
 }
 
 func (d *glusterfsVolumeDeleter) getGid() (int, bool, error) {
-	gidStr, ok := d.spec.Annotations[volumehelper.VolumeGidAnnotationKey]
+	gidStr, ok := d.spec.Annotations[volutil.VolumeGidAnnotationKey]
 
 	if !ok {
 		return 0, false, nil
@@ -669,7 +668,7 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 }
 
 func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+	if !volutil.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
 
@@ -723,12 +722,12 @@ func (p *glusterfsVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	gidStr := strconv.FormatInt(int64(gid), 10)
 
 	pv.Annotations = map[string]string{
-		volumehelper.VolumeGidAnnotationKey:        gidStr,
-		volumehelper.VolumeDynamicallyCreatedByKey: heketiAnn,
-		glusterTypeAnn:                             "file",
-		"Description":                              glusterDescAnn,
-		v1.MountOptionAnnotation:                   "auto_unmount",
-		heketiVolIDAnn:                             volID,
+		volutil.VolumeGidAnnotationKey:        gidStr,
+		volutil.VolumeDynamicallyCreatedByKey: heketiAnn,
+		glusterTypeAnn:                        "file",
+		"Description":                         glusterDescAnn,
+		v1.MountOptionAnnotation:              "auto_unmount",
+		heketiVolIDAnn:                        volID,
 	}
 
 	pv.Spec.Capacity = v1.ResourceList{
@@ -743,8 +742,9 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 
 	// GlusterFS/heketi creates volumes in units of GiB.
-	sz := int(volume.RoundUpToGiB(capacity))
+	sz := int(volutil.RoundUpToGiB(capacity))
 	glog.V(2).Infof("create volume of size %dGiB", sz)
+
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
@@ -1126,10 +1126,10 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 
 	// Find out delta size
 	expansionSize := (newSize.Value() - oldSize.Value())
-	expansionSizeGiB := int(volume.RoundUpSize(expansionSize, volume.GIB))
+	expansionSizeGiB := int(volutil.RoundUpSize(expansionSize, volutil.GIB))
 
 	// Find out requested Size
-	requestGiB := volume.RoundUpToGiB(newSize)
+	requestGiB := volutil.RoundUpToGiB(newSize)
 
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)

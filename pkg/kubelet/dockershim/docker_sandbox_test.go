@@ -219,9 +219,6 @@ func TestNetworkPluginInvocation(t *testing.T) {
 
 	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
 	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID)
-	// StopPodSandbox performs a lookup on status to figure out if the sandbox
-	// is running with hostnetworking, as all its given is the ID.
-	mockPlugin.EXPECT().GetPodNetworkStatus(ns, name, cID)
 	mockPlugin.EXPECT().TearDownPod(ns, name, cID).After(setup)
 
 	_, err := ds.RunPodSandbox(getTestCTX(), &runtimeapi.RunPodSandboxRequest{Config: c})

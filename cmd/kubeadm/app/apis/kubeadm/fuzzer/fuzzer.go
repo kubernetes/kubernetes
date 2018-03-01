@@ -36,15 +36,19 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
 			obj.API.BindPort = 20
-			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
 			obj.API.AdvertiseAddress = "foo"
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
 			obj.AuthorizationModes = []string{"foo"}
 			obj.CertificatesDir = "foo"
 			obj.APIServerCertSANs = []string{"foo"}
+			obj.Etcd.ServerCertSANs = []string{"foo"}
+			obj.Etcd.PeerCertSANs = []string{"foo"}
 			obj.Token = "foo"
 			obj.CRISocket = "foo"
+			obj.TokenTTL = &metav1.Duration{Duration: 1 * time.Hour}
+			obj.TokenUsages = []string{"foo"}
+			obj.TokenGroups = []string{"foo"}
 			obj.Etcd.Image = "foo"
 			obj.Etcd.DataDir = "foo"
 			obj.ImageRepository = "foo"
@@ -66,10 +70,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.KubeletConfiguration = kubeadm.KubeletConfiguration{
 				BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
-					PodManifestPath: "foo",
-					ClusterDNS:      []string{"foo"},
-					ClusterDomain:   "foo",
-					Authorization:   kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
+					StaticPodPath: "foo",
+					ClusterDNS:    []string{"foo"},
+					ClusterDomain: "foo",
+					Authorization: kubeletconfigv1beta1.KubeletAuthorization{Mode: "foo"},
 					Authentication: kubeletconfigv1beta1.KubeletAuthentication{
 						X509: kubeletconfigv1beta1.KubeletX509Authentication{ClientCAFile: "foo"},
 					},
@@ -78,7 +82,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
 			obj.KubeProxy = kubeadm.KubeProxy{
 				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-					FeatureGates:       "foo",
+					FeatureGates:       map[string]bool{"foo": true},
 					BindAddress:        "foo",
 					HealthzBindAddress: "foo:10256",
 					MetricsBindAddress: "foo:",

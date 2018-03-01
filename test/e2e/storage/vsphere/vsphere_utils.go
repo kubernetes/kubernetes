@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
@@ -175,7 +175,7 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Annotations: map[string]string{
-				volumehelper.VolumeGidAnnotationKey: "777",
+				util.VolumeGidAnnotationKey: "777",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

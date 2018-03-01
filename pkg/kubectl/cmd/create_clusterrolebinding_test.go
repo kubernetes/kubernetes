@@ -67,7 +67,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 		},
 	}
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
@@ -110,7 +110,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 
 	expectedOutput := "clusterrolebinding.rbac.authorization.k8s.io/" + expectBinding.Name + "\n"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateClusterRoleBinding(f, buf)
+	cmd := NewCmdCreateClusterRoleBinding(tf, buf)
 	cmd.Flags().Set("clusterrole", "fake-clusterrole")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")

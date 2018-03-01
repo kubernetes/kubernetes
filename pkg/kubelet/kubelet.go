@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -74,6 +75,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -254,8 +256,8 @@ type Dependencies struct {
 // KubeletConfiguration or returns an error.
 func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, bootstrapCheckpointPath string) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
-	if len(kubeCfg.ManifestURLHeader) > 0 {
-		for k, v := range kubeCfg.ManifestURLHeader {
+	if len(kubeCfg.StaticPodURLHeader) > 0 {
+		for k, v := range kubeCfg.StaticPodURLHeader {
 			for i := range v {
 				manifestURLHeader.Add(k, v[i])
 			}
@@ -266,15 +268,15 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 
 	// define file config source
-	if kubeCfg.PodManifestPath != "" {
-		glog.Infof("Adding manifest path: %v", kubeCfg.PodManifestPath)
-		config.NewSourceFile(kubeCfg.PodManifestPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+	if kubeCfg.StaticPodPath != "" {
+		glog.Infof("Adding pod path: %v", kubeCfg.StaticPodPath)
+		config.NewSourceFile(kubeCfg.StaticPodPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
 	}
 
 	// define url config source
-	if kubeCfg.ManifestURL != "" {
-		glog.Infof("Adding manifest url %q with HTTP header %v", kubeCfg.ManifestURL, manifestURLHeader)
-		config.NewSourceURL(kubeCfg.ManifestURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+	if kubeCfg.StaticPodURL != "" {
+		glog.Infof("Adding pod url %q with HTTP header %v", kubeCfg.StaticPodURL, manifestURLHeader)
+		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
 
 	// Restore from the checkpoint path
@@ -758,6 +760,21 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.imageManager = imageManager
 
+	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
+		// setup containerLogManager for CRI container runtime
+		containerLogManager, err := logs.NewContainerLogManager(
+			klet.runtimeService,
+			kubeCfg.ContainerLogMaxSize,
+			int(kubeCfg.ContainerLogMaxFiles),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
+		}
+		klet.containerLogManager = containerLogManager
+	} else {
+		klet.containerLogManager = logs.NewStubContainerLogManager()
+	}
+
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
@@ -992,6 +1009,9 @@ type Kubelet struct {
 
 	// Manager for image garbage collection.
 	imageManager images.ImageGCManager
+
+	// Manager for container logs.
+	containerLogManager logs.ContainerLogManager
 
 	// Secret manager.
 	secretManager secret.Manager
@@ -1335,6 +1355,9 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		glog.Fatalf("Failed to start ContainerManager %v", err)
 	}
+	// container log manager must start after container runtime is up to retrieve information from container runtime
+	// and inform container to reopen log file after log rotation.
+	kl.containerLogManager.Start()
 }
 
 // Run starts the kubelet reacting to config updates
@@ -1759,12 +1782,22 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	housekeepingTicker := time.NewTicker(housekeepingPeriod)
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
+	const (
+		base   = 100 * time.Millisecond
+		max    = 5 * time.Second
+		factor = 2
+	)
+	duration := base
 	for {
 		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
-			time.Sleep(5 * time.Second)
+			// exponential backoff
+			time.Sleep(duration)
+			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
 			continue
 		}
+		// reset backoff if we have a success
+		duration = base
 
 		kl.syncLoopMonitor.Store(kl.clock.Now())
 		if !kl.syncLoopIteration(updates, handler, syncTicker.C, housekeepingTicker.C, plegCh) {

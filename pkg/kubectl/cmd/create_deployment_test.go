@@ -74,7 +74,7 @@ func Test_generatorFromName(t *testing.T) {
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -86,11 +86,11 @@ func TestCreateDeployment(t *testing.T) {
 			}, nil
 		}),
 	}
-	tf.ClientConfig = &restclient.Config{}
+	tf.ClientConfigVal = &restclient.Config{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdCreateDeployment(f, buf, buf)
+	cmd := NewCmdCreateDeployment(tf, buf, buf)
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
@@ -103,7 +103,7 @@ func TestCreateDeployment(t *testing.T) {
 
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -115,13 +115,13 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 			}, nil
 		}),
 	}
-	tf.ClientConfig = &restclient.Config{}
+	tf.ClientConfigVal = &restclient.Config{}
 	tf.Namespace = "test"
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateDeployment(f, buf, buf)
+	cmd := NewCmdCreateDeployment(tf, buf, buf)
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
-	err := createDeployment(f, buf, buf, cmd, []string{depName})
+	err := createDeployment(tf, buf, buf, cmd, []string{depName})
 	assert.Error(t, err, "at least one image must be specified")
 }

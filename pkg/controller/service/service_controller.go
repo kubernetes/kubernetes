@@ -579,7 +579,7 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 	if len(x) != len(y) {
 		return false
 	}
-	return nodeNames(x).Equal(nodeNames(x))
+	return nodeNames(x).Equal(nodeNames(y))
 }
 
 func getNodeConditionPredicate() corelisters.NodeConditionPredicate {

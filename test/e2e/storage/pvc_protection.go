@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-var _ = utils.SIGDescribe("Storage Protection", func() {
+var _ = utils.SIGDescribe("PVC Protection", func() {
 	var (
 		client                  clientset.Interface
 		nameSpace               string

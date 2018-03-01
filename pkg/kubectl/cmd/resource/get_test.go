@@ -197,7 +197,7 @@ func testComponentStatusData() *api.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	_, _, codec := cmdtesting.NewExternalScheme()
 	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
 
@@ -215,9 +215,9 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 
-	mapper, _ := f.Object()
+	mapper, _ := tf.Object()
 	m, err := mapper.RESTMapping(schema.GroupKind{Group: "apitest", Kind: "Type"})
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
@@ -271,18 +271,18 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := testapi.Default.Codec()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.Run(cmd, []string{"replicationcontrollers", "foo"})
 
 	if !strings.Contains(buf.String(), "foo") {
@@ -293,7 +293,7 @@ func TestGetSchemaObject(t *testing.T) {
 func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	// overide the openAPISchema function to return custom output
@@ -307,7 +307,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -350,7 +350,7 @@ func testOpenAPISchemaData() (openapi.Resources, error) {
 func TestGetObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -361,7 +361,7 @@ func TestGetObjects(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -386,21 +386,37 @@ func TestGetObjectsFiltered(t *testing.T) {
 		flags  map[string]string
 		expect string
 	}{
-		{args: []string{"pods", "foo"}, resp: first, expect: "pod/foo\n"},
-		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first, expect: "pod/foo\n"},
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods, expect: "pod/foo\npod/bar\n"},
-		{args: []string{"pods/foo"}, resp: first, expect: "pod/foo\n"},
-		{args: []string{"pods"}, flags: map[string]string{"output": "yaml"}, resp: pods, expect: "pod/bar\n"},
-		{args: []string{}, flags: map[string]string{"filename": "../../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods, expect: "pod/foo\npod/bar\n"},
+		{args: []string{"pods", "foo"}, resp: first, flags: map[string]string{"show-all": "true"},
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
 
-		{args: []string{"pods"}, resp: pods, expect: "pod/bar\n"},
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "yaml"}, resp: pods, expect: "pod/foo\npod/bar\n"},
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods, expect: "pod/bar\n"},
+		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
+
+		{args: []string{"pods/foo"}, resp: first, flags: map[string]string{"show-all": "false"},
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "false", "output": "name"}, resp: pods,
+			expect: "pod/foo\npod/bar\n"},
+
+		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}, resp: pods,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
+
+		{args: []string{"pods"}, resp: pods, flags: map[string]string{"show-all": "false"},
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "name"}, resp: pods,
+			expect: "pod/foo\npod/bar\n"},
+
+		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods,
+			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
 	}
 
 	for i, test := range testCases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -412,12 +428,11 @@ func TestGetObjectsFiltered(t *testing.T) {
 			buf := bytes.NewBuffer([]byte{})
 			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdGet(f, buf, errBuf)
+			cmd := NewCmdGet(tf, buf, errBuf)
 			cmd.SetOutput(buf)
 			for k, v := range test.flags {
 				cmd.Flags().Lookup(k).Value.Set(v)
 			}
-			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, test.args)
 
 			if e, a := test.expect, buf.String(); e != a {
@@ -442,7 +457,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 		},
 	}
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -463,7 +478,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "yaml")
@@ -495,7 +510,7 @@ func TestGetSortedObjects(t *testing.T) {
 		},
 	}
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -503,12 +518,12 @@ func TestGetSortedObjects(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	// sorting with metedata.name
@@ -528,7 +543,7 @@ c         0/0                 0          <unknown>
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -539,9 +554,9 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
@@ -555,7 +570,7 @@ foo       0/0                 0          <unknown>
 func TestGetListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -566,7 +581,7 @@ func TestGetListObjects(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
@@ -582,7 +597,7 @@ bar       0/0                 0          <unknown>
 func TestGetAllListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -593,7 +608,7 @@ func TestGetAllListObjects(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("show-all", "true")
 	cmd.Run(cmd, []string{"pods"})
@@ -610,7 +625,7 @@ bar       0/0                 0          <unknown>
 func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -621,7 +636,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
@@ -651,7 +666,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 		Code:    0,
 	}
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -667,11 +682,11 @@ func TestGetMixedGenericObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods"})
@@ -701,7 +716,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -722,7 +737,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
@@ -740,7 +755,7 @@ baz       ClusterIP   <none>       <none>        <none>    <unknown>
 func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -758,11 +773,11 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("output", "json")
@@ -842,7 +857,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -866,7 +881,7 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("selector", "a=b")
@@ -886,7 +901,7 @@ baz       ClusterIP   <none>       <none>        <none>    <unknown>
 func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -910,7 +925,7 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("field-selector", "a=b")
@@ -938,7 +953,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		},
 	}
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -959,7 +974,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
@@ -977,7 +992,7 @@ foo       Unknown   <none>    <unknown>
 func TestGetByFormatForcesFlag(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -988,9 +1003,10 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 	cmd.Flags().Lookup("output").Value.Set("yaml")
+	cmd.Flags().Set("show-all", "false")
 	cmd.Run(cmd, []string{"pods"})
 
 	showAllFlag, _ := cmd.Flags().GetBool("show-all")
@@ -1072,7 +1088,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 func TestWatchLabelSelector(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	podList := &api.PodList{
@@ -1103,7 +1119,7 @@ func TestWatchLabelSelector(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1124,7 +1140,7 @@ foo       0/0                 0         <unknown>
 func TestWatchFieldSelector(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	podList := &api.PodList{
@@ -1155,7 +1171,7 @@ func TestWatchFieldSelector(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1176,7 +1192,7 @@ foo       0/0                 0         <unknown>
 func TestWatchResource(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1201,7 +1217,7 @@ func TestWatchResource(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1220,7 +1236,7 @@ foo       0/0                 0         <unknown>
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1245,11 +1261,11 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
@@ -1265,7 +1281,7 @@ foo       0/0                 0         <unknown>
 func TestWatchOnlyResource(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1290,7 +1306,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
@@ -1308,7 +1324,7 @@ foo       0/0                 0         <unknown>
 func TestWatchOnlyList(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	podList := &api.PodList{
@@ -1336,7 +1352,7 @@ func TestWatchOnlyList(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(f, buf, errBuf)
+	cmd := NewCmdGet(tf, buf, errBuf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")

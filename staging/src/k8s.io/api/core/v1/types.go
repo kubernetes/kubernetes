@@ -511,8 +511,9 @@ type PersistentVolumeSpec struct {
 	// +optional
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" protobuf:"bytes,4,opt,name=claimRef"`
 	// What happens to a persistent volume when released from its claim.
-	// Valid options are Retain (default) and Recycle.
-	// Recycling must be supported by the volume plugin underlying this persistent volume.
+	// Valid options are Retain (default for manually created PersistentVolumes), Delete (default
+	// for dynamically provisioned PersistentVolumes), and Recycle (deprecated).
+	// Recycle must be supported by the volume plugin underlying this PersistentVolume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=PersistentVolumeReclaimPolicy"`
@@ -1049,8 +1050,8 @@ type FlockerVolumeSource struct {
 type StorageMedium string
 
 const (
-	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
-	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
+	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node, assume anything we don't explicitly handle is this
+	StorageMediumMemory    StorageMedium = "Memory"    // use memory (e.g. tmpfs on linux)
 	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
@@ -1777,6 +1778,34 @@ type CSIPersistentVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+
+	// Attributes of the volume to publish.
+	// +optional
+	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty" protobuf:"bytes,5,rep,name=volumeAttributes"`
+
+	// ControllerPublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// ControllerPublishVolume and ControllerUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	ControllerPublishSecretRef *SecretReference `json:"controllerPublishSecretRef,omitempty" protobuf:"bytes,6,opt,name=controllerPublishSecretRef"`
+
+	// NodeStageSecretRef is a reference to the secret object containing sensitive
+	// information to pass to the CSI driver to complete the CSI NodeStageVolume
+	// and NodeStageVolume and NodeUnstageVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	NodeStageSecretRef *SecretReference `json:"nodeStageSecretRef,omitempty" protobuf:"bytes,7,opt,name=nodeStageSecretRef"`
+
+	// NodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	NodePublishSecretRef *SecretReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,8,opt,name=nodePublishSecretRef"`
 }
 
 // ContainerPort represents a network port in a single container.
@@ -2847,7 +2876,6 @@ type PodSpec struct {
 	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
-	// Note that 'None' policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
 	// +optional
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
@@ -2953,7 +2981,6 @@ type PodSpec struct {
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
-	// This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.
 	// +optional
 	DNSConfig *PodDNSConfig `json:"dnsConfig,omitempty" protobuf:"bytes,26,opt,name=dnsConfig"`
 }
@@ -3723,7 +3750,8 @@ type Endpoints struct {
 	// subsets for the different ports. No address will appear in both Addresses and
 	// NotReadyAddresses in the same subset.
 	// Sets of addresses and ports that comprise a service.
-	Subsets []EndpointSubset `json:"subsets" protobuf:"bytes,2,rep,name=subsets"`
+	// +optional
+	Subsets []EndpointSubset `json:"subsets,omitempty" protobuf:"bytes,2,rep,name=subsets"`
 }
 
 // EndpointSubset is a group of addresses with a common set of ports. The

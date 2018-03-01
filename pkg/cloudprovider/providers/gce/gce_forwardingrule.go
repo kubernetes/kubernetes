@@ -21,6 +21,7 @@ import (
 
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
@@ -117,7 +118,7 @@ func (gce *GCECloud) DeleteRegionForwardingRule(name, region string) error {
 // TODO(#51665): retire this function once Network Tiers becomes Beta in GCP.
 func (gce *GCECloud) getNetworkTierFromForwardingRule(name, region string) (string, error) {
 	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return NetworkTierDefault.ToGCEValue(), nil
+		return cloud.NetworkTierDefault.ToGCEValue(), nil
 	}
 	fwdRule, err := gce.GetAlphaRegionForwardingRule(name, region)
 	if err != nil {

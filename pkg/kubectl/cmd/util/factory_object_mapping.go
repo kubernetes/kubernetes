@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/categories"
@@ -132,7 +131,7 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	if err != nil {
 		return nil, err
 	}
-	if err := client.SetKubernetesDefaults(cfg); err != nil {
+	if err := setKubernetesDefaults(cfg); err != nil {
 		return nil, err
 	}
 	gvk := mapping.GroupVersionKind
@@ -166,9 +165,7 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 }
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		// if we can't make a client for this group/version, go generic if possible
 		if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
@@ -219,7 +216,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 }
 
 func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -282,8 +279,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 }
 
 func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -307,8 +303,7 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 }
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, clientsetErr := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
 	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 
 	if kubectl.IsNoSuchReaperError(reaperErr) {
@@ -367,7 +362,7 @@ func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*
 }
 
 func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(nil)
+	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
 		return nil, err
 	}

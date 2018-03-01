@@ -36,8 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type azureDiskDetacher struct {
@@ -249,8 +248,8 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	options := []string{}
 	if notMnt {
-		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
-		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
+		mountOptions := util.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
 			if cleanErr := os.Remove(deviceMountPath); cleanErr != nil {
@@ -268,7 +267,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 		return fmt.Errorf("invalid disk to detach: %q", diskURI)
 	}
 
-	_, err := d.cloud.InstanceID(context.TODO(), nodeName)
+	instanceid, err := d.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		glog.Warningf("no instance id for node %q, skip detaching (%v)", nodeName, err)
 		return nil
@@ -280,6 +279,10 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 	if err != nil {
 		return err
 	}
+
+	getLunMutex.LockKey(instanceid)
+	defer getLunMutex.UnlockKey(instanceid)
+
 	err = diskController.DetachDiskByName("", diskURI, nodeName)
 	if err != nil {
 		glog.Errorf("failed to detach azure disk %q, err %v", diskURI, err)
@@ -291,7 +294,7 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
+	err := util.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
 	if err == nil {
 		glog.V(4).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {

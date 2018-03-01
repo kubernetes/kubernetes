@@ -179,7 +179,9 @@ func (e *endpointImpl) run() {
 // allocate issues Allocate gRPC call to the device plugin.
 func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
-		DevicesIDs: devs,
+		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
+			{DevicesIDs: devs},
+		},
 	})
 }
 

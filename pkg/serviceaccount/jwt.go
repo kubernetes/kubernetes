@@ -38,6 +38,7 @@ import (
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
 type ServiceAccountTokenGetter interface {
 	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
+	GetPod(namespace, name string) (*v1.Pod, error)
 	GetSecret(namespace, name string) (*v1.Secret, error)
 }
 

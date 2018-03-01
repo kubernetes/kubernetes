@@ -183,6 +183,9 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
 	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, *b.pod); err != nil {
+		return err
+	}
 
 	data, err := CollectData(b.source.Items, b.pod, b.plugin.host, b.source.DefaultMode)
 	if err != nil {
@@ -283,7 +286,7 @@ func (c *downwardAPIVolumeUnmounter) TearDown() error {
 }
 
 func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
-	return volume.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
+	return volumeutil.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
 }
 
 func (b *downwardAPIVolumeMounter) getMetaDir() string {

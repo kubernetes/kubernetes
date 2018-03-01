@@ -43,13 +43,11 @@ aliases:
     - ixdy
     - rmmh
     - spiffxp
-    - spxtr
   sig-testing-approvers:
     - fejta
     - ixdy
     - rmmh
     - spiffxp
-    - spxtr
   sig-node-reviewers:
     - Random-Liu
     - dashpole
@@ -225,9 +223,7 @@ aliases:
     - piosz
     - jsafrane
     - jbeda
-  dep-reviewers:
-    - cblecker
-    - thockin
   dep-approvers:
     - cblecker
     - thockin
+    - sttts

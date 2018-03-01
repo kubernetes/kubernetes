@@ -328,6 +328,8 @@ func (p *sdLogProvider) tryGetName(sdLogEntry sd.LogEntry) (string, bool) {
 
 func convertLogEntry(sdLogEntry sd.LogEntry) (entry utils.LogEntry, err error) {
 	entry = utils.LogEntry{LogName: sdLogEntry.LogName}
+	entry.Location = sdLogEntry.Resource.Labels["location"]
+
 	if sdLogEntry.TextPayload != "" {
 		entry.TextPayload = sdLogEntry.TextPayload
 		return

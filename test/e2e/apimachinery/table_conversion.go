@@ -24,11 +24,13 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
+
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -142,7 +144,15 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}
-		err := c.CoreV1().RESTClient().Get().Resource("services").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
+		sar := &authorizationv1.SelfSubjectAccessReview{
+			Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+				NonResourceAttributes: &authorizationv1.NonResourceAttributes{
+					Path: "/",
+					Verb: "get",
+				},
+			},
+		}
+		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Body(sar).Do().Into(table)
 		Expect(err).To(HaveOccurred())
 		Expect(err.(errors.APIStatus).Status().Code).To(Equal(int32(406)))
 	})

@@ -36,7 +36,7 @@ spec:
         hostPath:
           path: /dev
       containers:
-      - image: "k8s.gcr.io/nvidia-gpu-device-plugin@sha256:0e79da6998a61257585e0d3fb5848240129f0fa5b4ad972dfed4049448093c33"
+      - image: "k8s.gcr.io/nvidia-gpu-device-plugin@sha256:0842734032018be107fa2490c98156992911e3e1f2a21e059ff0105b07dd8e9e"
         command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
         name: nvidia-gpu-device-plugin
         resources:

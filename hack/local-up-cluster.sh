@@ -817,14 +817,14 @@ kind: KubeProxyConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
 hostnameOverride: ${HOSTNAME_OVERRIDE}
-featureGates: ${FEATURE_GATES}
 mode: ${KUBE_PROXY_MODE}
 EOF
 
     sudo "${GO_OUT}/hyperkube" proxy \
+      --v=${LOG_LEVEL} \
+      --feature-gates="${FEATURE_GATES}" \
       --config=/tmp/kube-proxy.yaml \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" \
-      --v=${LOG_LEVEL} 2>&1 &
+      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
@@ -947,6 +947,15 @@ EOF
 fi
 }
 
+# If we are running in the CI, we need a few more things before we can start
+if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
+  echo "Preparing to test ..."
+  ${KUBE_ROOT}/hack/install-etcd.sh
+  export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
+  KUBE_FASTBUILD=true make ginkgo cross
+  apt install -y sudo
+fi
+
 # validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
@@ -1021,4 +1030,11 @@ print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
   while true; do sleep 1; done
+fi
+
+if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
+  cluster/kubectl.sh config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
+  cluster/kubectl.sh config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
+  cluster/kubectl.sh config set-context local --cluster=local --user=myself
+  cluster/kubectl.sh config use-context local
 fi

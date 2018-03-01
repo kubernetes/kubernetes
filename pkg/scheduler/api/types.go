@@ -36,6 +36,14 @@ const (
 	MaxPriority = 10
 	// MaxWeight defines the max weight value.
 	MaxWeight = MaxInt / MaxPriority
+	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
+	HighestUserDefinablePriority = int32(1000000000)
+	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
+	SystemCriticalPriority = 2 * HighestUserDefinablePriority
+	// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
+	// start with scheduling.SystemPriorityClassPrefix which is by default "system-".
+	SystemClusterCritical = "system-cluster-critical"
+	SystemNodeCritical    = "system-node-critical"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -143,6 +151,16 @@ type LabelPreference struct {
 	Presence bool
 }
 
+// ExtenderManagedResource describes the arguments of extended resources
+// managed by an extender.
+type ExtenderManagedResource struct {
+	// Name is the extended resource name.
+	Name v1.ResourceName
+	// IgnoredByScheduler indicates whether kube-scheduler should ignore this
+	// resource when applying predicates.
+	IgnoredByScheduler bool
+}
+
 // ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
@@ -170,6 +188,16 @@ type ExtenderConfig struct {
 	// so the scheduler should only send minimal information about the eligible nodes
 	// assuming that the extender already cached full details of all nodes in the cluster
 	NodeCacheCapable bool
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	ManagedResources []ExtenderManagedResource
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
@@ -230,6 +258,12 @@ type HostPriority struct {
 
 // HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
+
+// SystemPriorityClasses defines special priority classes which are used by system critical pods that should not be preempted by workload pods.
+var SystemPriorityClasses = map[string]int32{
+	SystemClusterCritical: SystemCriticalPriority,
+	SystemNodeCritical:    SystemCriticalPriority + 1000,
+}
 
 func (h HostPriorityList) Len() int {
 	return len(h)

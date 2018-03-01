@@ -53,7 +53,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -937,7 +937,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 
 		if cmad {
 			node.Annotations = make(map[string]string)
-			node.Annotations[volumehelper.ControllerManagedAttachAnnotation] = "true"
+			node.Annotations[util.ControllerManagedAttachAnnotation] = "true"
 		}
 
 		return node
@@ -1089,7 +1089,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[volumehelper.ControllerManagedAttachAnnotation])
+			actualCMAD, _ := strconv.ParseBool(savedNode.Annotations[util.ControllerManagedAttachAnnotation])
 			assert.Equal(t, tc.savedNodeCMAD, actualCMAD, "test [%s]", tc.name)
 		}
 	}

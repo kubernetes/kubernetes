@@ -92,7 +92,10 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
-	err := options.NewEtcdOptions(storageConfig).ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
+	etcdOptions := options.NewEtcdOptions(storageConfig)
+	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
+	etcdOptions.EnableWatchCache = false
+	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)
 	}

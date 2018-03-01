@@ -78,5 +78,5 @@ func (cu *cadvisorClient) WatchEvents(request *events.Request) (*events.EventCha
 }
 
 func (cu *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
-	return cadvisorapiv2.FsInfo{}, nil
+	return cu.winStatsClient.GetDirFsInfo(path)
 }

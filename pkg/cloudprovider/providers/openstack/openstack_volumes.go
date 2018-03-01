@@ -412,7 +412,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 
 	volSizeBytes := newSize.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(k8s_volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	volSizeGB := int(volumeutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", volSizeGB))
 
 	// if volume size equals to or greater than the newSize, return nil

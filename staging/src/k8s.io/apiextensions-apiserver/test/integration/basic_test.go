@@ -35,7 +35,7 @@ import (
 )
 
 func TestServerUp(t *testing.T) {
-	stopCh, _, _, err := testserver.StartDefaultServer()
+	stopCh, _, _, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestServerUp(t *testing.T) {
 }
 
 func TestNamespaceScopedCRUD(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestNamespaceScopedCRUD(t *testing.T) {
 }
 
 func TestClusterScopedCRUD(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestDiscovery(t *testing.T) {
 	group := "mygroup.example.com"
 	version := "v1beta1"
 
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,10 +388,14 @@ func TestDiscovery(t *testing.T) {
 	if !reflect.DeepEqual([]string(r.Verbs), expectedVerbs) {
 		t.Fatalf("Unexpected verbs for resource \"noxus\" in group version %v/%v via discovery: expected=%v got=%v", group, version, expectedVerbs, r.Verbs)
 	}
+
+	if !reflect.DeepEqual(r.Categories, []string{"all"}) {
+		t.Fatalf("Expected exactly the category \"all\" in group version %v/%v via discovery, got: %v", group, version, r.Categories)
+	}
 }
 
 func TestNoNamespaceReject(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +434,7 @@ func TestNoNamespaceReject(t *testing.T) {
 }
 
 func TestSameNameDiffNamespace(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,7 +454,7 @@ func TestSameNameDiffNamespace(t *testing.T) {
 }
 
 func TestSelfLink(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,7 +507,7 @@ func TestSelfLink(t *testing.T) {
 }
 
 func TestPreserveInt(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,7 +552,7 @@ func TestPreserveInt(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,7 +626,7 @@ func TestPatch(t *testing.T) {
 }
 
 func TestCrossNamespaceListWatch(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -758,7 +762,7 @@ func checkNamespacesWatchHelper(t *testing.T, ns string, namespacedwatch watch.I
 }
 
 func TestNameConflict(t *testing.T) {
-	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	if err != nil {
 		t.Fatal(err)
 	}

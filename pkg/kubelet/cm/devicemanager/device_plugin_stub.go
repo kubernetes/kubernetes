@@ -130,6 +130,11 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerF
 	return nil
 }
 
+// GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.
+func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+	return &pluginapi.DevicePluginOptions{}, nil
+}
+
 // PreStartContainer resets the devices received
 func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	log.Printf("PreStartContainer, %+v", r)

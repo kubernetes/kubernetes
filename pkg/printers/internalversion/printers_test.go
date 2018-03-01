@@ -2169,6 +2169,161 @@ func TestPrintHPA(t *testing.T) {
 			},
 			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t4\t<unknown>\n",
 		},
+		// external source type, target average value (no current)
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:         "some-external-metric",
+								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m (avg)\t2\t10\t4\t<unknown>\n",
+		},
+		// external source type, target average value
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:         "some-external-metric",
+								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricStatus{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:          "some-external-metric",
+								CurrentAverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t50m/100m (avg)\t2\t10\t4\t<unknown>\n",
+		},
+		// external source type, target value (no current)
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:  "some-service-metric",
+								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+		},
+		// external source type, target value
+		{
+			autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricSource{
+								MetricSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"label": "value",
+									},
+								},
+								MetricName:  "some-external-metric",
+								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ExternalMetricSourceType,
+							External: &autoscaling.ExternalMetricStatus{
+								MetricName:   "some-external-metric",
+								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+							},
+						},
+					},
+				},
+			},
+			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+		},
 		// pods source type (no current)
 		{
 			autoscaling.HorizontalPodAutoscaler{

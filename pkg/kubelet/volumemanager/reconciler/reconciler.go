@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package reconciler implements interfaces that attempt to reconcile the
-// desired state of the with the actual state of the world by triggering
+// desired state of the world with the actual state of the world by triggering
 // relevant actions (attach, detach, mount, unmount).
 package reconciler
 
@@ -41,10 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world
@@ -359,16 +359,16 @@ func (rc *reconciler) syncStates() {
 	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
 	for _, volume := range podVolumes {
 		if rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			glog.V(4).Info("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+			glog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
 			continue
 		}
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			glog.V(4).Info("Volume exists in actual state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+			glog.V(4).Infof("Volume exists in actual state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
 			continue
 		}
 		reconstructedVolume, err := rc.reconstructVolume(volume)
 		if err != nil {
-			glog.Warning("Could not construct volume information, cleanup the mounts. (pod.UID %s, volume.SpecName %s): %v", volume.podName, volume.volumeSpecName, err)
+			glog.Warningf("Could not construct volume information, cleanup the mounts. (pod.UID %s, volume.SpecName %s): %v", volume.podName, volume.volumeSpecName, err)
 			rc.cleanupMounts(volume)
 			continue
 		}
@@ -443,15 +443,14 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		return nil, err
 	}
 
-	volumeName, err := plugin.GetVolumeName(volumeSpec)
-	if err != nil {
-		return nil, err
-	}
 	var uniqueVolumeName v1.UniqueVolumeName
 	if attachablePlugin != nil {
-		uniqueVolumeName = volumehelper.GetUniqueVolumeName(volume.pluginName, volumeName)
+		uniqueVolumeName, err = util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		uniqueVolumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
+		uniqueVolumeName = util.GetUniqueVolumeNameForNonAttachableVolume(volume.podName, plugin, volumeSpec)
 	}
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
 	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)

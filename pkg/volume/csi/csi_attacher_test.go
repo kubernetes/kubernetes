@@ -19,6 +19,7 @@ package csi
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -383,6 +385,294 @@ func TestAttacherDetach(t *testing.T) {
 				t.Errorf("expecting attachment not to be nil, but it is")
 			}
 		}
+	}
+}
+
+func TestAttacherGetDeviceMountPath(t *testing.T) {
+	// Setup
+	// Create a new attacher
+	plug, _, tmpDir := newTestWatchPlugin(t)
+	defer os.RemoveAll(tmpDir)
+	attacher, err0 := plug.NewAttacher()
+	if err0 != nil {
+		t.Fatalf("failed to create new attacher: %v", err0)
+	}
+	csiAttacher := attacher.(*csiAttacher)
+
+	pluginDir := csiAttacher.plugin.host.GetPluginDir(plug.GetPluginName())
+
+	testCases := []struct {
+		testName          string
+		pvName            string
+		expectedMountPath string
+		shouldFail        bool
+	}{
+		{
+			testName:          "normal test",
+			pvName:            "test-pv1",
+			expectedMountPath: pluginDir + "/pv/test-pv1/globalmount",
+		},
+		{
+			testName:          "no pv name",
+			pvName:            "",
+			expectedMountPath: pluginDir + "/pv/test-pv1/globalmount",
+			shouldFail:        true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test case: %s", tc.testName)
+		var spec *volume.Spec
+
+		// Create spec
+		pv := makeTestPV(tc.pvName, 10, testDriver, "testvol")
+		spec = volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+
+		// Run
+		mountPath, err := csiAttacher.GetDeviceMountPath(spec)
+
+		// Verify
+		if err != nil && !tc.shouldFail {
+			t.Errorf("test should not fail, but error occurred: %v", err)
+		} else if err == nil {
+			if tc.shouldFail {
+				t.Errorf("test should fail, but no error occurred")
+			} else if mountPath != tc.expectedMountPath {
+				t.Errorf("mountPath does not equal expectedMountPath. Got: %s. Expected: %s", mountPath, tc.expectedMountPath)
+			}
+		}
+	}
+}
+
+func TestAttacherMountDevice(t *testing.T) {
+	testCases := []struct {
+		testName        string
+		volName         string
+		devicePath      string
+		deviceMountPath string
+		stageUnstageSet bool
+		shouldFail      bool
+	}{
+		{
+			testName:        "normal",
+			volName:         "test-vol1",
+			devicePath:      "path1",
+			deviceMountPath: "path2",
+			stageUnstageSet: true,
+		},
+		{
+			testName:        "no vol name",
+			volName:         "",
+			devicePath:      "path1",
+			deviceMountPath: "path2",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "no device path",
+			volName:         "test-vol1",
+			devicePath:      "",
+			deviceMountPath: "path2",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "no device mount path",
+			volName:         "test-vol1",
+			devicePath:      "path1",
+			deviceMountPath: "",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "stage_unstage cap not set",
+			volName:         "test-vol1",
+			devicePath:      "path1",
+			deviceMountPath: "path2",
+			stageUnstageSet: false,
+		},
+		{
+			testName:        "stage_unstage not set no vars should not fail",
+			stageUnstageSet: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test case: %s", tc.testName)
+		var spec *volume.Spec
+		pvName := "test-pv"
+
+		// Setup
+		// Create a new attacher
+		plug, fakeWatcher, tmpDir := newTestWatchPlugin(t)
+		defer os.RemoveAll(tmpDir)
+		attacher, err0 := plug.NewAttacher()
+		if err0 != nil {
+			t.Fatalf("failed to create new attacher: %v", err0)
+		}
+		csiAttacher := attacher.(*csiAttacher)
+		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
+
+		nodeName := string(csiAttacher.plugin.host.GetNodeName())
+
+		// Create spec
+		pv := makeTestPV(pvName, 10, testDriver, tc.volName)
+		spec = volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+
+		attachID := getAttachmentName(tc.volName, testDriver, nodeName)
+
+		// Set up volume attachment
+		attachment := makeTestAttachment(attachID, nodeName, pvName)
+		_, err := csiAttacher.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+		if err != nil {
+			t.Fatalf("failed to attach: %v", err)
+		}
+		go func() {
+			fakeWatcher.Delete(attachment)
+		}()
+
+		// Run
+		err = csiAttacher.MountDevice(spec, tc.devicePath, tc.deviceMountPath)
+
+		// Verify
+		if err != nil {
+			if !tc.shouldFail {
+				t.Errorf("test should not fail, but error occurred: %v", err)
+			}
+			return
+		}
+		if err == nil && tc.shouldFail {
+			t.Errorf("test should fail, but no error occurred")
+		}
+
+		// Verify call goes through all the way
+		numStaged := 1
+		if !tc.stageUnstageSet {
+			numStaged = 0
+		}
+
+		cdc := csiAttacher.csiClient.(*csiDriverClient)
+		staged := cdc.nodeClient.(*fake.NodeClient).GetNodeStagedVolumes()
+		if len(staged) != numStaged {
+			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
+		}
+		if tc.stageUnstageSet {
+			gotPath, ok := staged[tc.volName]
+			if !ok {
+				t.Errorf("could not find staged volume: %s", tc.volName)
+			}
+			if gotPath != tc.deviceMountPath {
+				t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, gotPath)
+			}
+		}
+	}
+}
+
+func TestAttacherUnmountDevice(t *testing.T) {
+	testCases := []struct {
+		testName        string
+		volID           string
+		deviceMountPath string
+		stageUnstageSet bool
+		shouldFail      bool
+	}{
+		{
+			testName:        "normal",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
+			stageUnstageSet: true,
+		},
+		{
+			testName:        "no device mount path",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "missing part of device mount path",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "test volume name mismatch",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
+			testName:        "stage_unstage not set",
+			volID:           "project/zone/test-vol1",
+			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
+			stageUnstageSet: false,
+		},
+		{
+			testName:        "stage_unstage not set no vars should not fail",
+			stageUnstageSet: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test case: %s", tc.testName)
+		// Setup
+		// Create a new attacher
+		plug, _, tmpDir := newTestWatchPlugin(t)
+		defer os.RemoveAll(tmpDir)
+		attacher, err0 := plug.NewAttacher()
+		if err0 != nil {
+			t.Fatalf("failed to create new attacher: %v", err0)
+		}
+		csiAttacher := attacher.(*csiAttacher)
+		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
+
+		// Add the volume to NodeStagedVolumes
+		cdc := csiAttacher.csiClient.(*csiDriverClient)
+		cdc.nodeClient.(*fake.NodeClient).AddNodeStagedVolume(tc.volID, tc.deviceMountPath)
+
+		// Make the PV for this object
+		dir := filepath.Dir(tc.deviceMountPath)
+		// dir is now /var/lib/kubelet/plugins/kubernetes.io/csi/pv/{pvname}
+		pvName := filepath.Base(dir)
+		pv := makeTestPV(pvName, 5, "csi", tc.volID)
+		_, err := csiAttacher.k8s.CoreV1().PersistentVolumes().Create(pv)
+		if err != nil && !tc.shouldFail {
+			t.Fatalf("Failed to create PV: %v", err)
+		}
+
+		// Run
+		err = csiAttacher.UnmountDevice(tc.deviceMountPath)
+
+		// Verify
+		if err != nil {
+			if !tc.shouldFail {
+				t.Errorf("test should not fail, but error occurred: %v", err)
+			}
+			return
+		}
+		if err == nil && tc.shouldFail {
+			t.Errorf("test should fail, but no error occurred")
+		}
+
+		// Verify call goes through all the way
+		expectedSet := 0
+		if !tc.stageUnstageSet {
+			expectedSet = 1
+		}
+		staged := cdc.nodeClient.(*fake.NodeClient).GetNodeStagedVolumes()
+		if len(staged) != expectedSet {
+			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", expectedSet, len(staged))
+		}
+
+		_, ok := staged[tc.volID]
+		if ok && tc.stageUnstageSet {
+			t.Errorf("found unexpected staged volume: %s", tc.volID)
+		} else if !ok && !tc.stageUnstageSet {
+			t.Errorf("could not find expected staged volume: %s", tc.volID)
+		}
+
 	}
 }
 

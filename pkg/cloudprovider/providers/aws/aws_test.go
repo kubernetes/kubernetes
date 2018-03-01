@@ -272,6 +272,12 @@ func TestNodeAddresses(t *testing.T) {
 	var instance1 ec2.Instance
 	var instance2 ec2.Instance
 
+	// ClusterID needs to be set
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
 	//0
 	instance0.InstanceId = aws.String("i-0")
 	instance0.PrivateDnsName = aws.String("instance-same.ec2.internal")
@@ -290,6 +296,7 @@ func TestNodeAddresses(t *testing.T) {
 	}
 	instance0.InstanceType = aws.String("c3.large")
 	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance0.Tags = tags
 	state0 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -301,6 +308,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance1.PrivateIpAddress = aws.String("192.168.0.2")
 	instance1.InstanceType = aws.String("c3.large")
 	instance1.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance1.Tags = tags
 	state1 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -313,6 +321,7 @@ func TestNodeAddresses(t *testing.T) {
 	instance2.PublicIpAddress = aws.String("1.2.3.4")
 	instance2.InstanceType = aws.String("c3.large")
 	instance2.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance2.Tags = tags
 	state2 := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -351,12 +360,19 @@ func TestNodeAddresses(t *testing.T) {
 func TestNodeAddressesWithMetadata(t *testing.T) {
 	var instance ec2.Instance
 
+	// ClusterID needs to be set
+	var tag ec2.Tag
+	tag.Key = aws.String(TagNameKubernetesClusterLegacy)
+	tag.Value = aws.String(TestClusterId)
+	tags := []*ec2.Tag{&tag}
+
 	instanceName := "instance.ec2.internal"
 	instance.InstanceId = aws.String("i-0")
 	instance.PrivateDnsName = &instanceName
 	instance.PublicIpAddress = aws.String("2.3.4.5")
 	instance.InstanceType = aws.String("c3.large")
 	instance.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	instance.Tags = tags
 	state := ec2.InstanceState{
 		Name: aws.String("running"),
 	}
@@ -1132,19 +1148,20 @@ func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterId)
 	c, _ := newAWSCloud(CloudConfig{}, awsServices)
 
-	sg1 := "sg-000001"
-	sg2 := "sg-000002"
+	sg1 := map[string]string{ServiceAnnotationLoadBalancerExtraSecurityGroups: "sg-000001"}
+	sg2 := map[string]string{ServiceAnnotationLoadBalancerExtraSecurityGroups: "sg-000002"}
+	sg3 := map[string]string{ServiceAnnotationLoadBalancerExtraSecurityGroups: "sg-000001, sg-000002"}
 
 	tests := []struct {
 		name string
 
-		extraSGsAnnotation string
-		expectedSGs        []string
+		annotations map[string]string
+		expectedSGs []string
 	}{
-		{"No extra SG annotation", "", []string{}},
-		{"Empty extra SGs specified", ", ,,", []string{}},
-		{"SG specified", sg1, []string{sg1}},
-		{"Multiple SGs specified", fmt.Sprintf("%s, %s", sg1, sg2), []string{sg1, sg2}},
+		{"No extra SG annotation", map[string]string{}, []string{}},
+		{"Empty extra SGs specified", map[string]string{ServiceAnnotationLoadBalancerExtraSecurityGroups: ", ,,"}, []string{}},
+		{"SG specified", sg1, []string{sg1[ServiceAnnotationLoadBalancerExtraSecurityGroups]}},
+		{"Multiple SGs specified", sg3, []string{sg1[ServiceAnnotationLoadBalancerExtraSecurityGroups], sg2[ServiceAnnotationLoadBalancerExtraSecurityGroups]}},
 	}
 
 	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroups(TestClusterId, "k8s-elb-aid", "cluster.test")
@@ -1153,7 +1170,7 @@ func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			serviceName := types.NamespacedName{Namespace: "default", Name: "myservice"}
 
-			sgList, err := c.buildELBSecurityGroupList(serviceName, "aid", test.extraSGsAnnotation)
+			sgList, err := c.buildELBSecurityGroupList(serviceName, "aid", test.annotations)
 			assert.NoError(t, err, "buildELBSecurityGroupList failed")
 			extraSGs := sgList[1:]
 			assert.True(t, sets.NewString(test.expectedSGs...).Equal(sets.NewString(extraSGs...)),

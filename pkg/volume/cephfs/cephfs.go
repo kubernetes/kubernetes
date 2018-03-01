@@ -158,7 +158,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			srvRec:       srvRec,
 			mounter:      mounter,
 			plugin:       plugin,
-			mountOptions: volume.MountOptionFromSpec(spec),
+			mountOptions: util.MountOptionFromSpec(spec),
 		},
 	}, nil
 }
@@ -332,7 +332,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	}
 	src += ":" + cephfsVolume.path
 
-	mountOptions := volume.JoinMountOptions(cephfsVolume.mountOptions, opt)
+	mountOptions := util.JoinMountOptions(cephfsVolume.mountOptions, opt)
 	if err = cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}

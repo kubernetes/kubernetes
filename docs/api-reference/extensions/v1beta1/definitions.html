@@ -4496,7 +4496,7 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for the pod. Defaults to "ClusterFirst". Valid values are <em>ClusterFirstWithHostNet</em>, <em>ClusterFirst</em>, <em>Default</em> or <em>None</em>. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstWithHostNet</em>. Note that <em>None</em> policy is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for the pod. Defaults to "ClusterFirst". Valid values are <em>ClusterFirstWithHostNet</em>, <em>ClusterFirst</em>, <em>Default</em> or <em>None</em>. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstWithHostNet</em>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4636,7 +4636,7 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsConfig</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy. This is an alpha feature introduced in v1.9 and CustomPodDNS feature gate must be enabled to use it.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_poddnsconfig">v1.PodDNSConfig</a></p></td>
 <td class="tableblock halign-left valign-top"></td>

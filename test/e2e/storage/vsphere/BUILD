@@ -37,7 +37,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/vsphere",
     deps = [
-        "//pkg/volume/util/volumehelper:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

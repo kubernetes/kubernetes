@@ -80,12 +80,12 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (aws.K
 	} else {
 		tags = *c.options.CloudTags
 	}
-	tags["Name"] = volume.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // AWS tags can have 255 characters
+	tags["Name"] = volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // AWS tags can have 255 characters
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
 	// AWS works with gigabytes, convert to GiB with rounding up
-	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGB := int(volumeutil.RoundUpSize(requestBytes, 1024*1024*1024))
 	volumeOptions := &aws.VolumeOptions{
 		CapacityGB: requestGB,
 		Tags:       tags,

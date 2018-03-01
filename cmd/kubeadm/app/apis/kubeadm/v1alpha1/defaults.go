@@ -116,6 +116,14 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.CRISocket = DefaultCRISocket
 	}
 
+	if len(obj.TokenUsages) == 0 {
+		obj.TokenUsages = constants.DefaultTokenUsages
+	}
+
+	if len(obj.TokenGroups) == 0 {
+		obj.TokenGroups = constants.DefaultTokenGroups
+	}
+
 	if obj.ImageRepository == "" {
 		obj.ImageRepository = DefaultImageRepository
 	}
@@ -197,8 +205,8 @@ func SetDefaults_KubeletConfiguration(obj *MasterConfiguration) {
 	if obj.KubeletConfiguration.BaseConfig == nil {
 		obj.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 	}
-	if obj.KubeletConfiguration.BaseConfig.PodManifestPath == "" {
-		obj.KubeletConfiguration.BaseConfig.PodManifestPath = DefaultManifestsDir
+	if obj.KubeletConfiguration.BaseConfig.StaticPodPath == "" {
+		obj.KubeletConfiguration.BaseConfig.StaticPodPath = DefaultManifestsDir
 	}
 	if obj.KubeletConfiguration.BaseConfig.ClusterDNS == nil {
 		dnsIP, err := constants.GetDNSIP(obj.Networking.ServiceSubnet)

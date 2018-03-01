@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	metricsclientset "k8s.io/metrics/pkg/client/clientset_generated/clientset"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -200,16 +199,8 @@ func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	return f.clientCache.KubernetesClientSetForVersion(nil)
 }
 
-func (f *ring0Factory) MetricsClientSet() (metricsclientset.Interface, error) {
-	return f.clientCache.MetricsClientSetForVersion(nil)
-}
-
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
 	return f.clientCache.ClientSetForVersion(nil)
-}
-
-func (f *ring0Factory) ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error) {
-	return f.clientCache.ClientSetForVersion(requiredVersion)
 }
 
 func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
@@ -217,10 +208,6 @@ func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
 }
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientConfig.ClientConfig()
-}
-
-func (f *ring0Factory) ClientConfigForVersion(requiredVersion *schema.GroupVersion) (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {

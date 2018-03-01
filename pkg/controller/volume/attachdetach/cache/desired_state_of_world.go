@@ -28,9 +28,9 @@ import (
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // DesiredStateOfWorld defines a set of thread-safe operations supported on
@@ -40,14 +40,14 @@ import (
 // should be attached to the specified node, and pods are the pods that
 // reference the volume and are scheduled to that node.
 // Note: This is distinct from the DesiredStateOfWorld implemented by the
-// kubelet volume manager. The both keep track of different objects. This
+// kubelet volume manager. They both keep track of different objects. This
 // contains attach/detach controller specific state.
 type DesiredStateOfWorld interface {
 	// AddNode adds the given node to the list of nodes managed by the attach/
 	// detach controller.
 	// If the node already exists this is a no-op.
 	// keepTerminatedPodVolumes is a property of the node that determines
-	// if for terminated pods volumes should be mounted and attached.
+	// if volumes should be mounted and attached for terminated pods.
 	AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool)
 
 	// AddPod adds the given pod to the list of pods that reference the
@@ -167,7 +167,7 @@ type nodeManaged struct {
 // The volumeToAttach object represents a volume that should be attached to a node.
 type volumeToAttach struct {
 	// multiAttachErrorReported indicates whether the multi-attach error has been reported for the given volume.
-	// It is used to to prevent reporting the error from being reported more than once for a given volume.
+	// It is used to prevent reporting the error from being reported more than once for a given volume.
 	multiAttachErrorReported bool
 
 	// volumeName contains the unique identifier for this volume.
@@ -231,11 +231,12 @@ func (dsw *desiredStateOfWorld) AddPod(
 			err)
 	}
 
-	volumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
+	volumeName, err := util.GetUniqueVolumeNameFromSpec(
 		attachableVolumePlugin, volumeSpec)
 	if err != nil {
 		return "", fmt.Errorf(
-			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
+			"failed to get UniqueVolumeName from volumeSpec for plugin=%q and volume=%q err=%v",
+			attachableVolumePlugin.GetPluginName(),
 			volumeSpec.Name(),
 			err)
 	}

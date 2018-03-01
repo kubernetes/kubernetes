@@ -113,7 +113,8 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetri
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
-	stats := newContainerStats(libcontainerStats)
+	withPerCPU := !ignoreMetrics.Has(container.PerCpuUsageMetrics)
+	stats := newContainerStats(libcontainerStats, withPerCPU)
 
 	// If we know the pid then get network stats from /proc/<pid>/net/dev
 	if pid == 0 {
@@ -467,14 +468,17 @@ func minUint32(x, y uint32) uint32 {
 var numCpusFunc = getNumberOnlineCPUs
 
 // Convert libcontainer stats to info.ContainerStats.
-func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
+func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 	ret.Cpu.Usage.User = s.CpuStats.CpuUsage.UsageInUsermode
 	ret.Cpu.Usage.System = s.CpuStats.CpuUsage.UsageInKernelmode
-	ret.Cpu.Usage.Total = 0
+	ret.Cpu.Usage.Total = s.CpuStats.CpuUsage.TotalUsage
 	ret.Cpu.CFS.Periods = s.CpuStats.ThrottlingData.Periods
 	ret.Cpu.CFS.ThrottledPeriods = s.CpuStats.ThrottlingData.ThrottledPeriods
 	ret.Cpu.CFS.ThrottledTime = s.CpuStats.ThrottlingData.ThrottledTime
 
+	if !withPerCPU {
+		return
+	}
 	if len(s.CpuStats.CpuUsage.PercpuUsage) == 0 {
 		// libcontainer's 'GetStats' can leave 'PercpuUsage' nil if it skipped the
 		// cpuacct subsystem.
@@ -501,7 +505,6 @@ func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
 
 	for i := uint32(0); i < numActual; i++ {
 		ret.Cpu.Usage.PerCpu[i] = s.CpuStats.CpuUsage.PercpuUsage[i]
-		ret.Cpu.Usage.Total += s.CpuStats.CpuUsage.PercpuUsage[i]
 	}
 
 }
@@ -587,13 +590,13 @@ func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerS
 	}
 }
 
-func newContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {
+func newContainerStats(libcontainerStats *libcontainer.Stats, withPerCPU bool) *info.ContainerStats {
 	ret := &info.ContainerStats{
 		Timestamp: time.Now(),
 	}
 
 	if s := libcontainerStats.CgroupStats; s != nil {
-		setCpuStats(s, ret)
+		setCpuStats(s, ret, withPerCPU)
 		setDiskIoStats(s, ret)
 		setMemoryStats(s, ret)
 	}

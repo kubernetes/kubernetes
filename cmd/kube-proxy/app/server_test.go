@@ -28,12 +28,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/util/configz"
-	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -52,6 +50,10 @@ type fakeIPTablesVersioner struct {
 
 func (fake *fakeIPTablesVersioner) GetVersion() (string, error) {
 	return fake.version, fake.err
+}
+
+func (fake *fakeIPTablesVersioner) IsCompatible() error {
+	return fake.err
 }
 
 type fakeIPSetVersioner struct {
@@ -81,232 +83,6 @@ type fakeKernelHandler struct {
 
 func (fake *fakeKernelHandler) GetModules() ([]string, error) {
 	return fake.modules, nil
-}
-
-func Test_getProxyMode(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("skipping on non-Linux")
-	}
-	var cases = []struct {
-		flag            string
-		annotationKey   string
-		annotationVal   string
-		iptablesVersion string
-		ipsetVersion    string
-		kmods           []string
-		kernelCompat    bool
-		iptablesError   error
-		ipsetError      error
-		expected        string
-	}{
-		{ // flag says userspace
-			flag:     "userspace",
-			expected: proxyModeUserspace,
-		},
-		{ // flag says iptables, error detecting version
-			flag:          "iptables",
-			iptablesError: fmt.Errorf("oops!"),
-			expected:      proxyModeUserspace,
-		},
-		{ // flag says iptables, version too low
-			flag:            "iptables",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says iptables, version ok, kernel not compatible
-			flag:            "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says iptables, version ok, kernel is compatible
-			flag:            "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // detect, error
-			flag:          "",
-			iptablesError: fmt.Errorf("oops!"),
-			expected:      proxyModeUserspace,
-		},
-		{ // detect, version too low
-			flag:            "",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // detect, version ok, kernel not compatible
-			flag:            "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-		{ // detect, version ok, kernel is compatible
-			flag:            "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // specify ipvs, feature gateway disabled, iptables version ok, kernel is compatible
-			flag:            "ipvs",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // specify ipvs, feature gateway disabled, iptables version too low
-			flag:            "ipvs",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // specify ipvs, feature gateway disabled, iptables version ok, kernel is not compatible
-			flag:            "ipvs",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-	}
-	for i, c := range cases {
-		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
-		kcompater := &fakeKernelCompatTester{c.kernelCompat}
-		ipsetver := &fakeIPSetVersioner{c.ipsetVersion, c.ipsetError}
-		khandler := &fakeKernelHandler{c.kmods}
-		r := getProxyMode(c.flag, versioner, khandler, ipsetver, kcompater)
-		if r != c.expected {
-			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
-		}
-	}
-}
-
-// This is a coarse test, but it offers some modicum of confidence as the code is evolved.
-func Test_getProxyModeEnableFeatureGateway(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("skipping on non-Linux")
-	}
-
-	// enable IPVS feature gateway
-	utilfeature.DefaultFeatureGate.Set("SupportIPVSProxyMode=true")
-
-	var cases = []struct {
-		flag            string
-		iptablesVersion string
-		ipsetVersion    string
-		kernelCompat    bool
-		iptablesError   error
-		ipsetError      error
-		mods            []string
-		expected        string
-	}{
-		{ // flag says userspace
-			flag:     "userspace",
-			expected: proxyModeUserspace,
-		},
-		{ // flag says iptables, error detecting version
-			flag:          "iptables",
-			iptablesError: fmt.Errorf("oops!"),
-			expected:      proxyModeUserspace,
-		},
-		{ // flag says iptables, version too low
-			flag:            "iptables",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says iptables, version ok, kernel not compatible
-			flag:            "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says iptables, version ok, kernel is compatible
-			flag:            "iptables",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // detect, error
-			flag:          "",
-			iptablesError: fmt.Errorf("oops!"),
-			expected:      proxyModeUserspace,
-		},
-		{ // detect, version too low
-			flag:            "",
-			iptablesVersion: "0.0.0",
-			expected:        proxyModeUserspace,
-		},
-		{ // detect, version ok, kernel not compatible
-			flag:            "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-		{ // detect, version ok, kernel is compatible
-			flag:            "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // detect, version ok, kernel is compatible
-			flag:            "",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // flag says ipvs, ipset version ok, kernel modules installed
-			flag:         "ipvs",
-			mods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			ipsetVersion: ipvs.MinIPSetCheckVersion,
-			expected:     proxyModeIPVS,
-		},
-		{ // flag says ipvs, ipset version too low, fallback on iptables mode
-			flag:            "ipvs",
-			mods:            []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			ipsetVersion:    "0.0",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // flag says ipvs, bad ipset version, fallback on iptables mode
-			flag:            "ipvs",
-			mods:            []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			ipsetVersion:    "a.b.c",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // flag says ipvs, required kernel modules are not installed, fallback on iptables mode
-			flag:            "ipvs",
-			mods:            []string{"foo", "bar", "baz"},
-			ipsetVersion:    ipvs.MinIPSetCheckVersion,
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    true,
-			expected:        proxyModeIPTables,
-		},
-		{ // flag says ipvs, required kernel modules are not installed, iptables version too old, fallback on userspace mode
-			flag:            "ipvs",
-			mods:            []string{"foo", "bar", "baz"},
-			ipsetVersion:    ipvs.MinIPSetCheckVersion,
-			iptablesVersion: "0.0.0",
-			kernelCompat:    true,
-			expected:        proxyModeUserspace,
-		},
-		{ // flag says ipvs, ipset version too low, iptables version too old, kernel not compatible, fallback on userspace mode
-			flag:            "ipvs",
-			mods:            []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
-			ipsetVersion:    "0.0",
-			iptablesVersion: iptables.MinCheckVersion,
-			kernelCompat:    false,
-			expected:        proxyModeUserspace,
-		},
-	}
-	for i, c := range cases {
-		versioner := &fakeIPTablesVersioner{c.iptablesVersion, c.iptablesError}
-		kcompater := &fakeKernelCompatTester{c.kernelCompat}
-		ipsetver := &fakeIPSetVersioner{c.ipsetVersion, c.ipsetError}
-		khandle := &fakeKernelHandler{c.mods}
-		r := getProxyMode(c.flag, versioner, khandle, ipsetver, kcompater)
-		if r != c.expected {
-			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
-		}
-	}
 }
 
 // This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
@@ -413,7 +189,8 @@ conntrack:
   min: 1
   tcpCloseWaitTimeout: 10s
   tcpEstablishedTimeout: 20s
-featureGates: "all"
+featureGates:
+  SupportIPVSProxyMode: true
 healthzBindAddress: "%s"
 hostnameOverride: "foo"
 iptables:
@@ -431,6 +208,9 @@ oomScoreAdj: 17
 portRange: "2-7"
 resourceContainer: /foo
 udpIdleTimeout: 123ms
+nodePortAddresses:
+  - "10.20.30.40/16"
+  - "fd00:1::0/64"
 `
 
 	testCases := []struct {
@@ -524,7 +304,7 @@ udpIdleTimeout: 123ms
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
-			FeatureGates:       "all",
+			FeatureGates:       map[string]bool{string(features.SupportIPVSProxyMode): true},
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
@@ -543,6 +323,7 @@ udpIdleTimeout: 123ms
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
+			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 		}
 
 		options := NewOptions()

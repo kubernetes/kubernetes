@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["controllermanager.go"],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app",
+    visibility = ["//visibility:public"],
     deps = [
         "//cmd/cloud-controller-manager/app/config:go_default_library",
         "//cmd/cloud-controller-manager/app/options:go_default_library",
@@ -49,4 +45,5 @@ filegroup(
         "//cmd/cloud-controller-manager/app/options:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

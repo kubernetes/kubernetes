@@ -32,7 +32,7 @@ import (
 func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	deleted := false
@@ -64,7 +64,7 @@ func TestReplaceObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(f, buf)
+	cmd := NewCmdReplace(tf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -88,7 +88,7 @@ func TestReplaceObject(t *testing.T) {
 func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	redisMasterDeleted := false
@@ -134,7 +134,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(f, buf)
+	cmd := NewCmdReplace(tf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
@@ -158,7 +158,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 func TestReplaceDirectory(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	created := map[string]bool{}
@@ -191,7 +191,7 @@ func TestReplaceDirectory(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(f, buf)
+	cmd := NewCmdReplace(tf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy")
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("output", "name")
@@ -215,7 +215,7 @@ func TestReplaceDirectory(t *testing.T) {
 func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -237,7 +237,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(f, buf)
+	cmd := NewCmdReplace(tf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")

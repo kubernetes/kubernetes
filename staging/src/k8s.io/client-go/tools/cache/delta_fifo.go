@@ -38,9 +38,22 @@ import (
 // TODO: consider merging keyLister with this object, tracking a list of
 //       "known" keys when Pop() is called. Have to think about how that
 //       affects error retrying.
-// TODO(lavalamp): I believe there is a possible race only when using an
-//                 external known object source that the above TODO would
-//                 fix.
+// NOTE: It is possible to misuse this and cause a race when using an
+//       external known object source.
+//       Whether there is a potential race depends on how the comsumer
+//       modifies knownObjects. In Pop(), process function is called under
+//       lock, so it is safe to update data structures in it that need to be
+//       in sync with the queue (e.g. knownObjects).
+//
+//       Example:
+//       In case of sharedIndexInformer being a consumer
+//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/
+//       src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
+//       there is no race as knownObjects (s.indexer) is modified safely
+//       under DeltaFIFO's lock. The only exceptions are GetStore() and
+//       GetIndexer() methods, which expose ways to modify the underlying
+//       storage. Currently these two methods are used for creating Lister
+//       and internal tests.
 //
 // Also see the comment on DeltaFIFO.
 func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
@@ -199,8 +212,6 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 		if err == nil && !exists && !itemsExist {
 			// Presumably, this was deleted when a relist happened.
 			// Don't provide a second report of the same deletion.
-			// TODO(lavalamp): This may be racy-- we aren't properly locked
-			// with knownObjects.
 			return nil
 		}
 	}
@@ -485,8 +496,6 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	}
 
 	// Detect deletions not already in the queue.
-	// TODO(lavalamp): This may be racy-- we aren't properly locked
-	// with knownObjects. Unproven.
 	knownKeys := f.knownObjects.ListKeys()
 	queuedDeletions := 0
 	for _, k := range knownKeys {

@@ -25,20 +25,11 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-)
-
-const (
-	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
-	minShares     = 2
-	sharesPerCPU  = 1024
-	milliCPUToCPU = 1000
-
-	// 100000 is equivalent to 100ms
-	quotaPeriod    = 100 * minQuotaPeriod
-	minQuotaPeriod = 1000
 )
 
 type podsByID []*kubecontainer.Pod
@@ -158,45 +149,6 @@ func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
 	return false
 }
 
-// milliCPUToShares converts milliCPU to CPU shares
-func milliCPUToShares(milliCPU int64) int64 {
-	if milliCPU == 0 {
-		// Return 2 here to really match kernel default for zero milliCPU.
-		return minShares
-	}
-	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
-	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
-	if shares < minShares {
-		return minShares
-	}
-	return shares
-}
-
-// milliCPUToQuota converts milliCPU to CFS quota and period values
-func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
-	// CFS quota is measured in two values:
-	//  - cfs_period_us=100ms (the amount of time to measure usage across)
-	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
-	// so in the above example, you are limited to 20% of a single CPU
-	// for multi-cpu environments, you just scale equivalent amounts
-	if milliCPU == 0 {
-		return
-	}
-
-	// we set the period to 100ms by default
-	period = quotaPeriod
-
-	// we then convert your milliCPU to a value normalized over a period
-	quota = (milliCPU * quotaPeriod) / milliCPUToCPU
-
-	// quota needs to be a minimum of 1ms.
-	if quota < minQuotaPeriod {
-		quota = minQuotaPeriod
-	}
-
-	return
-}
-
 // getStableKey generates a key (string) to uniquely identify a
 // (pod, container) tuple. The key should include the content of the
 // container, so that any change to the container generates a new key.
@@ -303,7 +255,9 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 		if pod.Spec.HostPID {
 			return runtimeapi.NamespaceMode_NODE
 		}
-		// TODO(verb): set NamespaceMode_POD based on ShareProcessNamespace after #58716 is merged
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
+			return runtimeapi.NamespaceMode_POD
+		}
 	}
 	// Note that PID does not default to the zero value for v1.Pod
 	return runtimeapi.NamespaceMode_CONTAINER

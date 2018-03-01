@@ -17,6 +17,8 @@ limitations under the License.
 package factory
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -532,4 +534,86 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 	)
+}
+
+type fakeExtender struct {
+	isBinder          bool
+	interestedPodName string
+}
+
+func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
+	return nil, nil, nil
+}
+
+func (f *fakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error) {
+	return nil, 0, nil
+}
+
+func (f *fakeExtender) Bind(binding *v1.Binding) error {
+	if f.isBinder {
+		return nil
+	}
+	return errors.New("not a binder")
+}
+
+func (f *fakeExtender) IsBinder() bool {
+	return f.isBinder
+}
+
+func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
+	return pod != nil && pod.Name == f.interestedPodName
+}
+
+func TestGetBinderFunc(t *testing.T) {
+	for _, test := range []struct {
+		podName   string
+		extenders []algorithm.SchedulerExtender
+
+		expectedBinderType string
+	}{
+		// Expect to return the default binder because the extender is not a
+		// binder, even though it's interested in the pod.
+		{
+			podName: "pod0",
+			extenders: []algorithm.SchedulerExtender{
+				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
+			},
+			expectedBinderType: "*factory.binder",
+		},
+		// Expect to return the fake binder because one of the extenders is a
+		// binder and it's interested in the pod.
+		{
+			podName: "pod0",
+			extenders: []algorithm.SchedulerExtender{
+				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
+				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
+			},
+			expectedBinderType: "*factory.fakeExtender",
+		},
+		// Expect to return the default binder because one of the extenders is
+		// a binder but the binder is not interested in the pod.
+		{
+			podName: "pod1",
+			extenders: []algorithm.SchedulerExtender{
+				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
+				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
+			},
+			expectedBinderType: "*factory.binder",
+		},
+	} {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: test.podName,
+			},
+		}
+
+		f := &configFactory{}
+		binderFunc := f.getBinderFunc(test.extenders)
+		binder := binderFunc(pod)
+
+		binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
+		if binderType != test.expectedBinderType {
+			t.Errorf("Expected binder %q but got %q", test.expectedBinderType, binderType)
+		}
+	}
 }

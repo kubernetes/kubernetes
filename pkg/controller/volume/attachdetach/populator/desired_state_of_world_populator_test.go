@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
@@ -66,7 +66,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	fakePodInformer.Informer().GetStore().Add(pod)
 
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
 

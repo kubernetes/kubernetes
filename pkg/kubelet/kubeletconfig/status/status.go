@@ -113,8 +113,12 @@ type ConfigOkCondition interface {
 type configOkCondition struct {
 	// conditionMux is a mutex on the condition, alternate between setting and syncing the condition
 	conditionMux sync.Mutex
-	// condition is the current ConfigOk node condition, which will be reported in the Node.status.conditions
-	condition *apiv1.NodeCondition
+	// message will appear as the condition's message
+	message string
+	// reason will appear as the condition's reason
+	reason string
+	// status will appear as the condition's status
+	status apiv1.ConditionStatus
 	// failedSyncReason is sent in place of the usual reason when the Kubelet is failing to sync the remote config
 	failedSyncReason string
 	// pendingCondition; write to this channel to indicate that ConfigOk needs to be synced to the API server
@@ -124,6 +128,9 @@ type configOkCondition struct {
 // NewConfigOkCondition returns a new ConfigOkCondition
 func NewConfigOkCondition() ConfigOkCondition {
 	return &configOkCondition{
+		message: EmptyMessage,
+		reason:  EmptyReason,
+		status:  apiv1.ConditionUnknown,
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingCondition: make(chan bool, 1),
 	}
@@ -135,23 +142,23 @@ func NewConfigOkCondition() ConfigOkCondition {
 func (c *configOkCondition) unsafeSet(message, reason string, status apiv1.ConditionStatus) {
 	// We avoid an empty Message, Reason, or Status on the condition. Since we use Patch to update conditions, an empty
 	// field might cause a value from a previous condition to leak through, which can be very confusing.
+
+	// message
 	if len(message) == 0 {
 		message = EmptyMessage
 	}
+	c.message = message
+	// reason
 	if len(reason) == 0 {
 		reason = EmptyReason
 	}
+	c.reason = reason
+	// status
 	if len(string(status)) == 0 {
 		status = apiv1.ConditionUnknown
 	}
-
-	c.condition = &apiv1.NodeCondition{
-		Message: message,
-		Reason:  reason,
-		Status:  status,
-		Type:    apiv1.NodeKubeletConfigOk,
-	}
-
+	c.status = status
+	// always poke worker after update
 	c.pokeSyncWorker()
 }
 
@@ -211,11 +218,6 @@ func (c *configOkCondition) Sync(client clientset.Interface, nodeName string) {
 		}
 	}()
 
-	if c.condition == nil {
-		utillog.Infof("ConfigOk condition is nil, skipping ConfigOk sync")
-		return
-	}
-
 	// get the Node so we can check the current condition
 	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
@@ -223,29 +225,32 @@ func (c *configOkCondition) Sync(client clientset.Interface, nodeName string) {
 		return
 	}
 
+	// construct the node condition
+	condition := &apiv1.NodeCondition{
+		Type:    apiv1.NodeKubeletConfigOk,
+		Message: c.message,
+		Reason:  c.reason,
+		Status:  c.status,
+	}
+
+	// overlay failed sync reason, if necessary
+	if len(c.failedSyncReason) > 0 {
+		condition.Reason = c.failedSyncReason
+		condition.Status = apiv1.ConditionFalse
+	}
+
 	// set timestamps
 	syncTime := metav1.NewTime(time.Now())
-	c.condition.LastHeartbeatTime = syncTime
-	if remote := getKubeletConfigOk(node.Status.Conditions); remote == nil || !utilequal.KubeletConfigOkEq(remote, c.condition) {
+	condition.LastHeartbeatTime = syncTime
+	if remote := getKubeletConfigOk(node.Status.Conditions); remote == nil || !utilequal.KubeletConfigOkEq(remote, condition) {
 		// update transition time the first time we create the condition,
 		// or if we are semantically changing the condition
-		c.condition.LastTransitionTime = syncTime
+		condition.LastTransitionTime = syncTime
 	} else {
 		// since the conditions are semantically equal, use lastTransitionTime from the condition currently on the Node
 		// we need to do this because the field will always be represented in the patch generated below, and this copy
 		// prevents nullifying the field during the patch operation
-		c.condition.LastTransitionTime = remote.LastTransitionTime
-	}
-
-	// overlay the failedSyncReason if necessary
-	var condition *apiv1.NodeCondition
-	if len(c.failedSyncReason) > 0 {
-		// get a copy of the condition before we add the overlay
-		condition = c.condition.DeepCopy()
-		condition.Reason = c.failedSyncReason
-		condition.Status = apiv1.ConditionFalse
-	} else {
-		condition = c.condition
+		condition.LastTransitionTime = remote.LastTransitionTime
 	}
 
 	// generate the patch

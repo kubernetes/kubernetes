@@ -1560,6 +1560,10 @@
      "resource": {
       "$ref": "v2beta1.ResourceMetricSource",
       "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
+     },
+     "external": {
+      "$ref": "v2beta1.ExternalMetricSource",
+      "description": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster)."
      }
     }
    },
@@ -1623,6 +1627,73 @@
      "targetAverageValue": {
       "type": "string",
       "description": "targetAverageValue is the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type."
+     }
+    }
+   },
+   "v2beta1.ExternalMetricSource": {
+    "id": "v2beta1.ExternalMetricSource",
+    "description": "ExternalMetricSource indicates how to scale on a metric not associated with any Kubernetes object (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster). Exactly one \"target\" type should be set.",
+    "required": [
+     "metricName"
+    ],
+    "properties": {
+     "metricName": {
+      "type": "string",
+      "description": "metricName is the name of the metric in question."
+     },
+     "metricSelector": {
+      "$ref": "v1.LabelSelector",
+      "description": "metricSelector is used to identify a specific time series within a given metric."
+     },
+     "targetValue": {
+      "type": "string",
+      "description": "targetValue is the target value of the metric (as a quantity). Mutually exclusive with TargetAverageValue."
+     },
+     "targetAverageValue": {
+      "type": "string",
+      "description": "targetAverageValue is the target per-pod value of global metric (as a quantity). Mutually exclusive with TargetValue."
+     }
+    }
+   },
+   "v1.LabelSelector": {
+    "id": "v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.LabelSelectorRequirement": {
+    "id": "v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
      }
     }
    },
@@ -1693,6 +1764,10 @@
      "resource": {
       "$ref": "v2beta1.ResourceMetricStatus",
       "description": "resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source."
+     },
+     "external": {
+      "$ref": "v2beta1.ExternalMetricStatus",
+      "description": "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster)."
      }
     }
    },
@@ -1757,6 +1832,32 @@
      "currentAverageValue": {
       "type": "string",
       "description": "currentAverageValue is the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification."
+     }
+    }
+   },
+   "v2beta1.ExternalMetricStatus": {
+    "id": "v2beta1.ExternalMetricStatus",
+    "description": "ExternalMetricStatus indicates the current value of a global metric not associated with any Kubernetes object.",
+    "required": [
+     "metricName",
+     "currentValue"
+    ],
+    "properties": {
+     "metricName": {
+      "type": "string",
+      "description": "metricName is the name of a metric used for autoscaling in metric system."
+     },
+     "metricSelector": {
+      "$ref": "v1.LabelSelector",
+      "description": "metricSelector is used to identify a specific time series within a given metric."
+     },
+     "currentValue": {
+      "type": "string",
+      "description": "currentValue is the current value of the metric (as a quantity)"
+     },
+     "currentAverageValue": {
+      "type": "string",
+      "description": "currentAverageValue is the current value of metric averaged over autoscaled pods."
      }
     }
    },

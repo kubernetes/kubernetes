@@ -77,13 +77,13 @@ func testCache(cache cache, t *testing.T) {
 	// when empty, record is stored
 	cache.set("foo", record1, time.Hour)
 	if result, ok := cache.get("foo"); !ok || result != record1 {
-		t.Errorf("Expected %#v, true, got %#v, %v", record1, ok)
+		t.Errorf("Expected %#v, true, got %#v, %v", record1, result, ok)
 	}
 
 	// newer record overrides
 	cache.set("foo", record2, time.Hour)
 	if result, ok := cache.get("foo"); !ok || result != record2 {
-		t.Errorf("Expected %#v, true, got %#v, %v", record2, ok)
+		t.Errorf("Expected %#v, true, got %#v, %v", record2, result, ok)
 	}
 
 	// removing the current value removes

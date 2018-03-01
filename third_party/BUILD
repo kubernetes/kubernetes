@@ -18,6 +18,7 @@ filegroup(
         "//third_party/forked/etcd237/pkg/fileutil:all-srcs",
         "//third_party/forked/etcd237/wal:all-srcs",
         "//third_party/forked/golang/expansion:all-srcs",
+        "//third_party/forked/golang/go/types:all-srcs",
         "//third_party/forked/golang/reflect:all-srcs",
         "//third_party/forked/golang/template:all-srcs",
         "//third_party/forked/gonum/graph:all-srcs",

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	csipb "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +30,7 @@ import (
 )
 
 const (
-	csiPluginName              = "kubernetes.io/csi"
-	csiVolAttribsAnnotationKey = "csi.volume.kubernetes.io/volume-attributes"
+	csiPluginName = "kubernetes.io/csi"
 
 	// TODO (vladimirvivien) implement a more dynamic way to discover
 	// the unix domain socket path for each installed csi driver.
@@ -42,11 +40,6 @@ const (
 	csiTimeout      = 15 * time.Second
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
-)
-
-var (
-	// csiVersion supported csi version
-	csiVersion = &csipb.Version{Major: 0, Minor: 2, Patch: 0}
 )
 
 type csiPlugin struct {

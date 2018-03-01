@@ -43,7 +43,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -1019,16 +1018,8 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 }
 
 func getRandomCloudZone(c clientset.Interface) string {
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// collect values of zone label from all nodes
-	zones := sets.NewString()
-	for _, node := range nodes.Items {
-		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
-			zones.Insert(zone)
-		}
-	}
+	zones, err := framework.GetClusterZones(c)
+	Expect(err).ToNot(HaveOccurred())
 	// return "" in case that no node has zone label
 	zone, _ := zones.PopAny()
 	return zone

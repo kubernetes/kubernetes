@@ -58,6 +58,7 @@ REQUIRED_BINS=(
   "github.com/onsi/ginkgo/ginkgo"
   "github.com/jteeuwen/go-bindata/go-bindata"
   "github.com/tools/godep"
+  "github.com/client9/misspell/cmd/misspell"
   "./..."
 )
 
@@ -88,8 +89,6 @@ hack/update-godep-licenses.sh >/dev/null
 kube::log::status "Creating OWNERS file"
 rm -f "Godeps/OWNERS" "vendor/OWNERS"
 cat <<__EOF__ > "Godeps/OWNERS"
-reviewers:
-- dep-reviewers
 approvers:
 - dep-approvers
 __EOF__

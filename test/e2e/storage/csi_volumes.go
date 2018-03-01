@@ -182,7 +182,6 @@ var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
 		ns     *v1.Namespace
 		node   v1.Node
 		config framework.VolumeTestConfig
-		suffix string
 	)
 
 	BeforeEach(func() {
@@ -197,7 +196,6 @@ var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
 			ServerNodeName:    node.Name,
 			WaitForCompletion: true,
 		}
-		suffix = ns.Name
 	})
 
 	// Create one of these for each of the drivers to be tested

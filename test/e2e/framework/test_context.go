@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -105,8 +106,8 @@ type TestContextType struct {
 	LogexporterGCSPath string
 	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
 	GarbageCollectorEnabled bool
-	// FeatureGates is a set of key=value pairs that describe feature gates for alpha/experimental features.
-	FeatureGates string
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool
 	// Node e2e specific test context
 	NodeTestContextType
 	// Monitoring solution that is used in current cluster.
@@ -205,7 +206,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set", defaultHost))
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+	flag.Var(utilflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")

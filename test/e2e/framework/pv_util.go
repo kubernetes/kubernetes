@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -81,6 +81,7 @@ type PersistentVolumeConfig struct {
 	Labels           labels.Set
 	StorageClassName string
 	NodeAffinity     *v1.VolumeNodeAffinity
+	VolumeMode       *v1.PersistentVolumeMode
 }
 
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to generate a PVC object.
@@ -92,6 +93,7 @@ type PersistentVolumeClaimConfig struct {
 	Annotations      map[string]string
 	Selector         *metav1.LabelSelector
 	StorageClassName *string
+	VolumeMode       *v1.PersistentVolumeMode
 }
 
 // Clean up a pv and pvc in a single pv/pvc test case.
@@ -581,12 +583,12 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			Namespace: pvConfig.Prebind.Namespace,
 		}
 	}
-	pv := &v1.PersistentVolume{
+	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
 			Annotations: map[string]string{
-				volumehelper.VolumeGidAnnotationKey: "777",
+				util.VolumeGidAnnotationKey: "777",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -603,9 +605,9 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			ClaimRef:         claimRef,
 			StorageClassName: pvConfig.StorageClassName,
 			NodeAffinity:     pvConfig.NodeAffinity,
+			VolumeMode:       pvConfig.VolumeMode,
 		},
 	}
-	return pv
 }
 
 // Returns a PVC definition based on the namespace.
@@ -635,6 +637,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 				},
 			},
 			StorageClassName: cfg.StorageClassName,
+			VolumeMode:       cfg.VolumeMode,
 		},
 	}
 }
@@ -868,14 +871,21 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
+	var volumeMounts = make([]v1.VolumeMount, 0)
+	var volumeDevices = make([]v1.VolumeDevice, 0)
 	var volumes = make([]v1.Volume, len(pvclaims))
 	for index, pvclaim := range pvclaims {
 		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
+		if pvclaim.Spec.VolumeMode != nil && *pvclaim.Spec.VolumeMode == v1.PersistentVolumeBlock {
+			volumeDevices = append(volumeDevices, v1.VolumeDevice{Name: volumename, DevicePath: "/mnt/" + volumename})
+		} else {
+			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
+		}
+
 		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
 	}
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
+	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Spec.Volumes = volumes
 	podSpec.Spec.SecurityContext.SELinuxOptions = seLinuxLabel
 	return podSpec

@@ -34,7 +34,6 @@ import (
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -145,7 +144,7 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -501,7 +500,7 @@ type cinderVolumeProvisioner struct {
 var _ volume.Provisioner = &cinderVolumeProvisioner{}
 
 func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
-	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
@@ -515,7 +514,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			Name:   c.options.PVName,
 			Labels: labels,
 			Annotations: map[string]string{
-				volumehelper.VolumeDynamicallyCreatedByKey: "cinder-dynamic-provisioner",
+				util.VolumeDynamicallyCreatedByKey: "cinder-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{

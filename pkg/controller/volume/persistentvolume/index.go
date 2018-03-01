@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -321,7 +320,7 @@ func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requ
 	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
 	for _, key := range keys {
 		indexedModes := v1helper.GetAccessModesFromString(key)
-		if volume.AccessModesContainedInAll(indexedModes, requestedModes) {
+		if volumeutil.AccessModesContainedInAll(indexedModes, requestedModes) {
 			matchedModes = append(matchedModes, indexedModes)
 		}
 	}

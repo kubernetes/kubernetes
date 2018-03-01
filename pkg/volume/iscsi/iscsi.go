@@ -31,6 +31,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -118,7 +119,7 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		exec:         exec,
 		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
-		mountOptions: volume.MountOptionFromSpec(spec),
+		mountOptions: ioutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
@@ -235,7 +236,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 
 func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
-	blkutil := ioutil.NewBlockVolumePathHandler()
+	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
 	if err != nil {
 		return nil, err

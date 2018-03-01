@@ -49,6 +49,7 @@ type FakeRuntimeService struct {
 	sync.Mutex
 
 	Called []string
+	Errors map[string][]error
 
 	FakeStatus         *runtimeapi.RuntimeStatus
 	Containers         map[string]*FakeContainer
@@ -101,9 +102,29 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 	return nil
 }
 
+func (r *FakeRuntimeService) InjectError(f string, err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Errors[f] = append(r.Errors[f], err)
+}
+
+// caller of popError must grab a lock.
+func (r *FakeRuntimeService) popError(f string) error {
+	if r.Errors == nil {
+		return nil
+	}
+	errs := r.Errors[f]
+	if len(errs) == 0 {
+		return nil
+	}
+	err, errs := errs[0], errs[1:]
+	return err
+}
+
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
 		Called:             make([]string, 0),
+		Errors:             make(map[string][]error),
 		Containers:         make(map[string]*FakeContainer),
 		Sandboxes:          make(map[string]*FakePodSandbox),
 		FakeContainerStats: make(map[string]*runtimeapi.ContainerStats),
@@ -465,5 +486,10 @@ func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ReopenContainerLog")
+
+	if err := r.popError("ReopenContainerLog"); err != nil {
+		return err
+	}
+
 	return nil
 }

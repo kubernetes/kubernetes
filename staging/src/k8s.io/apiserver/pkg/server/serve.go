@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/http2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -84,6 +85,12 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
 		// Specify allowed CAs for client certificates
 		secureServer.TLSConfig.ClientCAs = s.ClientCA
+	}
+
+	if s.HTTP2MaxStreamsPerConnection > 0 {
+		http2.ConfigureServer(secureServer, &http2.Server{
+			MaxConcurrentStreams: uint32(s.HTTP2MaxStreamsPerConnection),
+		})
 	}
 
 	glog.Infof("Serving securely on %s", secureServer.Addr)

@@ -19,7 +19,7 @@ package v1beta1
 const (
 	// Healthy means that the device is healty
 	Healthy = "Healthy"
-	// UnHealthy means that the device is unhealty
+	// UnHealthy means that the device is unhealthy
 	Unhealthy = "Unhealthy"
 
 	// Current version of the API supported by kubelet

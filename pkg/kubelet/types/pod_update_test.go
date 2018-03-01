@@ -158,7 +158,7 @@ func TestIsCriticalPod(t *testing.T) {
 		{
 			pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod3",
+					Name:      "pod4",
 					Namespace: "kube-system",
 					Annotations: map[string]string{
 						"scheduler.alpha.kubernetes.io/critical-pod": "",

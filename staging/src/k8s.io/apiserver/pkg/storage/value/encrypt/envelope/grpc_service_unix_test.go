@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -13,8 +15,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
-// +build !windows
 
 // Package envelope transforms values for storage at rest using a Envelope provider
 package envelope
@@ -124,7 +124,7 @@ func startTestKMSProvider() (*grpc.Server, error) {
 	}
 
 	server := grpc.NewServer()
-	kmsapi.RegisterKMSServiceServer(server, &base64Server{})
+	kmsapi.RegisterKeyManagementServiceServer(server, &base64Server{})
 	go server.Serve(listener)
 	return server, nil
 }

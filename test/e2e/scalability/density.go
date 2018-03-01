@@ -26,14 +26,12 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utiluuid "k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,7 +53,6 @@ const (
 	MinSaturationThreshold     = 2 * time.Minute
 	MinPodsPerSecondThroughput = 8
 	DensityPollInterval        = 10 * time.Second
-	MaxLatencyPodCreationTries = 5
 )
 
 // Maximum container failures this test tolerates before failing.
@@ -351,7 +348,6 @@ var _ = SIGDescribe("Density", func() {
 	var nodeCpuCapacity int64
 	var nodeMemCapacity int64
 	var nodes *v1.NodeList
-	var masters sets.String
 
 	testCaseBaseName := "density"
 	missingMeasurements := 0
@@ -419,7 +415,7 @@ var _ = SIGDescribe("Density", func() {
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
 
-		masters, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
+		_, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
@@ -901,13 +897,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 			},
 		},
 	}
-	for attempt := 1; attempt <= MaxLatencyPodCreationTries; attempt++ {
-		_, err := c.CoreV1().ReplicationControllers(ns).Create(rc)
-		if err == nil || apierrs.IsAlreadyExists(err) {
-			break
-		}
-		Expect(attempt < MaxLatencyPodCreationTries && framework.IsRetryableAPIError(err)).To(Equal(true))
-	}
+	framework.ExpectNoError(testutils.CreateRCWithRetries(c, ns, rc))
 	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	framework.Logf("Found pod '%s' running", name)
 }

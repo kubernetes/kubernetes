@@ -64,6 +64,7 @@ filegroup(
         "//test/integration/storageclasses:all-srcs",
         "//test/integration/tls:all-srcs",
         "//test/integration/ttlcontroller:all-srcs",
+        "//test/integration/util:all-srcs",
         "//test/integration/volume:all-srcs",
     ],
     tags = ["automanaged"],

@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -190,8 +190,8 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 // whether the existing node must be updated.
 func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v1.Node) bool {
 	var (
-		existingCMAAnnotation    = existingNode.Annotations[volumehelper.ControllerManagedAttachAnnotation]
-		newCMAAnnotation, newSet = node.Annotations[volumehelper.ControllerManagedAttachAnnotation]
+		existingCMAAnnotation    = existingNode.Annotations[volutil.ControllerManagedAttachAnnotation]
+		newCMAAnnotation, newSet = node.Annotations[volutil.ControllerManagedAttachAnnotation]
 	)
 
 	if newCMAAnnotation == existingCMAAnnotation {
@@ -203,13 +203,13 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 	// the correct value of the annotation.
 	if !newSet {
 		glog.Info("Controller attach-detach setting changed to false; updating existing Node")
-		delete(existingNode.Annotations, volumehelper.ControllerManagedAttachAnnotation)
+		delete(existingNode.Annotations, volutil.ControllerManagedAttachAnnotation)
 	} else {
 		glog.Info("Controller attach-detach setting changed to true; updating existing Node")
 		if existingNode.Annotations == nil {
 			existingNode.Annotations = make(map[string]string)
 		}
-		existingNode.Annotations[volumehelper.ControllerManagedAttachAnnotation] = newCMAAnnotation
+		existingNode.Annotations[volutil.ControllerManagedAttachAnnotation] = newCMAAnnotation
 	}
 
 	return true
@@ -270,7 +270,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		}
 
 		glog.Infof("Setting node annotation to enable volume controller attach/detach")
-		node.Annotations[volumehelper.ControllerManagedAttachAnnotation] = "true"
+		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
 		glog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
@@ -280,7 +280,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 		glog.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
-		node.Annotations[volumehelper.KeepTerminatedPodVolumesAnnotation] = "true"
+		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
@@ -606,8 +606,16 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		}
 
 		for _, removedResource := range removedDevicePlugins {
-			glog.V(2).Infof("Remove capacity for %s", removedResource)
-			delete(node.Status.Capacity, v1.ResourceName(removedResource))
+			glog.V(2).Infof("Set capacity for %s to 0 on device removal", removedResource)
+			// Set the capacity of the removed resource to 0 instead of
+			// removing the resource from the node status. This is to indicate
+			// that the resource is managed by device plugin and had been
+			// registered before.
+			//
+			// This is required to differentiate the device plugin managed
+			// resources and the cluster-level resources, which are absent in
+			// node status.
+			node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 		}
 	}
 

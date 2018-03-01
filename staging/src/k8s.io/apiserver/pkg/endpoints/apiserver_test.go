@@ -2839,65 +2839,6 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	}
 }
 
-func TestLegacyDelete(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{}
-	ID := "id"
-	storage["simple"] = LegacyRESTStorage{&simpleStorage}
-	var _ rest.Deleter = storage["simple"].(LegacyRESTStorage)
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", res)
-	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
-	if simpleStorage.deleteOptions != nil {
-		t.Errorf("unexpected delete options: %#v", simpleStorage.deleteOptions)
-	}
-}
-
-func TestLegacyDeleteIgnoresOptions(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{}
-	ID := "id"
-	storage["simple"] = LegacyRESTStorage{&simpleStorage}
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	item := metav1.NewDeleteOptions(300)
-	body, err := runtime.Encode(codec, item)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", res)
-	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
-	if simpleStorage.deleteOptions != nil {
-		t.Errorf("unexpected delete options: %#v", simpleStorage.deleteOptions)
-	}
-}
-
 func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	// TODO: remove mutating deny when we removed it from the endpoint implementation and ported all plugins
 	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {

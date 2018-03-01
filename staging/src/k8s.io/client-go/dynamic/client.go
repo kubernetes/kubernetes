@@ -280,6 +280,7 @@ func (rc *ResourceClient) Watch(opts metav1.ListOptions) (watch.Interface, error
 		Watch()
 }
 
+// Patch applies the patch and returns the patched resource.
 func (rc *ResourceClient) Patch(name string, pt types.PatchType, data []byte) (*unstructured.Unstructured, error) {
 	result := new(unstructured.Unstructured)
 	resourceName, subresourceName := rc.parseResourceSubresourceName()

@@ -30,6 +30,7 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
+  "verify-typecheck.sh"          # runs in separate typecheck job
   )
 
 # Only run whitelisted fast checks in quick mode.
@@ -45,6 +46,7 @@ QUICK_PATTERNS+=(
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"

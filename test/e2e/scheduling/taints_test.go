@@ -147,14 +147,12 @@ const (
 // - lack of eviction of short-tolerating pod after taint removal.
 var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	var cs clientset.Interface
-	var nodeList *v1.NodeList
 	var ns string
 	f := framework.NewDefaultFramework("taint-control")
 
 	BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
-		nodeList = &v1.NodeList{}
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
 

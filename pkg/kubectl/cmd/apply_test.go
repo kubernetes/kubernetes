@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -67,7 +68,7 @@ func TestApplyExtraArgsFail(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	f, _ := cmdtesting.NewAPIFactory()
+	f := cmdtesting.NewTestFactory()
 	c := NewCmdApply("kubectl", f, buf, errBuf)
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
@@ -331,7 +332,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 		tf.UnstructuredClient = &fake.RESTClient{
@@ -356,7 +357,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
+		tf.ClientConfigVal = defaultClientConfig()
 		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
 		cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -365,7 +366,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			}
 		})
 
-		cmd := NewCmdApplyViewLastApplied(f, buf, errBuf)
+		cmd := NewCmdApplyViewLastApplied(tf, buf, errBuf)
 		if test.filePath != "" {
 			cmd.Flags().Set("filename", test.filePath)
 		}
@@ -388,7 +389,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -406,11 +407,11 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply("kubectl", f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -432,7 +433,7 @@ func TestApplyObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -455,7 +456,7 @@ func TestApplyObject(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
@@ -493,7 +494,7 @@ func TestApplyObjectOutput(t *testing.T) {
 	}
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -516,7 +517,7 @@ func TestApplyObjectOutput(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("output", "yaml")
 		cmd.Run(cmd, []string{})
@@ -542,7 +543,7 @@ func TestApplyRetry(t *testing.T) {
 		firstPatch := true
 		retry := false
 		getCount := 0
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -574,7 +575,7 @@ func TestApplyRetry(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
@@ -599,7 +600,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers"
 	pathNameRC := pathRC + "/" + nameRC
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -621,7 +622,7 @@ func TestApplyNonExistObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply("kubectl", f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -643,7 +644,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 
 	var body []byte
 
-	f, tf := cmdtesting.NewAPIFactory()
+	tf := cmdtesting.NewTestFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -674,7 +675,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply("kubectl", f, buf, errBuf)
+	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -691,7 +692,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 	buf = bytes.NewBuffer([]byte{})
 	errBuf = bytes.NewBuffer([]byte{})
 
-	cmd = NewCmdApply("kubectl", f, buf, errBuf)
+	cmd = NewCmdApply("kubectl", tf, buf, errBuf)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -717,7 +718,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -747,7 +748,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		if asList {
 			cmd.Flags().Set("filename", filenameRCSVC)
 		} else {
@@ -800,7 +801,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 	deploymentBytes := readDeploymentFromFile(t, filenameDeployObjServerside)
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -844,7 +845,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameDeployObjClientside)
 		cmd.Flags().Set("output", "name")
 
@@ -872,7 +873,7 @@ func TestUnstructuredApply(t *testing.T) {
 	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -907,7 +908,7 @@ func TestUnstructuredApply(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameWidgetClientside)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
@@ -939,7 +940,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -997,7 +998,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameWidgetClientside)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{})
@@ -1067,7 +1068,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f, tf := cmdtesting.NewAPIFactory()
+			tf := cmdtesting.NewTestFactory()
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -1096,7 +1097,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 				}),
 			}
 			tf.Namespace = "test"
-			tf.ClientConfig = defaultClientConfig()
+			tf.ClientConfigVal = defaultClientConfig()
 			buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -1105,7 +1106,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 				}
 			})
 
-			cmd := NewCmdApplySetLastApplied(f, buf, errBuf)
+			cmd := NewCmdApplySetLastApplied(tf, buf, errBuf)
 			cmd.Flags().Set("filename", test.filePath)
 			cmd.Flags().Set("output", test.output)
 			cmd.Run(cmd, []string{})
@@ -1147,7 +1148,7 @@ func TestForceApply(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 	pathRCList := "/namespaces/test/replicationcontrollers"
 	expected := map[string]int{
-		"getOk":       9,
+		"getOk":       10,
 		"getNotFound": 1,
 		"getList":     1,
 		"patch":       6,
@@ -1158,8 +1159,9 @@ func TestForceApply(t *testing.T) {
 
 	for _, fn := range testingOpenAPISchemaFns {
 		deleted := false
+		isScaledDownToZero := false
 		counts := map[string]int{}
-		f, tf := cmdtesting.NewAPIFactory()
+		tf := cmdtesting.NewTestFactory()
 		tf.UnstructuredClient = &fake.RESTClient{
 			NegotiatedSerializer: unstructuredSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -1170,7 +1172,18 @@ func TestForceApply(t *testing.T) {
 						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
 					}
 					counts["getOk"]++
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+					var bodyRC io.ReadCloser
+					if isScaledDownToZero {
+						rcObj := readReplicationControllerFromFile(t, filenameRC)
+						rcObj.Spec.Replicas = 0
+						rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+						if err != nil {
+							t.Fatal(err)
+						}
+						bodyRC = ioutil.NopCloser(bytes.NewReader(rcBytes))
+					} else {
+						bodyRC = ioutil.NopCloser(bytes.NewReader(currentRC))
+					}
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 				case strings.HasSuffix(p, pathRCList) && m == "GET":
 					counts["getList"]++
@@ -1205,10 +1218,12 @@ func TestForceApply(t *testing.T) {
 				case strings.HasSuffix(p, pathRC) && m == "PUT":
 					counts["put"]++
 					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+					isScaledDownToZero = true
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 				case strings.HasSuffix(p, pathRCList) && m == "POST":
 					counts["post"]++
 					deleted = false
+					isScaledDownToZero = false
 					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 				default:
@@ -1219,12 +1234,12 @@ func TestForceApply(t *testing.T) {
 		}
 		tf.OpenAPISchemaFunc = fn
 		tf.Client = tf.UnstructuredClient
-		tf.ClientConfig = &restclient.Config{}
+		tf.ClientConfigVal = &restclient.Config{}
 		tf.Namespace = "test"
 		buf := bytes.NewBuffer([]byte{})
 		errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", f, buf, errBuf)
+		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("output", "name")
 		cmd.Flags().Set("force", "true")
