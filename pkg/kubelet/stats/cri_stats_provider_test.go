@@ -135,6 +135,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	mockCadvisor.
 		On("ContainerInfoV2", "/", options).Return(infos, nil).
+		On("ImagesFsInfo").Return(imageFsInfo, nil).
 		On("RootFsInfo").Return(rootFsInfo, nil).
 		On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil).
 		On("GetDirFsInfo", unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
@@ -205,7 +206,6 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRICPUAndMemoryStats(assert, c1, infos[container1.ContainerStatus.Id].Stats[0])
 	checkCRIRootfsStats(assert, c1, containerStats1, nil)
 	checkCRILogsStats(assert, c1, &rootFsInfo, containerLogStats1)
-	checkCRINetworkStats(assert, p0.Network, infos[sandbox0.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
