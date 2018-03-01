@@ -837,10 +837,18 @@ clientConnection:
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
 EOF
+    if [[ -n ${FEATURE_GATES} ]]; then
+      echo "featureGates:"
+      # Convert from foo=true,bar=false to
+      #   foo: true
+      #   bar: false
+      for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
+        echo $gate | sed -e 's/\(.*\)=\(.*\)/  \1: \2/'
+      done
+    fi >>/tmp/kube-proxy.yaml
 
     sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
-      --feature-gates="${FEATURE_GATES}" \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
