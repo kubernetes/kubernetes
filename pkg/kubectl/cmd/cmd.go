@@ -355,7 +355,7 @@ func runHelp(cmd *cobra.Command, args []string) {
 }
 
 func printDeprecationWarning(errOut io.Writer, command, alias string) {
-	fmt.Fprintf(errOut, "%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
+	fmt.Fprintf(errOut, "%s is DEPRECATED and will be removed in a future version. Use %s instead.\n", alias, command)
 }
 
 // deprecatedAlias is intended to be used to create a "wrapper" command around

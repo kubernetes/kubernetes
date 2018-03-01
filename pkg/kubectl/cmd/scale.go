@@ -147,7 +147,7 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 
 		mapping := info.ResourceMapping()
 		if mapping.Resource == "jobs" {
-			fmt.Fprintf(errOut, "%s scale job is DEPRECATED and will be removed in a future version.", cmd.Parent().Name())
+			fmt.Fprintf(errOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", cmd.Parent().Name())
 		}
 
 		scaler, err := f.Scaler(mapping)
