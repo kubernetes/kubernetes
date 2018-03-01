@@ -55,6 +55,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/audit/buffered:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/log:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/webhook:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
