@@ -161,8 +161,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	}
 
 	for _, pod := range pods.Items {
-		podToAdd := pod
-		podInformer.GetIndexer().Add(&podToAdd)
+		podInformer.GetIndexer().Add(&pod)
 		podsNum++
 	}
 	nodes, err := fakeKubeClient.Core().Nodes().List(metav1.ListOptions{})
@@ -170,8 +169,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, node := range nodes.Items {
-		nodeToAdd := node
-		nodeInformer.GetIndexer().Add(&nodeToAdd)
+		nodeInformer.GetIndexer().Add(&node)
 		nodesNum++
 	}
 
