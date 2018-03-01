@@ -60,6 +60,9 @@
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
+      },
+      { "name": "INITIAL_CLUSTER",
+        "value": "{{ etcd_cluster }}"
       }
         ],
     "livenessProbe": {
