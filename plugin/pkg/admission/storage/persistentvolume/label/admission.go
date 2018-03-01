@@ -33,12 +33,15 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
-const PluginName = "PersistentVolumeLabel"
+const (
+	// PluginName is the name of persistent volume label admission plugin
+	PluginName = "PersistentVolumeLabel"
+)
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
+		persistentVolumeLabelAdmission := newPersistentVolumeLabel()
 		return persistentVolumeLabelAdmission, nil
 	})
 }
@@ -57,11 +60,11 @@ type persistentVolumeLabel struct {
 var _ admission.MutationInterface = &persistentVolumeLabel{}
 var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 
-// NewPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,
+// newPersistentVolumeLabel returns an admission.Interface implementation which adds labels to PersistentVolume CREATE requests,
 // based on the labels provided by the underlying cloud provider.
 //
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
-func NewPersistentVolumeLabel() *persistentVolumeLabel {
+func newPersistentVolumeLabel() *persistentVolumeLabel {
 	// DEPRECATED: cloud-controller-manager will now start NewPersistentVolumeLabelController
 	// which does exactly what this admission controller used to do. So once GCE and AWS can
 	// run externally, we can remove this admission controller.

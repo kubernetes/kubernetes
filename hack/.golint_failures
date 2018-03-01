@@ -403,7 +403,6 @@ plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
-plugin/pkg/admission/persistentvolume/label
 plugin/pkg/admission/podnodeselector
 plugin/pkg/admission/podpreset
 plugin/pkg/admission/podtolerationrestriction
