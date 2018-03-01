@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -124,6 +125,16 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 	}
 	if spec.Template.Spec.ActiveDeadlineSeconds != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("template", "spec", "activeDeadlineSeconds"), spec.Template.Spec.ActiveDeadlineSeconds, "must not be specified"))
+	}
+
+	pvcNames := sets.NewString()
+	for _, pvc := range spec.VolumeClaimTemplates {
+		if pvcNames.Has(pvc.Name) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("volumeClaimTemplates", "metadata", "name"), pvc.Name))
+		} else {
+			pvcNames.Insert(pvc.Name)
+			allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeClaim(&pvc)...)
+		}
 	}
 
 	return allErrs

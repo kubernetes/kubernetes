@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -747,6 +748,92 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			if errs := ValidateStatefulSetUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 				t.Errorf("expected failure: %s", testName)
+			}
+		})
+	}
+}
+
+func TestValidateStatefulSetPVC(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	persistentVolumeClaim := api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "www",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		volumeMounts         []api.VolumeMount
+		volumeClaimTemplates []api.PersistentVolumeClaim
+		expectedErr          bool
+	}{
+		{
+			name: "valid statefulset",
+			volumeMounts: []api.VolumeMount{
+				{
+					Name:      "www",
+					MountPath: "/usr/share/nginx/html",
+				},
+			},
+			volumeClaimTemplates: []api.PersistentVolumeClaim{
+				persistentVolumeClaim,
+			},
+		},
+		{
+			name: "duplicate pvc in statefulset",
+			volumeMounts: []api.VolumeMount{
+				{
+					Name:      "www",
+					MountPath: "/usr/share/nginx/html",
+				},
+			},
+			volumeClaimTemplates: []api.PersistentVolumeClaim{
+				persistentVolumeClaim,
+				persistentVolumeClaim,
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			validStatefulSetSpec := apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: validLabels,
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers: []api.Container{
+							{
+								Name:                     "abc",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+								VolumeMounts:             test.volumeMounts,
+							},
+						},
+					},
+				},
+				VolumeClaimTemplates: test.volumeClaimTemplates,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			}
+
+			errs := ValidateStatefulSetSpec(&validStatefulSetSpec, field.NewPath("spec"))
+			if hasErr := len(errs) > 0; hasErr != test.expectedErr {
+				t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
 			}
 		})
 	}
