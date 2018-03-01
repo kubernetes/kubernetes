@@ -108,6 +108,7 @@ go_library(
         "//pkg/volume/util/volumepathhandler:go_default_library",
         "//pkg/volume/validation:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
+        "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
