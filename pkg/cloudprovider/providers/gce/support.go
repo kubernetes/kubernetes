@@ -64,3 +64,14 @@ func (l *gceRateLimiter) Accept(ctx context.Context, key *cloud.RateLimitKey) er
 	}
 	return nil
 }
+
+// CreateGCECloudWithCloud is a helper function to create an instance of GCECloud with the
+// given Cloud interface implementation. Typical usage is to use cloud.NewMockGCE to get a
+// handle to a mock Cloud instance and then use that for testing.
+func CreateGCECloudWithCloud(config *CloudConfig, c cloud.Cloud) (*GCECloud, error) {
+	gceCloud, err := CreateGCECloud(config)
+	if err == nil {
+		gceCloud.c = c
+	}
+	return gceCloud, err
+}
