@@ -160,6 +160,11 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
+	if config.VMType == "" {
+		// default to standard vmType if not set.
+		config.VMType = vmTypeStandard
+	}
+
 	env, err := auth.ParseAzureEnvironment(config.Cloud)
 	if err != nil {
 		return nil, err
