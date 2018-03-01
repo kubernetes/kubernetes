@@ -2923,23 +2923,6 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	}
 }
 
-func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name string, deleteOption *metav1.DeleteOptions) error {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return c.CoreV1().ReplicationControllers(ns).Delete(name, deleteOption)
-	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.ExtensionsV1beta1().ReplicaSets(ns).Delete(name, deleteOption)
-	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.ExtensionsV1beta1().Deployments(ns).Delete(name, deleteOption)
-	case extensionsinternal.Kind("DaemonSet"):
-		return c.ExtensionsV1beta1().DaemonSets(ns).Delete(name, deleteOption)
-	case batchinternal.Kind("Job"):
-		return c.BatchV1().Jobs(ns).Delete(name, deleteOption)
-	default:
-		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
-	}
-}
-
 func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	switch typed := obj.(type) {
 	case *v1.ReplicationController:
@@ -2986,10 +2969,6 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 	}
 }
 
-func getReaperForKind(internalClientset internalclientset.Interface, kind schema.GroupKind) (kubectl.Reaper, error) {
-	return kubectl.ReaperFor(kind, internalClientset)
-}
-
 // DeleteResourceAndPods deletes a given resource and all pods it spawned
 func DeleteResourceAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, kind schema.GroupKind, ns, name string) error {
 	By(fmt.Sprintf("deleting %v %s in namespace %s", kind, name, ns))
@@ -3006,23 +2985,13 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	if err != nil {
 		return err
 	}
-	reaper, err := getReaperForKind(internalClientset, kind)
-	if err != nil {
-		return err
-	}
-
 	ps, err := podStoreForSelector(clientset, ns, selector)
 	if err != nil {
 		return err
 	}
 	defer ps.Stop()
 	startTime := time.Now()
-	err = reaper.Stop(ns, name, 0, nil)
-	if apierrs.IsNotFound(err) {
-		Logf("%v %s was already deleted: %v", kind, name, err)
-		return nil
-	}
-	if err != nil {
+	if err := testutils.DeleteResourceUsingReaperWithRetries(internalClientset, kind, ns, name, nil); err != nil {
 		return fmt.Errorf("error while stopping %v: %s: %v", kind, name, err)
 	}
 	deleteTime := time.Now().Sub(startTime)
@@ -3071,15 +3040,10 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	}
 
 	defer ps.Stop()
-	startTime := time.Now()
 	falseVar := false
 	deleteOption := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	err = deleteResource(c, kind, ns, name, deleteOption)
-	if err != nil && apierrs.IsNotFound(err) {
-		Logf("%v %s was already deleted: %v", kind, name, err)
-		return nil
-	}
-	if err != nil {
+	startTime := time.Now()
+	if err := testutils.DeleteResourceWithRetries(c, kind, ns, name, deleteOption); err != nil {
 		return err
 	}
 	deleteTime := time.Now().Sub(startTime)

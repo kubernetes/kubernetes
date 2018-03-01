@@ -538,8 +538,7 @@ var _ = SIGDescribe("Density", func() {
 			namespaces, err := CreateNamespaces(f, numberOfCollections, fmt.Sprintf("density-%v", testArg.podsPerNode), testPhaseDurations.StartPhase(200, "namespace creation"))
 			framework.ExpectNoError(err)
 			if itArg.quotas {
-				err := CreateQuotas(f, namespaces, totalPods+nodeCount, testPhaseDurations.StartPhase(210, "quota creation"))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(CreateQuotas(f, namespaces, totalPods+nodeCount, testPhaseDurations.StartPhase(210, "quota creation")))
 			}
 
 			configs := make([]testutils.RunObjectConfig, numberOfCollections)
