@@ -194,6 +194,9 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
+		return err
+	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
 	configMap, err := b.getConfigMap(b.pod.Namespace, b.source.Name)
