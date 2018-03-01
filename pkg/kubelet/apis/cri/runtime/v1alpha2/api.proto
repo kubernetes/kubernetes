@@ -849,6 +849,8 @@ message ContainerStatus {
     repeated Mount mounts = 14;
     // Log path of container.
     string log_path = 15;
+    // Real Log path
+    string real_path = 16;
 }
 
 message ContainerStatusResponse {
