@@ -33,6 +33,9 @@ go_library(
     deps = [
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/core/serviceaccount:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",

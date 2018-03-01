@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -141,7 +143,7 @@ func getDEKFromKMSPlugin(pluginMock *base64Plugin) ([]byte, error) {
 	select {
 	case e := <-pluginMock.encryptRequest:
 		return e.Plain, nil
-	case <-time.After(1 * time.Microsecond):
+	case <-time.After(time.Second):
 		return nil, fmt.Errorf("timed-out while getting encryption request from KMS Plugin Mock")
 	}
 }

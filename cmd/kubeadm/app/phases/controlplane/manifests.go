@@ -206,7 +206,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	} else {
 		// Default to etcd static pod on localhost
 		etcdEndpointsArg := "--etcd-servers=https://127.0.0.1:2379"
-		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName))
+		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName))
 		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName))
 		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName))
 		command = append(command, etcdEndpointsArg, etcdCAFileArg, etcdClientFileArg, etcdKeyFileArg)

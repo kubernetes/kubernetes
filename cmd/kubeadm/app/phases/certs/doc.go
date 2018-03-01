@@ -40,6 +40,8 @@ package certs
 		 - apiserver-kubelet-client.key
 		 - apiserver-etcd-client.crt
 		 - apiserver-etcd-client.key
+		 - etcd/ca.crt
+		 - etcd/ca.key
 		 - etcd/server.crt
 		 - etcd/server.key
 		 - etcd/peer.crt
