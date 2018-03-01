@@ -1305,7 +1305,7 @@ func (j *IngressTestJig) WaitForIngressAddress(c clientset.Interface, ns, ingNam
 		ipOrNameList, err := getIngressAddress(c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
 			j.Logger.Errorf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
-			if IsRetryableAPIError(err) {
+			if testutils.IsRetryableAPIError(err) {
 				return false, nil
 			}
 			return false, err

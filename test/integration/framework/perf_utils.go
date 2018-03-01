@@ -76,7 +76,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		var err error
 		for retry := 0; retry < retries; retry++ {
 			_, err = p.client.CoreV1().Nodes().Create(baseNode)
-			if err == nil || !e2eframework.IsRetryableAPIError(err) {
+			if err == nil || !testutils.IsRetryableAPIError(err) {
 				break
 			}
 		}
