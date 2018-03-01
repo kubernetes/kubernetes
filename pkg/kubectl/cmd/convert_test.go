@@ -41,6 +41,28 @@ type checkField struct {
 func TestConvertObject(t *testing.T) {
 	testcases := []testcase{
 		{
+			name:          "apps deployment list to apps/v1 deployment",
+			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/appsdeployment_list.yaml",
+			outputVersion: "apps/v1",
+			fields: []checkField{
+				{
+					template: "{{(index .items 0).apiVersion}}",
+					expected: "apps/v1",
+				},
+			},
+		},
+		{
+			name:          "apps deployment to latest deployment without output version",
+			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/appsdeployment.yaml",
+			outputVersion: "",
+			fields: []checkField{
+				{
+					template: "{{.apiVersion}}",
+					expected: "apps/v1",
+				},
+			},
+		},
+		{
 			name:          "apps deployment to extensions deployment",
 			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/appsdeployment.yaml",
 			outputVersion: "extensions/v1beta1",

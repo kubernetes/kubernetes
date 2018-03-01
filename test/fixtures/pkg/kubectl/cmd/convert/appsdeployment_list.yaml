@@ -1,0 +1,27 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: nginx-deployment-1
+spec:
+  template:
+    metadata:
+      labels:
+        name: nginx-1
+    spec:
+      containers:
+      - name: nginx-1
+        image: nginx
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: nginx-deployment-2
+spec:
+  template:
+    metadata:
+      labels:
+        name: nginx-2
+    spec:
+      containers:
+      - name: nginx-2
+        image: nginx
