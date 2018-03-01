@@ -146,21 +146,17 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 }
 
 func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo, imageFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
-	capacity := &rootFsInfo.Capacity
-	available := &rootFsInfo.Available
-	if rootFsInfo.Mountpoint != imageFsInfo.Mountpoint {
-		capacity = addUsage(capacity, &imageFsInfo.Capacity)
-		available = addUsage(available, &imageFsInfo.Available)
-	}
 	result := &statsapi.FsStats{
 		Time:           metav1.NewTime(rootFsInfo.Timestamp),
-		AvailableBytes: available,
-		CapacityBytes:  capacity,
+		AvailableBytes: &rootFsInfo.Available,
+		CapacityBytes:  &rootFsInfo.Capacity,
 		InodesFree:     rootFsInfo.InodesFree,
 		Inodes:         rootFsInfo.Inodes,
 	}
-	for _, container := range containers {
-		addContainerUsage(result, &container)
+	if rootFsInfo.Device == imageFsInfo.Device {
+		for _, container := range containers {
+			addContainerUsage(result, &container)
+		}
 	}
 	for _, volume := range volumes {
 		result.UsedBytes = addUsage(result.UsedBytes, volume.FsStats.UsedBytes)
