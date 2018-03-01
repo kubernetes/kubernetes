@@ -43,13 +43,11 @@ aliases:
     - ixdy
     - rmmh
     - spiffxp
-    - spxtr
   sig-testing-approvers:
     - fejta
     - ixdy
     - rmmh
     - spiffxp
-    - spxtr
   sig-node-reviewers:
     - Random-Liu
     - dashpole
