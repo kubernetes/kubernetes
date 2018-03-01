@@ -65,7 +65,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	// if we're already external, no conversion necessary
 	gvks, _, err := p.typer.ObjectKinds(obj)
 	if err != nil {
-		glog.V(1).Info("error determining type for %T, using passed object: %v", obj, err)
+		glog.V(1).Infof("error determining type for %T, using passed object: %v", obj, err)
 		return p.printer.PrintObj(obj, w)
 	}
 	needsConversion := false
