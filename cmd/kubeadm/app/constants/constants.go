@@ -65,6 +65,13 @@ const (
 	// APIServerKubeletClientCertCommonName defines kubelet client certificate common name (CN)
 	APIServerKubeletClientCertCommonName = "kube-apiserver-kubelet-client"
 
+	// EtcdCACertAndKeyBaseName defines etcd's CA certificate and key base name
+	EtcdCACertAndKeyBaseName = "etcd/ca"
+	// EtcdCACertName defines etcd's CA certificate name
+	EtcdCACertName = "etcd/ca.crt"
+	// EtcdCAKeyName defines etcd's CA key name
+	EtcdCAKeyName = "etcd/ca.key"
+
 	// EtcdServerCertAndKeyBaseName defines etcd's server certificate and key base name
 	EtcdServerCertAndKeyBaseName = "etcd/server"
 	// EtcdServerCertName defines etcd's server certificate name
