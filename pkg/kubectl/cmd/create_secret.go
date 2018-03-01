@@ -182,7 +182,7 @@ func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.
 	if err != nil {
 		return err
 	}
-	requiredFlags := []string{"docker-username", "docker-password", "docker-email", "docker-server"}
+	requiredFlags := []string{"docker-username", "docker-password", "docker-server"}
 	for _, requiredFlag := range requiredFlags {
 		if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
 			return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
