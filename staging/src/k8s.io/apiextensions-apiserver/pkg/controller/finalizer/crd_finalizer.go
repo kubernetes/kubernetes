@@ -25,7 +25,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,6 +38,7 @@ import (
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 )
 
 // CRDFinalizer is a controller that finalizes the CRD by deleting all the CRs associated with it.
@@ -179,7 +179,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 
 	deletedNamespaces := sets.String{}
 	deleteErrors := []error{}
-	for _, item := range allResources.(*unstructured.UnstructuredList).Items {
+	for _, item := range allResources.(*cr.CustomResourceList).Items {
 		metadata, err := meta.Accessor(&item)
 		if err != nil {
 			utilruntime.HandleError(err)
@@ -213,10 +213,10 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		if err != nil {
 			return false, err
 		}
-		if len(listObj.(*unstructured.UnstructuredList).Items) == 0 {
+		if len(listObj.(*cr.CustomResourceList).Items) == 0 {
 			return true, nil
 		}
-		glog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
+		glog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*cr.CustomResourceList).Items))
 		return false, nil
 	})
 	if err != nil {

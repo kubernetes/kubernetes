@@ -17,7 +17,7 @@ limitations under the License.
 package customresource
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -32,11 +32,11 @@ func NewStatusStrategy(strategy customResourceStrategy) statusStrategy {
 }
 
 func (a statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
-	newCustomResourceObject := obj.(*unstructured.Unstructured)
-	oldCustomResourceObject := old.(*unstructured.Unstructured)
+	newCustomResourceObject := obj.(*cr.CustomResource)
+	oldCustomResourceObject := old.(*cr.CustomResource)
 
-	newCustomResource := newCustomResourceObject.UnstructuredContent()
-	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
+	newCustomResource := newCustomResourceObject.Obj.UnstructuredContent()
+	oldCustomResource := oldCustomResourceObject.Obj.UnstructuredContent()
 
 	// update is not allowed to set spec and metadata
 	_, ok1 := newCustomResource["spec"]

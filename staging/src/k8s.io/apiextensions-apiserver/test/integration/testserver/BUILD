@@ -16,6 +16,7 @@ go_library(
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/cr:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/cmd/server:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

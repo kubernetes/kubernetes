@@ -39,13 +39,14 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/cr"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 )
 
 func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtesting.EtcdTestServer) {
 	server, etcdStorage := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-	etcdStorage.Codec = unstructuredJsonCodec{}
+	etcdStorage.Codec = customResourceJsonCodec{}
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
 
 	parameterScheme := runtime.NewScheme()
@@ -77,6 +78,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 
 	storage := customresource.NewStorage(
 		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
+		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItem"},
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(
 			typer,
@@ -96,27 +98,29 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 }
 
 // createCustomResource is a helper function that returns a CustomResource with the updated resource version.
-func createCustomResource(storage *customresource.REST, cr unstructured.Unstructured, t *testing.T) (unstructured.Unstructured, error) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), cr.GetNamespace())
+func createCustomResource(storage *customresource.REST, cr cr.CustomResource, t *testing.T) (cr.CustomResource, error) {
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), cr.Obj.GetNamespace())
 	obj, err := storage.Create(ctx, &cr, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Failed to create CustomResource, %v", err)
 	}
-	newCR := obj.(*unstructured.Unstructured)
+	newCR := obj.(*cr.CustomResource)
 	return *newCR, nil
 }
 
-func validNewCustomResource() *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "mygroup.example.com/v1beta1",
-			"kind":       "Noxu",
-			"metadata": map[string]interface{}{
-				"namespace": "default",
-				"name":      "foo",
-			},
-			"spec": map[string]interface{}{
-				"replicas": int64(7),
+func validNewCustomResource() *cr.CustomResource {
+	return &cr.CustomResource{
+		Obj: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "mygroup.example.com/v1beta1",
+				"kind":       "Noxu",
+				"metadata": map[string]interface{}{
+					"namespace": "default",
+					"name":      "foo",
+				},
+				"spec": map[string]interface{}{
+					"replicas": int64(7),
+				},
 			},
 		},
 	}
@@ -189,8 +193,8 @@ func TestStatusUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	update := gottenObj.(*unstructured.Unstructured)
-	updateContent := update.Object
+	update := gottenObj.(*cr.CustomResource)
+	updateContent := update.Obj.Object
 	updateContent["status"] = map[string]interface{}{
 		"replicas": int64(7),
 	}
@@ -204,11 +208,11 @@ func TestStatusUpdate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	cr, ok := obj.(*unstructured.Unstructured)
+	cr, ok := obj.(*cr.CustomResource)
 	if !ok {
 		t.Fatal("unexpected error: custom resource should be of type Unstructured")
 	}
-	content := cr.UnstructuredContent()
+	content := cr.Obj.UnstructuredContent()
 
 	spec := content["spec"].(map[string]interface{})
 	status := content["status"].(map[string]interface{})
@@ -228,7 +232,8 @@ func TestScaleGet(t *testing.T) {
 
 	name := "foo"
 
-	var cr unstructured.Unstructured
+	var cr cr.CustomResource
+	cr.Obj = &unstructured.Unstructured{}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.CustomResource.Storage.Create(ctx, key, &validCustomResource, &cr, 0); err != nil {
@@ -266,11 +271,12 @@ func TestScaleGetWithoutSpecReplicas(t *testing.T) {
 
 	name := "foo"
 
-	var cr unstructured.Unstructured
+	var cr cr.CustomResource
+	cr.Obj = &unstructured.Unstructured{}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
 	withoutSpecReplicas := validCustomResource.DeepCopy()
-	unstructured.RemoveNestedField(withoutSpecReplicas.Object, "spec", "replicas")
+	unstructured.RemoveNestedField(withoutSpecReplicas.Obj.Object, "spec", "replicas")
 	if err := storage.CustomResource.Storage.Create(ctx, key, withoutSpecReplicas, &cr, 0); err != nil {
 		t.Fatalf("error setting new custom resource (key: %s) %v: %v", key, withoutSpecReplicas, err)
 	}
@@ -291,7 +297,8 @@ func TestScaleUpdate(t *testing.T) {
 
 	name := "foo"
 
-	var cr unstructured.Unstructured
+	var cr cr.CustomResource
+	cr.Obj = &unstructured.Unstructured{}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
 	if err := storage.CustomResource.Storage.Create(ctx, key, &validCustomResource, &cr, 0); err != nil {
@@ -343,11 +350,12 @@ func TestScaleUpdateWithoutSpecReplicas(t *testing.T) {
 
 	name := "foo"
 
-	var cr unstructured.Unstructured
+	var cr cr.CustomResource
+	cr.Obj = &unstructured.Unstructured{}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/noxus/" + metav1.NamespaceDefault + "/" + name
 	withoutSpecReplicas := validCustomResource.DeepCopy()
-	unstructured.RemoveNestedField(withoutSpecReplicas.Object, "spec", "replicas")
+	unstructured.RemoveNestedField(withoutSpecReplicas.Obj.Object, "spec", "replicas")
 	if err := storage.CustomResource.Storage.Create(ctx, key, withoutSpecReplicas, &cr, 0); err != nil {
 		t.Fatalf("error setting new custom resource (key: %s) %v: %v", key, withoutSpecReplicas, err)
 	}
@@ -377,20 +385,20 @@ func TestScaleUpdateWithoutSpecReplicas(t *testing.T) {
 	}
 }
 
-type unstructuredJsonCodec struct{}
+type customResourceJsonCodec struct{}
 
-func (c unstructuredJsonCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	obj := into.(*unstructured.Unstructured)
+func (c customResourceJsonCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	obj := into.(*cr.CustomResource)
 	err := obj.UnmarshalJSON(data)
 	if err != nil {
 		return nil, nil, err
 	}
-	gvk := obj.GroupVersionKind()
+	gvk := obj.Obj.GroupVersionKind()
 	return obj, &gvk, nil
 }
 
-func (c unstructuredJsonCodec) Encode(obj runtime.Object, w io.Writer) error {
-	u := obj.(*unstructured.Unstructured)
+func (c customResourceJsonCodec) Encode(obj runtime.Object, w io.Writer) error {
+	u := obj.(*cr.CustomResource)
 	bs, err := u.MarshalJSON()
 	if err != nil {
 		return err
