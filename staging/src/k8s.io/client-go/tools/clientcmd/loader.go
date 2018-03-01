@@ -557,7 +557,12 @@ func GetClusterFileReferences(cluster *clientcmdapi.Cluster) []*string {
 }
 
 func GetAuthInfoFileReferences(authInfo *clientcmdapi.AuthInfo) []*string {
-	return []*string{&authInfo.ClientCertificate, &authInfo.ClientKey, &authInfo.TokenFile}
+	s := []*string{&authInfo.ClientCertificate, &authInfo.ClientKey, &authInfo.TokenFile}
+	// Only resolve exec command if it isn't PATH based.
+	if authInfo.Exec != nil && strings.ContainsRune(authInfo.Exec.Command, filepath.Separator) {
+		s = append(s, &authInfo.Exec.Command)
+	}
+	return s
 }
 
 // ResolvePaths updates the given refs to be absolute paths, relative to the given base directory

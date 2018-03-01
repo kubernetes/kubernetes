@@ -119,6 +119,9 @@ type AuthInfo struct {
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
 	// +optional
 	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
+	// Exec specifies a custom exec-based authentication plugin for the kubernetes cluster.
+	// +optional
+	Exec *ExecConfig `json:"exec,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
@@ -145,6 +148,35 @@ type AuthProviderConfig struct {
 	Name string `json:"name"`
 	// +optional
 	Config map[string]string `json:"config,omitempty"`
+}
+
+// ExecConfig specifies a command to provide client credentials. The command is exec'd
+// and outputs structured stdout holding credentials.
+//
+// See the client.authentiction.k8s.io API group for specifications of the exact input
+// and output format
+type ExecConfig struct {
+	// Command to execute.
+	Command string `json:"command"`
+	// Arguments to pass to the command when executing it.
+	// +optional
+	Args []string `json:"args"`
+	// Env defines additional environment variables to expose to the process. These
+	// are unioned with the host's environment, as well as variables client-go uses
+	// to pass argument to the plugin.
+	// +optional
+	Env []ExecEnvVar `json:"env"`
+
+	// Preferred input version of the ExecInfo. The returned ExecCredentials MUST use
+	// the same encoding version as the input.
+	APIVersion string `json:"apiVersion,omitempty"`
+}
+
+// ExecEnvVar is used for setting environment variables when executing an exec-based
+// credential plugin.
+type ExecEnvVar struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // NewConfig is a convenience function that returns a new Config object with non-nil maps
