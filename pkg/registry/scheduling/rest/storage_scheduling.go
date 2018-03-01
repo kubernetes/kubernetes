@@ -68,22 +68,6 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 }
 
 func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
-	priorityClasses := []*scheduling.PriorityClass{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: scheduling.SystemNodeCritical,
-			},
-			Value:       scheduling.SystemCriticalPriority + 1000,
-			Description: "Used for system critical pods that must not be moved from their current node.",
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: scheduling.SystemClusterCritical,
-			},
-			Value:       scheduling.SystemCriticalPriority,
-			Description: "Used for system critical pods that must run in the cluster, but can be moved to another node if necessary.",
-		},
-	}
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// Adding system priority classes is important. If they fail to add, many critical system
 		// components may fail and cluster may break.
@@ -94,7 +78,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 				return false, nil
 			}
 
-			for _, pc := range priorityClasses {
+			for _, pc := range scheduling.SystemPriorityClasses() {
 				_, err := schedClientSet.PriorityClasses().Get(pc.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
@@ -106,11 +90,12 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 						}
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
+						glog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
 						return false, err
 					}
 				}
 			}
-			glog.Infof("all system priority classes are created successfully.")
+			glog.Infof("all system priority classes are created successfully or already exist.")
 			return true, nil
 		})
 		// if we're never able to make it through initialization, kill the API server.

@@ -325,11 +325,8 @@ var _ = SIGDescribe("PodPriorityResolution [Serial] [Feature:PodPreemption]", fu
 		framework.ExpectNoError(err)
 	})
 
-	// This test verifies that when a higher priority pod is created and no node with
-	// enough resources is found, scheduler preempts a lower priority pod to schedule
-	// the high priority pod.
+	// This test verifies that system critical priorities are created automatically and resolved properly.
 	It("validates critical system priorities are created and resolved", func() {
-		var podRes v1.ResourceList
 		// Create pods that use system critical priorities and
 		By("Create pods that use critical system priorities.")
 		systemPriorityClasses := []string{
@@ -339,9 +336,6 @@ var _ = SIGDescribe("PodPriorityResolution [Serial] [Feature:PodPreemption]", fu
 			pod := createPausePod(f, pausePodConfig{
 				Name:              fmt.Sprintf("pod%d-%v", i, spc),
 				PriorityClassName: spc,
-				Resources: &v1.ResourceRequirements{
-					Requests: podRes,
-				},
 			})
 			Expect(pod.Spec.Priority).NotTo(BeNil())
 			framework.Logf("Created pod: %v", pod.Name)

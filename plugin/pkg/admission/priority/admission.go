@@ -19,12 +19,10 @@ package priority
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -187,16 +185,6 @@ func (p *priorityPlugin) validatePriorityClass(a admission.Attributes) error {
 	pc, ok := a.GetObject().(*scheduling.PriorityClass)
 	if !ok {
 		return errors.NewBadRequest("resource was marked with kind PriorityClass but was unable to be converted")
-	}
-	// API server adds system critical priority classes at bootstrapping. We should
-	// not enforce restrictions on adding system level priority classes for API server.
-	if userInfo := a.GetUserInfo(); userInfo == nil || userInfo.GetName() != user.APIServerUser {
-		if pc.Value > scheduling.HighestUserDefinablePriority {
-			return admission.NewForbidden(a, fmt.Errorf("maximum allowed value of a user defined priority is %v", scheduling.HighestUserDefinablePriority))
-		}
-		if strings.HasPrefix(pc.Name, scheduling.SystemPriorityClassPrefix) {
-			return admission.NewForbidden(a, fmt.Errorf("priority class names with '"+scheduling.SystemPriorityClassPrefix+"' prefix are reserved for system use only"))
-		}
 	}
 	// If the new PriorityClass tries to be the default priority, make sure that no other priority class is marked as default.
 	if pc.GlobalDefault {

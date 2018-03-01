@@ -87,17 +87,6 @@ var systemClusterCritical = &scheduling.PriorityClass{
 }
 
 func TestPriorityClassAdmission(t *testing.T) {
-	var tooHighPriorityClass = &scheduling.PriorityClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "PriorityClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "toohighclass",
-		},
-		Value:       scheduling.HighestUserDefinablePriority + 1,
-		Description: "Just a test priority class",
-	}
-
 	var systemClass = &scheduling.PriorityClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PriorityClass",
@@ -131,21 +120,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			true,
 		},
 		{
-			"too high PriorityClass value",
-			[]*scheduling.PriorityClass{},
-			tooHighPriorityClass,
-			nil,
-			true,
-		},
-		{
-			"system name conflict",
-			[]*scheduling.PriorityClass{},
-			systemClass,
-			nil,
-			true,
-		},
-		{
-			"system name allowed for API server",
+			"system name and value are allowed by admission controller",
 			[]*scheduling.PriorityClass{},
 			systemClass,
 			&user.DefaultInfo{
