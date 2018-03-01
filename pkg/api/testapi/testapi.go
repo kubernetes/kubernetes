@@ -26,57 +26,83 @@ package testapi
 import (
 	"fmt"
 	"mime"
-	"os"
 	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admission"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/authorization"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/events"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/imagepolicy"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/settings"
-	"k8s.io/kubernetes/pkg/apis/storage"
 
-	_ "k8s.io/kubernetes/pkg/apis/admission/install"
-	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
-	_ "k8s.io/kubernetes/pkg/apis/componentconfig/install"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	_ "k8s.io/kubernetes/pkg/apis/events/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
-	_ "k8s.io/kubernetes/pkg/apis/networking/install"
-	_ "k8s.io/kubernetes/pkg/apis/policy/install"
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
-	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
-	_ "k8s.io/kubernetes/pkg/apis/settings/install"
-	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	"k8s.io/kubernetes/pkg/apis/admission"
+	admissioninstall "k8s.io/kubernetes/pkg/apis/admission/install"
+	admissionregistrationinstall "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	appsinstall "k8s.io/kubernetes/pkg/apis/apps/install"
+	authenticationinstall "k8s.io/kubernetes/pkg/apis/authentication/install"
+	"k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationinstall "k8s.io/kubernetes/pkg/apis/authorization/install"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalinginstall "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	batchinstall "k8s.io/kubernetes/pkg/apis/batch/install"
+	"k8s.io/kubernetes/pkg/apis/certificates"
+	certificatesinstall "k8s.io/kubernetes/pkg/apis/certificates/install"
+	"k8s.io/kubernetes/pkg/apis/core"
+	coreinstall "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/apis/events"
+	eventsinstall "k8s.io/kubernetes/pkg/apis/events/install"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsinstall "k8s.io/kubernetes/pkg/apis/extensions/install"
+	"k8s.io/kubernetes/pkg/apis/imagepolicy"
+	imagepolicyinstall "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	"k8s.io/kubernetes/pkg/apis/networking"
+	networkinginstall "k8s.io/kubernetes/pkg/apis/networking/install"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	policyinstall "k8s.io/kubernetes/pkg/apis/policy/install"
+	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacinstall "k8s.io/kubernetes/pkg/apis/rbac/install"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulinginstall "k8s.io/kubernetes/pkg/apis/scheduling/install"
+	"k8s.io/kubernetes/pkg/apis/settings"
+	settingsinstall "k8s.io/kubernetes/pkg/apis/settings/install"
+	"k8s.io/kubernetes/pkg/apis/storage"
+	storageinstall "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
-var (
-	Groups        = make(map[string]TestGroup)
-	Default       TestGroup
+type TestAPI struct {
+	// GroupFactoryRegistry is the APIGroupFactoryRegistry (overlaps a bit with
+	// Registry, see comments in package for details)
+	GroupFactoryRegistry announced.APIGroupFactoryRegistry
+
+	// Registry is an instance of an API registry.
+	Registry *registered.APIRegistrationManager
+
+	// Scheme is an instance of runtime.Scheme to which types in the Kubernetes
+	// API are already registered.
+	Scheme *runtime.Scheme
+
+	// Codecs provides access to encoding and decoding for the scheme
+	Codecs serializer.CodecFactory
+
+	// ParameterCodec handles versioning of objects that are converted to query parameters.
+	ParameterCodec runtime.ParameterCodec
+
+	Groups map[string]TestGroup
+
+	apiMediaType      string
+	apiSerializer     runtime.SerializerInfo
+	storageMediaType  string
+	storageSerializer runtime.SerializerInfo
+}
+
+type CompleteTestAPI struct {
+	*TestAPI
+
+	Core          TestGroup
 	Authorization TestGroup
 	Autoscaling   TestGroup
 	Batch         TestGroup
@@ -92,257 +118,126 @@ var (
 	ImagePolicy   TestGroup
 	Admission     TestGroup
 	Networking    TestGroup
-
-	serializer        runtime.SerializerInfo
-	storageSerializer runtime.SerializerInfo
-)
+}
 
 type TestGroup struct {
+	tapi                 *TestAPI
 	externalGroupVersion schema.GroupVersion
 	internalGroupVersion schema.GroupVersion
 	internalTypes        map[string]reflect.Type
 	externalTypes        map[string]reflect.Type
 }
 
-func init() {
-	if apiMediaType := os.Getenv("KUBE_TEST_API_TYPE"); len(apiMediaType) > 0 {
-		var ok bool
+type APIInstaller func(announced.APIGroupFactoryRegistry, *registered.APIRegistrationManager, *runtime.Scheme)
+
+func NewTestAPI(apiMediaType, storageMediaType string, installers ...APIInstaller) *TestAPI {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	tapi := &TestAPI{
+		GroupFactoryRegistry: make(announced.APIGroupFactoryRegistry),
+		Registry:             registered.NewOrDie(""),
+		Scheme:               scheme,
+		Codecs:               codecs,
+		ParameterCodec:       runtime.NewParameterCodec(scheme),
+		Groups:               make(map[string]TestGroup),
+	}
+
+	if apiMediaType != "" {
 		mediaType, _, err := mime.ParseMediaType(apiMediaType)
 		if err != nil {
 			panic(err)
 		}
-		serializer, ok = runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), mediaType)
+		apiSerializer, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", apiMediaType))
 		}
+
+		tapi.apiMediaType = mediaType
+		tapi.apiSerializer = apiSerializer
 	}
 
-	if storageMediaType := StorageMediaType(); len(storageMediaType) > 0 {
-		var ok bool
+	if storageMediaType != "" {
 		mediaType, _, err := mime.ParseMediaType(storageMediaType)
 		if err != nil {
 			panic(err)
 		}
-		storageSerializer, ok = runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), mediaType)
+		storageSerializer, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", storageMediaType))
 		}
+
+		tapi.storageMediaType = mediaType
+		tapi.storageSerializer = storageSerializer
 	}
 
-	kubeTestAPI := os.Getenv("KUBE_TEST_API")
-	if len(kubeTestAPI) != 0 {
-		// priority is "first in list preferred", so this has to run in reverse order
-		testGroupVersions := strings.Split(kubeTestAPI, ",")
-		for i := len(testGroupVersions) - 1; i >= 0; i-- {
-			gvString := testGroupVersions[i]
-			groupVersion, err := schema.ParseGroupVersion(gvString)
-			if err != nil {
-				panic(fmt.Sprintf("Error parsing groupversion %v: %v", gvString, err))
-			}
-
-			internalGroupVersion := schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}
-			Groups[groupVersion.Group] = TestGroup{
-				externalGroupVersion: groupVersion,
-				internalGroupVersion: internalGroupVersion,
-				internalTypes:        legacyscheme.Scheme.KnownTypes(internalGroupVersion),
-				externalTypes:        legacyscheme.Scheme.KnownTypes(groupVersion),
-			}
-		}
+	for _, install := range installers {
+		install(tapi.GroupFactoryRegistry, tapi.Registry, tapi.Scheme)
 	}
 
-	if _, ok := Groups[api.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: api.GroupName, Version: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version}
-		Groups[api.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: api.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(api.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
+	for name, _ := range tapi.GroupFactoryRegistry {
+		egv := schema.GroupVersion{
+			Group:   name,
+			Version: tapi.Registry.GroupOrDie(name).GroupVersion.Version,
 		}
-	}
-	if _, ok := Groups[extensions.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: extensions.GroupName, Version: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersion.Version}
-		Groups[extensions.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: extensions.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(extensions.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
+		igv := schema.GroupVersion{
+			Group:   name,
+			Version: runtime.APIVersionInternal,
 		}
-	}
-	if _, ok := Groups[autoscaling.GroupName]; !ok {
-		internalTypes := make(map[string]reflect.Type)
-		for k, t := range legacyscheme.Scheme.KnownTypes(extensions.SchemeGroupVersion) {
-			if k == "Scale" {
-				continue
-			}
-			internalTypes[k] = t
-		}
-		externalGroupVersion := schema.GroupVersion{Group: autoscaling.GroupName, Version: legacyscheme.Registry.GroupOrDie(autoscaling.GroupName).GroupVersion.Version}
-		Groups[autoscaling.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: extensions.SchemeGroupVersion,
-			internalTypes:        internalTypes,
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[autoscaling.GroupName+"IntraGroup"]; !ok {
-		internalTypes := make(map[string]reflect.Type)
-		for k, t := range legacyscheme.Scheme.KnownTypes(extensions.SchemeGroupVersion) {
-			if k == "Scale" {
-				internalTypes[k] = t
-				break
-			}
-		}
-		externalGroupVersion := schema.GroupVersion{Group: autoscaling.GroupName, Version: legacyscheme.Registry.GroupOrDie(autoscaling.GroupName).GroupVersion.Version}
-		Groups[autoscaling.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: autoscaling.SchemeGroupVersion,
-			internalTypes:        internalTypes,
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[batch.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: batch.GroupName, Version: legacyscheme.Registry.GroupOrDie(batch.GroupName).GroupVersion.Version}
-		Groups[batch.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: batch.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(batch.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[apps.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: apps.GroupName, Version: legacyscheme.Registry.GroupOrDie(apps.GroupName).GroupVersion.Version}
-		Groups[apps.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: apps.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(apps.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[policy.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: policy.GroupName, Version: legacyscheme.Registry.GroupOrDie(policy.GroupName).GroupVersion.Version}
-		Groups[policy.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: policy.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(policy.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[rbac.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: rbac.GroupName, Version: legacyscheme.Registry.GroupOrDie(rbac.GroupName).GroupVersion.Version}
-		Groups[rbac.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: rbac.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(rbac.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[scheduling.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: scheduling.GroupName, Version: legacyscheme.Registry.GroupOrDie(scheduling.GroupName).GroupVersion.Version}
-		Groups[scheduling.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: scheduling.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(scheduling.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[settings.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: settings.GroupName, Version: legacyscheme.Registry.GroupOrDie(settings.GroupName).GroupVersion.Version}
-		Groups[settings.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: settings.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(settings.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[storage.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: storage.GroupName, Version: legacyscheme.Registry.GroupOrDie(storage.GroupName).GroupVersion.Version}
-		Groups[storage.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: storage.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(storage.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[certificates.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: certificates.GroupName, Version: legacyscheme.Registry.GroupOrDie(certificates.GroupName).GroupVersion.Version}
-		Groups[certificates.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: certificates.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(certificates.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[imagepolicy.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: imagepolicy.GroupName, Version: legacyscheme.Registry.GroupOrDie(imagepolicy.GroupName).GroupVersion.Version}
-		Groups[imagepolicy.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: imagepolicy.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(imagepolicy.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[authorization.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: authorization.GroupName, Version: legacyscheme.Registry.GroupOrDie(authorization.GroupName).GroupVersion.Version}
-		Groups[authorization.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: authorization.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(authorization.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[admissionregistration.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: admissionregistration.GroupName, Version: legacyscheme.Registry.GroupOrDie(admissionregistration.GroupName).GroupVersion.Version}
-		Groups[admissionregistration.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: admissionregistration.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(admissionregistration.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[admission.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: admission.GroupName, Version: legacyscheme.Registry.GroupOrDie(admission.GroupName).GroupVersion.Version}
-		Groups[admission.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: admission.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(admission.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[networking.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: networking.GroupName, Version: legacyscheme.Registry.GroupOrDie(networking.GroupName).GroupVersion.Version}
-		Groups[networking.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: networking.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(networking.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
-	if _, ok := Groups[events.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: events.GroupName, Version: legacyscheme.Registry.GroupOrDie(events.GroupName).GroupVersion.Version}
-		Groups[events.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: events.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(events.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
+		tapi.Groups[name] = TestGroup{
+			tapi:                 tapi,
+			internalGroupVersion: igv,
+			externalGroupVersion: egv,
+			internalTypes:        tapi.Scheme.KnownTypes(igv),
+			externalTypes:        tapi.Scheme.KnownTypes(egv),
 		}
 	}
 
-	Default = Groups[api.GroupName]
-	Autoscaling = Groups[autoscaling.GroupName]
-	Batch = Groups[batch.GroupName]
-	Apps = Groups[apps.GroupName]
-	Policy = Groups[policy.GroupName]
-	Certificates = Groups[certificates.GroupName]
-	Extensions = Groups[extensions.GroupName]
-	Events = Groups[events.GroupName]
-	Rbac = Groups[rbac.GroupName]
-	Scheduling = Groups[scheduling.GroupName]
-	Settings = Groups[settings.GroupName]
-	Storage = Groups[storage.GroupName]
-	ImagePolicy = Groups[imagepolicy.GroupName]
-	Authorization = Groups[authorization.GroupName]
-	Admission = Groups[admission.GroupName]
-	Networking = Groups[networking.GroupName]
+	return tapi
+}
+
+func NewCompleteTestAPI() *CompleteTestAPI {
+	tapi := &CompleteTestAPI{
+		TestAPI: NewTestAPI("", "",
+			admissionregistrationinstall.Install,
+			admissioninstall.Install,
+			appsinstall.Install,
+			authenticationinstall.Install,
+			authorizationinstall.Install,
+			autoscalinginstall.Install,
+			batchinstall.Install,
+			certificatesinstall.Install,
+			coreinstall.Install,
+			eventsinstall.Install,
+			extensionsinstall.Install,
+			imagepolicyinstall.Install,
+			networkinginstall.Install,
+			policyinstall.Install,
+			rbacinstall.Install,
+			schedulinginstall.Install,
+			settingsinstall.Install,
+			storageinstall.Install,
+		),
+	}
+
+	tapi.Core = tapi.Groups[core.GroupName]
+	tapi.Autoscaling = tapi.Groups[autoscaling.GroupName]
+	tapi.Batch = tapi.Groups[batch.GroupName]
+	tapi.Apps = tapi.Groups[apps.GroupName]
+	tapi.Policy = tapi.Groups[policy.GroupName]
+	tapi.Certificates = tapi.Groups[certificates.GroupName]
+	tapi.Extensions = tapi.Groups[extensions.GroupName]
+	tapi.Events = tapi.Groups[events.GroupName]
+	tapi.Rbac = tapi.Groups[rbac.GroupName]
+	tapi.Scheduling = tapi.Groups[scheduling.GroupName]
+	tapi.Settings = tapi.Groups[settings.GroupName]
+	tapi.Storage = tapi.Groups[storage.GroupName]
+	tapi.ImagePolicy = tapi.Groups[imagepolicy.GroupName]
+	tapi.Authorization = tapi.Groups[authorization.GroupName]
+	tapi.Admission = tapi.Groups[admission.GroupName]
+	tapi.Networking = tapi.Groups[networking.GroupName]
+
+	return tapi
 }
 
 func (g TestGroup) ContentConfig() (string, *schema.GroupVersion, runtime.Codec) {
@@ -370,47 +265,46 @@ func (g TestGroup) ExternalTypes() map[string]reflect.Type {
 	return g.externalTypes
 }
 
-// Codec returns the codec for the API version to test against, as set by the
-// KUBE_TEST_API_TYPE env var.
+// Codec returns the codec for the API version to test against.
 func (g TestGroup) Codec() runtime.Codec {
-	if serializer.Serializer == nil {
-		return legacyscheme.Codecs.LegacyCodec(g.externalGroupVersion)
+	if g.tapi.apiSerializer.Serializer == nil {
+		return g.tapi.Codecs.LegacyCodec(g.externalGroupVersion)
 	}
-	return legacyscheme.Codecs.CodecForVersions(serializer.Serializer, legacyscheme.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
+	return g.tapi.Codecs.CodecForVersions(g.tapi.apiSerializer.Serializer, g.tapi.Codecs.UniversalDeserializer(), schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // NegotiatedSerializer returns the negotiated serializer for the server.
 func (g TestGroup) NegotiatedSerializer() runtime.NegotiatedSerializer {
-	return legacyscheme.Codecs
+	return g.tapi.Codecs
 }
 
-func StorageMediaType() string {
-	return os.Getenv("KUBE_TEST_API_STORAGE_TYPE")
+func (t *TestAPI) StorageMediaType() string {
+	return t.storageMediaType
 }
 
 // StorageCodec returns the codec for the API version to store in etcd, as set by the
 // KUBE_TEST_API_STORAGE_TYPE env var.
 func (g TestGroup) StorageCodec() runtime.Codec {
-	s := storageSerializer.Serializer
+	s := g.tapi.storageSerializer.Serializer
 
 	if s == nil {
-		return legacyscheme.Codecs.LegacyCodec(g.externalGroupVersion)
+		return g.tapi.Codecs.LegacyCodec(g.externalGroupVersion)
 	}
 
 	// etcd2 only supports string data - we must wrap any result before returning
 	// TODO: remove for etcd3 / make parameterizable
-	if !storageSerializer.EncodesAsText {
+	if !g.tapi.storageSerializer.EncodesAsText {
 		s = runtime.NewBase64Serializer(s, s)
 	}
-	ds := recognizer.NewDecoder(s, legacyscheme.Codecs.UniversalDeserializer())
+	ds := recognizer.NewDecoder(s, g.tapi.Codecs.UniversalDeserializer())
 
-	return legacyscheme.Codecs.CodecForVersions(s, ds, schema.GroupVersions{g.externalGroupVersion}, nil)
+	return g.tapi.Codecs.CodecForVersions(s, ds, schema.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // Converter returns the legacyscheme.Scheme for the API version to test against, as set by the
 // KUBE_TEST_API env var.
 func (g TestGroup) Converter() runtime.ObjectConvertor {
-	interfaces, err := legacyscheme.Registry.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
+	interfaces, err := g.tapi.Registry.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -420,7 +314,7 @@ func (g TestGroup) Converter() runtime.ObjectConvertor {
 // MetadataAccessor returns the MetadataAccessor for the API version to test against,
 // as set by the KUBE_TEST_API env var.
 func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
-	interfaces, err := legacyscheme.Registry.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
+	interfaces, err := g.tapi.Registry.GroupOrDie(g.externalGroupVersion.Group).InterfacesFor(g.externalGroupVersion)
 	if err != nil {
 		panic(err)
 	}
@@ -431,7 +325,7 @@ func (g TestGroup) MetadataAccessor() meta.MetadataAccessor {
 // 'resource' should be the resource path, e.g. "pods" for the Pod type. 'name' should be
 // empty for lists.
 func (g TestGroup) SelfLink(resource, name string) string {
-	if g.externalGroupVersion.Group == api.GroupName {
+	if g.externalGroupVersion.Group == core.GroupName {
 		if name == "" {
 			return fmt.Sprintf("/api/%s/%s", g.externalGroupVersion.Version, resource)
 		}
@@ -451,7 +345,7 @@ func (g TestGroup) SelfLink(resource, name string) string {
 // /api/v1/watch/namespaces/foo/pods/pod0 for v1.
 func (g TestGroup) ResourcePathWithPrefix(prefix, resource, namespace, name string) string {
 	var path string
-	if g.externalGroupVersion.Group == api.GroupName {
+	if g.externalGroupVersion.Group == core.GroupName {
 		path = "/api/" + g.externalGroupVersion.Version
 	} else {
 		// TODO: switch back once we have proper multiple group support
@@ -496,13 +390,13 @@ func (g TestGroup) SubResourcePath(resource, namespace, name, sub string) string
 
 // RESTMapper returns RESTMapper in legacyscheme.Registry.
 func (g TestGroup) RESTMapper() meta.RESTMapper {
-	return legacyscheme.Registry.RESTMapper()
+	return g.tapi.Registry.RESTMapper()
 }
 
 // ExternalGroupVersions returns all external group versions allowed for the server.
-func ExternalGroupVersions() schema.GroupVersions {
+func (t *TestAPI) ExternalGroupVersions() schema.GroupVersions {
 	versions := []schema.GroupVersion{}
-	for _, g := range Groups {
+	for _, g := range t.Groups {
 		gv := g.GroupVersion()
 		versions = append(versions, *gv)
 	}
@@ -510,25 +404,25 @@ func ExternalGroupVersions() schema.GroupVersions {
 }
 
 // GetCodecForObject gets codec based on runtime.Object
-func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
-	kinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
+func (t *TestAPI) GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
+	kinds, _, err := t.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected encoding error: %v", err)
 	}
 	kind := kinds[0]
 
-	for _, group := range Groups {
+	for _, group := range t.Groups {
 		if group.GroupVersion().Group != kind.Group {
 			continue
 		}
 
-		if legacyscheme.Scheme.Recognizes(kind) {
+		if t.Scheme.Recognizes(kind) {
 			return group.Codec(), nil
 		}
 	}
 	// Codec used for unversioned types
-	if legacyscheme.Scheme.Recognizes(kind) {
-		serializer, ok := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if t.Scheme.Recognizes(kind) {
+		serializer, ok := runtime.SerializerInfoForMediaType(t.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			return nil, fmt.Errorf("no serializer registered for json")
 		}
@@ -538,6 +432,12 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 }
 
 // NewTestGroup creates a new TestGroup.
-func NewTestGroup(external, internal schema.GroupVersion, internalTypes map[string]reflect.Type, externalTypes map[string]reflect.Type) TestGroup {
-	return TestGroup{external, internal, internalTypes, externalTypes}
+func (t *TestAPI) NewTestGroup(external, internal schema.GroupVersion, internalTypes map[string]reflect.Type, externalTypes map[string]reflect.Type) TestGroup {
+	return TestGroup{
+		tapi:                 t,
+		externalGroupVersion: external,
+		internalGroupVersion: internal,
+		internalTypes:        internalTypes,
+		externalTypes:        externalTypes,
+	}
 }
