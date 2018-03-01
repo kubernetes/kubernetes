@@ -386,6 +386,43 @@ cleanup()
   exit 0
 }
 
+# Check if all processes are still running. Prints a warning once each time
+# a process dies unexpectedly.
+function healthcheck {
+  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 ${APISERVER_PID} 2>/dev/null; then
+    warning "API server terminated unexpectedly, see ${APISERVER_LOG}"
+    APISERVER_PID=
+  fi
+
+  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 ${CTLRMGR_PID} 2>/dev/null; then
+    warning "kube-controller-manager terminated unexpectedly, see ${CTLRMGR_LOG}"
+    CTLRMGR_PID=
+  fi
+
+  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+    # TODO (https://github.com/kubernetes/kubernetes/issues/62474): check health also in this case
+    :
+  elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
+    warning "kubelet terminated unexpectedly, see ${KUBELET_LOG}"
+    KUBELET_PID=
+  fi
+
+  if [[ -n "${PROXY_PID-}" ]] && ! sudo kill -0 ${PROXY_PID} 2>/dev/null; then
+    warning "kube-proxy terminated unexpectedly, see ${PROXY_LOG}"
+    PROXY_PID=
+  fi
+
+  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 ${SCHEDULER_PID} 2>/dev/null; then
+    warning "scheduler terminated unexpectedly, see ${SCHEDULER_LOG}"
+    SCHEDULER_PID=
+  fi
+
+  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 ${ETCD_PID} 2>/dev/null; then
+    warning "etcd terminated unexpectedly"
+    ETCD_PID=
+  fi
+}
+
 function warning {
   message=$1
 
@@ -1008,7 +1045,7 @@ fi
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-  while true; do sleep 1; done
+  while true; do sleep 1; healthcheck; done
 fi
 
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
