@@ -864,6 +864,7 @@ func getTestCloud() (az *Cloud) {
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
+			VMType: vmTypeStandard,
 		},
 	}
 	az.DisksClient = newFakeDisksClient()
