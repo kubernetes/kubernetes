@@ -19,7 +19,10 @@ limitations under the License.
 package mount
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 )
 
 const (
@@ -65,6 +68,42 @@ type Interface interface {
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error
+	// SafeMakeDir makes sure that the created directory does not escape given
+	// base directory mis-using symlinks. The directory is created in the same
+	// mount namespace as where kubelet is running. Note that the function makes
+	// sure that it creates the directory somewhere under the base, nothing
+	// else. E.g. if the directory already exists, it may exists outside of the
+	// base due to symlinks.
+	SafeMakeDir(pathname string, base string, perm os.FileMode) error
+	// CleanSubPaths removes any bind-mounts created by PrepareSafeSubpath in given
+	// pod volume directory.
+	CleanSubPaths(podDir string, volumeName string) error
+	// PrepareSafeSubpath does everything that's necessary to prepare a subPath
+	// that's 1) inside given volumePath and 2) immutable after this call.
+	//
+	// newHostPath - location of prepared subPath. It should be used instead of
+	// hostName when running the container.
+	// cleanupAction - action to run when the container is running or it failed to start.
+	//
+	// CleanupAction must be called immediately after the container with given
+	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
+	// when the pod finishes.
+	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
+}
+
+type Subpath struct {
+	// index of the VolumeMount for this container
+	VolumeMountIndex int
+	// Full path to the subpath directory on the host
+	Path string
+	// name of the volume that is a valid directory name.
+	VolumeName string
+	// Full path to the volume path
+	VolumePath string
+	// Path to the pod's directory, including pod UID
+	PodDir string
+	// Name of the container
+	ContainerName string
 }
 
 // Exec executes command where mount utilities are. This can be either the host,
@@ -180,6 +219,13 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
+func isNotDirErr(err error) bool {
+	if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOTDIR {
+		return true
+	}
+	return false
+}
+
 // IsNotMountPoint determines if a directory is a mountpoint.
 // It should return ErrNotExist when the directory does not exist.
 // This method uses the List() of all mountpoints
@@ -189,7 +235,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
 	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
-	if notMntErr != nil {
+	if notMntErr != nil && isNotDirErr(notMntErr) {
 		return notMnt, notMntErr
 	}
 	// identified as mountpoint, so return this fact
@@ -234,4 +280,17 @@ func isBind(options []string) (bool, []string) {
 	}
 
 	return bind, bindRemountOpts
+}
+
+// pathWithinBase checks if give path is withing given base directory.
+func pathWithinBase(fullPath, basePath string) bool {
+	rel, err := filepath.Rel(basePath, fullPath)
+	if err != nil {
+		return false
+	}
+	if strings.HasPrefix(rel, "..") {
+		// Needed to escape the base path
+		return false
+	}
+	return true
 }

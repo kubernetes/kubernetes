@@ -842,7 +842,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	// TODO: determine how this should be handled for rkt
-	opts, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+	opts, _, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
 	if err != nil {
 		return err
 	}

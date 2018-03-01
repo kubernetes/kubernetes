@@ -18,6 +18,10 @@ limitations under the License.
 
 package mount
 
+import (
+	"os"
+)
+
 type NsenterMounter struct{}
 
 func NewNsenterMounter() *NsenterMounter {
@@ -63,5 +67,17 @@ func (*NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (stri
 }
 
 func (*NsenterMounter) MakeRShared(path string) error {
+	return nil
+}
+
+func (*NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
+}
+
+func (*NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return subPath.Path, nil, nil
+}
+
+func (*NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {
 	return nil
 }
