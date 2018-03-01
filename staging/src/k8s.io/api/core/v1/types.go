@@ -2983,6 +2983,13 @@ type PodSecurityContext struct {
 	// for that container.
 	// +optional
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,2,opt,name=runAsUser"`
+	// The GID to run the entrypoint of the container process.
+	// Uses runtime default if unset.
+	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence
+	// for that container.
+	// +optional
+	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,6,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.
@@ -5165,6 +5172,12 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,4,opt,name=runAsUser"`
+	// The GID to run the entrypoint of the container process.
+	// Uses runtime default if unset.
+	// May also be set in PodSecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,8,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
 	// does not run as UID 0 (root) and fail to start the container if it does.

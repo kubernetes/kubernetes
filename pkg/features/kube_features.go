@@ -261,6 +261,12 @@ const (
 	//
 	// Enables the regional PD feature on GCE.
 	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
+
+	// owner: @krmayankk
+	// alpha: v1.10
+	//
+	// Enables control over the primary group ID of containers' init processes.
+	RunAsGroup utilfeature.Feature = "RunAsGroup"
 )
 
 func init() {
@@ -306,6 +312,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
+	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

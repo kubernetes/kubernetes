@@ -122,6 +122,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.RunAsUser = *containerSc.RunAsUser
 	}
 
+	if containerSc.RunAsGroup != nil {
+		effectiveSc.RunAsGroup = new(int64)
+		*effectiveSc.RunAsGroup = *containerSc.RunAsGroup
+	}
+
 	if containerSc.RunAsNonRoot != nil {
 		effectiveSc.RunAsNonRoot = new(bool)
 		*effectiveSc.RunAsNonRoot = *containerSc.RunAsNonRoot
@@ -154,6 +159,11 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 	if pod.Spec.SecurityContext.RunAsUser != nil {
 		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
+	}
+
+	if pod.Spec.SecurityContext.RunAsGroup != nil {
+		synthesized.RunAsGroup = new(int64)
+		*synthesized.RunAsGroup = *pod.Spec.SecurityContext.RunAsGroup
 	}
 
 	if pod.Spec.SecurityContext.RunAsNonRoot != nil {

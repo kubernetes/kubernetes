@@ -39,13 +39,18 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 		sc = &runtimeapi.LinuxContainerSecurityContext{
 			SupplementalGroups: lc.SecurityContext.SupplementalGroups,
 			RunAsUser:          lc.SecurityContext.RunAsUser,
+			RunAsGroup:         lc.SecurityContext.RunAsGroup,
 			ReadonlyRootfs:     lc.SecurityContext.ReadonlyRootfs,
 			SelinuxOptions:     lc.SecurityContext.SelinuxOptions,
 			NamespaceOptions:   lc.SecurityContext.NamespaceOptions,
 		}
 	}
 
-	modifyContainerConfig(sc, config)
+	err := modifyContainerConfig(sc, config)
+	if err != nil {
+		return err
+	}
+
 	if err := modifyHostConfig(sc, hc, separator); err != nil {
 		return err
 	}
@@ -59,7 +64,10 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, podSandb
 		return nil
 	}
 
-	modifyContainerConfig(lc.SecurityContext, config)
+	err := modifyContainerConfig(lc.SecurityContext, config)
+	if err != nil {
+		return err
+	}
 	if err := modifyHostConfig(lc.SecurityContext, hc, separator); err != nil {
 		return err
 	}
@@ -68,9 +76,9 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, podSandb
 }
 
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
-func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) {
+func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) error {
 	if sc == nil {
-		return
+		return nil
 	}
 	if sc.RunAsUser != nil {
 		config.User = strconv.FormatInt(sc.GetRunAsUser().Value, 10)
@@ -78,6 +86,18 @@ func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config 
 	if sc.RunAsUsername != "" {
 		config.User = sc.RunAsUsername
 	}
+
+	user := config.User
+	if sc.RunAsGroup != nil {
+		if user == "" {
+			return fmt.Errorf("runAsGroup is specified without a runAsUser.")
+		}
+		user = fmt.Sprintf("%s:%d", config.User, sc.GetRunAsGroup().Value)
+	}
+
+	config.User = user
+
+	return nil
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
