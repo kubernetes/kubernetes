@@ -73,6 +73,17 @@ function is-quick {
   return 1
 }
 
+function is-explicitly-chosen {
+  local name="${1#verify-}"
+  name="${name%.*}"
+  for e in ${WHAT}; do
+    if [[ $e == "$name" ]]; then
+      return
+    fi
+  done
+  return 1
+}
+
 function run-cmd {
   local filename="${2##*/verify-}"
   local testname="${filename%%.*}"
@@ -109,13 +120,19 @@ function run-checks {
   for t in $(ls ${pattern})
   do
     local check_name="$(basename "${t}")"
-    if is-excluded "${t}" ; then
-      echo "Skipping ${check_name}"
-      continue
-    fi
-    if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${check_name} in quick mode"
-      continue
+    if [[ ! -z ${WHAT:-} ]]; then
+      if ! is-explicitly-chosen "${check_name}"; then
+        continue
+      fi
+    else
+      if is-excluded "${t}" ; then
+        echo "Skipping ${check_name}"
+        continue
+      fi
+      if ${QUICK} && ! is-quick "${t}" ; then
+        echo "Skipping ${check_name} in quick mode"
+        continue
+      fi
     fi
     echo -e "Verifying ${check_name}"
     local start=$(date +%s)
