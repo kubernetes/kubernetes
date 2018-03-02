@@ -52,8 +52,6 @@ func fakecmd() *cobra.Command {
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 		},
 	}
-
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
 	return cmd
 }
 
