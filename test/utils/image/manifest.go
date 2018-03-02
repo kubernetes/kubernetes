@@ -94,7 +94,7 @@ var (
 	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.0", true}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0", true}
 	VolumeNFSServer     = ImageConfig{gcRegistry, "volume-nfs", "0.8", false}
-	VolumeISCSIServer   = ImageConfig{gcRegistry, "volume-icsci", "0.1", false}
+	VolumeISCSIServer   = ImageConfig{gcRegistry, "volume-iscsi", "0.2", false}
 	VolumeGlusterServer = ImageConfig{gcRegistry, "volume-gluster", "0.2", false}
 	VolumeCephServer    = ImageConfig{gcRegistry, "volume-ceph", "0.1", false}
 	VolumeRBDServer     = ImageConfig{gcRegistry, "volume-rbd", "0.1", false}
