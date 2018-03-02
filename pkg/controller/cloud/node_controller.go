@@ -417,7 +417,7 @@ func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances,
 	exists, err := instances.InstanceExistsByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		_, err = instances.ExternalID(context.TODO(), types.NodeName(node.Name))
+		_, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
 		if err == nil {
 			return true, nil
 		}
