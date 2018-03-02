@@ -19,12 +19,16 @@ package storage
 import (
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -193,4 +197,40 @@ func TestShortNames(t *testing.T) {
 	registrytest.AssertShortNames(t, storage, expected)
 }
 
-// TODO TestUpdateStatus
+func TestUpdateStatus(t *testing.T) {
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	key, _ := storage.KeyFunc(ctx, "foo")
+	dsStart := newValidDaemonSet()
+	if err := storage.Storage.Create(ctx, key, dsStart, nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	dsIn := &extensions.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Status: extensions.DaemonSetStatus{
+			Conditions: []extensions.DaemonSetCondition{
+				{Status: "True"},
+			},
+		},
+	}
+
+	if _, _, err := statusStorage.Update(ctx, dsIn.Name, rest.DefaultUpdatedObjectInfo(dsIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	dsOut := obj.(*extensions.DaemonSet)
+	// only compare relevant changes b/c of difference in metadata
+	if !apiequality.Semantic.DeepEqual(dsIn.Status, dsOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(dsIn.Status, dsOut.Status))
+	}
+}
