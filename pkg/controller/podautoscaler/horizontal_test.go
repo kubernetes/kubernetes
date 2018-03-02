@@ -103,6 +103,7 @@ type testCase struct {
 	reportedLevels       []uint64
 	reportedCPURequests  []resource.Quantity
 	reportedPodReadiness []v1.ConditionStatus
+	reportedPodPhase     []v1.PodPhase
 	scaleUpdated         bool
 	statusUpdated        bool
 	eventCreated         bool
@@ -250,10 +251,14 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			if tc.reportedPodReadiness != nil {
 				podReadiness = tc.reportedPodReadiness[i]
 			}
+			podPhase := v1.PodRunning
+			if tc.reportedPodPhase != nil {
+				podPhase = tc.reportedPodPhase[i]
+			}
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := v1.Pod{
 				Status: v1.PodStatus{
-					Phase: v1.PodRunning,
+					Phase: podPhase,
 					Conditions: []v1.PodCondition{
 						{
 							Type:   v1.PodReady,
@@ -713,6 +718,24 @@ func TestScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpIgnoresFailedPods(t *testing.T) {
+	tc := testCase{
+		minReplicas:          2,
+		maxReplicas:          6,
+		initialReplicas:      2,
+		desiredReplicas:      4,
+		CPUTarget:            30,
+		CPUCurrent:           60,
+		verifyCPUCurrent:     true,
+		reportedLevels:       []uint64{500, 700},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		reportedPodPhase:     []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		useMetricsAPI:        true,
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUpDeployment(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
@@ -1013,6 +1036,24 @@ func TestScaleDownIgnoresUnreadyPods(t *testing.T) {
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:        true,
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownIgnoresFailedPods(t *testing.T) {
+	tc := testCase{
+		minReplicas:          2,
+		maxReplicas:          6,
+		initialReplicas:      5,
+		desiredReplicas:      3,
+		CPUTarget:            50,
+		CPUCurrent:           28,
+		verifyCPUCurrent:     true,
+		reportedLevels:       []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:        true,
+		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		reportedPodPhase:     []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
 	}
 	tc.runTest(t)
 }

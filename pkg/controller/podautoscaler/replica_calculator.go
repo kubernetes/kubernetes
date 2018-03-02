@@ -88,7 +88,11 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
 			// save this pod name for later, but pretend it doesn't exist for now
-			unreadyPods.Insert(pod.Name)
+			if pod.Status.Phase != v1.PodFailed {
+				// Failed pods should not be counted as unready pods as they will
+				// not become running anymore.
+				unreadyPods.Insert(pod.Name)
+			}
 			delete(metrics, pod.Name)
 			continue
 		}
