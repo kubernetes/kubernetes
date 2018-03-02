@@ -19,6 +19,8 @@ limitations under the License.
 package kubernetes
 
 import (
+	errors "errors"
+
 	glog "github.com/golang/glog"
 	discovery "k8s.io/client-go/discovery"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
@@ -397,6 +399,9 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 // NewForConfig creates a new Clientset for the given config.
 func NewForConfig(c *rest.Config) (*Clientset, error) {
+	if c == nil {
+		return nil, errors.New("config argument can't be nil")
+	}
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
