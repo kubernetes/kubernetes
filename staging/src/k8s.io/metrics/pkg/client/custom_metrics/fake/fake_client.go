@@ -51,6 +51,18 @@ func (i GetForActionImpl) GetSubresource() string {
 	return i.MetricName
 }
 
+func (i GetForActionImpl) DeepCopy() testing.Action {
+	var labelSelector labels.Selector
+	if i.LabelSelector != nil {
+		labelSelector = i.LabelSelector.DeepCopySelector()
+	}
+	return GetForActionImpl{
+		GetAction:     i.GetAction.DeepCopy().(testing.GetAction),
+		MetricName:    i.MetricName,
+		LabelSelector: labelSelector,
+	}
+}
+
 func NewGetForAction(groupKind schema.GroupKind, namespace, name string, metricName string, labelSelector labels.Selector) GetForActionImpl {
 	// the version doesn't matter
 	gvk := groupKind.WithVersion("")
