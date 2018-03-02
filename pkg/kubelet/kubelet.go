@@ -1317,12 +1317,12 @@ func (kl *Kubelet) initializeModules() error {
 
 	// Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
-		return fmt.Errorf("Failed to start OOM watcher %v", err)
+		return fmt.Errorf("failed to start OOM watcher %v", err)
 	}
 
 	// Initialize GPUs
 	if err := kl.gpuManager.Start(); err != nil {
-		glog.Errorf("Failed to start gpuManager %v", err)
+		return fmt.Errorf("failed to start gpuManager %v", err)
 	}
 
 	// Start resource analyzer
