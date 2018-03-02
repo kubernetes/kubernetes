@@ -33,6 +33,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -209,6 +210,9 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 			if err == nil { // delete err is returned if err is not set
 				err = e
 			}
+		} else {
+			framework.Logf("sleeping a bit so kubelet can unmount and detach the volume")
+			time.Sleep(framework.PodCleanupTimeout)
 		}
 	}()
 
