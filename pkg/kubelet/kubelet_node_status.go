@@ -302,8 +302,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
-		// TODO: ExternalID is deprecated, we'll have to drop this code
-		externalID, err := instances.ExternalID(context.TODO(), kl.nodeName)
+		// ExternalID is deprecated, so ProviderID is retrieved using InstanceID
+		externalID, err := instances.InstanceID(context.TODO(), kl.nodeName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get external ID from cloud provider: %v", err)
 		}

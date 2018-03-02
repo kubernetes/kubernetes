@@ -110,18 +110,6 @@ func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID st
 	return addresses, nil
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (i *Instances) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		if err == ErrNotFound {
-			return "", cloudprovider.InstanceNotFound
-		}
-		return "", err
-	}
-	return srv.ID, nil
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {

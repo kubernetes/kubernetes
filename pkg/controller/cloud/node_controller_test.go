@@ -90,7 +90,7 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 			providerIDErr:      errors.New("unimplemented"),
 			existsByNodeName:   true,
 			nodeNameErr:        nil,
-			expectedCalls:      []string{"instance-exists-by-provider-id", "external-id"},
+			expectedCalls:      []string{"instance-exists-by-provider-id", "instance-id"},
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node0",
@@ -106,7 +106,7 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 			providerIDErr:      errors.New("unimplemented"),
 			existsByNodeName:   false,
 			nodeNameErr:        cloudprovider.InstanceNotFound,
-			expectedCalls:      []string{"instance-exists-by-provider-id", "external-id"},
+			expectedCalls:      []string{"instance-exists-by-provider-id", "instance-id"},
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node0",
@@ -138,7 +138,7 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 				"expected exist by provider id to be `%t` but got `%t`",
 				tc.existsByProviderID, exists)
 
-			assert.False(t, tc.existsByNodeName && tc.existsByNodeName != exists,
+			assert.False(t, tc.existsByNodeName && tc.existsByNodeName == exists,
 				"expected exist by node name to be `%t` but got `%t`", tc.existsByNodeName, exists)
 
 			assert.False(t, !tc.existsByNodeName && !tc.existsByProviderID && exists,

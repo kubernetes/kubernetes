@@ -577,11 +577,6 @@ func convertToK8sType(vmName string) k8stypes.NodeName {
 	return k8stypes.NodeName(vmName)
 }
 
-// ExternalID returns the cloud provider ID of the node with the specified Name (deprecated).
-func (vs *VSphere) ExternalID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
-	return vs.InstanceID(ctx, nodeName)
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {

@@ -1318,24 +1318,6 @@ func (c *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 	return extractNodeAddresses(instance)
 }
 
-// ExternalID returns the cloud provider ID of the node with the specified nodeName (deprecated).
-func (c *Cloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	if c.selfAWSInstance.nodeName == nodeName {
-		// We assume that if this is run on the instance itself, the instance exists and is alive
-		return c.selfAWSInstance.awsID, nil
-	}
-	// We must verify that the instance still exists
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
-	instance, err := c.findInstanceByNodeName(nodeName)
-	if err != nil {
-		return "", err
-	}
-	if instance == nil {
-		return "", cloudprovider.InstanceNotFound
-	}
-	return aws.StringValue(instance.InstanceId), nil
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
