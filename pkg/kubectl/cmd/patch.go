@@ -100,6 +100,7 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().String("type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
+	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types")
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
@@ -143,12 +144,14 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
+	all := cmdutil.GetFlagBool(cmd, "all")
+
 	r := f.NewBuilder().
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		ResourceTypeOrNameArgs(false, args...).
+		ResourceTypeOrNameArgs(all, args...).
 		Flatten().
 		Do()
 	err = r.Err()
