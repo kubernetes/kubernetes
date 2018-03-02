@@ -74,12 +74,15 @@ go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
+        "audit_test.go",
         "serving_test.go",
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
@@ -90,6 +93,7 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/tools/clientcmd/api/v1:go_default_library",
     ],
 )
 

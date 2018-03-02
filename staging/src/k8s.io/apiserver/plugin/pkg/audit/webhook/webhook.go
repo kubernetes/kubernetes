@@ -101,3 +101,7 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 		return b.w.RestClient.Post().Body(&list).Do()
 	}).Error()
 }
+
+func (b *backend) String() string {
+	return PluginName
+}
