@@ -78,7 +78,6 @@ pkg/apis/storage
 pkg/apis/storage/util
 pkg/apis/storage/v1/util
 pkg/apis/storage/v1alpha1
-pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
 pkg/client/chaosclient
