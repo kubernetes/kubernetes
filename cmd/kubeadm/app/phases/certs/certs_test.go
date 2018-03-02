@@ -382,6 +382,22 @@ func TestNewEtcdPeerCertAndKey(t *testing.T) {
 	}
 }
 
+func TestNewEtcdHealthcheckClientCertAndKey(t *testing.T) {
+	caCert, caKey, err := NewCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of ca cert and key: %v", err)
+	}
+
+	etcdHealthcheckClientCert, _, err := NewEtcdHealthcheckClientCertAndKey(caCert, caKey)
+	if err != nil {
+		t.Fatalf("failed creation of cert and key: %v", err)
+	}
+
+	certstestutil.AssertCertificateIsSignedByCa(t, etcdHealthcheckClientCert, caCert)
+	certstestutil.AssertCertificateHasClientAuthUsage(t, etcdHealthcheckClientCert)
+	certstestutil.AssertCertificateHasOrganizations(t, etcdHealthcheckClientCert, kubeadmconstants.MastersGroup)
+}
+
 func TestNewAPIServerEtcdClientCertAndKey(t *testing.T) {
 	caCert, caKey, err := NewCACertAndKey()
 	if err != nil {
@@ -595,6 +611,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 				kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdCAKeyName,
 				kubeadmconstants.EtcdServerCertName, kubeadmconstants.EtcdServerKeyName,
 				kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName,
+				kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
 				kubeadmconstants.APIServerEtcdClientCertName, kubeadmconstants.APIServerEtcdClientKeyName,
 				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
 				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
@@ -628,6 +645,11 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 			setupFunc:     CreateEtcdCACertAndKeyFiles,
 			createFunc:    CreateEtcdPeerCertAndKeyFiles,
 			expectedFiles: []string{kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName},
+		},
+		{
+			setupFunc:     CreateEtcdCACertAndKeyFiles,
+			createFunc:    CreateEtcdHealthcheckClientCertAndKeyFiles,
+			expectedFiles: []string{kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName},
 		},
 		{
 			setupFunc:     CreateEtcdCACertAndKeyFiles,

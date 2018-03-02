@@ -90,13 +90,22 @@ const (
 	// EtcdPeerCertCommonName defines etcd's peer certificate common name (CN)
 	EtcdPeerCertCommonName = "kube-etcd-peer"
 
-	// APIServerEtcdClientCertAndKeyBaseName defines etcd client certificate and key base name
+	// EtcdHealthcheckClientCertAndKeyBaseName defines etcd's healthcheck client certificate and key base name
+	EtcdHealthcheckClientCertAndKeyBaseName = "etcd/healthcheck-client"
+	// EtcdHealthcheckClientCertName defines etcd's healthcheck client certificate name
+	EtcdHealthcheckClientCertName = "etcd/healthcheck-client.crt"
+	// EtcdHealthcheckClientKeyName defines etcd's healthcheck client key name
+	EtcdHealthcheckClientKeyName = "etcd/healthcheck-client.key"
+	// EtcdHealthcheckClientCertCommonName defines etcd's healthcheck client certificate common name (CN)
+	EtcdHealthcheckClientCertCommonName = "kube-etcd-healthcheck-client"
+
+	// APIServerEtcdClientCertAndKeyBaseName defines apiserver's etcd client certificate and key base name
 	APIServerEtcdClientCertAndKeyBaseName = "apiserver-etcd-client"
-	// APIServerEtcdClientCertName defines etcd client certificate name
+	// APIServerEtcdClientCertName defines apiserver's etcd client certificate name
 	APIServerEtcdClientCertName = "apiserver-etcd-client.crt"
-	// APIServerEtcdClientKeyName defines etcd client key name
+	// APIServerEtcdClientKeyName defines apiserver's etcd client key name
 	APIServerEtcdClientKeyName = "apiserver-etcd-client.key"
-	// APIServerEtcdClientCertCommonName defines etcd client certificate common name (CN)
+	// APIServerEtcdClientCertCommonName defines apiserver's etcd client certificate common name (CN)
 	APIServerEtcdClientCertCommonName = "kube-apiserver-etcd-client"
 
 	// ServiceAccountKeyBaseName defines SA key base name
