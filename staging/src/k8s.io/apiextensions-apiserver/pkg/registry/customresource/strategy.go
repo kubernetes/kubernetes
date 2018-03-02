@@ -182,3 +182,11 @@ func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label label
 		GetAttrs: a.GetAttrs,
 	}
 }
+
+// CheckGracefulDelete updates the delete option with the desiered grace value
+func (a customResourceStrategy) CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+	if options == nil || options.GracePeriodSeconds == nil {
+		return false
+	}
+	return true
+}

@@ -68,6 +68,21 @@ func TestFinalization(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Testing Grace period is updating
+	period := int64(30)
+	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
+		Preconditions: &metav1.Preconditions{
+			UID: &uid,
+		},
+		GracePeriodSeconds: &period,
+	})
+	require.NoError(t, err)
+
+	gottenNoxuInstance, err = noxuResourceClient.Get(name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	require.Equal(t, gottenNoxuInstance.GetDeletionGracePeriodSeconds, period)
+
 	// Removing the finalizers to allow the following delete remove the object.
 	// This step will fail if previous delete wrongly removed the object. The
 	// object will be deleted as part of the finalizer update.
