@@ -150,7 +150,8 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 	if policy.LowThresholdPercent > policy.HighThresholdPercent {
 		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
 	}
-	im := &realImageGCManager{
+
+	return &realImageGCManager{
 		runtime:       runtime,
 		policy:        policy,
 		imageRecords:  make(map[string]*imageRecord),
@@ -159,37 +160,32 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 		nodeRef:       nodeRef,
 		initialized:   false,
 		sandboxImage:  sandboxImage,
-	}
-
-	return im, nil
+	}, nil
 }
 
 func (im *realImageGCManager) Start() {
 	go wait.Until(func() {
-		// Initial detection make detected time "unknown" in the past.
-		var ts time.Time
-		if im.initialized {
-			ts = time.Now()
+		images, err := im.runtime.ListImages()
+		if err != nil {
+			glog.Warningf("[imageGCManager] Failed to list images: %v", err)
 		}
-		_, err := im.detectImages(ts)
+
+		// 1. Initial detection make detected time "unknown" in the past.
+		var detectTime time.Time
+		if im.initialized {
+			detectTime = time.Now()
+		}
+		_, err = im.detectImages(detectTime, images)
 		if err != nil {
 			glog.Warningf("[imageGCManager] Failed to monitor images: %v", err)
 		} else {
 			im.initialized = true
 		}
+
+		// 2. periodically updates image cache.
+		im.imageCache.set(images)
+
 	}, 5*time.Minute, wait.NeverStop)
-
-	// Start a goroutine periodically updates image cache.
-	// TODO(random-liu): Merge this with the previous loop.
-	go wait.Until(func() {
-		images, err := im.runtime.ListImages()
-		if err != nil {
-			glog.Warningf("[imageGCManager] Failed to update image list: %v", err)
-		} else {
-			im.imageCache.set(images)
-		}
-	}, 30*time.Second, wait.NeverStop)
-
 }
 
 // Get a list of images on this node
@@ -197,7 +193,7 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
-func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, error) {
+func (im *realImageGCManager) detectImages(detectTime time.Time, images []container.Image) (sets.String, error) {
 	imagesInUse := sets.NewString()
 
 	// Always consider the container runtime pod sandbox image in use
@@ -206,10 +202,6 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 		imagesInUse.Insert(imageRef)
 	}
 
-	images, err := im.runtime.ListImages()
-	if err != nil {
-		return imagesInUse, err
-	}
 	pods, err := im.runtime.GetPods(true)
 	if err != nil {
 		return imagesInUse, err
@@ -321,7 +313,11 @@ func (im *realImageGCManager) DeleteUnusedImages() error {
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
 func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) {
-	imagesInUse, err := im.detectImages(freeTime)
+	allImages, err := im.runtime.ListImages()
+	if err != nil {
+		return 0, fmt.Errorf("[imageGCManager] Failed to list images: %v", err)
+	}
+	imagesInUse, err := im.detectImages(freeTime, allImages)
 	if err != nil {
 		return 0, err
 	}
