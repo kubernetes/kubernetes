@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos
-RUN yum -y install hostname centos-release-gluster && yum -y install glusterfs-server && yum clean all
+FROM fedora:26
+RUN yum -y install hostname glusterfs-server && yum clean all
 ADD glusterd.vol /etc/glusterfs/
 ADD run_gluster.sh /usr/local/bin/
 ADD index.html /vol/
