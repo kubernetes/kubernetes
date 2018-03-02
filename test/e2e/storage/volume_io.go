@@ -65,6 +65,7 @@ var md5hashes = map[int64]string{
 func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
 	volName := fmt.Sprintf("%s-%s", config.Prefix, "io-volume")
 
+	var gracePeriod int64 = 1
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -111,7 +112,8 @@ func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc 
 					},
 				},
 			},
-			SecurityContext: podSecContext,
+			TerminationGracePeriodSeconds: &gracePeriod,
+			SecurityContext:               podSecContext,
 			Volumes: []v1.Volume{
 				{
 					Name:         volName,
