@@ -131,8 +131,8 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
 			kubeReserved := getNodeCPUAndMemoryCapacity(f)[v1.ResourceMemory]
 			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
-			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
-			kubeReserved.Sub(resource.MustParse("300Mi"))
+			// We want Allocatable = 150Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 400Mb
+			kubeReserved.Sub(resource.MustParse("400Mi"))
 			initialConfig.KubeReserved = map[string]string{
 				string(v1.ResourceMemory): kubeReserved.String(),
 			}
