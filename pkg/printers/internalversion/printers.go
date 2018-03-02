@@ -593,7 +593,7 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 	}
 
 	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
-		reason = "Unknown"
+		reason = node.NodeUnreachablePodReason
 	} else if pod.DeletionTimestamp != nil {
 		reason = "Terminating"
 	}
