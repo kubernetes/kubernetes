@@ -112,10 +112,12 @@ define VERIFY_HELP_INFO
 #
 # Args:
 #   BRANCH: Branch to be passed to verify-godeps.sh script.
+#   WHAT: List of checks to run
 #
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
+#   make verify WHAT="bazel typecheck"
 endef
 .PHONY: verify
 ifeq ($(PRINT_HELP),y)

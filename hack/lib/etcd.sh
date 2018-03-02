@@ -103,6 +103,9 @@ kube::etcd::cleanup() {
 kube::etcd::install() {
   (
     cd "${KUBE_ROOT}/third_party"
+    if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-* ]]; then
+      return  # already installed
+    fi
     if [[ $(uname) == "Darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
       url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
