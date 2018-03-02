@@ -51,6 +51,7 @@ type AnnotateOptions struct {
 	all             bool
 	resourceVersion string
 	selector        string
+	fieldSelector   string
 	outputFormat    string
 
 	// results of arg parsing
@@ -137,6 +138,7 @@ func NewCmdAnnotate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, annotation will NOT contact api-server but run locally.")
 	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
@@ -175,6 +177,9 @@ func (o AnnotateOptions) Validate() error {
 	if o.all && len(o.selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
+	if o.all && len(o.fieldSelector) > 0 {
+		return fmt.Errorf("cannot set --all and --field-selector at the same time")
+	}
 	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -203,6 +208,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 
 	if !o.local {
 		b = b.LabelSelectorParam(o.selector).
+			FieldSelectorParam(o.fieldSelector).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
 	}

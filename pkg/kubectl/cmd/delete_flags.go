@@ -59,6 +59,8 @@ func (o *FileNameFlags) AddFlags(cmd *cobra.Command) {
 // used for commands requiring deletion logic.
 type DeleteFlags struct {
 	FileNameFlags *FileNameFlags
+	LabelSelector *string
+	FieldSelector *string
 
 	All            *bool
 	Cascade        *bool
@@ -79,6 +81,12 @@ func (f *DeleteFlags) ToOptions(out, errOut io.Writer) *DeleteOptions {
 	// add filename options
 	if f.FileNameFlags != nil {
 		options.FilenameOptions = f.FileNameFlags.ToOptions()
+	}
+	if f.LabelSelector != nil {
+		options.LabelSelector = *f.LabelSelector
+	}
+	if f.FieldSelector != nil {
+		options.FieldSelector = *f.FieldSelector
 	}
 
 	// add output format
@@ -113,7 +121,12 @@ func (f *DeleteFlags) ToOptions(out, errOut io.Writer) *DeleteOptions {
 
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	f.FileNameFlags.AddFlags(cmd)
-
+	if f.LabelSelector != nil {
+		cmd.Flags().StringVarP(f.LabelSelector, "selector", "l", *f.LabelSelector, "Selector (label query) to filter on, not including uninitialized ones.")
+	}
+	if f.FieldSelector != nil {
+		cmd.Flags().StringVarP(f.FieldSelector, "field-selector", "", *f.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	}
 	if f.All != nil {
 		cmd.Flags().BoolVar(f.All, "all", *f.All, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	}
@@ -153,6 +166,8 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	ignoreNotFound := false
 	now := false
 	output := ""
+	labelSelector := ""
+	fieldSelector := ""
 	timeout := time.Duration(0)
 
 	filenames := []string{}
@@ -160,6 +175,8 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 
 	return &DeleteFlags{
 		FileNameFlags: &FileNameFlags{Usage: usage, Filenames: &filenames, Recursive: &recursive},
+		LabelSelector: &labelSelector,
+		FieldSelector: &fieldSelector,
 
 		Cascade:     &cascade,
 		GracePeriod: &gracePeriod,
