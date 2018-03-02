@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 const (
@@ -44,6 +45,8 @@ const (
 	loadBalancerRuleIDTemplate  = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/loadBalancingRules/%s"
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 	securityRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s/securityRules/%s"
+
+	storageAccountNameMaxLength = 24
 )
 
 var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(.+)$`)
@@ -349,4 +352,14 @@ func ExtractDiskData(diskData interface{}) (provisioningState string, diskState 
 		diskState = ref.(string)
 	}
 	return provisioningState, diskState, nil
+}
+
+// get a storage account by UUID
+func generateStorageAccountName(accountNamePrefix string) string {
+	uniqueID := strings.Replace(string(uuid.NewUUID()), "-", "", -1)
+	accountName := strings.ToLower(accountNamePrefix + uniqueID)
+	if len(accountName) > storageAccountNameMaxLength {
+		return accountName[:storageAccountNameMaxLength-1]
+	}
+	return accountName
 }
