@@ -29,7 +29,7 @@ import (
 )
 
 // The plugin name reported in error metrics.
-const pluginName = "buffered"
+const PluginName = "buffered"
 
 const (
 	// Default configuration values for ModeBatch.
@@ -259,7 +259,7 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) {
 			sendErr = fmt.Errorf("audit backend shut down")
 		}
 		if sendErr != nil {
-			audit.HandlePluginError(pluginName, sendErr, ev[evIndex:]...)
+			audit.HandlePluginError(PluginName, sendErr, ev[evIndex:]...)
 		}
 	}()
 
@@ -276,4 +276,8 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) {
 			return
 		}
 	}
+}
+
+func (b *bufferedBackend) String() string {
+	return fmt.Sprintf("%s<%s>", PluginName, b.delegateBackend)
 }
