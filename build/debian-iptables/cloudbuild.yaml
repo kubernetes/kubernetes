@@ -1,0 +1,38 @@
+timeout: 10800s
+
+substitutions:
+  { "_ARCH": "amd64",
+    "_REGISTRY": "gcr.io/k8s-image-staging",
+    "_TAG": "v10" }
+
+steps:
+- name: gcr.io/cloud-builders/git
+  id: git-clone
+  entrypoint: bash
+  args:
+  - "-c"
+  - |
+    set -ex
+    mkdir -p /workspace/src/k8s.io
+    mkdir -p /workspace/tmp-${_ARCH}
+    cd /workspace/src/k8s.io
+    git clone https://github.com/kubernetes/kubernetes.git
+
+- name: gcr.io/k8s-image-staging/make
+  id: make-build
+  entrypoint: bash
+  dir: "/workspace/src/k8s.io/kubernetes/build/debian-iptables"
+  args:
+  - "-c"
+  - |
+    set -ex
+    TEMP_DIR=/workspace/tmp-${_ARCH} make build
+
+- name: gcr.io/cloud-builders/docker
+  id: docker-build
+  dir: "/workspace/src/k8s.io/kubernetes/build/debian-iptables"
+  args: ["build", "-t", "${_REGISTRY}/debian-iptables-${_ARCH}:${_TAG}",
+         "/workspace/tmp-${_ARCH}"]
+
+images:
+  - "${_REGISTRY}/debian-iptables-${_ARCH}:${_TAG}"
