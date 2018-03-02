@@ -119,6 +119,42 @@ type FakeExtender struct {
 	cachedPDBs           []*policy.PodDisruptionBudget
 }
 
+func (f *FakeExtender) SupportsPreemption() bool {
+	// Assume preempt verb is always defined.
+	return true
+}
+
+func (f *FakeExtender) ProcessPreemption(
+	pod *v1.Pod,
+	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+) (map[*v1.Node]*schedulerapi.Victims, error) {
+	nodeToVictimsCopy := map[*v1.Node]*schedulerapi.Victims{}
+	// We don't want to change the original nodeToVictims
+	for k, v := range nodeToVictims {
+		// In real world implementation, extender's user should have his own way to get node object
+		// by name if needed (e.g. query kube-apiserver etc).
+		//
+		// For test purpose, we just use node from parameters directly.
+		nodeToVictimsCopy[k] = v
+	}
+
+	for node, victims := range nodeToVictimsCopy {
+		// Try to do preemption on extender side.
+		extenderVictimPods, extendernPDBViolations, fits := f.selectVictimsOnNodeByExtender(pod, node, nodeNameToInfo)
+		// If it's unfit after extender's preemption, this node is unresolvable by preemption overall,
+		// let's remove it from potential preemption nodes.
+		if !fits {
+			delete(nodeToVictimsCopy, node)
+		} else {
+			// Append new victims to original victims
+			nodeToVictimsCopy[node].Pods = append(victims.Pods, extenderVictimPods...)
+			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + extendernPDBViolations
+		}
+	}
+	return nodeToVictimsCopy, nil
+}
+
 // selectVictimsOnNodeByExtender checks the given nodes->pods map with predicates on extender's side.
 // Returns:
 // 1. More victim pods (if any) amended by preemption phase of extender.
@@ -127,6 +163,7 @@ type FakeExtender struct {
 func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	pod *v1.Pod,
 	node *v1.Node,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
 ) ([]*v1.Pod, int, bool) {
 	// TODO(harry): add more test in generic_scheduler_test.go to verify this logic.
 	// If a extender support preemption but have no cached node info, let's run filter to make sure
@@ -139,7 +176,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	}
 
 	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
-	// and get cached node info by given nodeName.
+	// and get cached node info by given node name.
 	nodeInfoCopy := f.cachedNodeNameToInfo[node.GetName()].Clone()
 
 	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
@@ -189,38 +226,6 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	}
 
 	return victims, numViolatingVictim, true
-}
-
-func (f *FakeExtender) SupportsPreemption() bool {
-	// Assume preempt verb is always defined.
-	return true
-}
-
-func (f *FakeExtender) ProcessPreemption(
-	pod *v1.Pod,
-	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
-) (map[*v1.Node]*schedulerapi.Victims, error) {
-	nodeToVictimsCopy := map[*v1.Node]*schedulerapi.Victims{}
-	// We don't want to change the original nodeToVictims
-	for k, v := range nodeToVictims {
-		nodeToVictimsCopy[k] = v
-	}
-
-	for node, victims := range nodeToVictimsCopy {
-		// Try to do preemption on extender side.
-		extenderVictimPods, extendernPDBViolations, fits := f.selectVictimsOnNodeByExtender(pod, node)
-		// If it's unfit after extender's preemption, this node is unresolvable by preemption overall,
-		// let's remove it from potential preemption nodes.
-		if !fits {
-			delete(nodeToVictimsCopy, node)
-		} else {
-			// Append new victims to original victims
-			nodeToVictimsCopy[node].Pods = append(victims.Pods, extenderVictimPods...)
-			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + extendernPDBViolations
-		}
-	}
-	return nodeToVictimsCopy, nil
 }
 
 // runPredicate run predicates of extender one by one for given pod and node.

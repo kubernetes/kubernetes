@@ -128,15 +128,16 @@ func (h *HTTPExtender) ProcessPreemption(
 
 	if h.nodeCacheCapable {
 		// If extender has cached node info, pass NodeNameToMetaVictims in args.
-		nodeNameToVictims := convertToNodeNameToMetaVictims(nodeToVictims)
+		nodeNameToMetaVictims := convertToNodeNameToMetaVictims(nodeToVictims)
 		args = &schedulerapi.ExtenderPreemptionArgs{
 			Pod: pod,
-			NodeNameToMetaVictims: nodeNameToVictims,
+			NodeNameToMetaVictims: nodeNameToMetaVictims,
 		}
 	} else {
+		nodeNameToVictims := convertToNodeNameToVictims(nodeToVictims)
 		args = &schedulerapi.ExtenderPreemptionArgs{
-			Pod:           pod,
-			NodeToVictims: nodeToVictims,
+			Pod:               pod,
+			NodeNameToVictims: nodeNameToVictims,
 		}
 	}
 
@@ -151,10 +152,10 @@ func (h *HTTPExtender) ProcessPreemption(
 		return nil, err
 	}
 	return nodeToVictims, nil
-
 }
 
-// convertToNodeToVictims converts from meta types to struct type.
+// convertToNodeToVictims converts "nodeNameToMetaVictims" from object identifiers,
+// such as UIDs and names, to object pointers.
 func (h *HTTPExtender) convertToNodeToVictims(
 	nodeNameToMetaVictims map[string]*schedulerapi.MetaVictims,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
@@ -165,7 +166,7 @@ func (h *HTTPExtender) convertToNodeToVictims(
 			Pods: []*v1.Pod{},
 		}
 		for _, metaPod := range metaVictims.Pods {
-			pod, err := h.restorePodFromNodeInfo(metaPod, nodeName, nodeNameToInfo)
+			pod, err := h.convertPodUIDToPod(metaPod, nodeName, nodeNameToInfo)
 			if err != nil {
 				return nil, err
 			}
@@ -176,11 +177,11 @@ func (h *HTTPExtender) convertToNodeToVictims(
 	return nodeToVictims, nil
 }
 
-// restorePodFromNodeInfo returns v1.Pod object for given MetaPod and node name.
+// convertPodUIDToPod returns v1.Pod object for given MetaPod and node name.
 // The v1.Pod object is restored by nodeInfo.Pods().
 // It should return error if there's cache inconsistency between default scheduler and extender
 // so that this pod or node is missing from nodeNameToInfo.
-func (h *HTTPExtender) restorePodFromNodeInfo(
+func (h *HTTPExtender) convertPodUIDToPod(
 	metaPod *schedulerapi.MetaPod,
 	nodeName string,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo) (*v1.Pod, error) {
@@ -215,6 +216,17 @@ func convertToNodeNameToMetaVictims(
 			metaVictims.Pods = append(metaVictims.Pods, metaPod)
 		}
 		nodeNameToVictims[node.GetName()] = metaVictims
+	}
+	return nodeNameToVictims
+}
+
+// convertToNodeNameToVictims converts from node type to node name as key.
+func convertToNodeNameToVictims(
+	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+) map[string]*schedulerapi.Victims {
+	nodeNameToVictims := map[string]*schedulerapi.Victims{}
+	for node, victims := range nodeToVictims {
+		nodeNameToVictims[node.GetName()] = victims
 	}
 	return nodeNameToVictims
 }
