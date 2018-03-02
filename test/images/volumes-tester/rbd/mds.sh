@@ -1,4 +1,6 @@
-# Copyright 2016 The Kubernetes Authors.
+#!/bin/bash
+
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CEPH all in one
-# Based on image by Ricardo Rocha, ricardo@catalyst.net.nz
-
-FROM fedora:26
-
-# Base Packages
-RUN yum install -y wget strace psmisc procps-ng ceph ceph-fuse && yum clean all
-
-# Get ports exposed
-EXPOSE 6789
-
-ADD ./bootstrap.sh /bootstrap.sh
-ADD ./mon.sh /mon.sh
-ADD ./mds.sh /mds.sh
-ADD ./osd.sh /osd.sh
-ADD ./ceph.conf.sh /ceph.conf.sh
-ADD ./keyring /var/lib/ceph/mon/keyring
-ADD ./block.tar.gz /
-
-CMD /bootstrap.sh
+#
+# Configures Ceph Metadata Service (mds), needed by CephFS
+#
+ceph-mds -i cephfs -c /etc/ceph/ceph.conf

@@ -279,10 +279,9 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: config.Prefix + "-secret",
 				},
-				// Must use the ceph keyring at contrib/for-tests/volumes-ceph/ceph/init.sh
-				// and encode in base64
+				// from test/images/volumes-tester/rbd/keyring
 				Data: map[string][]byte{
-					"key": []byte("AQAMgXhVwBCeDhAA9nlPaFyfUSatGD4drFWDvQ=="),
+					"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
 				},
 				Type: "kubernetes.io/cephfs",
 			}
