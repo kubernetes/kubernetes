@@ -21,8 +21,8 @@ const (
 
 func writePreamble(buf *bytes.Buffer, name string) {
 	buf.WriteString(fmt.Sprintf("# bash completion for %-36s -*- shell-script -*-\n", name))
-	buf.WriteString(fmt.Sprintf(`
-__%[1]s_debug()
+	buf.WriteString(`
+__debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
         echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
@@ -31,13 +31,13 @@ __%[1]s_debug()
 
 # Homebrew on Macs have version 1.3 of bash-completion which doesn't include
 # _init_completion. This is a very minimal version of that function.
-__%[1]s_init_completion()
+__my_init_completion()
 {
     COMPREPLY=()
     _get_comp_words_by_ref "$@" cur prev words cword
 }
 
-__%[1]s_index_of_word()
+__index_of_word()
 {
     local w word=$1
     shift
@@ -49,7 +49,7 @@ __%[1]s_index_of_word()
     index=-1
 }
 
-__%[1]s_contains_word()
+__contains_word()
 {
     local w word=$1; shift
     for w in "$@"; do
@@ -58,9 +58,9 @@ __%[1]s_contains_word()
     return 1
 }
 
-__%[1]s_handle_reply()
+__handle_reply()
 {
-    __%[1]s_debug "${FUNCNAME[0]}"
+    __debug "${FUNCNAME[0]}"
     case $cur in
         -*)
             if [[ $(type -t compopt) = "builtin" ]]; then
@@ -85,7 +85,7 @@ __%[1]s_handle_reply()
 
                 local index flag
                 flag="${cur%%=*}"
-                __%[1]s_index_of_word "${flag}" "${flags_with_completion[@]}"
+                __index_of_word "${flag}" "${flags_with_completion[@]}"
                 COMPREPLY=()
                 if [[ ${index} -ge 0 ]]; then
                     PREFIX=""
@@ -103,7 +103,7 @@ __%[1]s_handle_reply()
 
     # check if we are handling a flag with special work handling
     local index
-    __%[1]s_index_of_word "${prev}" "${flags_with_completion[@]}"
+    __index_of_word "${prev}" "${flags_with_completion[@]}"
     if [[ ${index} -ge 0 ]]; then
         ${flags_completion[${index}]}
         return
@@ -139,21 +139,21 @@ __%[1]s_handle_reply()
 }
 
 # The arguments should be in the form "ext1|ext2|extn"
-__%[1]s_handle_filename_extension_flag()
+__handle_filename_extension_flag()
 {
     local ext="$1"
     _filedir "@(${ext})"
 }
 
-__%[1]s_handle_subdirs_in_dir_flag()
+__handle_subdirs_in_dir_flag()
 {
     local dir="$1"
     pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1
 }
 
-__%[1]s_handle_flag()
+__handle_flag()
 {
-    __%[1]s_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
 
     # if a command required a flag, and we found it, unset must_have_one_flag()
     local flagname=${words[c]}
@@ -164,13 +164,13 @@ __%[1]s_handle_flag()
         flagname=${flagname%%=*} # strip everything after the =
         flagname="${flagname}=" # but put the = back
     fi
-    __%[1]s_debug "${FUNCNAME[0]}: looking for ${flagname}"
-    if __%[1]s_contains_word "${flagname}" "${must_have_one_flag[@]}"; then
+    __debug "${FUNCNAME[0]}: looking for ${flagname}"
+    if __contains_word "${flagname}" "${must_have_one_flag[@]}"; then
         must_have_one_flag=()
     fi
 
     # if you set a flag which only applies to this command, don't show subcommands
-    if __%[1]s_contains_word "${flagname}" "${local_nonpersistent_flags[@]}"; then
+    if __contains_word "${flagname}" "${local_nonpersistent_flags[@]}"; then
       commands=()
     fi
 
@@ -187,7 +187,7 @@ __%[1]s_handle_flag()
     fi
 
     # skip the argument to a two word flag
-    if __%[1]s_contains_word "${words[c]}" "${two_word_flags[@]}"; then
+    if __contains_word "${words[c]}" "${two_word_flags[@]}"; then
         c=$((c+1))
         # if we are looking for a flags value, don't show commands
         if [[ $c -eq $cword ]]; then
@@ -199,13 +199,13 @@ __%[1]s_handle_flag()
 
 }
 
-__%[1]s_handle_noun()
+__handle_noun()
 {
-    __%[1]s_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
 
-    if __%[1]s_contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
+    if __contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
         must_have_one_noun=()
-    elif __%[1]s_contains_word "${words[c]}" "${noun_aliases[@]}"; then
+    elif __contains_word "${words[c]}" "${noun_aliases[@]}"; then
         must_have_one_noun=()
     fi
 
@@ -213,9 +213,9 @@ __%[1]s_handle_noun()
     c=$((c+1))
 }
 
-__%[1]s_handle_command()
+__handle_command()
 {
-    __%[1]s_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
 
     local next_command
     if [[ -n ${last_command} ]]; then
@@ -228,30 +228,30 @@ __%[1]s_handle_command()
         fi
     fi
     c=$((c+1))
-    __%[1]s_debug "${FUNCNAME[0]}: looking for ${next_command}"
+    __debug "${FUNCNAME[0]}: looking for ${next_command}"
     declare -F "$next_command" >/dev/null && $next_command
 }
 
-__%[1]s_handle_word()
+__handle_word()
 {
     if [[ $c -ge $cword ]]; then
-        __%[1]s_handle_reply
+        __handle_reply
         return
     fi
-    __%[1]s_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+    __debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
     if [[ "${words[c]}" == -* ]]; then
-        __%[1]s_handle_flag
-    elif __%[1]s_contains_word "${words[c]}" "${commands[@]}"; then
-        __%[1]s_handle_command
-    elif [[ $c -eq 0 ]] && __%[1]s_contains_word "$(basename "${words[c]}")" "${commands[@]}"; then
-        __%[1]s_handle_command
+        __handle_flag
+    elif __contains_word "${words[c]}" "${commands[@]}"; then
+        __handle_command
+    elif [[ $c -eq 0 ]] && __contains_word "$(basename "${words[c]}")" "${commands[@]}"; then
+        __handle_command
     else
-        __%[1]s_handle_noun
+        __handle_noun
     fi
-    __%[1]s_handle_word
+    __handle_word
 }
 
-`, name))
+`)
 }
 
 func writePostscript(buf *bytes.Buffer, name string) {
@@ -263,7 +263,7 @@ func writePostscript(buf *bytes.Buffer, name string) {
     if declare -F _init_completion >/dev/null 2>&1; then
         _init_completion -s || return
     else
-        __%[1]s_init_completion -n "=" || return
+        __my_init_completion -n "=" || return
     fi
 
     local c=0
@@ -272,13 +272,13 @@ func writePostscript(buf *bytes.Buffer, name string) {
     local local_nonpersistent_flags=()
     local flags_with_completion=()
     local flags_completion=()
-    local commands=("%[1]s")
+    local commands=("%s")
     local must_have_one_flag=()
     local must_have_one_noun=()
     local last_command
     local nouns=()
 
-    __%[1]s_handle_word
+    __handle_word
 }
 
 `, name))
@@ -303,7 +303,7 @@ func writeCommands(buf *bytes.Buffer, cmd *Command) {
 	buf.WriteString("\n")
 }
 
-func writeFlagHandler(buf *bytes.Buffer, name string, annotations map[string][]string, cmd *Command) {
+func writeFlagHandler(buf *bytes.Buffer, name string, annotations map[string][]string) {
 	for key, value := range annotations {
 		switch key {
 		case BashCompFilenameExt:
@@ -311,7 +311,7 @@ func writeFlagHandler(buf *bytes.Buffer, name string, annotations map[string][]s
 
 			var ext string
 			if len(value) > 0 {
-				ext = fmt.Sprintf("__%s_handle_filename_extension_flag ", cmd.Name()) + strings.Join(value, "|")
+				ext = "__handle_filename_extension_flag " + strings.Join(value, "|")
 			} else {
 				ext = "_filedir"
 			}
@@ -329,7 +329,7 @@ func writeFlagHandler(buf *bytes.Buffer, name string, annotations map[string][]s
 
 			var ext string
 			if len(value) == 1 {
-				ext = fmt.Sprintf("__%s_handle_subdirs_in_dir_flag ", cmd.Name()) + value[0]
+				ext = "__handle_subdirs_in_dir_flag " + value[0]
 			} else {
 				ext = "_filedir -d"
 			}
@@ -338,7 +338,7 @@ func writeFlagHandler(buf *bytes.Buffer, name string, annotations map[string][]s
 	}
 }
 
-func writeShortFlag(buf *bytes.Buffer, flag *pflag.Flag, cmd *Command) {
+func writeShortFlag(buf *bytes.Buffer, flag *pflag.Flag) {
 	name := flag.Shorthand
 	format := "    "
 	if len(flag.NoOptDefVal) == 0 {
@@ -346,10 +346,10 @@ func writeShortFlag(buf *bytes.Buffer, flag *pflag.Flag, cmd *Command) {
 	}
 	format += "flags+=(\"-%s\")\n"
 	buf.WriteString(fmt.Sprintf(format, name))
-	writeFlagHandler(buf, "-"+name, flag.Annotations, cmd)
+	writeFlagHandler(buf, "-"+name, flag.Annotations)
 }
 
-func writeFlag(buf *bytes.Buffer, flag *pflag.Flag, cmd *Command) {
+func writeFlag(buf *bytes.Buffer, flag *pflag.Flag) {
 	name := flag.Name
 	format := "    flags+=(\"--%s"
 	if len(flag.NoOptDefVal) == 0 {
@@ -357,7 +357,7 @@ func writeFlag(buf *bytes.Buffer, flag *pflag.Flag, cmd *Command) {
 	}
 	format += "\")\n"
 	buf.WriteString(fmt.Sprintf(format, name))
-	writeFlagHandler(buf, "--"+name, flag.Annotations, cmd)
+	writeFlagHandler(buf, "--"+name, flag.Annotations)
 }
 
 func writeLocalNonPersistentFlag(buf *bytes.Buffer, flag *pflag.Flag) {
@@ -383,9 +383,9 @@ func writeFlags(buf *bytes.Buffer, cmd *Command) {
 		if nonCompletableFlag(flag) {
 			return
 		}
-		writeFlag(buf, flag, cmd)
+		writeFlag(buf, flag)
 		if len(flag.Shorthand) > 0 {
-			writeShortFlag(buf, flag, cmd)
+			writeShortFlag(buf, flag)
 		}
 		if localNonPersistentFlags.Lookup(flag.Name) != nil {
 			writeLocalNonPersistentFlag(buf, flag)
@@ -395,9 +395,9 @@ func writeFlags(buf *bytes.Buffer, cmd *Command) {
 		if nonCompletableFlag(flag) {
 			return
 		}
-		writeFlag(buf, flag, cmd)
+		writeFlag(buf, flag)
 		if len(flag.Shorthand) > 0 {
-			writeShortFlag(buf, flag, cmd)
+			writeShortFlag(buf, flag)
 		}
 	})
 

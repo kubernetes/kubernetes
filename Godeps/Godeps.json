@@ -2577,13 +2577,13 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Comment": "v0.0.1-28-gfd32f09",
-			"Rev": "fd32f09af19efc9b1279c54e0d8ed23f66232a15"
+			"Comment": "v0.0.1-27-g9395926",
+			"Rev": "93959269ad99e80983c9ba742a7e01203a4c0e4f"
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra/doc",
-			"Comment": "v0.0.1-28-gfd32f09",
-			"Rev": "fd32f09af19efc9b1279c54e0d8ed23f66232a15"
+			"Comment": "v0.0.1-27-g9395926",
+			"Rev": "93959269ad99e80983c9ba742a7e01203a4c0e4f"
 		},
 		{
 			"ImportPath": "github.com/spf13/jwalterweatherman",
