@@ -3136,6 +3136,22 @@ run_deployment_tests() {
   kubectl delete configmap test-set-env-config "${kube_flags[@]}"
   kubectl delete secret test-set-env-secret "${kube_flags[@]}"
 
+  ### Set entrypoint of a deployment
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert 'deploy nginx-deployment' "{{$container_name_field}}" 'nginx'
+  # Set entrypoint of deployments for nginx container
+  kubectl set entrypoint deployment nginx-deployment nginx --command="'/bin/sh' 'ls -la'" --args="test" "${kube_flags[@]}"
+  # Remove command of specific container of deployment
+  kubectl set entrypoint deployment nginx-deployment nginx --command=""
+  # Remove argument of specific container of deployment
+  kubectl set entrypoint deployment nginx-deployment nginx --args=""
+  # Clean up
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+
   ### Delete a deployment with initializer
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''

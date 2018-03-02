@@ -1725,6 +1725,10 @@
 			"Rev": "44d81051d367757e1c7c6a5a86423ece9afcf63c"
 		},
 		{
+			"ImportPath": "github.com/google/shlex",
+			"Rev": "6f45313302b9c56850fc17f99e40caebce98c716"
+		},
+		{
 			"ImportPath": "github.com/google/uuid",
 			"Comment": "0.2-15-g8c31c18",
 			"Rev": "8c31c18f31ede9fc8eae72290a7e7a8064e9b3e3"

@@ -226,6 +226,7 @@ docs/man/man1/kubectl-rollout.1
 docs/man/man1/kubectl-run-container.1
 docs/man/man1/kubectl-run.1
 docs/man/man1/kubectl-scale.1
+docs/man/man1/kubectl-set-entrypoint.1
 docs/man/man1/kubectl-set-env.1
 docs/man/man1/kubectl-set-image.1
 docs/man/man1/kubectl-set-resources.1
@@ -326,6 +327,7 @@ docs/user-guide/kubectl/kubectl_rollout_undo.md
 docs/user-guide/kubectl/kubectl_run.md
 docs/user-guide/kubectl/kubectl_scale.md
 docs/user-guide/kubectl/kubectl_set.md
+docs/user-guide/kubectl/kubectl_set_entrypoint.md
 docs/user-guide/kubectl/kubectl_set_env.md
 docs/user-guide/kubectl/kubectl_set_image.md
 docs/user-guide/kubectl/kubectl_set_resources.md
