@@ -27,7 +27,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -154,7 +153,6 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 		return nil, err
 	}
 
-	// TPRs are enabled and not yet beta, since this these are the successor, they fall under the same enablement rule
 	// If additional API servers are added, they should be gated.
 	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, runOptions)
 	if err != nil {
@@ -195,8 +193,6 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	if err != nil {
 		return nil, err
 	}
-	aggregatorConfig.ExtraConfig.ProxyTransport = proxyTransport
-	aggregatorConfig.ExtraConfig.ServiceResolver = serviceResolver
 	aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
@@ -480,7 +476,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		)
 	}
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, storageFactory, client, clientgoExternalClient, sharedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
@@ -564,19 +560,18 @@ func BuildAdmissionPluginInitializers(s *options.ServerRunOptions, client intern
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorage.StorageFactory, client internalclientset.Interface, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
 	}
-	if client == nil || reflect.ValueOf(client).IsNil() {
-		// TODO: Remove check once client can never be nil.
-		glog.Errorf("Failed to setup bootstrap token authenticator because the loopback clientset was not setup properly.")
-	} else {
+	kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
+	if len(kubeAPIVersions) == 0 {
 		authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
 			sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
 		)
 	}
+
 	return authenticatorConfig.New()
 }
 

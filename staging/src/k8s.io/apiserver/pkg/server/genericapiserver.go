@@ -236,12 +236,7 @@ func (s *GenericAPIServer) RequestContextMapper() apirequest.RequestContextMappe
 	return s.requestContextMapper
 }
 
-// MinRequestTimeout is exposed so that third party resource storage can be build in a different location.
-// TODO refactor third party resource storage
-func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
-	return s.minRequestTimeout
-}
-
+// preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
 	*GenericAPIServer
 }
@@ -259,12 +254,6 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 	s.installHealthz()
 
-	return preparedGenericAPIServer{s}
-}
-
-// Run spawns the secure http server. It only returns if stopCh is closed
-// or the secure port cannot be listened on initially.
-func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
 		s.AddPreShutdownHook("audit-backend", func() error {
@@ -273,6 +262,12 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		})
 	}
 
+	return preparedGenericAPIServer{s}
+}
+
+// Run spawns the secure http server. It only returns if stopCh is closed
+// or the secure port cannot be listened on initially.
+func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	err := s.NonBlockingRun(stopCh)
 	if err != nil {
 		return err
@@ -349,7 +344,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
-			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
+			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
 
@@ -372,6 +367,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
+
 	return nil
 }
 
