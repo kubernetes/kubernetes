@@ -107,7 +107,7 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 							{
-								Prefix:       "p_",
+								Prefix:       "P_",
 								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 						},
@@ -118,8 +118,8 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 		}
 
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
-			"data_1=value-1", "data_2=value-2", "data_3=value-3",
-			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
+			"DATA_1=value-1", "DATA_2=value-2", "DATA_3=value-3",
+			"P_DATA_1=value-1", "P_DATA_2=value-2", "P_DATA_3=value-3",
 		})
 	})
 })
@@ -131,9 +131,9 @@ func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 			Name:      name,
 		},
 		Data: map[string]string{
-			"data_1": "value-1",
-			"data_2": "value-2",
-			"data_3": "value-3",
+			"DATA_1": "value-1",
+			"DATA_2": "value-2",
+			"DATA_3": "value-3",
 		},
 	}
 }

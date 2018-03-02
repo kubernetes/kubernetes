@@ -109,7 +109,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 							{
-								Prefix:    "p_",
+								Prefix:    "P_",
 								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 						},
@@ -120,8 +120,8 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 		}
 
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
-			"data_1=value-1", "data_2=value-2", "data_3=value-3",
-			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
+			"DATA_1=value-1", "DATA_2=value-2", "DATA_3=value-3",
+			"P_DATA_1=value-1", "P_DATA_2=value-2", "P_DATA_3=value-3",
 		})
 	})
 })
