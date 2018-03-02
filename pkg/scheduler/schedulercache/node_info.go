@@ -316,7 +316,11 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 
 // AddPod adds pod information to this NodeInfo.
 func (n *NodeInfo) AddPod(pod *v1.Pod) {
-	res, non0CPU, non0Mem := calculateResource(pod)
+	var capacity *v1.ResourceList
+	if n.node != nil {
+		capacity = &n.node.Status.Capacity
+	}
+	res, non0CPU, non0Mem := calculateResource(pod, capacity)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
@@ -371,7 +375,11 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.pods[i] = n.pods[len(n.pods)-1]
 			n.pods = n.pods[:len(n.pods)-1]
 			// reduce the resource data
-			res, non0CPU, non0Mem := calculateResource(pod)
+			var capacity *v1.ResourceList
+			if n.node != nil {
+				capacity = &n.node.Status.Capacity
+			}
+			res, non0CPU, non0Mem := calculateResource(pod, capacity)
 
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
@@ -397,12 +405,12 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
-func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
+func calculateResource(pod *v1.Pod, capacity *v1.ResourceList) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
 
-		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&c.Resources.Requests, capacity)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.

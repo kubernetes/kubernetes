@@ -319,15 +319,16 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	framework.Logf("ComputeCpuMemFraction for node: %v", node.Name)
 	totalRequestedCpuResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
+	capacity := &node.Status.Capacity
 	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {
-			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
-			totalRequestedCpuResource += getNonZeroRequests(&pod).MilliCPU
-			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
+			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod, capacity).MilliCPU, getNonZeroRequests(&pod, capacity).Memory)
+			totalRequestedCpuResource += getNonZeroRequests(&pod, capacity).MilliCPU
+			totalRequestedMemResource += getNonZeroRequests(&pod, capacity).Memory
 		}
 	}
 	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
@@ -346,11 +347,11 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	return cpuFraction, memFraction
 }
 
-func getNonZeroRequests(pod *v1.Pod) Resource {
+func getNonZeroRequests(pod *v1.Pod, capacity *v1.ResourceList) Resource {
 	result := Resource{}
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
-		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
+		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests, capacity)
 		result.MilliCPU += cpu
 		result.Memory += memory
 	}
