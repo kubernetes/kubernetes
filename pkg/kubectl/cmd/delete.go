@@ -90,7 +90,8 @@ var (
 type DeleteOptions struct {
 	resource.FilenameOptions
 
-	Selector        string
+	LabelSelector   string
+	FieldSelector   string
 	DeleteAll       bool
 	IgnoreNotFound  bool
 	Cascade         bool
@@ -143,9 +144,6 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	deleteFlags.AddFlags(cmd)
 
-	// flag-specific output flag, as this command does not depend on PrintFlags
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
-
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -156,7 +154,6 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 		return err
 	}
 
-	o.Selector = cmdutil.GetFlagString(cmd, "selector")
 	o.Reaper = f.Reaper
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
@@ -165,7 +162,8 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		LabelSelectorParam(o.Selector).
+		LabelSelectorParam(o.LabelSelector).
+		FieldSelectorParam(o.FieldSelector).
 		IncludeUninitialized(includeUninitialized).
 		SelectAllParam(o.DeleteAll).
 		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
@@ -186,8 +184,11 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 }
 
 func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
-	if o.DeleteAll && len(o.Selector) > 0 {
+	if o.DeleteAll && len(o.LabelSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
+	if o.DeleteAll && len(o.FieldSelector) > 0 {
+		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
 	if o.DeleteAll {
 		f := cmd.Flags().Lookup("ignore-not-found")
