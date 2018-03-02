@@ -416,7 +416,7 @@ var _ = utils.SIGDescribe("Volume plugin streaming [Slow]", func() {
 						Name: name,
 					},
 					FSType:   "ext2",
-					ReadOnly: true,
+					ReadOnly: false,
 				},
 			}
 		})
