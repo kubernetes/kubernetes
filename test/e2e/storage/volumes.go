@@ -261,7 +261,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
 				Prefix:      "cephfs",
-				ServerImage: imageutils.GetE2EImage(imageutils.VolumeCephServer),
+				ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
 				ServerPorts: []int{6789},
 			}
 
