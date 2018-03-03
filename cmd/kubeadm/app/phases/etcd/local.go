@@ -65,7 +65,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false),
 			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 		},
-		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTP),
+		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTPS),
 	}, etcdMounts)
 }
 
@@ -78,7 +78,7 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
 		"key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
 		"trusted-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"client-cert-auth":      "true",
+		"client-cert-auth":      "false",
 		"peer-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
 		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
 		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
