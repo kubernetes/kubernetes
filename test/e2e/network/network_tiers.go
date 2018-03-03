@@ -73,7 +73,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		By("creating a Service of type LoadBalancer using the standard network tier")
 		svc := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			setNetworkTier(svc, gcecloud.NetworkTierAnnotationStandard.ToGCEValue())
+			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationStandard))
 		})
 		// Verify that service has been updated properly.
 		svcTier, err := gcecloud.GetServiceNetworkTier(svc)
@@ -120,7 +120,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		By("updating the Service to use the standard tier with a requested IP")
 		svc = jig.UpdateServiceOrFail(ns, svc.Name, func(svc *v1.Service) {
 			svc.Spec.LoadBalancerIP = requestedIP
-			setNetworkTier(svc, gcecloud.NetworkTierAnnotationStandard.ToGCEValue())
+			setNetworkTier(svc, string(gcecloud.NetworkTierAnnotationStandard))
 		})
 		// Verify that service has been updated properly.
 		Expect(svc.Spec.LoadBalancerIP).To(Equal(requestedIP))
