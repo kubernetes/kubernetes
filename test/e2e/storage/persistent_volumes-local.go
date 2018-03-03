@@ -135,6 +135,9 @@ const (
 
 	// A sample request size
 	testRequestSize = "10Mi"
+
+	// Max number of nodes to use for testing
+	maxNodes = 5
 )
 
 var (
@@ -159,6 +162,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		// Get all the schedulable nodes
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
+
+		// Cap max number of nodes
+		maxLen := len(nodes.Items)
+		if maxLen > maxNodes {
+			maxLen = maxNodes
+		}
+
 		scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 		// Choose the first node
 		node0 := &nodes.Items[0]
@@ -167,7 +177,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		config = &localTestConfig{
 			ns:           f.Namespace.Name,
 			client:       f.ClientSet,
-			nodes:        nodes.Items,
+			nodes:        nodes.Items[:maxLen],
 			node0:        node0,
 			scName:       scName,
 			ssTester:     ssTester,
