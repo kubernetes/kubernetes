@@ -466,6 +466,9 @@ func newDaemonSet(dsName, image string, label map[string]string) *apps.DaemonSet
 			Name: dsName,
 		},
 		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: label,
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: label,
