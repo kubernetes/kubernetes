@@ -69,7 +69,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["humanreadable_test.go"],
+    srcs = [
+        "humanreadable_test.go",
+        "template_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
