@@ -63,8 +63,7 @@ const (
 	// to specify that the service should be exposed using an Azure security rule
 	// that may be shared with other service, trading specificity of rules for an
 	// increase in the number of services that can be exposed. This relies on the
-	// Azure "augmented security rules" feature which at the time of writing is in
-	// preview and available only in certain regions.
+	// Azure "augmented security rules" feature.
 	ServiceAnnotationSharedSecurityRule = "service.beta.kubernetes.io/azure-shared-securityrule"
 )
 
