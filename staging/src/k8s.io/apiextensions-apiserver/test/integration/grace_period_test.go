@@ -23,11 +23,10 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/testserver"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestFinalization(t *testing.T) {
+func TestGracePeriod(t *testing.T) {
 	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServerWithClients()
 	require.NoError(t, err)
 	defer close(stopCh)
@@ -44,32 +43,8 @@ func TestFinalization(t *testing.T) {
 	instance.SetFinalizers([]string{"noxu.example.com/finalizer"})
 	createdNoxuInstance, err := instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
 	require.NoError(t, err)
-
-	uid := createdNoxuInstance.GetUID()
-	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
-		Preconditions: &metav1.Preconditions{
-			UID: &uid,
-		},
-	})
-	require.NoError(t, err)
-
-	// Deleting something with a finalizer sets deletion timestamp to a not-nil value but does not
-	// remove the object from the API server. Here we read it to confirm this.
-	gottenNoxuInstance, err := noxuResourceClient.Get(name, metav1.GetOptions{})
-	require.NoError(t, err)
-
-	require.NotNil(t, gottenNoxuInstance.GetDeletionTimestamp())
-
-	// Trying to delete it again to confirm it will not remove the object because finalizer is still there.
-	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
-		Preconditions: &metav1.Preconditions{
-			UID: &uid,
-		},
-	})
-	require.NoError(t, err)
-
-	// Testing Grace period is updating
 	period := int64(30)
+	uid := createdNoxuInstance.GetUID()
 	err = noxuResourceClient.Delete(name, &metav1.DeleteOptions{
 		Preconditions: &metav1.Preconditions{
 			UID: &uid,
@@ -77,30 +52,10 @@ func TestFinalization(t *testing.T) {
 		GracePeriodSeconds: &period,
 	})
 	require.NoError(t, err)
+	// Testing Grace period is updating
 
-	gottenNoxuInstance, err = noxuResourceClient.Get(name, metav1.GetOptions{})
+	gottenNoxuInstance, err := noxuResourceClient.Get(name, metav1.GetOptions{})
 	require.NoError(t, err)
 
-	require.Equal(t, gottenNoxuInstance.GetFinalizers(), period)
-
-	// Removing the finalizers to allow the following delete remove the object.
-	// This step will fail if previous delete wrongly removed the object. The
-	// object will be deleted as part of the finalizer update.
-	for {
-		gottenNoxuInstance.SetFinalizers(nil)
-		_, err = noxuResourceClient.Update(gottenNoxuInstance)
-		if err == nil {
-			break
-		}
-		if !errors.IsConflict(err) {
-			require.NoError(t, err) // Fail on unexpected error
-		}
-		gottenNoxuInstance, err = noxuResourceClient.Get(name, metav1.GetOptions{})
-		require.NoError(t, err)
-	}
-
-	// Check that the object is actually gone.
-	_, err = noxuResourceClient.Get(name, metav1.GetOptions{})
-	require.Error(t, err)
-	require.True(t, errors.IsNotFound(err), "%#v", err)
+	require.Equal(t, *gottenNoxuInstance.GetDeletionGracePeriodSeconds(), period)
 }
