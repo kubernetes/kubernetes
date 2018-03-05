@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//cmd/cloud-controller-manager/app/config:go_default_library",
         "//cmd/controller-manager/app/options:go_default_library",
-        "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
@@ -43,6 +42,7 @@ go_test(
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubeapiserver/options:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
