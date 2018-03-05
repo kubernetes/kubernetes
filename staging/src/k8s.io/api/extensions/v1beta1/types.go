@@ -1001,7 +1001,7 @@ type HostPortRange struct {
 	Max int32 `json:"max" protobuf:"varint,2,opt,name=max"`
 }
 
-// SELinux  Strategy Options defines the strategy type and any options used to create the strategy.
+// SELinux Strategy Options defines the strategy type and any options used to create the strategy.
 type SELinuxStrategyOptions struct {
 	// type is the strategy that will dictate the allowable labels that may be set.
 	Rule SELinuxStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=SELinuxStrategy"`
@@ -1022,7 +1022,7 @@ const (
 	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
-// Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.
+// Run As User Strategy Options defines the strategy type and any options used to create the strategy.
 type RunAsUserStrategyOptions struct {
 	// Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
 	Rule RunAsUserStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsUserStrategy"`
