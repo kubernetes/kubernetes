@@ -1515,6 +1515,10 @@ function start-kube-apiserver {
       # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
       # never restarts. Please manually restart apiserver before this time.
       params+=" --audit-log-maxsize=2000000000"
+      params+=" --audit-log-mode=batch"
+      # If we want to validate audit events from log files, we always need to wait
+      # more than 30 seconds util audit events are force writing to disk.
+      params+=" --audit-log-batch-max-wait=30s"
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
       params+=" --audit-webhook-mode=batch"

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -41,6 +42,9 @@ import (
 var (
 	watchTestTimeout int64 = 1
 	auditTestUser          = "kubecfg"
+	// we must wait util audit events are force writing to disk
+	// This time should be larger than --audit-log-batch-max-wait
+	waitingBatchTime = 30*time.Second + 5*time.Second
 
 	crd          = testserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
@@ -630,6 +634,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 			expectedEvents = append(expectedEvents, t.events...)
 		}
 
+		time.Sleep(waitingBatchTime)
 		expectAuditLines(f, expectedEvents)
 	})
 })
