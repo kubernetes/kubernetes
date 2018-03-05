@@ -20,6 +20,7 @@ package mount
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/golang/glog"
 )
@@ -137,4 +138,16 @@ func (m *execMounter) MakeDir(pathname string) error {
 
 func (m *execMounter) ExistsPath(pathname string) bool {
 	return m.wrappedMounter.ExistsPath(pathname)
+}
+
+func (m *execMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return m.wrappedMounter.PrepareSafeSubpath(subPath)
+}
+
+func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return m.wrappedMounter.CleanSubPaths(podDir, volumeName)
+}
+
+func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
 }

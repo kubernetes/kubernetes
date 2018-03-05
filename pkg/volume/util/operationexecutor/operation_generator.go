@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -85,7 +86,7 @@ type OperationGenerator interface {
 	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (volumetypes.GeneratedOperations, error)
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
-	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
 	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
@@ -651,7 +652,8 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	volumeToUnmount MountedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	podsDir string) (volumetypes.GeneratedOperations, error) {
 	// Get mountable plugin
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginByName(volumeToUnmount.PluginName)
@@ -666,6 +668,14 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	}
 
 	unmountVolumeFunc := func() (error, error) {
+		mounter := og.volumePluginMgr.Host.GetMounter(volumeToUnmount.PluginName)
+
+		// Remove all bind-mounts for subPaths
+		podDir := path.Join(podsDir, string(volumeToUnmount.PodUID))
+		if err := mounter.CleanSubPaths(podDir, volumeToUnmount.OuterVolumeSpecName); err != nil {
+			return volumeToUnmount.GenerateError("error cleaning subPath mounts", err)
+		}
+
 		// Execute unmount
 		unmountErr := volumeUnmounter.TearDown()
 		if unmountErr != nil {
