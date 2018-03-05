@@ -954,6 +954,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
   apt install -y sudo
+  # configure shared mounts to prevent failure in DIND scenarios
+  mount --make-rshared /
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
