@@ -1713,7 +1713,7 @@ function create-subnetworks() {
       --secondary-range "services-default=${SERVICE_CLUSTER_IP_RANGE}"
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
-    if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
+    if ! echo ${subnet} | grep -qs secondaryIpRanges ${subnet} 2>/dev/null; then
       echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
       exit 1
     fi
