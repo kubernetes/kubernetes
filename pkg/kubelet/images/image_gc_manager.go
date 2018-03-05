@@ -176,7 +176,7 @@ func (im *realImageGCManager) Start() {
 		if im.initialized {
 			ts = time.Now()
 		}
-		_, err := im.detectImages(ts)
+		err := im.detectImages(ts)
 		if err != nil {
 			glog.Warningf("[imageGCManager] Failed to monitor images: %v", err)
 		} else {
@@ -202,7 +202,7 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
-func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, error) {
+func (im *realImageGCManager) detectImages(detectTime time.Time) error {
 	imagesInUse := sets.NewString()
 
 	// Always consider the container runtime pod sandbox image in use
@@ -213,11 +213,11 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 
 	images, err := im.runtime.ListImages()
 	if err != nil {
-		return imagesInUse, err
+		return err
 	}
 	pods, err := im.runtime.GetPods(true)
 	if err != nil {
-		return imagesInUse, err
+		return err
 	}
 
 	// Make a set of images in use by containers.
@@ -263,7 +263,7 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 		}
 	}
 
-	return imagesInUse, nil
+	return nil
 }
 
 func (im *realImageGCManager) GarbageCollect() error {
@@ -326,7 +326,7 @@ func (im *realImageGCManager) DeleteUnusedImages() error {
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
 func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) {
-	imagesInUse, err := im.detectImages(freeTime)
+	err := im.detectImages(freeTime)
 	if err != nil {
 		return 0, err
 	}
@@ -337,10 +337,6 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 	// Get all images in eviction order.
 	images := make([]evictionInfo, 0, len(im.imageRecords))
 	for image, record := range im.imageRecords {
-		if isImageUsed(image, imagesInUse) {
-			glog.V(5).Infof("Image ID %s is being used", image)
-			continue
-		}
 		images = append(images, evictionInfo{
 			id:          image,
 			imageRecord: *record,
