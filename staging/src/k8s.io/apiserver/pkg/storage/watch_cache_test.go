@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -41,7 +41,23 @@ func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
 			Namespace:       "ns",
 			Name:            name,
 			ResourceVersion: strconv.FormatUint(resourceVersion, 10),
+			Labels: map[string]string{
+				"k8s-app": "my-app",
+			},
 		},
+		Spec: v1.PodSpec{
+			NodeName: "some-node",
+		},
+	}
+}
+
+func makeTestStoreElement(pod *v1.Pod) *storeElement {
+	return &storeElement{
+		Key:           "prefix/ns/" + pod.Name,
+		Object:        pod,
+		Labels:        labels.Set(pod.Labels),
+		Fields:        fields.Set{"spec.nodeName": pod.Spec.NodeName},
+		Uninitialized: false,
 	}
 }
 
@@ -51,7 +67,11 @@ func newTestWatchCache(capacity int) *watchCache {
 		return NamespaceKeyFunc("prefix", obj)
 	}
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-		return nil, nil, false, nil
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return nil, nil, false, fmt.Errorf("not a pod!")
+		}
+		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, false, nil
 	}
 	wc := newWatchCache(capacity, keyFunc, getAttrsFunc)
 	wc.clock = clock.NewFakeClock(time.Now())
@@ -69,8 +89,9 @@ func TestWatchCacheBasic(t *testing.T) {
 	if item, ok, _ := store.Get(pod1); !ok {
 		t.Errorf("didn't find pod")
 	} else {
-		if !apiequality.Semantic.DeepEqual(&storeElement{Key: "prefix/ns/pod", Object: pod1}, item) {
-			t.Errorf("expected %v, got %v", pod1, item)
+		expected := makeTestStoreElement(makeTestPod("pod", 1))
+		if !apiequality.Semantic.DeepEqual(expected, item) {
+			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
 	pod2 := makeTestPod("pod", 2)
@@ -80,8 +101,9 @@ func TestWatchCacheBasic(t *testing.T) {
 	if item, ok, _ := store.Get(pod2); !ok {
 		t.Errorf("didn't find pod")
 	} else {
-		if !apiequality.Semantic.DeepEqual(&storeElement{Key: "prefix/ns/pod", Object: pod2}, item) {
-			t.Errorf("expected %v, got %v", pod1, item)
+		expected := makeTestStoreElement(makeTestPod("pod", 2))
+		if !apiequality.Semantic.DeepEqual(expected, item) {
+			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
 	pod3 := makeTestPod("pod", 3)
@@ -97,15 +119,18 @@ func TestWatchCacheBasic(t *testing.T) {
 	store.Add(makeTestPod("pod2", 5))
 	store.Add(makeTestPod("pod3", 6))
 	{
-		podNames := sets.String{}
+		expected := map[string]storeElement{
+			"prefix/ns/pod1": *makeTestStoreElement(makeTestPod("pod1", 4)),
+			"prefix/ns/pod2": *makeTestStoreElement(makeTestPod("pod2", 5)),
+			"prefix/ns/pod3": *makeTestStoreElement(makeTestPod("pod3", 6)),
+		}
+		items := make(map[string]storeElement, 0)
 		for _, item := range store.List() {
-			podNames.Insert(item.(*storeElement).Object.(*v1.Pod).ObjectMeta.Name)
+			elem := item.(*storeElement)
+			items[elem.Key] = *elem
 		}
-		if !podNames.HasAll("pod1", "pod2", "pod3") {
-			t.Errorf("missing pods, found %v", podNames)
-		}
-		if len(podNames) != 3 {
-			t.Errorf("found missing/extra items")
+		if !apiequality.Semantic.DeepEqual(expected, items) {
+			t.Errorf("expected %v, got %v", expected, items)
 		}
 	}
 
@@ -115,15 +140,17 @@ func TestWatchCacheBasic(t *testing.T) {
 		makeTestPod("pod5", 8),
 	}, "8")
 	{
-		podNames := sets.String{}
+		expected := map[string]storeElement{
+			"prefix/ns/pod4": *makeTestStoreElement(makeTestPod("pod4", 7)),
+			"prefix/ns/pod5": *makeTestStoreElement(makeTestPod("pod5", 8)),
+		}
+		items := make(map[string]storeElement)
 		for _, item := range store.List() {
-			podNames.Insert(item.(*storeElement).Object.(*v1.Pod).ObjectMeta.Name)
+			elem := item.(*storeElement)
+			items[elem.Key] = *elem
 		}
-		if !podNames.HasAll("pod4", "pod5") {
-			t.Errorf("missing pods, found %v", podNames)
-		}
-		if len(podNames) != 2 {
-			t.Errorf("found missing/extra items")
+		if !apiequality.Semantic.DeepEqual(expected, items) {
+			t.Errorf("expected %v, got %v", expected, items)
 		}
 	}
 }
@@ -288,8 +315,9 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 	if !exists {
 		t.Fatalf("no results returned: %#v", obj)
 	}
-	if !apiequality.Semantic.DeepEqual(&storeElement{Key: "prefix/ns/bar", Object: makeTestPod("bar", 5)}, obj) {
-		t.Errorf("unexpected element returned: %#v", obj)
+	expected := makeTestStoreElement(makeTestPod("bar", 5))
+	if !apiequality.Semantic.DeepEqual(expected, obj) {
+		t.Errorf("expected %v, got %v", expected, obj)
 	}
 }
 
