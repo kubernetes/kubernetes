@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -37,9 +38,84 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
 )
 
 var testClusterName = "testCluster"
+
+func TestParseConfig(t *testing.T) {
+	azureConfig := `{
+		"aadClientCertPassword": "aadClientCertPassword",
+		"aadClientCertPath": "aadClientCertPath",
+		"aadClientId": "aadClientId",
+		"aadClientSecret": "aadClientSecret",
+		"cloud":"AzurePublicCloud",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffDuration": 1,
+		"cloudProviderBackoffExponent": 1,
+		"cloudProviderBackoffJitter": 1,
+		"cloudProviderBackoffRetries": 1,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitBucket": 1,
+		"CloudProviderRateLimitBucketWrite": 1,
+		"cloudProviderRateLimitQPS": 1,
+		"CloudProviderRateLimitQPSWrite": 1,
+		"location": "location",
+		"maximumLoadBalancerRuleCount": 1,
+		"primaryAvailabilitySetName": "primaryAvailabilitySetName",
+		"primaryScaleSetName": "primaryScaleSetName",
+		"resourceGroup": "resourceGroup",
+		"routeTableName": "routeTableName",
+		"securityGroupName": "securityGroupName",
+		"subnetName": "subnetName",
+		"subscriptionId": "subscriptionId",
+		"tenantId": "tenantId",
+		"useInstanceMetadata": true,
+		"useManagedIdentityExtension": true,
+		"vnetName": "vnetName",
+		"vnetResourceGroup": "vnetResourceGroup",
+		vmType: "standard"
+	}`
+	expected := &Config{
+		AzureAuthConfig: auth.AzureAuthConfig{
+			AADClientCertPassword:       "aadClientCertPassword",
+			AADClientCertPath:           "aadClientCertPath",
+			AADClientID:                 "aadClientId",
+			AADClientSecret:             "aadClientSecret",
+			Cloud:                       "AzurePublicCloud",
+			SubscriptionID:              "subscriptionId",
+			TenantID:                    "tenantId",
+			UseManagedIdentityExtension: true,
+		},
+		CloudProviderBackoff:              true,
+		CloudProviderBackoffDuration:      1,
+		CloudProviderBackoffExponent:      1,
+		CloudProviderBackoffJitter:        1,
+		CloudProviderBackoffRetries:       1,
+		CloudProviderRateLimit:            true,
+		CloudProviderRateLimitBucket:      1,
+		CloudProviderRateLimitBucketWrite: 1,
+		CloudProviderRateLimitQPS:         1,
+		CloudProviderRateLimitQPSWrite:    1,
+		Location:                          "location",
+		MaximumLoadBalancerRuleCount:      1,
+		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
+		PrimaryScaleSetName:               "primaryScaleSetName",
+		ResourceGroup:                     "resourceGroup",
+		RouteTableName:                    "routeTableName",
+		SecurityGroupName:                 "securityGroupName",
+		SubnetName:                        "subnetName",
+		UseInstanceMetadata:               true,
+		VMType:                            "standard",
+		VnetName:                          "vnetName",
+		VnetResourceGroup:                 "vnetResourceGroup",
+	}
+
+	buffer := bytes.NewBufferString(azureConfig)
+	config, err := parseConfig(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, config)
+}
 
 // Test flipServiceInternalAnnotation
 func TestFlipServiceInternalAnnotation(t *testing.T) {
