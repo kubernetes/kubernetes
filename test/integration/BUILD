@@ -66,6 +66,7 @@ filegroup(
         "//test/integration/ttlcontroller:all-srcs",
         "//test/integration/util:all-srcs",
         "//test/integration/volume:all-srcs",
+        "//test/integration/webhook:all-srcs",
     ],
     tags = ["automanaged"],
 )
