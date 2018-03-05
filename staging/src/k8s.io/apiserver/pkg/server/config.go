@@ -100,10 +100,11 @@ type Config struct {
 	AdmissionControl      admission.Interface
 	CorsAllowedOriginList []string
 
-	EnableSwaggerUI bool
-	EnableIndex     bool
-	EnableProfiling bool
-	EnableDiscovery bool
+	EnableSwaggerUI   bool
+	EnableIndex       bool
+	EnableProfiling   bool
+	EnableDiscovery   bool
+	EnableLogsHandler bool
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -262,6 +263,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		EnableIndex:                  true,
 		EnableDiscovery:              true,
 		EnableProfiling:              true,
+		EnableLogsHandler:            true,
 		MaxRequestsInFlight:          400,
 		MaxMutatingRequestsInFlight:  200,
 		RequestTimeout:               time.Duration(60) * time.Second,
@@ -593,6 +595,10 @@ func installAPI(s *GenericAPIServer, c *Config) {
 
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
+	}
+
+	if c.EnableLogsHandler {
+		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 }
 

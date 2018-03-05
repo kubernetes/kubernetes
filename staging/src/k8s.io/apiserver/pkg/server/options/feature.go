@@ -27,6 +27,7 @@ type FeatureOptions struct {
 	EnableProfiling           bool
 	EnableContentionProfiling bool
 	EnableSwaggerUI           bool
+	EnableLogsHandler         bool
 }
 
 func NewFeatureOptions() *FeatureOptions {
@@ -36,6 +37,7 @@ func NewFeatureOptions() *FeatureOptions {
 		EnableProfiling:           defaults.EnableProfiling,
 		EnableContentionProfiling: defaults.EnableContentionProfiling,
 		EnableSwaggerUI:           defaults.EnableSwaggerUI,
+		EnableLogsHandler:         defaults.EnableLogsHandler,
 	}
 }
 
@@ -50,6 +52,8 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 		"Enable lock contention profiling, if profiling is enabled")
 	fs.BoolVar(&o.EnableSwaggerUI, "enable-swagger-ui", o.EnableSwaggerUI,
 		"Enables swagger ui on the apiserver at /swagger-ui")
+	fs.BoolVar(&o.EnableLogsHandler, "enable-logs-handler", o.EnableLogsHandler,
+		"If true, install a /logs handler for the apiserver logs.")
 }
 
 func (o *FeatureOptions) ApplyTo(c *server.Config) error {
@@ -60,6 +64,7 @@ func (o *FeatureOptions) ApplyTo(c *server.Config) error {
 	c.EnableProfiling = o.EnableProfiling
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 	c.EnableSwaggerUI = o.EnableSwaggerUI
+	c.EnableLogsHandler = o.EnableLogsHandler
 
 	return nil
 }

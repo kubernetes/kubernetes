@@ -64,7 +64,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 	endpointsstorage "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
-	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
@@ -109,9 +108,8 @@ type ExtraConfig struct {
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
 
 	// Used to start and monitor tunneling
-	Tunneler          tunneler.Tunneler
-	EnableLogsSupport bool
-	ProxyTransport    http.RoundTripper
+	Tunneler       tunneler.Tunneler
+	ProxyTransport http.RoundTripper
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
@@ -302,10 +300,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s, err := c.GenericConfig.New("kube-apiserver", delegationTarget)
 	if err != nil {
 		return nil, err
-	}
-
-	if c.ExtraConfig.EnableLogsSupport {
-		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
 	m := &Master{
