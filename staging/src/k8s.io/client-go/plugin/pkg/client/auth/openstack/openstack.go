@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
 	"k8s.io/apimachinery/pkg/util/net"
@@ -35,64 +36,119 @@ func init() {
 	}
 }
 
-// DefaultTTLDuration is the time before a token gets expired.
-const DefaultTTLDuration = 10 * time.Minute
-
 // openstackAuthProvider is an authprovider for openstack. this provider reads
 // the environment variables to determine the client identity, and generates a
 // token which will be inserted into the request header later.
 type openstackAuthProvider struct {
-	ttl time.Duration
-
 	tokenGetter TokenGetter
+	persister   restclient.AuthProviderConfigPersister
 }
+
+// newOpenstackAuthProvider creates an auth provider which works with openstack
+// environment.
+func newOpenstackAuthProvider(clusterAddress string, oapConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+	options, err := openstack.AuthOptionsFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("error reading openstack env vars: %s", err)
+	}
+	tg := &tokenGetter{options}
+	ctg := newCachedGetter(tg, persister, oapConfig)
+	return &openstackAuthProvider{
+		tokenGetter: ctg,
+		persister:   persister,
+	}, nil
+}
+
+// Login is not used
+func (oap *openstackAuthProvider) Login() error { return nil }
 
 // TokenGetter returns a bearer token that can be inserted into request.
 type TokenGetter interface {
-	Token() (string, error)
+	Token() (*openstackToken, error)
 }
 
-type tokenGetter struct{}
-
-// Token creates a token by authenticate with keystone.
-func (*tokenGetter) Token() (string, error) {
-	options, err := openstack.AuthOptionsFromEnv()
-	if err != nil {
-		return "", fmt.Errorf("failed to read openstack env vars: %s", err)
-	}
-	client, err := openstack.AuthenticatedClient(options)
-	if err != nil {
-		return "", fmt.Errorf("authentication failed: %s", err)
-	}
-	return client.TokenID, nil
+type tokenGetter struct {
+	options gophercloud.AuthOptions
 }
 
-// cachedGetter caches a token until it gets expired, after the expiration, it will
-// generate another token and cache it.
+// Token gets a token from the OpenStack Identity service
+func (tg *tokenGetter) Token() (*openstackToken, error) {
+	token, err := tokenFromAuth(tg.options)
+	if err != nil {
+		return nil, fmt.Errorf("error getting openstack token: %s", err)
+	}
+	return token, nil
+}
+
 type cachedGetter struct {
-	mutex       sync.Mutex
-	tokenGetter TokenGetter
+	lk        sync.Mutex
+	tg        TokenGetter
+	persister restclient.AuthProviderConfigPersister
+	cache     map[string]string
+}
 
-	token string
-	born  time.Time
-	ttl   time.Duration
+func newCachedGetter(tg TokenGetter, persister restclient.AuthProviderConfigPersister, cache map[string]string) *cachedGetter {
+	if cache == nil {
+		cache = make(map[string]string)
+	}
+	return &cachedGetter{
+		tg:        tg,
+		persister: persister,
+		cache:     cache,
+	}
 }
 
 // Token returns the current available token, create a new one if expired.
-func (c *cachedGetter) Token() (string, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	var err error
-	// no token or exceeds the TTL
-	if c.token == "" || time.Now().Sub(c.born) > c.ttl {
-		c.token, err = c.tokenGetter.Token()
-		if err != nil {
-			return "", fmt.Errorf("failed to get token: %s", err)
+func (g *cachedGetter) Token() (*openstackToken, error) {
+	if token, err := g.cachedToken(); err == nil {
+		if token.Valid() {
+			return token, nil
 		}
-		c.born = time.Now()
 	}
-	return c.token, nil
+	token, err := g.tg.Token()
+	if err != nil {
+		return nil, err
+	}
+	cache := g.update(token)
+	if g.persister != nil {
+		if err := g.persister.Persist(cache); err != nil {
+			glog.V(4).Infof("Failed to persist token: %v", err)
+		}
+	}
+	return token, nil
+}
+
+func (g *cachedGetter) cachedToken() (*openstackToken, error) {
+	g.lk.Lock()
+	defer g.lk.Unlock()
+	id, ok := g.cache["token-id"]
+	if !ok {
+		return nil, fmt.Errorf("the token ID is not in the cache")
+	}
+	expiresAt, ok := g.cache["expires-at"]
+	if !ok {
+		return nil, fmt.Errorf("the token expires-at time is not in the cache")
+	}
+	expiresAtTime, err := time.Parse(time.RFC3339Nano, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	return &openstackToken{
+		ID:        id,
+		ExpiresAt: expiresAtTime,
+	}, nil
+}
+
+func (g *cachedGetter) update(token *openstackToken) map[string]string {
+	g.lk.Lock()
+	defer g.lk.Unlock()
+	ret := map[string]string{}
+	for k, v := range g.cache {
+		ret[k] = v
+	}
+	ret["token-id"] = token.ID
+	ret["expires-at"] = token.ExpiresAt.Format(time.RFC3339Nano)
+	return ret
 }
 
 // tokenRoundTripper implements the RoundTripper interface: adding the bearer token
@@ -100,7 +156,8 @@ func (c *cachedGetter) Token() (string, error) {
 type tokenRoundTripper struct {
 	http.RoundTripper
 
-	tokenGetter TokenGetter
+	tg        TokenGetter
+	persister restclient.AuthProviderConfigPersister
 }
 
 var _ net.RoundTripperWrapper = &tokenRoundTripper{}
@@ -112,55 +169,30 @@ func (t *tokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 		return t.RoundTripper.RoundTrip(req)
 	}
 
-	token, err := t.tokenGetter.Token()
+	token, err := t.tg.Token()
 	if err == nil {
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Authorization", "Bearer "+token.ID)
 	} else {
-		glog.V(4).Infof("failed to get token: %s", err)
+		glog.V(4).Infof("Failed to get token: %s", err)
 	}
 
-	return t.RoundTripper.RoundTrip(req)
+	res, err := t.RoundTripper.RoundTrip(req)
+
+	if res.StatusCode == 401 {
+		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
+		emptyCache := make(map[string]string)
+		t.persister.Persist(emptyCache)
+	}
+
+	return res, nil
 }
 
 func (t *tokenRoundTripper) WrappedRoundTripper() http.RoundTripper { return t.RoundTripper }
 
-// newOpenstackAuthProvider creates an auth provider which works with openstack
-// environment.
-func newOpenstackAuthProvider(clusterAddress string, config map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	var ttlDuration time.Duration
-	var err error
-
-	ttl, found := config["ttl"]
-	if !found {
-		ttlDuration = DefaultTTLDuration
-		// persist to config
-		config["ttl"] = ttlDuration.String()
-		if err = persister.Persist(config); err != nil {
-			return nil, fmt.Errorf("failed to persist config: %s", err)
-		}
-	} else {
-		ttlDuration, err = time.ParseDuration(ttl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse ttl config: %s", err)
-		}
-	}
-
-	// TODO: read/persist client configuration(OS_XXX env vars) in config
-
-	return &openstackAuthProvider{
-		ttl:         ttlDuration,
-		tokenGetter: &tokenGetter{},
-	}, nil
-}
-
 func (oap *openstackAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
 	return &tokenRoundTripper{
 		RoundTripper: rt,
-		tokenGetter: &cachedGetter{
-			tokenGetter: oap.tokenGetter,
-			ttl:         oap.ttl,
-		},
+		tg:           oap.tokenGetter,
+		persister:    oap.persister,
 	}
 }
-
-func (oap *openstackAuthProvider) Login() error { return nil }
