@@ -91,6 +91,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/e2e/storage/openstack:all-srcs",
         "//test/e2e/storage/utils:all-srcs",
         "//test/e2e/storage/vsphere:all-srcs",
     ],

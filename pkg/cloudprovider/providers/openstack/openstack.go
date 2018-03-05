@@ -164,7 +164,7 @@ func init() {
 		if err != nil {
 			return nil, err
 		}
-		return newOpenStack(cfg)
+		return NewOpenStack(cfg)
 	})
 }
 
@@ -198,7 +198,7 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 
 // configFromEnv allows setting up credentials etc using the
 // standard OS_* OpenStack client environment variables.
-func configFromEnv() (cfg Config, ok bool) {
+func ConfigFromEnv() (cfg Config, ok bool) {
 	cfg.Global.AuthURL = os.Getenv("OS_AUTH_URL")
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
@@ -243,7 +243,7 @@ func readConfig(config io.Reader) (Config, error) {
 		return Config{}, fmt.Errorf("no OpenStack cloud provider config file given")
 	}
 
-	cfg, _ := configFromEnv()
+	cfg, _ := ConfigFromEnv()
 
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
@@ -310,7 +310,7 @@ func checkOpenStackOpts(openstackOpts *OpenStack) error {
 	return checkMetadataSearchOrder(openstackOpts.metadataOpts.SearchOrder)
 }
 
-func newOpenStack(cfg Config) (*OpenStack, error) {
+func NewOpenStack(cfg Config) (*OpenStack, error) {
 	provider, err := openstack.NewClient(cfg.Global.AuthURL)
 	if err != nil {
 		return nil, err

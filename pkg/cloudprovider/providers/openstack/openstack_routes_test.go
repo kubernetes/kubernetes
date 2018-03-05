@@ -30,12 +30,12 @@ import (
 func TestRoutes(t *testing.T) {
 	const clusterName = "ignored"
 
-	cfg, ok := configFromEnv()
+	cfg, ok := ConfigFromEnv()
 	if !ok {
 		t.Skipf("No config found in environment")
 	}
 
-	os, err := newOpenStack(cfg)
+	os, err := NewOpenStack(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
