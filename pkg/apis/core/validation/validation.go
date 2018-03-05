@@ -2175,7 +2175,11 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		}
 
 		if len(mnt.SubPath) > 0 {
-			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subPath"), "subPath is disabled by feature-gate"))
+			} else {
+				allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
+			}
 		}
 
 		if mnt.MountPropagation != nil {
