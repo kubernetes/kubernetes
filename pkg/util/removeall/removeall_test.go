@@ -161,3 +161,15 @@ func TestRemoveAllOneFilesystem(t *testing.T) {
 		}
 	}
 }
+
+func (mounter *fakeMounter) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return "", nil, nil
+}
+
+func (mounter *fakeMounter) CleanSubPaths(_, _ string) error {
+	return nil
+}
+
+func (mounter *fakeMounter) SafeMakeDir(_, _ string, _ os.FileMode) error {
+	return nil
+}

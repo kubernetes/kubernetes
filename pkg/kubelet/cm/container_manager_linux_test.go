@@ -75,6 +75,18 @@ func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
 }
 
+func (mi *fakeMountInterface) PrepareSafeSubpath(subPath mount.Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return "", nil, nil
+}
+
+func (mi *fakeMountInterface) CleanSubPaths(_, _ string) error {
+	return nil
+}
+
+func (mi *fakeMountInterface) SafeMakeDir(_, _ string, _ os.FileMode) error {
+	return nil
+}
+
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{
