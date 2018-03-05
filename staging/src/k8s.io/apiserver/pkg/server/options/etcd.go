@@ -91,6 +91,21 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, must be 'etcd3' or 'etcd2'. If not specified, it will default to 'etcd3'"))
 	}
 
+	for _, override := range s.EtcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		if len(tokens) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid value of etcd server overrides: %s", override))
+			continue
+		}
+
+		apiresource := strings.Split(tokens[0], "/")
+		if len(apiresource) != 2 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid resource definition: %s", tokens[0]))
+			continue
+		}
+
+	}
+
 	return allErrors
 }
 
