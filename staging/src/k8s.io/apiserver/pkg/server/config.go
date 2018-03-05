@@ -105,6 +105,7 @@ type Config struct {
 	EnableProfiling   bool
 	EnableDiscovery   bool
 	EnableLogsHandler bool
+	LogsDir           string
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -598,7 +599,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	}
 
 	if c.EnableLogsHandler {
-		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
+		routes.Logs{LogDir: c.LogsDir}.Install(s.Handler.GoRestfulContainer)
 	}
 }
 
