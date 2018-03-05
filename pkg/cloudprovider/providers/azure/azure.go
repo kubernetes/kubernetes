@@ -110,7 +110,7 @@ type Config struct {
 	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
 
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
-	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount"`
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
 }
 
 // Cloud holds the config and clients
