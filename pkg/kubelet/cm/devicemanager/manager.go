@@ -377,16 +377,26 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 	go func() {
 		e.run()
 		e.stop()
-
 		m.mutex.Lock()
 		if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
-			glog.V(2).Infof("Delete resource for endpoint %v", e)
-			delete(m.endpoints, r.ResourceName)
+			m.markResourceUnhealthy(r.ResourceName)
 		}
-
 		glog.V(2).Infof("Unregistered endpoint %v", e)
 		m.mutex.Unlock()
 	}()
+}
+
+func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
+	glog.V(2).Infof("Mark all resources Unhealthy for resource %s", resourceName)
+	healthyDevices := sets.NewString()
+	if _, ok := m.healthyDevices[resourceName]; ok {
+		healthyDevices = m.healthyDevices[resourceName]
+		m.healthyDevices[resourceName] = sets.NewString()
+	}
+	if _, ok := m.unhealthyDevices[resourceName]; !ok {
+		m.unhealthyDevices[resourceName] = sets.NewString()
+	}
+	m.unhealthyDevices[resourceName] = m.unhealthyDevices[resourceName].Union(healthyDevices)
 }
 
 // GetCapacity is expected to be called when Kubelet updates its node status.
@@ -405,12 +415,20 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	needsUpdateCheckpoint := false
 	var capacity = v1.ResourceList{}
 	var allocatable = v1.ResourceList{}
-	var deletedResources []string
+	deletedResources := sets.NewString()
 	m.mutex.Lock()
 	for resourceName, devices := range m.healthyDevices {
-		if _, ok := m.endpoints[resourceName]; !ok {
+		e, ok := m.endpoints[resourceName]
+		if (ok && e.stopGracePeriodExpired()) || !ok {
+			// The resources contained in endpoints and (un)healthyDevices
+			// should always be consistent. Otherwise, we run with the risk
+			// of failing to garbage collect non-existing resources or devices.
+			if !ok {
+				glog.Errorf("unexpected: healthyDevices and endpoints are out of sync")
+			}
+			delete(m.endpoints, resourceName)
 			delete(m.healthyDevices, resourceName)
-			deletedResources = append(deletedResources, resourceName)
+			deletedResources.Insert(resourceName)
 			needsUpdateCheckpoint = true
 		} else {
 			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
@@ -418,17 +436,14 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		}
 	}
 	for resourceName, devices := range m.unhealthyDevices {
-		if _, ok := m.endpoints[resourceName]; !ok {
+		e, ok := m.endpoints[resourceName]
+		if (ok && e.stopGracePeriodExpired()) || !ok {
+			if !ok {
+				glog.Errorf("unexpected: unhealthyDevices and endpoints are out of sync")
+			}
+			delete(m.endpoints, resourceName)
 			delete(m.unhealthyDevices, resourceName)
-			alreadyDeleted := false
-			for _, name := range deletedResources {
-				if name == resourceName {
-					alreadyDeleted = true
-				}
-			}
-			if !alreadyDeleted {
-				deletedResources = append(deletedResources, resourceName)
-			}
+			deletedResources.Insert(resourceName)
 			needsUpdateCheckpoint = true
 		} else {
 			capacityCount := capacity[v1.ResourceName(resourceName)]
@@ -441,7 +456,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	if needsUpdateCheckpoint {
 		m.writeCheckpoint()
 	}
-	return capacity, allocatable, deletedResources
+	return capacity, allocatable, deletedResources.UnsortedList()
 }
 
 // checkpointData struct is used to store pod to device allocation information
@@ -495,12 +510,12 @@ func (m *ManagerImpl) readCheckpoint() error {
 	defer m.mutex.Unlock()
 	m.podDevices.fromCheckpointData(data.PodDeviceEntries)
 	m.allocatedDevices = m.podDevices.devices()
-	for resource, devices := range data.RegisteredDevices {
-		// TODO: Support Checkpointing for unhealthy devices as well
+	for resource := range data.RegisteredDevices {
+		// During start up, creates empty healthyDevices list so that the resource capacity
+		// will stay zero till the corresponding device plugin re-registers.
 		m.healthyDevices[resource] = sets.NewString()
-		for _, dev := range devices {
-			m.healthyDevices[resource].Insert(dev)
-		}
+		m.unhealthyDevices[resource] = sets.NewString()
+		m.endpoints[resource] = newStoppedEndpointImpl(resource, make(map[string]pluginapi.Device))
 	}
 	return nil
 }
@@ -688,6 +703,8 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
 }
 
+// callPreStartContainerIfNeeded issues PreStartContainer grpc call for device plugin resource
+// with PreStartRequired option set.
 func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource string) error {
 	m.mutex.Lock()
 	opts, ok := m.pluginOpts[resource]
