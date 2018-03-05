@@ -81348,7 +81348,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.RunAsUserStrategyOptions": {
-    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "Run As User Strategy Options defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
@@ -81367,7 +81367,7 @@
     }
    },
    "io.k8s.api.extensions.v1beta1.SELinuxStrategyOptions": {
-    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "SELinux Strategy Options defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
@@ -82040,7 +82040,7 @@
     }
    },
    "io.k8s.api.policy.v1beta1.RunAsUserStrategyOptions": {
-    "description": "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "Run As User Strategy Options defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],
@@ -82059,7 +82059,7 @@
     }
    },
    "io.k8s.api.policy.v1beta1.SELinuxStrategyOptions": {
-    "description": "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+    "description": "SELinux Strategy Options defines the strategy type and any options used to create the strategy.",
     "required": [
      "rule"
     ],

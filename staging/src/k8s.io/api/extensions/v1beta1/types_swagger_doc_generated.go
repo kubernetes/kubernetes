@@ -581,7 +581,7 @@ func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
 }
 
 var map_RunAsUserStrategyOptions = map[string]string{
-	"":       "Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.",
+	"":       "Run As User Strategy Options defines the strategy type and any options used to create the strategy.",
 	"rule":   "Rule is the strategy that will dictate the allowable RunAsUser values that may be set.",
 	"ranges": "Ranges are the allowed ranges of uids that may be used.",
 }
@@ -591,7 +591,7 @@ func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 }
 
 var map_SELinuxStrategyOptions = map[string]string{
-	"":               "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
+	"":               "SELinux Strategy Options defines the strategy type and any options used to create the strategy.",
 	"rule":           "type is the strategy that will dictate the allowable labels that may be set.",
 	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
 }
