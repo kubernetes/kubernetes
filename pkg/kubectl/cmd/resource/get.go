@@ -469,7 +469,9 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		nonEmptyObjCount++
 	}
 
-	cmdutil.PrintFilterCount(options.ErrOut, nonEmptyObjCount, filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
+	if nonEmptyObjCount == 0 && filteredResourceCount == 0 {
+		fmt.Fprintln(options.ErrOut, "No resources found.")
+	}
 	return utilerrors.NewAggregate(allErrs)
 }
 

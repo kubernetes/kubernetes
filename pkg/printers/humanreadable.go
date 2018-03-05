@@ -375,9 +375,6 @@ func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions
 		fmt.Fprintln(output)
 	}
 	for _, row := range table.Rows {
-		if !options.ShowAll && hasCondition(row.Conditions, metav1beta1.RowCompleted) {
-			continue
-		}
 		first := true
 		for i, cell := range row.Cells {
 			column := table.ColumnDefinitions[i]

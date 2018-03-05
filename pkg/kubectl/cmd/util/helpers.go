@@ -716,29 +716,6 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	return filterCount, list, nil
 }
 
-// PrintFilterCount displays informational messages based on the number of resources found, hidden, or
-// config flags shown.
-func PrintFilterCount(out io.Writer, found, hidden, errors int, options *printers.PrintOptions, ignoreNotFound bool) {
-	switch {
-	case errors > 0 || ignoreNotFound:
-		// print nothing
-	case found <= hidden:
-		if found == 0 {
-			fmt.Fprintln(out, "No resources found.")
-		} else {
-			fmt.Fprintln(out, "No resources found, use --show-all to see completed objects.")
-		}
-	case hidden > 0 && !options.ShowAll && !options.NoHeaders:
-		if glog.V(2) {
-			if hidden > 1 {
-				fmt.Fprintf(out, "info: %d objects not shown, use --show-all to see completed objects.\n", hidden)
-			} else {
-				fmt.Fprintf(out, "info: 1 object not shown, use --show-all to see completed objects.\n")
-			}
-		}
-	}
-}
-
 // IsSiblingCommandExists receives a pointer to a cobra command and a target string.
 // Returns true if the target string is found in the list of sibling commands.
 func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {

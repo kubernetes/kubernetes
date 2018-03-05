@@ -33,16 +33,10 @@ func TestResourceFilter(t *testing.T) {
 	}{
 		{"v1.Pod pending", false, &v1.Pod{Status: v1.PodStatus{Phase: v1.PodPending}}},
 		{"v1.Pod running", false, &v1.Pod{Status: v1.PodStatus{Phase: v1.PodRunning}}},
-		{"v1.Pod succeeded", true, &v1.Pod{Status: v1.PodStatus{Phase: v1.PodSucceeded}}},
-		{"v1.Pod failed", true, &v1.Pod{Status: v1.PodStatus{Phase: v1.PodFailed}}},
-		{"v1.Pod evicted", true, &v1.Pod{Status: v1.PodStatus{Phase: v1.PodFailed, Reason: "Evicted"}}},
 		{"v1.Pod unknown", false, &v1.Pod{Status: v1.PodStatus{Phase: v1.PodUnknown}}},
 
 		{"api.Pod pending", false, &api.Pod{Status: api.PodStatus{Phase: api.PodPending}}},
 		{"api.Pod running", false, &api.Pod{Status: api.PodStatus{Phase: api.PodRunning}}},
-		{"api.Pod succeeded", true, &api.Pod{Status: api.PodStatus{Phase: api.PodSucceeded}}},
-		{"api.Pod failed", true, &api.Pod{Status: api.PodStatus{Phase: api.PodFailed}}},
-		{"api.Pod evicted", true, &api.Pod{Status: api.PodStatus{Phase: api.PodFailed, Reason: "Evicted"}}},
 		{"api.Pod unknown", false, &api.Pod{Status: api.PodStatus{Phase: api.PodUnknown}}},
 	}
 
@@ -59,18 +53,6 @@ func TestResourceFilter(t *testing.T) {
 		}
 		if want := test.hide; got != want {
 			t.Errorf("%v: got %v, want %v", test.name, got, want)
-		}
-	}
-
-	options.ShowAll = true
-	for _, test := range tests {
-		got, err := filters.Filter(test.object, options)
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", test.name, err)
-			continue
-		}
-		if want := false; got != want {
-			t.Errorf("%v (ShowAll): got %v, want %v", test.name, got, want)
 		}
 	}
 }

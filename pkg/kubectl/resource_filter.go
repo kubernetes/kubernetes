@@ -17,9 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -39,18 +37,9 @@ func NewResourceFilter() Filters {
 
 // filterPods returns true if a pod should be skipped.
 // If show-all is true, the pod will be never be skipped (return false);
-// otherwise, skip terminated pod.
-func filterPods(obj runtime.Object, options printers.PrintOptions) bool {
-	if options.ShowAll {
-		return false
-	}
-
-	switch p := obj.(type) {
-	case *v1.Pod:
-		return p.Status.Phase == v1.PodSucceeded || p.Status.Phase == v1.PodFailed
-	case *api.Pod:
-		return p.Status.Phase == api.PodSucceeded || p.Status.Phase == api.PodFailed
-	}
+// show-all is deprecated in v1.10 and inert in v1.11.
+// TODO: It will be removed in a future release.
+func filterPods(runtime.Object, printers.PrintOptions) bool {
 	return false
 }
 

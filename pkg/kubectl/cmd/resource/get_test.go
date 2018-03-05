@@ -389,29 +389,11 @@ func TestGetObjectsFiltered(t *testing.T) {
 		{args: []string{"pods", "foo"}, resp: first, flags: map[string]string{"show-all": "true"},
 			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
 
-		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
-
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods,
 			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
 
-		{args: []string{"pods/foo"}, resp: first, flags: map[string]string{"show-all": "false"},
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
-
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false", "output": "name"}, resp: pods,
-			expect: "pod/foo\npod/bar\n"},
-
-		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}, resp: pods,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
-
-		{args: []string{"pods"}, resp: pods, flags: map[string]string{"show-all": "false"},
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
-
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "name"}, resp: pods,
 			expect: "pod/foo\npod/bar\n"},
-
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
 	}
 
 	for i, test := range testCases {
@@ -986,32 +968,6 @@ foo       Unknown   <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetByFormatForcesFlag(t *testing.T) {
-	pods, _, _ := testData()
-
-	tf := cmdtesting.NewTestFactory()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
-	}
-	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdGet(tf, buf, errBuf)
-	cmd.SetOutput(buf)
-	cmd.Flags().Lookup("output").Value.Set("yaml")
-	cmd.Flags().Set("show-all", "false")
-	cmd.Run(cmd, []string{"pods"})
-
-	showAllFlag, _ := cmd.Flags().GetBool("show-all")
-	if showAllFlag {
-		t.Error("expected showAll to not be true when getting resource")
 	}
 }
 
