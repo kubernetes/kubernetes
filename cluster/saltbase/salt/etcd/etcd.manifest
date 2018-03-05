@@ -63,6 +63,9 @@
       },
       { "name": "INITIAL_CLUSTER",
         "value": "{{ etcd_cluster }}"
+      },
+      { "name": "ETCD_CREDS",
+        "value": "{{ etcd_creds }}"
       }
         ],
     "livenessProbe": {
