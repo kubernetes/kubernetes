@@ -62,11 +62,16 @@ type Mounter struct {
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
 // mounterPath allows using an alternative to `/bin/mount` for mounting.
-func New(mounterPath string) Interface {
-	return &Mounter{
+func New(mounterPath string, withSystemd bool) Interface {
+	mounter := &Mounter{
 		mounterPath: mounterPath,
-		withSystemd: detectSystemd(),
 	}
+
+	if withSystemd {
+		mounter.withSystemd = detectSystemd()
+	}
+
+	return mounter
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must

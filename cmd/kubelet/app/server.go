@@ -327,7 +327,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
+	mounter := mount.New(s.ExperimentalMounterPath, s.MounterDetectSystemdRun)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
@@ -904,6 +904,7 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		kubeFlags.MaxPerPodContainerCount,
 		kubeFlags.MaxContainerCount,
 		kubeFlags.MasterServiceNamespace,
+		kubeFlags.MounterDetectSystemdRun,
 		kubeFlags.RegisterSchedulable,
 		kubeFlags.NonMasqueradeCIDR,
 		kubeFlags.KeepTerminatedPodVolumes,
@@ -977,6 +978,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	maxPerPodContainerCount int32,
 	maxContainerCount int32,
 	masterServiceNamespace string,
+	mounterDetectSystemdRun bool,
 	registerSchedulable bool,
 	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
@@ -1010,6 +1012,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		maxPerPodContainerCount,
 		maxContainerCount,
 		masterServiceNamespace,
+		mounterDetectSystemdRun,
 		registerSchedulable,
 		nonMasqueradeCIDR,
 		keepTerminatedPodVolumes,

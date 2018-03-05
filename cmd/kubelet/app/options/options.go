@@ -135,6 +135,8 @@ type KubeletFlags struct {
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
+	// MounterDetectSystemdRun turn on "systemd-run" detection for linux mounted volumes
+	MounterDetectSystemdRun bool
 	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string
 	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
@@ -235,14 +237,15 @@ func NewKubeletFlags() *KubeletFlags {
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
 		RotateCertificates:                  false,
 		// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
-		EnableCustomMetrics: false,
-		NodeLabels:          make(map[string]string),
-		VolumePluginDir:     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
-		RegisterNode:        true,
-		SeccompProfileRoot:  filepath.Join(defaultRootDir, "seccomp"),
-		HostNetworkSources:  []string{kubetypes.AllSource},
-		HostPIDSources:      []string{kubetypes.AllSource},
-		HostIPCSources:      []string{kubetypes.AllSource},
+		EnableCustomMetrics:     false,
+		NodeLabels:              make(map[string]string),
+		VolumePluginDir:         "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
+		RegisterNode:            true,
+		MounterDetectSystemdRun: true,
+		SeccompProfileRoot:      filepath.Join(defaultRootDir, "seccomp"),
+		HostNetworkSources:      []string{kubetypes.AllSource},
+		HostPIDSources:          []string{kubetypes.AllSource},
+		HostIPCSources:          []string{kubetypes.AllSource},
 		// TODO(#56523): default CAdvisorPort to 0 (disabled) and deprecate it
 		CAdvisorPort: 4194,
 	}
@@ -395,6 +398,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.StringVar(&f.MasterServiceNamespace, "master-service-namespace", f.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in a future version.")
+	fs.BoolVar(&f.MounterDetectSystemdRun, "mounter-detect-systemd-run", f.MounterDetectSystemdRun, "Turn on systemd-run detection for mounted volumes")
 	fs.BoolVar(&f.RegisterSchedulable, "register-schedulable", f.RegisterSchedulable, "Register the node as schedulable. Won't have any effect if register-node is false.")
 	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
 	fs.StringVar(&f.NonMasqueradeCIDR, "non-masquerade-cidr", f.NonMasqueradeCIDR, "Traffic to IPs outside this range will use IP masquerade. Set to '0.0.0.0/0' to never masquerade.")
