@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+	aggregatormetrics "k8s.io/kube-aggregator/pkg/apiserver/metrics"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
@@ -262,8 +264,13 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
 	}
 	s.proxyHandlers[apiService.Name] = proxyHandler
-	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
-	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
+	handler := http.Handler(proxyHandler)
+	if apiService.Spec.Service != nil {
+		handler = metrics.InstrumentHandlerFromContext(s.contextMapper, proxyHandler)
+	}
+	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, handler)
+	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", handler)
+	aggregatormetrics.SetProxyingGroupVersionActive(apiService.Name)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -303,6 +310,8 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Unregister(proxyPath + "/")
+	aggregatormetrics.SetProxyingGroupVersionInactive(apiServiceName)
+
 	if s.openAPIAggregationController != nil {
 		s.openAPIAggregationController.RemoveAPIService(apiServiceName)
 	}
