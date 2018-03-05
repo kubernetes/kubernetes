@@ -62,6 +62,8 @@ func newAlgorithmCache() AlgorithmCache {
 	}
 }
 
+// NewEquivalenceCache returns EquivalenceCache to speed up predicates by caching
+// result from previous scheduling.
 func NewEquivalenceCache() *EquivalenceCache {
 	return &EquivalenceCache{
 		algorithmCache: make(map[string]AlgorithmCache),
