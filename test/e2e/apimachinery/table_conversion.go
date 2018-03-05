@@ -32,12 +32,19 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/kubernetes/pkg/printers"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+var serverPrintVersion = utilversion.MustParseSemantic("v1.10.0")
+
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
+
+	BeforeEach(func() {
+		framework.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
+	})
 
 	It("should return pod details", func() {
 		ns := f.Namespace.Name
