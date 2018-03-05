@@ -1089,7 +1089,7 @@ func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
 }
 
 // CreateIngress creates the Ingress and associated service/rc.
-// Required: ing.yaml, rc.yaml, svc.yaml must exist in manifestPath
+// Required: ing.yaml, dep.yaml, svc.yaml must exist in manifestPath
 // Optional: secret.yaml, ingAnnotations
 // If ingAnnotations is specified it will overwrite any annotations in ing.yaml
 // If svcAnnotations is specified it will overwrite any annotations in svc.yaml
@@ -1099,8 +1099,8 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		return filepath.Join(TestContext.RepoRoot, manifestPath, file)
 	}
 
-	j.Logger.Infof("creating replication controller")
-	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	j.Logger.Infof("creating deployment")
+	RunKubectlOrDie("create", "-f", mkpath("dep.yaml"), fmt.Sprintf("--namespace=%v", ns))
 
 	j.Logger.Infof("creating service")
 	RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
