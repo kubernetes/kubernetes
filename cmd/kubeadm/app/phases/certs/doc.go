@@ -46,6 +46,8 @@ package certs
 		 - etcd/server.key
 		 - etcd/peer.crt
 		 - etcd/peer.key
+		 - etcd/healthcheck-client.crt
+		 - etcd/healthcheck-client.key
 		 - sa.pub
 		 - sa.key
 		 - front-proxy-ca.crt

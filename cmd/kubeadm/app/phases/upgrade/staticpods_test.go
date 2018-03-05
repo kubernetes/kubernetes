@@ -327,6 +327,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			// certsphase.CreateEtcdCACertAndKeyFiles,
 			// certsphase.CreateEtcdServerCertAndKeyFiles,
 			// certsphase.CreateEtcdPeerCertAndKeyFiles,
+			// certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles,
 			// certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
 			certsphase.CreateServiceAccountKeyAndPublicKeyFiles,
 			certsphase.CreateFrontProxyCACertAndKeyFiles,
