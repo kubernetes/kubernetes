@@ -66,11 +66,11 @@ const (
 	// Azure "augmented security rules" feature which at the time of writing is in
 	// preview and available only in certain regions.
 	ServiceAnnotationSharedSecurityRule = "service.beta.kubernetes.io/azure-shared-securityrule"
-)
 
-// ServiceAnnotationLoadBalancerResourceGroup is the annotation used on the service
-// to specify the resource group of load balancer objects that are not in the same resource group as the cluster.
-const ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+	// ServiceAnnotationLoadBalancerResourceGroup is the annotation used on the service
+	// to specify the resource group of load balancer objects that are not in the same resource group as the cluster.
+	ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+)
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
