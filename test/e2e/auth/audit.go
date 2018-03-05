@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -35,12 +36,18 @@ import (
 
 	"github.com/evanphx/json-patch"
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	auditTestUser = "kubecfg"
+
+	pollingInterval = 30 * time.Second
+	pollingTimeout  = 5 * time.Minute
 )
 
 var (
 	watchTestTimeout int64 = 1
-	auditTestUser          = "kubecfg"
 
 	crd          = testserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
 	crdName      = strings.SplitN(crd.Name, ".", 2)[0]
@@ -630,7 +637,14 @@ var _ = SIGDescribe("Advanced Audit", func() {
 			expectedEvents = append(expectedEvents, t.events...)
 		}
 
-		expectAuditLines(f, expectedEvents)
+		err = wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
+			ok, err := expectAuditLines(f, expectedEvents)
+			if err != nil {
+				framework.Logf("Failed to observe audit events: %v", err)
+			}
+			return ok, nil
+		})
+		framework.ExpectNoError(err, "after %v failed to observe audit events", pollingTimeout)
 	})
 })
 
@@ -648,7 +662,7 @@ type auditEvent struct {
 }
 
 // Search the audit log for the expected audit lines.
-func expectAuditLines(f *framework.Framework, expected []auditEvent) {
+func expectAuditLines(f *framework.Framework, expected []auditEvent) (bool, error) {
 	expectations := map[auditEvent]bool{}
 	for _, event := range expected {
 		expectations[event] = false
@@ -656,25 +670,36 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 
 	// Fetch the log stream.
 	stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
-	framework.ExpectNoError(err, "could not read audit log")
+	if err != nil {
+		return false, err
+	}
 	defer stream.Close()
 
 	scanner := bufio.NewScanner(stream)
 	for scanner.Scan() {
 		line := scanner.Text()
 		event, err := parseAuditLine(line)
-		framework.ExpectNoError(err)
+		if err != nil {
+			return false, err
+		}
 
 		// If the event was expected, mark it as found.
 		if _, found := expectations[event]; found {
 			expectations[event] = true
 		}
 	}
-	framework.ExpectNoError(scanner.Err(), "error reading audit log")
-
-	for event, found := range expectations {
-		Expect(found).To(BeTrue(), "Event %#v not found!", event)
+	if err := scanner.Err(); err != nil {
+		return false, err
 	}
+
+	noneMissing := true
+	for event, found := range expectations {
+		if !found {
+			framework.Logf("Event %#v not found!", event)
+		}
+		noneMissing = noneMissing && found
+	}
+	return noneMissing, nil
 }
 
 func parseAuditLine(line string) (auditEvent, error) {
