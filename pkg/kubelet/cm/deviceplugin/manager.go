@@ -350,16 +350,18 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 	go func() {
 		e.run()
 		e.stop()
-
 		m.mutex.Lock()
 		if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
-			glog.V(2).Infof("Delete resource for endpoint %v", e)
-			delete(m.endpoints, r.ResourceName)
+			m.markResourceUnhealthy(r.ResourceName)
 		}
-
 		glog.V(2).Infof("Unregistered endpoint %v", e)
 		m.mutex.Unlock()
 	}()
+}
+
+func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
+	glog.V(2).Infof("Mark all resources Unhealthy for resource %s", resourceName)
+	m.allDevices[resourceName] = sets.NewString()
 }
 
 // GetCapacity is expected to be called when Kubelet updates its node status.
@@ -379,7 +381,15 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, []string) {
 	var deletedResources []string
 	m.mutex.Lock()
 	for resourceName, devices := range m.allDevices {
-		if _, ok := m.endpoints[resourceName]; !ok {
+		e, ok := m.endpoints[resourceName]
+		if (ok && e.stopGracePeriodExpired()) || !ok {
+			// The resources contained in endpoints and allDevices should always be
+			// consistent. Otherwise, we run with the risk of failing to garbage
+			// collect non-existing resources or devices.
+			if !ok {
+				glog.Errorf("unexpected: allDevices and endpoints are out of sync")
+			}
+			delete(m.endpoints, resourceName)
 			delete(m.allDevices, resourceName)
 			deletedResources = append(deletedResources, resourceName)
 			needsUpdateCheckpoint = true
@@ -440,11 +450,11 @@ func (m *ManagerImpl) readCheckpoint() error {
 	defer m.mutex.Unlock()
 	m.podDevices.fromCheckpointData(data.PodDeviceEntries)
 	m.allocatedDevices = m.podDevices.devices()
-	for resource, devices := range data.RegisteredDevices {
+	for resource := range data.RegisteredDevices {
+		// During start up, creates empty allDevices list so that the resource capacity
+		// will stay zero till the corresponding device plugin re-registers.
 		m.allDevices[resource] = sets.NewString()
-		for _, dev := range devices {
-			m.allDevices[resource].Insert(dev)
-		}
+		m.endpoints[resource] = newStoppedEndpointImpl(resource, make(map[string]pluginapi.Device))
 	}
 	return nil
 }
