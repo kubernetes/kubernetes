@@ -307,15 +307,15 @@ data:
     .:53 {
         errors
         health
-        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }} {
+        kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
-           upstream /etc/resolv.conf
+           upstream
            fallthrough in-addr.arpa ip6.arpa
-        }
+        }{{ .Federation }}
         prometheus :9153
-        proxy . /etc/resolv.conf
+        proxy . {{ .UpstreamNameserver }}
         cache 30
-    }
+    }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
 	CoreDNSClusterRole = `
