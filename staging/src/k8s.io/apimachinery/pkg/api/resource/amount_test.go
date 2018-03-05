@@ -131,3 +131,28 @@ func TestAmountSign(t *testing.T) {
 		}
 	}
 }
+
+func TestInt64AmountAsScaledInt64(t *testing.T) {
+	for _, test := range []struct {
+		value  int64
+		scale  Scale
+		scaled Scale
+		result int64
+		ok     bool
+	}{
+		{100, 0, 5, 1, true},
+		{100, 1, 1, 100, true},
+		{100, 5, 2, 100000, true},
+		{100, -1, 0, 10, true},
+		{-1932, 2, 4, -20, true},
+		{876, 30, 4, 0, false},
+	} {
+		r, ok := int64Amount{value: test.value, scale: test.scale}.AsScaledInt64(test.scaled)
+		if r != test.result {
+			t.Errorf("%v: unexpected result: %d", test, r)
+		}
+		if ok != test.ok {
+			t.Errorf("%v: unexpected ok: %t", test, ok)
+		}
+	}
+}
