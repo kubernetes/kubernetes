@@ -61,7 +61,6 @@ def upgrade_charm():
     hookenv.atexit(remove_state, 'config.changed.install_from_upstream')
 
     cleanup_pre_snap_services()
-    check_resources_for_upgrade_needed()
 
     # Remove the RC for nginx ingress if it exists
     if hookenv.config().get('ingress'):
@@ -78,11 +77,14 @@ def upgrade_charm():
     set_state('kubernetes-worker.restart-needed')
 
 
+def get_resource_paths():
+    resources = ['kubectl', 'kubelet', 'kube-proxy']
+    return [hookenv.resource_get(resource) for resource in resources]
+
+
 def check_resources_for_upgrade_needed():
     hookenv.status_set('maintenance', 'Checking resources')
-    resources = ['kubectl', 'kubelet', 'kube-proxy']
-    paths = [hookenv.resource_get(resource) for resource in resources]
-    if any_file_changed(paths):
+    if any_file_changed(get_resource_paths()):
         set_upgrade_needed()
 
 
@@ -140,8 +142,9 @@ def upgrade_needed_status():
 
 
 @when('kubernetes-worker.snaps.upgrade-specified')
+@when_not('kubernetes-worker.snaps.installed')
 def install_snaps():
-    check_resources_for_upgrade_needed()
+    any_file_changed(get_resource_paths())
     channel = hookenv.config('channel')
     hookenv.status_set('maintenance', 'Installing kubectl snap')
     snap.install('kubectl', channel=channel, classic=True)
