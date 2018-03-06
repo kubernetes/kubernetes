@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
@@ -83,8 +82,8 @@ type managerImpl struct {
 	resourceToNodeReclaimFuncs map[v1.ResourceName]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
-	// notifiersInitialized indicates if the threshold notifiers have been initialized (i.e. synchronize() has been called once)
-	notifiersInitialized bool
+	// notifierStopCh is a channel used to stop all thresholdNotifiers
+	notifierStopCh ThresholdStopCh
 	// dedicatedImageFs indicates if imagefs is on a separate device from the rootfs
 	dedicatedImageFs *bool
 }
@@ -114,6 +113,7 @@ func NewManager(
 		nodeRef:         nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		notifierStopCh:               NewInitialStopCh(clock),
 		dedicatedImageFs:             nil,
 	}
 	return manager, manager
@@ -184,8 +184,8 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
-func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, summary *statsapi.Summary, hard bool, handler thresholdNotifierHandlerFunc) error {
-	for _, threshold := range thresholds {
+func (m *managerImpl) startMemoryThresholdNotifier(summary *statsapi.Summary, hard bool, handler thresholdNotifierHandlerFunc) error {
+	for _, threshold := range m.config.Thresholds {
 		if threshold.Signal != evictionapi.SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
 			continue
 		}
@@ -215,7 +215,7 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, summary *s
 		if err != nil {
 			return err
 		}
-		go memcgThresholdNotifier.Start(wait.NeverStop)
+		go memcgThresholdNotifier.Start(m.notifierStopCh)
 		return nil
 	}
 	return nil
@@ -252,11 +252,10 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	// attempt to create a threshold notifier to improve eviction response time
-	if m.config.KernelMemcgNotification && !m.notifiersInitialized {
-		glog.Infof("eviction manager attempting to integrate with kernel memcg notification api")
-		m.notifiersInitialized = true
+	if m.config.KernelMemcgNotification && m.notifierStopCh.Reset() {
+		glog.V(4).Infof("eviction manager attempting to integrate with kernel memcg notification api")
 		// start soft memory notification
-		err = startMemoryThresholdNotifier(m.config.Thresholds, summary, false, func(desc string) {
+		err = m.startMemoryThresholdNotifier(summary, false, func(desc string) {
 			glog.Infof("soft memory eviction threshold crossed at %s", desc)
 			// TODO wait grace period for soft memory limit
 			m.synchronize(diskInfoProvider, podFunc)
@@ -265,7 +264,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
 		}
 		// start hard memory notification
-		err = startMemoryThresholdNotifier(m.config.Thresholds, summary, true, func(desc string) {
+		err = m.startMemoryThresholdNotifier(summary, true, func(desc string) {
 			glog.Infof("hard memory eviction threshold crossed at %s", desc)
 			m.synchronize(diskInfoProvider, podFunc)
 		})
