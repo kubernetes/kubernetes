@@ -396,6 +396,12 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 			// skip linebreak above first resource group
 			if lastMapping != nil && !noHeaders {
 				fmt.Fprintf(options.ErrOut, "%s\n", "")
+				
+				// Add document separator after each print
+				outputOption := cmd.Flags().Lookup("output").Value.String()
+				if outputOption != "" && outputOption != "yaml" {
+					fmt.Fprintf(options.ErrOut, "---\n", "")
+				}
 			}
 
 			lastMapping = mapping
