@@ -24,6 +24,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -260,6 +261,10 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error failing a daemon pod")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
+
+		By("Wait for the failed daemon pod to be completely deleted.")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, waitFailedDaemonPodDeleted(c, &pod))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for the failed daemon pod to be completely deleted")
 	})
 
 	// This test should not be added to conformance. We will consider deprecating OnDelete when the
@@ -728,4 +733,16 @@ func curHistory(historyList *apps.ControllerRevisionList, ds *apps.DaemonSet) *a
 	Expect(foundCurHistories).To(Equal(1))
 	Expect(curHistory).NotTo(BeNil())
 	return curHistory
+}
+
+func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func() (bool, error) {
+	return func() (bool, error) {
+		if _, err := c.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
+			if errors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, fmt.Errorf("failed to get failed daemon pod %q: %v", pod.Name, err)
+		}
+		return false, nil
+	}
 }
