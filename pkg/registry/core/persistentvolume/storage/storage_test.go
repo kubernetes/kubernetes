@@ -169,8 +169,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvStart := validNewPersistentVolume("foo")
-	err := storage.Storage.Create(ctx, key, pvStart, nil, 0)
-	if err != nil {
+	if err := storage.Storage.Create(ctx, key, pvStart, nil, 0); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -183,8 +182,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = statusStorage.Update(ctx, pvIn.Name, rest.DefaultUpdatedObjectInfo(pvIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := statusStorage.Update(ctx, pvIn.Name, rest.DefaultUpdatedObjectInfo(pvIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})

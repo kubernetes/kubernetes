@@ -162,8 +162,7 @@ func TestUpdateStatus(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	resourcequotaStart := validNewResourceQuota()
-	err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0)
-	if err != nil {
+	if err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -192,11 +191,13 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := status.Update(ctx, resourcequotaIn.Name, rest.DefaultUpdatedObjectInfo(resourcequotaIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	rqOut := obj.(*api.ResourceQuota)
 	// only compare the meaningful update b/c we can't compare due to metadata
 	if !apiequality.Semantic.DeepEqual(resourcequotaIn.Status, rqOut.Status) {

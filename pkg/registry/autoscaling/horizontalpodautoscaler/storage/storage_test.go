@@ -177,8 +177,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	autoscalerStart := validNewHorizontalPodAutoscaler("foo")
-	err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0)
-	if err != nil {
+	if err := storage.Storage.Create(ctx, key, autoscalerStart, nil, 0); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -194,11 +193,13 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = statusStorage.Update(ctx, autoscalerIn.Name, rest.DefaultUpdatedObjectInfo(autoscalerIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := statusStorage.Update(ctx, autoscalerIn.Name, rest.DefaultUpdatedObjectInfo(autoscalerIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	autosclaerOut := obj.(*autoscaling.HorizontalPodAutoscaler)
 	// only compare the meaningful update b/c we can't compare due to metadata
 	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autosclaerOut.Status) {
