@@ -272,14 +272,20 @@ func (s *Scheme) IsUnversioned(obj Object) (bool, bool) {
 // New returns a new API object of the given version and name, or an error if it hasn't
 // been registered. The version and kind fields must be specified.
 func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
+	var obj Object
 	if t, exists := s.gvkToType[kind]; exists {
-		return reflect.New(t).Interface().(Object), nil
+		obj = reflect.New(t).Interface().(Object)
 	}
 
 	if t, exists := s.unversionedKinds[kind.Kind]; exists {
-		return reflect.New(t).Interface().(Object), nil
+		obj = reflect.New(t).Interface().(Object)
 	}
-	return nil, NewNotRegisteredErrForKind(kind)
+	if obj == nil {
+		return nil, NewNotRegisteredErrForKind(kind)
+	}
+	reflect.ValueOf(obj).Elem().FieldByName("Kind").Set(reflect.ValueOf(kind.Kind))
+	reflect.ValueOf(obj).Elem().FieldByName("APIVersion").Set(reflect.ValueOf(kind.Version))
+	return obj, nil
 }
 
 // AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
