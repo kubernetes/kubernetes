@@ -48,7 +48,7 @@ type HostPortManager interface {
 }
 
 type hostportManager struct {
-	hostPortMap    map[hostport]closeable
+	hostPortMap    map[string]utilnet.Closeable
 	execer         exec.Interface
 	conntrackFound bool
 	iptables       utiliptables.Interface
@@ -58,10 +58,10 @@ type hostportManager struct {
 
 func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
 	h := &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
+		hostPortMap: make(map[string]utilnet.Closeable),
 		execer:      exec.New(),
 		iptables:    iptables,
-		portOpener:  openLocalPort,
+		portOpener:  utilnet.OpenLocalPort,
 	}
 	h.conntrackFound = conntrack.Exists(h.execer)
 	if !h.conntrackFound {
@@ -259,14 +259,14 @@ func (hm *hostportManager) syncIPTables(lines []byte) error {
 func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error {
 	errList := []error{}
 	for _, pm := range hostportMappings {
-		hp := portMappingToHostport(pm)
-		if socket, ok := hm.hostPortMap[hp]; ok {
-			glog.V(2).Infof("Closing host port %s", hp.String())
+		hpStr := utilnet.ToLocalPortString(pm.HostIP, int(pm.HostPort), strings.ToLower(string(pm.Protocol)), "")
+		if socket, ok := hm.hostPortMap[hpStr]; ok {
+			glog.V(2).Infof("Closing host port %s", hpStr)
 			if err := socket.Close(); err != nil {
-				errList = append(errList, fmt.Errorf("failed to close host port %s: %v", hp.String(), err))
+				errList = append(errList, fmt.Errorf("failed to close host port %s: %v", hpStr, err))
 				continue
 			}
-			delete(hm.hostPortMap, hp)
+			delete(hm.hostPortMap, hpStr)
 		}
 	}
 	return utilerrors.NewAggregate(errList)

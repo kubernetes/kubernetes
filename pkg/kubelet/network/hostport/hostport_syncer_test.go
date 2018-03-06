@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type ruleMatch struct {
@@ -38,7 +39,7 @@ func TestOpenPodHostports(t *testing.T) {
 	fakeOpener := NewFakeSocketManager()
 
 	h := &hostportSyncer{
-		hostPortMap: make(map[hostport]closeable),
+		hostPortMap: make(map[string]utilnet.Closeable),
 		iptables:    fakeIPTables,
 		portOpener:  fakeOpener.openFakeSocket,
 	}
@@ -159,11 +160,12 @@ func TestOpenPodHostports(t *testing.T) {
 	}
 
 	// Already running pod's host port
-	hp := hostport{
-		tests[1].mapping.PortMappings[0].HostPort,
-		strings.ToLower(string(tests[1].mapping.PortMappings[0].Protocol)),
+	hp := localPort{
+		port:     int(tests[1].mapping.PortMappings[0].HostPort),
+		protocol: strings.ToLower(string(tests[1].mapping.PortMappings[0].Protocol)),
 	}
-	h.hostPortMap[hp] = &fakeSocket{
+	hpStr := utilnet.ToLocalPortString(hp.IP, hp.port, hp.protocol, hp.description)
+	h.hostPortMap[hpStr] = &fakeSocket{
 		tests[1].mapping.PortMappings[0].HostPort,
 		strings.ToLower(string(tests[1].mapping.PortMappings[0].Protocol)),
 		false,
@@ -206,10 +208,10 @@ func TestOpenPodHostports(t *testing.T) {
 	}
 
 	// Socket
-	hostPortMap := map[hostport]closeable{
-		{123, "tcp"}:  &fakeSocket{123, "tcp", false},
-		{4567, "tcp"}: &fakeSocket{4567, "tcp", false},
-		{5678, "udp"}: &fakeSocket{5678, "udp", false},
+	hostPortMap := map[string]utilnet.Closeable{
+		utilnet.ToLocalPortString("", 123, "tcp", ""):  &fakeSocket{123, "tcp", false},
+		utilnet.ToLocalPortString("", 4567, "tcp", ""): &fakeSocket{4567, "tcp", false},
+		utilnet.ToLocalPortString("", 5678, "udp", ""): &fakeSocket{5678, "udp", false},
 	}
 	if !reflect.DeepEqual(hostPortMap, h.hostPortMap) {
 		t.Fatalf("Mismatch in expected hostPortMap. Expected '%v', got '%v'", hostPortMap, h.hostPortMap)
@@ -262,7 +264,7 @@ func TestHostPortSyncerRemoveLegacyRules(t *testing.T) {
 	}
 	portOpener := NewFakeSocketManager()
 	h := &hostportSyncer{
-		hostPortMap: make(map[hostport]closeable),
+		hostPortMap: make(map[string]utilnet.Closeable),
 		iptables:    iptables,
 		portOpener:  portOpener.openFakeSocket,
 	}

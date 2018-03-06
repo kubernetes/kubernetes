@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const (
@@ -77,93 +78,37 @@ func ConstructPodPortMapping(pod *v1.Pod, podIP net.IP) *PodPortMapping {
 	}
 }
 
-type hostport struct {
-	port     int32
-	protocol string
-}
-
-type hostportOpener func(*hostport) (closeable, error)
-
-type closeable interface {
-	Close() error
-}
-
-func openLocalPort(hp *hostport) (closeable, error) {
-	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
-	// This ensures a) that it's safe to use that port and b) that (a) stays
-	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
-	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
-	// would never know.
-	// NOTE: We should not need to have a real listen()ing socket - bind()
-	// should be enough, but I can't figure out a way to e2e test without
-	// it.  Tools like 'ss' and 'netstat' do not show sockets that are
-	// bind()ed but not listen()ed, and at least the default debian netcat
-	// has no way to avoid about 10 seconds of retries.
-	var socket closeable
-	switch hp.protocol {
-	case "tcp":
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", hp.port))
-		if err != nil {
-			return nil, err
-		}
-		socket = listener
-	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", hp.port))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-		socket = conn
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", hp.protocol)
-	}
-	glog.V(3).Infof("Opened local port %s", hp.String())
-	return socket, nil
-}
+type hostportOpener func(IP string, port int, proto string, desc string) (utilnet.Closeable, error)
 
 // openHostports opens all given hostports using the given hostportOpener
 // If encounter any error, clean up and return the error
 // If all ports are opened successfully, return the hostport and socket mapping
 // TODO: move openHostports and closeHostports into a common struct
-func openHostports(portOpener hostportOpener, podPortMapping *PodPortMapping) (map[hostport]closeable, error) {
+func openHostports(portOpener hostportOpener, podPortMapping *PodPortMapping) (map[string]utilnet.Closeable, error) {
 	var retErr error
-	ports := make(map[hostport]closeable)
+	ports := make(map[string]utilnet.Closeable)
 	for _, pm := range podPortMapping.PortMappings {
 		if pm.HostPort <= 0 {
 			continue
 		}
-		hp := portMappingToHostport(pm)
-		socket, err := portOpener(&hp)
+		socket, err := portOpener(pm.HostIP, int(pm.HostPort), strings.ToLower(string(pm.Protocol)), "")
 		if err != nil {
 			retErr = fmt.Errorf("cannot open hostport %d for pod %s: %v", pm.HostPort, getPodFullName(podPortMapping), err)
 			break
 		}
-		ports[hp] = socket
+		ports[utilnet.ToLocalPortString(pm.HostIP, int(pm.HostPort), strings.ToLower(string(pm.Protocol)), "")] = socket
 	}
 
 	// If encounter any error, close all hostports that just got opened.
 	if retErr != nil {
 		for hp, socket := range ports {
 			if err := socket.Close(); err != nil {
-				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podPortMapping), err)
+				glog.Errorf("Cannot clean up hostport %s for pod %s: %v", hp, getPodFullName(podPortMapping), err)
 			}
 		}
 		return nil, retErr
 	}
 	return ports, nil
-}
-
-// portMappingToHostport creates hostport structure based on input portmapping
-func portMappingToHostport(portMapping *PortMapping) hostport {
-	return hostport{
-		port:     portMapping.HostPort,
-		protocol: strings.ToLower(string(portMapping.Protocol)),
-	}
 }
 
 // ensureKubeHostportChains ensures the KUBE-HOSTPORTS chain is setup correctly

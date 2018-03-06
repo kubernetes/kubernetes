@@ -25,14 +25,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
 )
+
+// localPort describes a port on specific IP address and protocol
+type localPort struct {
+	// description is the identity message of a given local port.
+	description string
+	// IP is the IP address part of a given local port.
+	// If this string is empty, the port binds to all local IP addresses.
+	IP string
+	// port is the port part of a given local port.
+	port int
+	// protocol is the protocol part of a given local port.
+	// The value is assumed to be lower-case. For example, "udp" not "UDP", "tcp" not "TCP".
+	protocol string
+}
 
 func TestHostportManager(t *testing.T) {
 	iptables := NewFakeIPTables()
 	portOpener := NewFakeSocketManager()
 	manager := &hostportManager{
-		hostPortMap: make(map[hostport]closeable),
+		hostPortMap: make(map[string]utilnet.Closeable),
 		iptables:    iptables,
 		portOpener:  portOpener.openFakeSocket,
 		execer:      exec.New(),
@@ -113,8 +128,8 @@ func TestHostportManager(t *testing.T) {
 	}
 
 	// Check port opened
-	expectedPorts := []hostport{{8080, "tcp"}, {8081, "udp"}, {8443, "tcp"}}
-	openedPorts := make(map[hostport]bool)
+	expectedPorts := []localPort{{port: 8080, protocol: "tcp"}, {port: 8081, protocol: "udp"}, {port: 8443, protocol: "tcp"}}
+	openedPorts := make(map[string]bool)
 	for hp, port := range portOpener.mem {
 		if !port.closed {
 			openedPorts[hp] = true
@@ -122,7 +137,8 @@ func TestHostportManager(t *testing.T) {
 	}
 	assert.EqualValues(t, len(openedPorts), len(expectedPorts))
 	for _, hp := range expectedPorts {
-		_, ok := openedPorts[hp]
+		hpStr := utilnet.ToLocalPortString(hp.IP, hp.port, hp.protocol, hp.description)
+		_, ok := openedPorts[hpStr]
 		assert.EqualValues(t, true, ok)
 	}
 

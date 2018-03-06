@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type fakeSocket struct {
@@ -40,19 +41,20 @@ func (f *fakeSocket) Close() error {
 }
 
 func NewFakeSocketManager() *fakeSocketManager {
-	return &fakeSocketManager{mem: make(map[hostport]*fakeSocket)}
+	return &fakeSocketManager{mem: make(map[string]*fakeSocket)}
 }
 
 type fakeSocketManager struct {
-	mem map[hostport]*fakeSocket
+	mem map[string]*fakeSocket
 }
 
-func (f *fakeSocketManager) openFakeSocket(hp *hostport) (closeable, error) {
-	if socket, ok := f.mem[*hp]; ok && !socket.closed {
+func (f *fakeSocketManager) openFakeSocket(IP string, port int, protocol string, desc string) (utilnet.Closeable, error) {
+	hpStr := utilnet.ToLocalPortString(IP, port, protocol, desc)
+	if socket, ok := f.mem[hpStr]; ok && !socket.closed {
 		return nil, fmt.Errorf("hostport is occupied")
 	}
-	fs := &fakeSocket{hp.port, hp.protocol, false}
-	f.mem[*hp] = fs
+	fs := &fakeSocket{int32(port), protocol, false}
+	f.mem[hpStr] = fs
 	return fs, nil
 }
 
