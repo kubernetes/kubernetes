@@ -253,7 +253,41 @@ func TestWatch(t *testing.T) {
 	)
 }
 
-//TODO TestUpdateStatus
+func TestUpdateStatus(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	if _, err := createController(storage.Controller, *validController, t); err != nil {
+		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
+	}
+
+	rcIn := &api.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Status: api.ReplicationControllerStatus{
+			Conditions: []api.ReplicationControllerCondition{
+				{Status: "True"},
+			},
+		},
+	}
+
+	if _, _, err := storage.Status.Update(ctx, rcIn.Name, rest.DefaultUpdatedObjectInfo(rcIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	obj, err := storage.Controller.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rcOut := obj.(*api.ReplicationController)
+	// only compare relevant changes b/c of difference in metadata
+	if !apiequality.Semantic.DeepEqual(rcIn.Status, rcOut.Status) {
+		t.Errorf("unexpected object: %s", diff.ObjectDiff(rcIn.Status, rcOut.Status))
+	}
+}
 
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
