@@ -95,7 +95,7 @@ func csiClusterRole(
 			{
 				APIGroups: []string{""},
 				Resources: []string{"events"},
-				Verbs:     []string{"get", "list", "watch", "creat", "update", "patch"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
 			},
 			{
 				APIGroups: []string{""},
