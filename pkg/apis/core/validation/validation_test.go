@@ -4162,6 +4162,7 @@ func TestValidateEnv(t *testing.T) {
 		{Name: "abc", Value: ""},
 		{Name: "a.b.c", Value: "value"},
 		{Name: "a-b-c", Value: "value"},
+		{Name: "a:b:c", Value: "value"},
 		{
 			Name: "abc",
 			ValueFrom: &core.EnvVarSource{
@@ -4563,6 +4564,12 @@ func TestValidateEnvFrom(t *testing.T) {
 			},
 		},
 		{
+			Prefix: "a:b",
+			ConfigMapRef: &core.ConfigMapEnvSource{
+				LocalObjectReference: core.LocalObjectReference{Name: "abc"},
+			},
+		},
+		{
 			SecretRef: &core.SecretEnvSource{
 				LocalObjectReference: core.LocalObjectReference{Name: "abc"},
 			},
@@ -4575,6 +4582,12 @@ func TestValidateEnvFrom(t *testing.T) {
 		},
 		{
 			Prefix: "a.b",
+			SecretRef: &core.SecretEnvSource{
+				LocalObjectReference: core.LocalObjectReference{Name: "abc"},
+			},
+		},
+		{
+			Prefix: "a:b",
 			SecretRef: &core.SecretEnvSource{
 				LocalObjectReference: core.LocalObjectReference{Name: "abc"},
 			},
