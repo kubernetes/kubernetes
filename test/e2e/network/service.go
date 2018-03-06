@@ -1928,7 +1928,7 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 	timeout := 2 * time.Minute
 	framework.Logf("Waiting up to %v wget %s", timeout, serviceIPPort)
 	cmd := fmt.Sprintf(`wget -T 30 -qO- %s | grep client_address`, serviceIPPort)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
