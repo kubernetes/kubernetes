@@ -405,11 +405,31 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	kl.updatePodCIDR(node.Spec.PodCIDR)
 
 	kl.setNodeStatus(node)
-	// Patch the current status on the API server
-	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient, types.NodeName(kl.nodeName), originalNode, node)
-	if err != nil {
-		return err
+
+	statusUnknown := false
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == v1.NodeReady && condition.Status == v1.ConditionUnknown {
+			statusUnknown = true
+			break
+		}
 	}
+
+	var updatedNode *v1.Node
+	if statusUnknown {
+		// If the previous status was unknown, heartbeating stalled for some reason,
+		// just overwrite the existing state.
+		updatedNode, err = kl.heartbeatClient.Nodes().UpdateStatus(node)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Otherwise, patch the current status on the API server
+		updatedNode, _, err = nodeutil.PatchNodeStatus(kl.heartbeatClient, types.NodeName(kl.nodeName), originalNode, node)
+		if err != nil {
+			return err
+		}
+	}
+
 	// If update finishes successfully, mark the volumeInUse as reportedInUse to indicate
 	// those volumes are already updated in the node's status
 	kl.volumeManager.MarkVolumesAsReportedInUse(updatedNode.Status.VolumesInUse)
