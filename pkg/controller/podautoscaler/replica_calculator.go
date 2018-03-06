@@ -276,7 +276,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 // GetObjectMetricReplicas calculates the desired replica count based on a target metric utilization (as a milli-value)
 // for the given object in the given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targetUtilization int64, metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targetUtilization int64, metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, selector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
 	utilization, timestamp, err = c.metricsClient.GetObjectMetric(metricName, namespace, objectRef)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v on %s %s/%s", metricName, objectRef.Kind, namespace, objectRef.Name, err)
@@ -287,9 +287,45 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 		// return the current replicas if the change would be too small
 		return currentReplicas, utilization, timestamp, nil
 	}
-	replicaCount = int32(math.Ceil(usageRatio * float64(currentReplicas)))
+
+	// Calculate the total number of ready pods, as we want to base the
+	// replica count off of how many pods are ready, not how many pods
+	// exist.
+	readyPodCount, err := c.getReadyPodsCount(namespace, selector)
+
+	if err != nil {
+		return 0, 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
+	}
+
+	replicaCount = int32(math.Ceil(usageRatio * float64(readyPodCount)))
 
 	return replicaCount, utilization, timestamp, nil
+}
+
+// @TODO(mattjmcnaughton) Many different functions in this module use variations
+// of this function. Make this function generic, so we don't repeat the same
+// logic in multiple places.
+func (c *ReplicaCalculator) getReadyPodsCount(namespace string, selector labels.Selector) (int64, error) {
+	podList, err := c.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+	}
+
+	if len(podList.Items) == 0 {
+		return 0, fmt.Errorf("no pods returned by selector while calculating replica count")
+	}
+
+	readyPodCount := 0
+
+	for _, pod := range podList.Items {
+		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
+			continue
+		}
+
+		readyPodCount++
+	}
+
+	return int64(readyPodCount), nil
 }
 
 // GetExternalMetricReplicas calculates the desired replica count based on a
