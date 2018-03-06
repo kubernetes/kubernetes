@@ -184,13 +184,9 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodePIDPressure)
 }
 
-func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observations signalObservations, hard bool, handler thresholdNotifierHandlerFunc) error {
+func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, summary *statsapi.Summary, hard bool, handler thresholdNotifierHandlerFunc) error {
 	for _, threshold := range thresholds {
 		if threshold.Signal != evictionapi.SignalMemoryAvailable || hard != isHardEvictionThreshold(threshold) {
-			continue
-		}
-		observed, found := observations[evictionapi.SignalMemoryAvailable]
-		if !found {
 			continue
 		}
 		cgroups, err := cm.GetCgroupSubsystems()
@@ -203,11 +199,19 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 			return fmt.Errorf("memory cgroup mount point not found")
 		}
 		attribute := "memory.usage_in_bytes"
-		quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-		usageThreshold := resource.NewQuantity(observed.capacity.Value(), resource.DecimalSI)
-		usageThreshold.Sub(*quantity)
+		if summary.Node.Memory == nil || summary.Node.Memory.UsageBytes == nil || summary.Node.Memory.WorkingSetBytes == nil {
+			return fmt.Errorf("summary was incomplete")
+		}
+		// Set threshold on usage to capacity - eviction_hard + inactive_file,
+		// since we want to be notified when working_set = capacity - eviction_hard
+		inactiveFile := resource.NewQuantity(int64(*summary.Node.Memory.UsageBytes-*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
+		capacity := resource.NewQuantity(int64(*summary.Node.Memory.AvailableBytes+*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
+		evictionThresholdQuantity := evictionapi.GetThresholdQuantity(threshold.Value, capacity)
+		memcgThreshold := capacity.DeepCopy()
+		memcgThreshold.Sub(*evictionThresholdQuantity)
+		memcgThreshold.Add(*inactiveFile)
 		description := fmt.Sprintf("<%s available", formatThresholdValue(threshold.Value))
-		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, usageThreshold.String(), description, handler)
+		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, memcgThreshold.String(), description, handler)
 		if err != nil {
 			return err
 		}
@@ -247,16 +251,12 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil
 	}
 
-	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc := makeSignalObservations(summary)
-	debugLogObservations("observations", observations)
-
 	// attempt to create a threshold notifier to improve eviction response time
 	if m.config.KernelMemcgNotification && !m.notifiersInitialized {
 		glog.Infof("eviction manager attempting to integrate with kernel memcg notification api")
 		m.notifiersInitialized = true
 		// start soft memory notification
-		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, false, func(desc string) {
+		err = startMemoryThresholdNotifier(m.config.Thresholds, summary, false, func(desc string) {
 			glog.Infof("soft memory eviction threshold crossed at %s", desc)
 			// TODO wait grace period for soft memory limit
 			m.synchronize(diskInfoProvider, podFunc)
@@ -265,7 +265,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			glog.Warningf("eviction manager: failed to create soft memory threshold notifier: %v", err)
 		}
 		// start hard memory notification
-		err = startMemoryThresholdNotifier(m.config.Thresholds, observations, true, func(desc string) {
+		err = startMemoryThresholdNotifier(m.config.Thresholds, summary, true, func(desc string) {
 			glog.Infof("hard memory eviction threshold crossed at %s", desc)
 			m.synchronize(diskInfoProvider, podFunc)
 		})
@@ -273,6 +273,10 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			glog.Warningf("eviction manager: failed to create hard memory threshold notifier: %v", err)
 		}
 	}
+
+	// make observations and get a function to derive pod usage stats relative to those observations.
+	observations, statsFunc := makeSignalObservations(summary)
+	debugLogObservations("observations", observations)
 
 	// determine the set of thresholds met independent of grace period
 	thresholds = thresholdsMet(thresholds, observations, false)
