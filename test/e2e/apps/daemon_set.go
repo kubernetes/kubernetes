@@ -269,7 +269,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating simple daemon set %s", dsName)
-		ds, err := c.AppsV1().DaemonSets(ns).Create(newDaemonSet(dsName, image, label))
+		ds := newDaemonSet(dsName, image, label)
+		ds.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{Type: apps.OnDeleteDaemonSetStrategyType}
+		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Check that daemon pods launch on every node of the cluster.")
