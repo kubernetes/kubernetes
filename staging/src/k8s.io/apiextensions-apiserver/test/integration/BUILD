@@ -10,6 +10,7 @@ go_test(
     srcs = [
         "basic_test.go",
         "finalization_test.go",
+        "grace_period_test.go",
         "registration_test.go",
         "subresources_test.go",
         "validation_test.go",
