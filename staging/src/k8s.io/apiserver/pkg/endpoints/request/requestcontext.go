@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/golang/glog"
 )
@@ -40,37 +41,62 @@ type RequestContextMapper interface {
 }
 
 type requestContextMap struct {
-	contexts map[*http.Request]Context
-	lock     sync.Mutex
+	// contexts contains a request Context map
+	// atomic.Value has a very good read performance compared to sync.RWMutex
+	// almost all requests have 3-4 context updates associated with them,
+	// and they can use only read lock to protect updating context, which is of higher performance with higher burst.
+	contexts map[*http.Request]*atomic.Value
+	lock     sync.RWMutex
 }
 
 // NewRequestContextMapper returns a new RequestContextMapper.
 // The returned mapper must be added as a request filter using NewRequestContextFilter.
 func NewRequestContextMapper() RequestContextMapper {
 	return &requestContextMap{
-		contexts: make(map[*http.Request]Context),
+		contexts: make(map[*http.Request]*atomic.Value),
 	}
+}
+
+func (c *requestContextMap) getValue(req *http.Request) (*atomic.Value, bool) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	value, ok := c.contexts[req]
+	return value, ok
+}
+
+// contextWrap is a wrapper of Context to prevent atomic.Value to be copied
+type contextWrap struct {
+	Context
 }
 
 // Get returns the context associated with the given request (if any), and true if the request has an associated context, and false if it does not.
 // Get will only return a valid context when called from inside the filter chain set up by NewRequestContextFilter()
 func (c *requestContextMap) Get(req *http.Request) (Context, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	context, ok := c.contexts[req]
-	return context, ok
+	value, ok := c.getValue(req)
+	if !ok {
+		return nil, false
+	}
+
+	if context, ok := value.Load().(contextWrap); ok {
+		return context.Context, ok
+	}
+
+	return nil, false
 }
 
 // Update maps the request to the given context.
 // If no context was previously associated with the request, an error is returned and the context is ignored.
 func (c *requestContextMap) Update(req *http.Request, context Context) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if _, ok := c.contexts[req]; !ok {
-		return errors.New("No context associated")
+	value, ok := c.getValue(req)
+	if !ok {
+		return errors.New("no context associated")
 	}
-	// TODO: ensure the new context is a descendant of the existing one
-	c.contexts[req] = context
+	wrapper, ok := value.Load().(contextWrap)
+	if !ok {
+		return errors.New("value type does not match")
+	}
+	wrapper.Context = context
+	value.Store(wrapper)
 	return nil
 }
 
@@ -83,7 +109,10 @@ func (c *requestContextMap) init(req *http.Request, context Context) bool {
 	if _, exists := c.contexts[req]; exists {
 		return false
 	}
-	c.contexts[req] = context
+
+	value := &atomic.Value{}
+	value.Store(contextWrap{context})
+	c.contexts[req] = value
 	return true
 }
 
