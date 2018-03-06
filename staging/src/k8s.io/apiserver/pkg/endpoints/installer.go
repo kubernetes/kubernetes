@@ -51,6 +51,7 @@ const (
 type APIInstaller struct {
 	group                        *APIGroupVersion
 	prefix                       string // Path prefix where API resources are to be registered.
+	requestTimeout               time.Duration
 	minRequestTimeout            time.Duration
 	enableAPIResponseCompression bool
 }
@@ -515,6 +516,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Kind:        fqKindToRegister,
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
+		RequestTimeout:   a.requestTimeout,
 	}
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion

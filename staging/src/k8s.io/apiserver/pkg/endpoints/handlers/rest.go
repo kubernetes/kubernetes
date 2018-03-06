@@ -60,6 +60,7 @@ type RequestScope struct {
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
+	RequestTimeout   time.Duration
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
@@ -313,13 +314,24 @@ func readBody(req *http.Request) ([]byte, error) {
 	return ioutil.ReadAll(req.Body)
 }
 
-func parseTimeout(str string) time.Duration {
+func parseTimeout(str string, requestTimeout time.Duration, requestReceived time.Time) time.Duration {
+	elapsed := time.Since(requestReceived)
+	lastTimeout := requestTimeout - elapsed
+
 	if str != "" {
 		timeout, err := time.ParseDuration(str)
 		if err == nil {
-			return timeout
+			if lastTimeout < 0 || timeout < lastTimeout {
+				return timeout
+			}
 		}
+
 		glog.Errorf("Failed to parse %q: %v", str, err)
 	}
-	return 30 * time.Second
+	// if requestReceived not recorded
+	if lastTimeout < 0 {
+		return 30 * time.Second
+	}
+
+	return lastTimeout
 }

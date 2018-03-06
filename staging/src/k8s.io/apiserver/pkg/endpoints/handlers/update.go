@@ -39,9 +39,6 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		trace := utiltrace.New("Update " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -94,6 +91,10 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
 		}
+
+		requestReceived := request.TimeStampFrom(ctx)
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"), scope.RequestTimeout, requestReceived)
 
 		trace.Step("About to store object in database")
 		wasCreated := false

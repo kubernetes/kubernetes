@@ -84,6 +84,10 @@ type GenericAPIServer struct {
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
 
+	// If specified, all requests except those which match the LongRunningFunc predicate will timeout
+	// after this duration.
+	requestTimeout time.Duration
+
 	// ShutdownTimeout is the timeout used for server shutdown. This specifies the timeout before server
 	// gracefully shutdown returns.
 	ShutdownTimeout time.Duration
@@ -449,6 +453,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Admit:                        s.admissionControl,
 		Context:                      s.RequestContextMapper(),
 		MinRequestTimeout:            s.minRequestTimeout,
+		RequestTimeout:               s.requestTimeout,
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
 	}
 }

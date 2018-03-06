@@ -473,6 +473,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		HandlerChainWaitGroup:  c.HandlerChainWaitGroup,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
+		requestTimeout:    c.RequestTimeout,
 		ShutdownTimeout:   c.RequestTimeout,
 
 		SecureServingInfo: c.SecureServing,

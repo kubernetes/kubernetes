@@ -67,6 +67,9 @@ const (
 
 	// auditKey is the context key for the audit event.
 	auditKey
+
+	// timestampKey is the context key for the timestamp when request come in.
+	timestampKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -156,4 +159,15 @@ func WithAuditEvent(parent Context, ev *audit.Event) Context {
 func AuditEventFrom(ctx Context) *audit.Event {
 	ev, _ := ctx.Value(auditKey).(*audit.Event)
 	return ev
+}
+
+// WithTimeStamp returns a copy of parent in which the timestamp value is set
+func WithTimeStamp(parent Context, t time.Time) Context {
+	return WithValue(parent, timestampKey, t)
+}
+
+// AuditEventFrom returns value of the timestamp key on the ctx
+func TimeStampFrom(ctx Context) time.Time {
+	t, _ := ctx.Value(timestampKey).(time.Time)
+	return t
 }

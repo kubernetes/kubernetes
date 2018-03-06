@@ -54,6 +54,12 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 		if longRunning(req, requestInfo) {
 			return nil, nil, nil
 		}
+
+		ctx = apirequest.WithTimeStamp(ctx, time.Now())
+		if err := requestContextMapper.Update(req, ctx); err != nil {
+			return nil, nil, apierrors.NewInternalError(fmt.Errorf("failed to attach request received timestamp to context: %v", err))
+		}
+
 		metricFn := func() {
 			metrics.Record(req, requestInfo, "", http.StatusGatewayTimeout, 0, 0)
 		}
