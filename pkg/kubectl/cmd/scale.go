@@ -31,7 +31,8 @@ import (
 
 var (
 	scaleLong = templates.LongDesc(i18n.T(`
-		Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
+		Set a new size for a Deployment, ReplicaSet, StatefulSet, Replication Controller,
+		or Job.
 
 		Scale also allows users to specify one or more preconditions for the scale action.
 
