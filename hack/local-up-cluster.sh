@@ -90,8 +90,9 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 # Install a default storage class (enabled by default)
 DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 
-# start the cache mutation detector by default so that cache mutators will be found
-KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
+# Do not run the mutation detector by default on a local cluster.
+# It is intended for a specific type of testing and inherently leaks memory.
+KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-false}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
 # panic the server on watch decode errors since they are considered coder mistakes
