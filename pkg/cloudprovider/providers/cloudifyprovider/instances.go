@@ -45,7 +45,7 @@ func (r *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, e
 	params["deployment_id"] = r.deployment
 
 	nodeInstances, err := r.client.GetAliveNodeInstancesWithType(
-		params, "cloudify.nodes.ApplicationServer.kubernetes.Node")
+		params, cloudify.KubernetesNode)
 	if err != nil {
 		glog.Infof("Not found instances: %+v", err)
 		return nil, err
@@ -141,7 +141,7 @@ func (r *Instances) InstanceID(nodeName types.NodeName) (string, error) {
 	params["deployment_id"] = r.deployment
 
 	nodeInstances, err := r.client.GetAliveNodeInstancesWithType(
-		params, "cloudify.nodes.ApplicationServer.kubernetes.Node")
+		params, cloudify.KubernetesNode)
 	if err != nil {
 		glog.Infof("Not found instances: %+v", err)
 		return "", err

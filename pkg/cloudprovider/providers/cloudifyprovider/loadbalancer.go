@@ -51,7 +51,7 @@ func (r *Balancer) getLoadBalancerNode(clusterName string, service *api.Service)
 	params["deployment_id"] = r.deployment
 
 	instances, err := r.client.GetLoadBalancerInstances(params, clusterName, nameSpace, name,
-		"cloudify.nodes.ApplicationServer.kubernetes.LoadBalancer")
+		cloudify.KubernetesLoadBalancer)
 	if err != nil {
 		glog.Infof("Not found instances: %+v", err)
 		return nil
@@ -158,7 +158,7 @@ func (r *Balancer) getLoadbalancerScaleGroup() (string, error) {
 		return "", err
 	}
 	for _, node := range nodes.Items {
-		if node.Type == "cloudify.nodes.ApplicationServer.kubernetes.LoadBalancer" {
+		if node.Type == cloudify.KubernetesLoadBalancer {
 			if node.ScalingGroupName != "" {
 				return node.ScalingGroupName, nil
 			}
