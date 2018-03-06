@@ -769,6 +769,7 @@ items:
     - ""
     resources:
     - endpoints
+    - nodes
     - services
     verbs:
     - list
