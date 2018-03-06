@@ -1,0 +1,47 @@
+timeout: 10800s
+
+substitutions:
+  { "_ARCH": "amd64",
+    "_REGISTRY": "gcr.io/k8s-image-staging",
+    "_TAG": "0.1.2" }
+
+steps:
+- name: gcr.io/cloud-builders/git
+  id: git-clone
+  entrypoint: bash
+  args:
+  - "-c"
+  - |
+    set -ex
+    mkdir -p /workspace/src/k8s.io
+    mkdir -p /workspace/tmp-${_ARCH}
+    cd /workspace/src/k8s.io
+    git clone https://github.com/kubernetes/kubernetes.git
+
+- name: golang:1.8.3
+  id: go-build
+  entrypoint: bash
+  dir: "/workspace/src/k8s.io/kubernetes/cluster/images/etcd-version-monitor"
+  env:
+  - "GOPATH=/workspace/"
+  args:
+  - "-c"
+  - |
+    set -ex
+    cp etcd-version-monitor.go Dockerfile /workspace/tmp-${_ARCH}
+    GOARCH=${_ARCH} CGO_ENABLED=0 go build \
+        -o /workspace/tmp-${_ARCH}/etcd-version-monitor \
+        k8s.io/kubernetes/cluster/images/etcd-version-monitor
+
+- name: gcr.io/cloud-builders/docker
+  id: docker-build
+  entrypoint: bash
+  dir: "/workspace/src/k8s.io/kubernetes/cluster/images/etcd-version-monitor"
+  args:
+  - "-c"
+  - |
+    set -e
+    docker build -t ${_REGISTRY}/etcd-version-monitor:${_TAG} /workspace/tmp-${_ARCH}
+
+images:
+  - "${_REGISTRY}/etcd-version-monitor:${_TAG}"
