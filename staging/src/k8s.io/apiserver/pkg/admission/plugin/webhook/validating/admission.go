@@ -174,6 +174,10 @@ func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes
 
 // Validate makes an admission decision based on the request attributes.
 func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
+	if rules.IsWebhookConfigurationResource(attr) {
+		return nil
+	}
+
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
@@ -266,7 +270,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 	return errs[0]
 }
 
-// TODO: factor into a common place along with the validating webhook version.
+// TODO: factor into a common place along with the mutating webhook version.
 func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {

@@ -67,6 +67,15 @@ func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {
 	}
 }
 
+// Deny all requests made to this function.
+func alwaysDeny(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("calling always-deny")
+	reviewResponse := v1beta1.AdmissionResponse{}
+	reviewResponse.Allowed = false
+	reviewResponse.Result = &metav1.Status{Message: "this webhook denies all requests"}
+	return &reviewResponse
+}
+
 // only allow pods to pull images from specific registry.
 func admitPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	glog.V(2).Info("admitting pods")
@@ -295,6 +304,10 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	}
 }
 
+func serveAlwaysDeny(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, alwaysDeny)
+}
+
 func servePods(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, admitPods)
 }
@@ -324,6 +337,7 @@ func main() {
 	config.addFlags()
 	flag.Parse()
 
+	http.HandleFunc("/always-deny", serveAlwaysDeny)
 	http.HandleFunc("/pods", servePods)
 	http.HandleFunc("/mutating-pods", serveMutatePods)
 	http.HandleFunc("/configmaps", serveConfigmaps)
