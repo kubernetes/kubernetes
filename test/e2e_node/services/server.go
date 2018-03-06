@@ -17,7 +17,6 @@ limitations under the License.
 package services
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -33,8 +32,6 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
-
-var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
 // A server manages a separate server process started and killed with
 // commands.
@@ -171,7 +168,7 @@ func (s *server) start() error {
 			for {
 				glog.Infof("Running health check for service %q", s.name)
 				// Wait for an initial health check to pass, so that we are sure the server started.
-				err := readinessCheck(s.name, s.healthCheckUrls, nil)
+				err := framework.ReadinessCheck(s.name, s.healthCheckUrls, nil)
 				if err != nil {
 					if usedStartCmd {
 						glog.Infof("Waiting for server %q start command to complete after initial health check failed", s.name)
@@ -250,7 +247,7 @@ func (s *server) start() error {
 		}
 	}()
 
-	return readinessCheck(s.name, s.healthCheckUrls, errCh)
+	return framework.ReadinessCheck(s.name, s.healthCheckUrls, errCh)
 }
 
 // kill runs the server's kill command.

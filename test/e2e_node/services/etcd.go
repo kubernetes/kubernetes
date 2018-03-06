@@ -28,6 +28,8 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // TODO: These tests should not be leveraging v2http
@@ -114,7 +116,7 @@ func (e *EtcdServer) Start() error {
 		errCh <- srv.Serve(l)
 	}(e.clientListen)
 
-	err = readinessCheck("etcd", []string{etcdHealthCheckURL}, errCh)
+	err = framework.ReadinessCheck("etcd", []string{etcdHealthCheckURL}, errCh)
 	if err != nil {
 		return err
 	}
