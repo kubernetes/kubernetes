@@ -358,10 +358,6 @@ func (rc *reconciler) syncStates() {
 	}
 	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
 	for _, volume := range podVolumes {
-		if rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			glog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
-			continue
-		}
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
 			glog.V(4).Infof("Volume exists in actual state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
 			continue
@@ -376,7 +372,7 @@ func (rc *reconciler) syncStates() {
 			glog.Warning("Volume is in pending operation, skip cleaning up mounts")
 		}
 		glog.V(2).Infof(
-			"Reconciler sync states: could not find pod information in desired state, update it in actual state: %+v",
+			"Reconciler sync states: adding reconstructed volume to actual state of world: %+v",
 			reconstructedVolume)
 		volumesNeedUpdate[reconstructedVolume.volumeName] = reconstructedVolume
 	}
@@ -419,28 +415,44 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
-
-	// Create pod object
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID: types.UID(volume.podName),
-		},
-	}
 	mapperPlugin, err := rc.volumePluginMgr.FindMapperPluginByName(volume.pluginName)
 	if err != nil {
 		return nil, err
 	}
-	volumeSpec, err := rc.operationExecutor.ReconstructVolumeOperation(
-		volume.volumeMode,
-		plugin,
-		mapperPlugin,
-		pod.UID,
-		volume.podName,
-		volume.volumeSpecName,
-		volume.mountPath,
-		volume.pluginName)
-	if err != nil {
-		return nil, err
+
+	// try to reconstruct the volume from desired state of world
+	found, volumeSpec, outerName, pod := rc.desiredStateOfWorld.FindSpecWithName(volume.podName, volume.volumeSpecName)
+	if found {
+		glog.V(2).Infof("Reconstructed volume with SpecName %s for pod %s from desired state of world", volume.volumeSpecName, volume.podName)
+	} else {
+		// Volume is not in desired state of world, reconstruct it via volume
+		// plugin. Use dummy values for those that can't be reconstructed
+		// - we just need something that can be cleaned up.
+		glog.V(2).Infof("Reconstructed volume %s for pod %s from volume plugin")
+		pod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: types.UID(volume.podName),
+			},
+		}
+
+		volumeSpec, err = rc.operationExecutor.ReconstructVolumeOperation(
+			volume.volumeMode,
+			plugin,
+			mapperPlugin,
+			pod.UID,
+			volume.podName,
+			volume.volumeSpecName,
+			volume.mountPath,
+			volume.pluginName)
+		if err != nil {
+			return nil, err
+		}
+
+		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
+		// for volume cleanup.
+		// TODO: in case pod is added back before reconciler starts to unmount, we can update this field from desired state information
+		outerName = volume.volumeSpecName
+		glog.V(2).Infof("Reconstructed volume with SpecName %s for pod %s from volume plugin", volume.volumeSpecName, volume.podName)
 	}
 
 	var uniqueVolumeName v1.UniqueVolumeName
@@ -498,13 +510,10 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	}
 
 	reconstructedVolume := &reconstructedVolume{
-		volumeName: uniqueVolumeName,
-		podName:    volume.podName,
-		volumeSpec: volumeSpec,
-		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
-		// for volume cleanup.
-		// TODO: in case pod is added back before reconciler starts to unmount, we can update this field from desired state information
-		outerVolumeSpecName: volume.volumeSpecName,
+		volumeName:          uniqueVolumeName,
+		podName:             volume.podName,
+		volumeSpec:          volumeSpec,
+		outerVolumeSpecName: outerName,
 		pod:                 pod,
 		attachablePlugin:    attachablePlugin,
 		volumeGidValue:      "",
