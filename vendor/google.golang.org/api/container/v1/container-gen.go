@@ -1523,6 +1523,7 @@ type NodeConfig struct {
 	// Additionally, to avoid ambiguity, keys must not conflict with any
 	// other
 	// metadata keys for the project or be one of the reserved keys:
+	//  "cluster-location"
 	//  "cluster-name"
 	//  "cluster-uid"
 	//  "configure-sh"
