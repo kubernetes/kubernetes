@@ -16,6 +16,9 @@
 
 # Starts 'etcd' version ${START_VERSION} and writes to it:
 # 'etcd_version' -> "${START_VERSION}"
+# ETCD_CREDS may optionally be  set to provide flags for TLS credentials
+# such as '--cert-file' and '--peer-cert-file'. For a complete list of
+# flags, see https://coreos.com/etcd/docs/latest/op-guide/security.html.
 # Successful write confirms that etcd is up and running.
 # Sets ETCD_PID at the end.
 # Returns 0 if etcd was successfully started, non-0 otherwise.
@@ -23,6 +26,7 @@ start_etcd() {
   # Use random ports, so that apiserver cannot connect to etcd.
   ETCD_PORT=18629
   ETCD_PEER_PORT=2380
+  ETCD_CREDS="${ETCD_CREDS:-}"
   # Avoid collisions between etcd and event-etcd.
   case "${DATA_DIRECTORY}" in
     *event*)
@@ -46,7 +50,8 @@ start_etcd() {
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
     --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
-    --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} &
+    --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
+    ${ETCD_CREDS} &
   ETCD_PID=$!
   # Wait until we can write to etcd.
   for i in $(seq 240); do
