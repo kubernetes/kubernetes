@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -54,75 +53,6 @@ func (f *fakeSocketManager) openFakeSocket(hp *hostport) (closeable, error) {
 	fs := &fakeSocket{hp.port, hp.protocol, false}
 	f.mem[*hp] = fs
 	return fs, nil
-}
-
-func TestOpenHostports(t *testing.T) {
-	opener := NewFakeSocketManager()
-	testCases := []struct {
-		podPortMapping *PodPortMapping
-		expectError    bool
-	}{
-		{
-			&PodPortMapping{
-				Namespace: "ns1",
-				Name:      "n0",
-			},
-			false,
-		},
-		{
-			&PodPortMapping{
-				Namespace: "ns1",
-				Name:      "n1",
-				PortMappings: []*PortMapping{
-					{HostPort: 80, Protocol: v1.Protocol("TCP")},
-					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
-					{HostPort: 443, Protocol: v1.Protocol("TCP")},
-				},
-			},
-			false,
-		},
-		{
-			&PodPortMapping{
-				Namespace: "ns1",
-				Name:      "n2",
-				PortMappings: []*PortMapping{
-					{HostPort: 80, Protocol: v1.Protocol("TCP")},
-				},
-			},
-			true,
-		},
-		{
-			&PodPortMapping{
-				Namespace: "ns1",
-				Name:      "n3",
-				PortMappings: []*PortMapping{
-					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
-					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
-				},
-			},
-			true,
-		},
-		{
-			&PodPortMapping{
-				Namespace: "ns1",
-				Name:      "n3",
-				PortMappings: []*PortMapping{
-					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
-				},
-			},
-			false,
-		},
-	}
-
-	for _, tc := range testCases {
-		mapping, err := openHostports(opener.openFakeSocket, tc.podPortMapping)
-		if tc.expectError {
-			assert.Error(t, err)
-			continue
-		}
-		assert.NoError(t, err)
-		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings))
-	}
 }
 
 func TestEnsureKubeHostportChains(t *testing.T) {
