@@ -57,9 +57,7 @@ func TestParseServerURIBad(t *testing.T) {
 
 func TestEtcdConnection(t *testing.T) {
 	etcd := new(EtcdConnection)
-
-	result := etcd.serverReachable(&url.URL{Host: "-not a real network address-", Scheme: "tcp"})
-	if result {
+	if err := etcd.serverReachable(&url.URL{Host: "-not a real network address-", Scheme: "tcp"}); err == nil {
 		t.Fatal("checkConnection should not have succeeded")
 	}
 }
@@ -80,7 +78,7 @@ func TestCheckEtcdServersUri(t *testing.T) {
 	etcd.ServerList = []string{"-invalid uri$@#%"}
 	result, err := etcd.CheckEtcdServers()
 	if err == nil {
-		t.Fatalf("expected bad uri to raise parse error")
+		t.Fatal("expected bad uri to raise parse error")
 	}
 	if result {
 		t.Fatal("CheckEtcdServers should not have succeeded")
@@ -91,8 +89,8 @@ func TestCheckEtcdServers(t *testing.T) {
 	etcd := new(EtcdConnection)
 	etcd.ServerList = []string{""}
 	result, err := etcd.CheckEtcdServers()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatalf("expected empty uri to raise network error")
 	}
 	if result {
 		t.Fatal("CheckEtcdServers should not have succeeded")

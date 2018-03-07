@@ -182,7 +182,7 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) {
 	c.HealthzChecks = append(c.HealthzChecks, healthz.NamedCheck("etcd", func(r *http.Request) error {
 		done, err := preflight.EtcdConnection{ServerList: s.StorageConfig.ServerList}.CheckEtcdServers()
 		if !done {
-			return fmt.Errorf("etcd failed")
+			return fmt.Errorf("etcd failed %v", err)
 		}
 		if err != nil {
 			return err
