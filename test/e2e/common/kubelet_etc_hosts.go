@@ -17,6 +17,8 @@ limitations under the License.
 package common
 
 import (
+	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -40,6 +42,7 @@ type KubeletManagedHostConfig struct {
 	hostNetworkPod *v1.Pod
 	pod            *v1.Pod
 	f              *framework.Framework
+	tmpEtcHostFile *os.File
 }
 
 var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
@@ -59,6 +62,8 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 
 		By("Running the test")
 		config.verifyEtcHosts()
+
+		config.cleanup()
 	})
 })
 
@@ -76,11 +81,37 @@ func (config *KubeletManagedHostConfig) verifyEtcHosts() {
 }
 
 func (config *KubeletManagedHostConfig) setup() {
+	etcHostContents := `127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+ff00::0	ip6-mcastprefix
+ff02::1	ip6-allnodes
+ff02::2	ip6-allrouters`
+
+	// Write the data to a temp file.
+	var err error
+	config.tmpEtcHostFile, err = ioutil.TempFile("", "etc-hosts")
+	if err != nil {
+		framework.Failf("failed to create temp file for /etc/hosts: %v", err)
+	}
+	if _, err := config.tmpEtcHostFile.Write([]byte(etcHostContents)); err != nil {
+		framework.Failf("Failed to write temp file for /etc/hosts data: %v", err)
+	}
+	if err := config.tmpEtcHostFile.Close(); err != nil {
+		framework.Failf("Failed to close temp file: %v", err)
+	}
+
 	By("Creating hostNetwork=false pod")
 	config.createPodWithoutHostNetwork()
 
 	By("Creating hostNetwork=true pod")
 	config.createPodWithHostNetwork()
+}
+
+func (config *KubeletManagedHostConfig) cleanup() {
+	if config.tmpEtcHostFile != nil {
+		os.Remove(config.tmpEtcHostFile.Name())
+	}
 }
 
 func (config *KubeletManagedHostConfig) createPodWithoutHostNetwork() {
@@ -184,7 +215,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {
 					Name: "host-etc-hosts",
 					VolumeSource: v1.VolumeSource{
 						HostPath: &v1.HostPathVolumeSource{
-							Path: "/etc/hosts",
+							Path: config.tmpEtcHostFile.Name(),
 							Type: hostPathType,
 						},
 					},
