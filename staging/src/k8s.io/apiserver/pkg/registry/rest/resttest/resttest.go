@@ -47,6 +47,7 @@ type Tester struct {
 	generatesName       bool
 	returnDeletedObject bool
 	namer               func(int) string
+	skipDefaultGrace    bool
 }
 
 func New(t *testing.T, storage rest.Storage) *Tester {
@@ -80,6 +81,11 @@ func (t *Tester) AllowCreateOnUpdate() *Tester {
 
 func (t *Tester) GeneratesName() *Tester {
 	t.generatesName = true
+	return t
+}
+
+func (t *Tester) SkipDefaultGrace() *Tester {
+	t.skipDefaultGrace = true
 	return t
 }
 
@@ -182,7 +188,9 @@ func (t *Tester) TestDelete(valid runtime.Object, createFn CreateFunc, getFn Get
 
 // Test gracefully deleting an object.
 func (t *Tester) TestDeleteGraceful(valid runtime.Object, createFn CreateFunc, getFn GetFunc, expectedGrace int64) {
-	t.testDeleteGracefulHasDefault(valid.DeepCopyObject(), createFn, getFn, expectedGrace)
+	if !t.skipDefaultGrace {
+		t.testDeleteGracefulHasDefault(valid.DeepCopyObject(), createFn, getFn, expectedGrace)
+	}
 	t.testDeleteGracefulWithValue(valid.DeepCopyObject(), createFn, getFn, expectedGrace)
 	t.testDeleteGracefulUsesZeroOnNil(valid.DeepCopyObject(), createFn, expectedGrace)
 	t.testDeleteGracefulExtend(valid.DeepCopyObject(), createFn, getFn, expectedGrace)
