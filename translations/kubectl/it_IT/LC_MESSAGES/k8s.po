@@ -3092,7 +3092,7 @@ msgstr "Imposta il current-context in un file kubeconfig"
 
 #: pkg/kubectl/cmd/describe.go:86
 msgid "Show details of a specific resource or group of resources"
-msgstr "Mostra i dettagli di una specifiche risorsa o un gruppo di risorse"
+msgstr "Mostra i dettagli di una specifica risorsa o un gruppo di risorse"
 
 #: pkg/kubectl/cmd/rollout/rollout_status.go:58
 msgid "Show the status of the rollout"
