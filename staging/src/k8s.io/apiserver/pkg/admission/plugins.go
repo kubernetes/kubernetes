@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -143,6 +144,9 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 				handlers = append(handlers, plugin)
 			}
 		}
+	}
+	if len(pluginNames) != 0 {
+		glog.Infof("Loaded %d admission controller(s) successfully in the following order: %s.", len(pluginNames), strings.Join(pluginNames, ","))
 	}
 	return chainAdmissionHandler(handlers), nil
 }
