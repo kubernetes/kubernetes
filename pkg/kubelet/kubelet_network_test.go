@@ -176,7 +176,7 @@ func TestNodeIPParam(t *testing.T) {
 		tests = append(tests, successTest)
 	}
 	for _, test := range tests {
-		err := validateNodeIP(net.ParseIP(test.nodeIP))
+		err := (&Kubelet{}).validateNodeIP(net.ParseIP(test.nodeIP))
 		if test.success {
 			assert.NoError(t, err, "test %s", test.testName)
 		} else {
