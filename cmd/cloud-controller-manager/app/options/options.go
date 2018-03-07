@@ -66,9 +66,6 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.Generic.ComponentConfig.CloudProvider, "cloud-provider", o.Generic.ComponentConfig.CloudProvider, "The provider of cloud services. Cannot be empty.")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
-	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
-	fs.StringVar(&o.Generic.ComponentConfig.ServiceAccountKeyFile, "service-account-private-key-file", o.Generic.ComponentConfig.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
-	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
 	fs.Int32Var(&o.Generic.ComponentConfig.ConcurrentServiceSyncs, "concurrent-service-syncs", o.Generic.ComponentConfig.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 
 	leaderelectionconfig.BindFlags(&o.Generic.ComponentConfig.LeaderElection, fs)
