@@ -71,8 +71,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 			}
 		}
 		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
-			return
+			framework.Skipf("Master is node api.Registry. Skipping testing Scheduler metrics.")
 		}
 		response, err := grabber.GrabFromScheduler()
 		framework.ExpectNoError(err)
@@ -92,8 +91,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 			}
 		}
 		if !masterRegistered {
-			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
-			return
+			framework.Skipf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
 		}
 		response, err := grabber.GrabFromControllerManager()
 		framework.ExpectNoError(err)
