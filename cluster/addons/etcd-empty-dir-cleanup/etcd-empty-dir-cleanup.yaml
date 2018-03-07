@@ -24,4 +24,4 @@ spec:
   dnsPolicy: Default
   containers:
   - name: etcd-empty-dir-cleanup
-    image: k8s.gcr.io/etcd-empty-dir-cleanup:3.1.10.0
+    image: k8s.gcr.io/etcd-empty-dir-cleanup:3.1.11.0
