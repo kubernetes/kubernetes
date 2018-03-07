@@ -80,6 +80,33 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
+// Snapshot takes a snapshot of the current schedulerCache.
+func (cache *schedulerCache) Snapshot() *Snapshot {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	nodes := make(map[string]*NodeInfo)
+	for k, v := range cache.nodes {
+		nodes[k] = v.Clone()
+	}
+
+	assumedPods := make(map[string]bool)
+	for k, v := range cache.assumedPods {
+		assumedPods[k] = v
+	}
+
+	pdbs := make(map[string]*policy.PodDisruptionBudget)
+	for k, v := range cache.pdbs {
+		pdbs[k] = v.DeepCopy()
+	}
+
+	return &Snapshot{
+		Nodes:       nodes,
+		AssumedPods: assumedPods,
+		Pdbs:        pdbs,
+	}
+}
+
 func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
