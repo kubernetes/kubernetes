@@ -288,9 +288,6 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 		return currentReplicas, utilization, timestamp, nil
 	}
 
-	// Calculate the total number of ready pods, as we want to base the
-	// replica count off of how many pods are ready, not how many pods
-	// exist.
 	readyPodCount, err := c.getReadyPodsCount(namespace, selector)
 
 	if err != nil {
@@ -318,11 +315,9 @@ func (c *ReplicaCalculator) getReadyPodsCount(namespace string, selector labels.
 	readyPodCount := 0
 
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != v1.PodRunning || !podutil.IsPodReady(&pod) {
-			continue
+		if pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(&pod) {
+			readyPodCount++
 		}
-
-		readyPodCount++
 	}
 
 	return int64(readyPodCount), nil
@@ -331,18 +326,24 @@ func (c *ReplicaCalculator) getReadyPodsCount(namespace string, selector labels.
 // GetExternalMetricReplicas calculates the desired replica count based on a
 // target metric value (as a milli-value) for the external metric in the given
 // namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, targetUtilization int64, metricName, namespace string, selector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
-	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, targetUtilization int64, metricName, namespace string, metricSelector *metav1.LabelSelector, podSelector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+	metricLabelSelector, err := metav1.LabelSelectorAsSelector(metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, err
 	}
-	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, labelSelector)
+	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, metricLabelSelector)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, selector, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
 	}
 	utilization = 0
 	for _, val := range metrics {
 		utilization = utilization + val
+	}
+
+	readyPodCount, err := c.getReadyPodsCount(namespace, podSelector)
+
+	if err != nil {
+		return 0, 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 	}
 
 	usageRatio := float64(utilization) / float64(targetUtilization)
@@ -351,20 +352,20 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 		return currentReplicas, utilization, timestamp, nil
 	}
 
-	return int32(math.Ceil(usageRatio * float64(currentReplicas))), utilization, timestamp, nil
+	return int32(math.Ceil(usageRatio * float64(readyPodCount))), utilization, timestamp, nil
 }
 
 // GetExternalPerPodMetricReplicas calculates the desired replica count based on a
 // target metric value per pod (as a milli-value) for the external metric in the
 // given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, selector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
-	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+	metricLabelSelector, err := metav1.LabelSelectorAsSelector(metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, err
 	}
-	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, labelSelector)
+	metrics, timestamp, err := c.metricsClient.GetExternalMetric(metricName, namespace, metricLabelSelector)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, selector, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
 	}
 	utilization = 0
 	for _, val := range metrics {
