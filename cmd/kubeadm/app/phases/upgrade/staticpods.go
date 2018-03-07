@@ -148,6 +148,9 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		if err := certsphase.CreateEtcdPeerCertAndKeyFiles(cfg); err != nil {
 			return fmt.Errorf("failed to upgrade the %s peer certificate and key: %v", constants.Etcd, err)
 		}
+		if err := certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles(cfg); err != nil {
+			return fmt.Errorf("failed to upgrade the %s healthcheck certificate and key: %v", constants.Etcd, err)
+		}
 	}
 	if component == constants.KubeAPIServer {
 		if err := certsphase.CreateAPIServerEtcdClientCertAndKeyFiles(cfg); err != nil {

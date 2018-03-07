@@ -23,13 +23,13 @@ import (
 
 const (
 	kubeDNSv190AndAboveVersion = "1.14.8"
-	coreDNSVersion             = "1.0.4"
+	coreDNSVersion             = "1.0.6"
 )
 
 // GetDNSVersion returns the right kube-dns version for a specific k8s version
 func GetDNSVersion(kubeVersion *version.Version, dns string) string {
 	// v1.9.0+ uses kube-dns 1.14.8
-	// v1.9.0+ uses CoreDNS  1.0.4 if feature gate "CoreDNS" is enabled.
+	// v1.9.0+ uses CoreDNS  1.0.6 if feature gate "CoreDNS" is enabled.
 
 	// In the future when the version is bumped at HEAD; add conditional logic to return the right versions
 	// Also, the version might be bumped for different k8s releases on the same branch

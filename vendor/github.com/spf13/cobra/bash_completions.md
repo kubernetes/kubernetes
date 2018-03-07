@@ -204,3 +204,17 @@ __kubectl_get_namespaces()
     fi
 }
 ```
+# Using bash aliases for commands
+
+You can also configure the `bash aliases` for the commands and they will also support completions.
+
+```bash
+alias aliasname=origcommand
+complete -o default -F __start_origcommand aliasname
+
+# and now when you run `aliasname` completion will make
+# suggestions as it did for `origcommand`.
+
+$) aliasname <tab><tab>
+completion     firstcommand   secondcommand
+```

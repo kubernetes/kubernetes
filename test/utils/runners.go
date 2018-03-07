@@ -1113,7 +1113,7 @@ func (config *SecretConfig) Run() error {
 }
 
 func (config *SecretConfig) Stop() error {
-	if err := config.Client.CoreV1().Secrets(config.Namespace).Delete(config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting secret: %v", err)
 	}
 	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
@@ -1171,7 +1171,7 @@ func (config *ConfigMapConfig) Run() error {
 }
 
 func (config *ConfigMapConfig) Stop() error {
-	if err := config.Client.CoreV1().ConfigMaps(config.Namespace).Delete(config.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, &metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("Error deleting configmap: %v", err)
 	}
 	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)

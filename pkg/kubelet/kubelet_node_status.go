@@ -22,8 +22,8 @@ import (
 	"math"
 	"net"
 	goruntime "runtime"
-	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/version"
@@ -702,7 +701,6 @@ func (kl *Kubelet) setNodeStatusImages(node *v1.Node) {
 		return
 	}
 	// sort the images from max to min, and only set top N images into the node status.
-	sort.Sort(sliceutils.ByImageSize(containerImages))
 	if maxImagesInNodeStatus < len(containerImages) {
 		containerImages = containerImages[0:maxImagesInNodeStatus]
 	}
@@ -773,7 +771,6 @@ func (kl *Kubelet) setNodeReadyCondition(node *v1.Node) {
 			LastHeartbeatTime: currentTime,
 		}
 	}
-
 	// Append AppArmor status if it's enabled.
 	// TODO(tallclair): This is a temporary message until node feature reporting is added.
 	if newNodeReadyCondition.Status == v1.ConditionTrue &&
@@ -1019,10 +1016,15 @@ func (kl *Kubelet) setNodeOODCondition(node *v1.Node) {
 
 // Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 // TODO: why is this a package var?
-var oldNodeUnschedulable bool
+var (
+	oldNodeUnschedulable     bool
+	oldNodeUnschedulableLock sync.Mutex
+)
 
 // record if node schedulable change.
 func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) {
+	oldNodeUnschedulableLock.Lock()
+	defer oldNodeUnschedulableLock.Unlock()
 	if oldNodeUnschedulable != node.Spec.Unschedulable {
 		if node.Spec.Unschedulable {
 			kl.recordNodeStatusEvent(v1.EventTypeNormal, events.NodeNotSchedulable)

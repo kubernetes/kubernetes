@@ -20,6 +20,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -67,7 +68,12 @@ func (cm *containerManagerStub) GetNodeAllocatableReservation() v1.ResourceList 
 }
 
 func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
-	return nil
+	c := v1.ResourceList{
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(
+			int64(0),
+			resource.BinarySI),
+	}
+	return c
 }
 
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

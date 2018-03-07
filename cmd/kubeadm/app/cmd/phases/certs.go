@@ -98,6 +98,13 @@ var (
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdPeerCertName, kubeadmconstants.EtcdPeerKeyName)
 
+	etcdHealthcheckClientCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
+		Generates the client certificate for liveness probes to healthcheck etcd and the respective key,
+		and saves them into %s and %s files.
+
+		If both files already exist, kubeadm skips the generation step and existing files will be used.
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName)
+
 	apiServerEtcdServerCertLongDesc = fmt.Sprintf(normalizer.LongDesc(`
 		Generates the client certificate for the API server to connect to etcd securely and the respective key,
 		and saves them into %s and %s files.
@@ -205,6 +212,12 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 			short:   "Generates an etcd peer certificate and key",
 			long:    etcdPeerCertLongDesc,
 			cmdFunc: certsphase.CreateEtcdPeerCertAndKeyFiles,
+		},
+		{
+			use:     "etcd-healthcheck-client",
+			short:   "Generates a client certificate for liveness probes to healthcheck etcd",
+			long:    etcdHealthcheckClientCertLongDesc,
+			cmdFunc: certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles,
 		},
 		{
 			use:     "apiserver-etcd-client",

@@ -44,7 +44,7 @@ const (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin]", func() {
+var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 
 	Context("DevicePlugin", func() {

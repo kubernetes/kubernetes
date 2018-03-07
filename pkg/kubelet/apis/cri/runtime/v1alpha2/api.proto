@@ -235,6 +235,8 @@ message LinuxSandboxSecurityContext {
     SELinuxOption selinux_options = 2;
     // UID to run sandbox processes as, when applicable.
     Int64Value run_as_user = 3;
+    // GID to run sandbox processes as, when applicable.
+    Int64Value run_as_group = 8;
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
@@ -551,6 +553,9 @@ message LinuxContainerSecurityContext {
     // UID to run the container process as. Only one of run_as_user and
     // run_as_username can be specified at a time.
     Int64Value run_as_user = 5;
+    // GID to run the container process as. Only one of run_as_group and
+    // run_as_groupname can be specified at a time.
+    Int64Value run_as_group = 12;
     // User name to run the container process as. If specified, the user MUST
     // exist in the container image (i.e. in the /etc/passwd inside the image),
     // and be resolved there by the runtime; otherwise, the runtime MUST error.

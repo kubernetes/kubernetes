@@ -153,6 +153,12 @@ func (b *bufferedBackend) Shutdown() {
 	<-b.shutdownCh
 
 	// Wait until all sending routines exit.
+	//
+	// - When b.shutdownCh is closed, we know that the goroutine in Run has terminated.
+	// - This means that processIncomingEvents has terminated.
+	// - Which means that b.buffer is closed and cannot accept any new events anymore.
+	// - Because processEvents is called synchronously from the Run goroutine, the waitgroup has its final value.
+	// Hence wg.Wait will not miss any more outgoing batches.
 	b.wg.Wait()
 
 	b.delegateBackend.Shutdown()
@@ -250,7 +256,7 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) {
 	// recover from.
 	defer func() {
 		if err := recover(); err != nil {
-			sendErr = fmt.Errorf("panic when processing events: %v", err)
+			sendErr = fmt.Errorf("audit backend shut down")
 		}
 		if sendErr != nil {
 			audit.HandlePluginError(pluginName, sendErr, ev[evIndex:]...)

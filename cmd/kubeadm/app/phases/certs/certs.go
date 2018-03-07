@@ -40,6 +40,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateEtcdCACertAndKeyFiles,
 		CreateEtcdServerCertAndKeyFiles,
 		CreateEtcdPeerCertAndKeyFiles,
+		CreateEtcdHealthcheckClientCertAndKeyFiles,
 		CreateAPIServerEtcdClientCertAndKeyFiles,
 		CreateServiceAccountKeyAndPublicKeyFiles,
 		CreateFrontProxyCACertAndKeyFiles,
@@ -187,6 +188,30 @@ func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 		etcdCACert,
 		etcdPeerCert,
 		etcdPeerKey,
+	)
+}
+
+// CreateEtcdHealthcheckClientCertAndKeyFiles create a new client certificate for liveness probes to healthcheck etcd
+// If the etcd-healthcheck-client certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
+// It assumes the etcd CA certificate and key file exist in the CertificatesDir
+func CreateEtcdHealthcheckClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+
+	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
+	if err != nil {
+		return err
+	}
+
+	etcdHealthcheckClientCert, etcdHealthcheckClientKey, err := NewEtcdHealthcheckClientCertAndKey(etcdCACert, etcdCAKey)
+	if err != nil {
+		return err
+	}
+
+	return writeCertificateFilesIfNotExist(
+		cfg.CertificatesDir,
+		kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
+		etcdCACert,
+		etcdHealthcheckClientCert,
+		etcdHealthcheckClientKey,
 	)
 }
 
@@ -373,6 +398,22 @@ func NewEtcdPeerCertAndKey(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Cer
 	}
 
 	return etcdPeerCert, etcdPeerKey, nil
+}
+
+// NewEtcdHealthcheckClientCertAndKey generate certificate for liveness probes to healthcheck etcd, signed by the given CA.
+func NewEtcdHealthcheckClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+
+	config := certutil.Config{
+		CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
+		Organization: []string{kubeadmconstants.MastersGroup},
+		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	etcdHealcheckClientCert, etcdHealcheckClientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating etcd healthcheck client key and certificate: %v", err)
+	}
+
+	return etcdHealcheckClientCert, etcdHealcheckClientKey, nil
 }
 
 // NewAPIServerEtcdClientCertAndKey generate certificate for the apiservers to connect to etcd securely, signed by the given CA.

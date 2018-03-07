@@ -43,7 +43,7 @@ type AzureAuthConfig struct {
 	// The password of the client certificate for an AAD application with RBAC access to talk to Azure RM APIs
 	AADClientCertPassword string `json:"aadClientCertPassword" yaml:"aadClientCertPassword"`
 	// Use managed service identity for the virtual machine to access Azure ARM APIs
-	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
+	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension" yaml:"useManagedIdentityExtension"`
 	// The ID of the Azure Subscription that the cluster is deployed in
 	SubscriptionID string `json:"subscriptionId" yaml:"subscriptionId"`
 }

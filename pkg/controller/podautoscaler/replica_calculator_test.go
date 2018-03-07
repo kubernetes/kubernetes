@@ -77,6 +77,7 @@ type replicaCalcTestCase struct {
 	metric   *metricInfo
 
 	podReadiness []v1.ConditionStatus
+	podPhase     []v1.PodPhase
 }
 
 const (
@@ -90,15 +91,24 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
-		for i := 0; i < int(tc.currentReplicas); i++ {
+		podsCount := int(tc.currentReplicas)
+		// Failed pods are not included in tc.currentReplicas
+		if tc.podPhase != nil && len(tc.podPhase) > podsCount {
+			podsCount = len(tc.podPhase)
+		}
+		for i := 0; i < podsCount; i++ {
 			podReadiness := v1.ConditionTrue
-			if tc.podReadiness != nil {
+			if tc.podReadiness != nil && i < len(tc.podReadiness) {
 				podReadiness = tc.podReadiness[i]
+			}
+			podPhase := v1.PodRunning
+			if tc.podPhase != nil {
+				podPhase = tc.podPhase[i]
 			}
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := v1.Pod{
 				Status: v1.PodStatus{
-					Phase: v1.PodRunning,
+					Phase: podPhase,
 					Conditions: []v1.PodCondition{
 						{
 							Type:   v1.PodReady,
@@ -405,6 +415,25 @@ func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 4,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{500, 700},
+
+			targetUtilization:   30,
+			expectedUtilization: 60,
+			expectedValue:       numContainersPerPod * 600,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpCM(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -605,6 +634,25 @@ func TestReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
 			targetUtilization:   50,
 			expectedUtilization: 30,
 			expectedValue:       numContainersPerPod * 300,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 300, 500, 250, 250},
+
+			targetUtilization:   50,
+			expectedUtilization: 28,
+			expectedValue:       numContainersPerPod * 280,
 		},
 	}
 	tc.runTest(t)

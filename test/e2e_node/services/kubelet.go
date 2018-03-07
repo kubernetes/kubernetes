@@ -258,7 +258,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	cmdArgs = append(cmdArgs,
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
-		"--docker-disable-shared-pid=false",
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--allow-privileged", "true",
 	)

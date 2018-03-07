@@ -97,6 +97,24 @@ func ComponentProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, p
 	}
 }
 
+// EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
+func EtcdProbe(cfg *kubeadmapi.MasterConfiguration, componentName string, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
+	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
+	// etcd pod is alive if a linearizable get succeeds.
+	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=%s:%d %s get foo", GetProbeAddress(cfg, componentName), port, tlsFlags)
+
+	return &v1.Probe{
+		Handler: v1.Handler{
+			Exec: &v1.ExecAction{
+				Command: []string{"/bin/sh", "-ec", cmd},
+			},
+		},
+		InitialDelaySeconds: 15,
+		TimeoutSeconds:      15,
+		FailureThreshold:    8,
+	}
+}
+
 // NewVolume creates a v1.Volume with a hostPath mount to the specified location
 func NewVolume(name, path string, pathType *v1.HostPathType) v1.Volume {
 	return v1.Volume{

@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.2.14}
+ETCD_VERSION=${ETCD_VERSION:-3.2.16}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 
@@ -103,6 +103,9 @@ kube::etcd::cleanup() {
 kube::etcd::install() {
   (
     cd "${KUBE_ROOT}/third_party"
+    if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-* ]]; then
+      return  # already installed
+    fi
     if [[ $(uname) == "Darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
       url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"

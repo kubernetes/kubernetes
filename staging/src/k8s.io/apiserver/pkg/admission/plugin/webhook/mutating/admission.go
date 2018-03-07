@@ -186,6 +186,10 @@ func (a *MutatingWebhook) loadConfiguration(attr admission.Attributes) *v1beta1.
 
 // Admit makes an admission decision based on the request attributes.
 func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
+	if rules.IsWebhookConfigurationResource(attr) {
+		return nil
+	}
+
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}

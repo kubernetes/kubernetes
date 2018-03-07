@@ -69,6 +69,8 @@ const (
 	NoDiskConflictPred = "NoDiskConflict"
 	// PodToleratesNodeTaintsPred defines the name of predicate PodToleratesNodeTaints.
 	PodToleratesNodeTaintsPred = "PodToleratesNodeTaints"
+	// CheckNodeUnschedulablePred defines the name of predicate CheckNodeUnschedulablePredicate.
+	CheckNodeUnschedulablePred = "CheckNodeUnschedulable"
 	// PodToleratesNodeNoExecuteTaintsPred defines the name of predicate PodToleratesNodeNoExecuteTaints.
 	PodToleratesNodeNoExecuteTaintsPred = "PodToleratesNodeNoExecuteTaints"
 	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
@@ -125,7 +127,7 @@ const (
 // The order is based on the restrictiveness & complexity of predicates.
 // Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 var (
-	predicatesOrdering = []string{CheckNodeConditionPred,
+	predicatesOrdering = []string{CheckNodeConditionPred, CheckNodeUnschedulablePred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
@@ -1446,14 +1448,23 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 	return nil, nil
 }
 
-// PodToleratesNodeTaints checks if a pod tolerations can tolerate the node taints
-func PodToleratesNodeTaints(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+// CheckNodeUnschedulablePredicate checks if a pod can be scheduled on a node with Unschedulable spec.
+func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnknownCondition}, nil
 	}
 
 	if nodeInfo.Node().Spec.Unschedulable {
 		return false, []algorithm.PredicateFailureReason{ErrNodeUnschedulable}, nil
+	}
+
+	return true, nil, nil
+}
+
+// PodToleratesNodeTaints checks if a pod tolerations can tolerate the node taints
+func PodToleratesNodeTaints(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnknownCondition}, nil
 	}
 
 	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {

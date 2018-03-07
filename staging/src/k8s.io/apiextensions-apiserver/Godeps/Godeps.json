@@ -584,7 +584,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/cobra",
-			"Rev": "fd32f09af19efc9b1279c54e0d8ed23f66232a15"
+			"Rev": "6644d46b81fa1831979c4cded0106e774e0ef0ab"
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
@@ -1468,6 +1468,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/util/wsstream",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/plugin/pkg/audit/buffered",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

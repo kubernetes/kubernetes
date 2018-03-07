@@ -1538,7 +1538,7 @@ function start-kube-apiserver {
         params+=" --audit-webhook-batch-throttle-burst=${ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST}"
       fi
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-}" ]]; then
-        params+=" --audit-webhook-batch-initial-backoff=${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF}"
+        params+=" --audit-webhook-initial-backoff=${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF}"
       fi
       create-master-audit-webhook-config "${audit_webhook_config_file}"
       audit_webhook_config_mount="{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"${audit_webhook_config_file}\", \"readOnly\": true},"
@@ -1997,6 +1997,12 @@ function update-event-exporter {
     sed -i -e "s@{{ *event_exporter_zone *}}@${ZONE:-}@g" "$1"
 }
 
+function update-dashboard-controller {
+  if [ -n "${CUSTOM_KUBE_DASHBOARD_BANNER:-}" ]; then
+    sed -i -e "s@\( \+\)# PLATFORM-SPECIFIC ARGS HERE@\1- --system-banner=${CUSTOM_KUBE_DASHBOARD_BANNER}\n\1- --system-banner-severity=WARNING@" "$1"
+  fi
+}
+
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
   local -r coredns_file="${dst_dir}/dns/coredns.yaml"
@@ -2156,6 +2162,8 @@ EOF
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
+    local -r dashboard_controller_yaml="${dst_dir}/dashboard/dashboard-controller.yaml"
+    update-dashboard-controller ${dashboard_controller_yaml}
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"

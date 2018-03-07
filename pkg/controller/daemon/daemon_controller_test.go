@@ -1545,6 +1545,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 		predicateName                                    string
 		podsOnNode                                       []*v1.Pod
 		nodeCondition                                    []v1.NodeCondition
+		nodeUnschedulable                                bool
 		ds                                               *apps.DaemonSet
 		wantToRun, shouldSchedule, shouldContinueRunning bool
 		err                                              error
@@ -1800,6 +1801,24 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldSchedule:        true,
 			shouldContinueRunning: true,
 		},
+		{
+			predicateName: "ShouldRunDaemonPodOnUnscheduableNode",
+			ds: &apps.DaemonSet{
+				Spec: apps.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: resourcePodSpec("", "50M", "0.5"),
+					},
+				},
+			},
+			nodeUnschedulable:     true,
+			wantToRun:             true,
+			shouldSchedule:        true,
+			shouldContinueRunning: true,
+		},
 	}
 
 	for i, c := range cases {
@@ -1807,6 +1826,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			node := newNode("test-node", simpleDaemonSetLabel)
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
+			node.Spec.Unschedulable = c.nodeUnschedulable
 			manager, _, _, err := newTestController()
 			if err != nil {
 				t.Fatalf("error creating DaemonSets controller: %v", err)

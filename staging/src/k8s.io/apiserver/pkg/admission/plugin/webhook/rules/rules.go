@@ -93,3 +93,15 @@ func (r *Matcher) resource() bool {
 	}
 	return false
 }
+
+// IsWebhookConfigurationResource determines if an admission.Attributes object is describing
+// the admission of a ValidatingWebhookConfiguration or a MutatingWebhookConfiguration
+func IsWebhookConfigurationResource(attr admission.Attributes) bool {
+	gvk := attr.GetKind()
+	if gvk.Group == "admissionregistration.k8s.io" {
+		if gvk.Kind == "ValidatingWebhookConfiguration" || gvk.Kind == "MutatingWebhookConfiguration" {
+			return true
+		}
+	}
+	return false
+}

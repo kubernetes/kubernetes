@@ -1089,7 +1089,7 @@ Depending on the enclosing object, subresources might not be allowed. Required.<
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rules</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rules describes what operations on what resources/subresources the webhook cares about. The webhook cares about an operation if it matches <em>any</em> Rule.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Rules describes what operations on what resources/subresources the webhook cares about. The webhook cares about an operation if it matches <em>any</em> Rule. However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks from putting the cluster in a state which cannot be recovered from without completely disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_rulewithoperations">v1beta1.RuleWithOperations</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
