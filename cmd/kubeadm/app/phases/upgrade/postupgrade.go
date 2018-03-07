@@ -17,10 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -29,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -205,19 +203,9 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 // shouldBackupAPIServerCertAndKey checks if the cert of kube-apiserver will be expired in 180 days.
 func shouldBackupAPIServerCertAndKey(certAndKeyDir string) (bool, error) {
 	apiServerCert := filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName)
-	data, err := ioutil.ReadFile(apiServerCert)
+	certs, err := certutil.CertsFromFile(apiServerCert)
 	if err != nil {
-		return false, fmt.Errorf("failed to read kube-apiserver certificate from disk: %v", err)
-	}
-
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return false, fmt.Errorf("expected the kube-apiserver certificate to be PEM encoded")
-	}
-
-	certs, err := x509.ParseCertificates(block.Bytes)
-	if err != nil {
-		return false, fmt.Errorf("unable to parse certificate data: %v", err)
+		return false, fmt.Errorf("couldn't load the certificate file %s: %v", apiServerCert, err)
 	}
 	if len(certs) == 0 {
 		return false, fmt.Errorf("no certificate data found")
