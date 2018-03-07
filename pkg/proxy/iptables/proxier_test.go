@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -353,13 +354,14 @@ func (c *fakeClosable) Close() error {
 
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
-	openPorts []*utilproxy.LocalPort
+	openPorts []string
 }
 
 // OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
 // to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
-	f.openPorts = append(f.openPorts, lp)
+func (f *fakePortOpener) OpenLocalPort(IP string, port int, proto, desc string) (utilnet.Closeable, error) {
+	lpStr := utilnet.ToLocalPortString(IP, port, proto, desc)
+	f.openPorts = append(f.openPorts, lpStr)
 	return nil, nil
 }
 
@@ -399,8 +401,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		iptables:                 ipt,
 		clusterCIDR:              "10.0.0.0/24",
 		hostname:                 testHostname,
-		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
+		portsHolder:              utilnet.NewPortHolder(),
+		portMapper:               &fakePortOpener{[]string{}},
 		healthChecker:            newFakeHealthChecker(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
