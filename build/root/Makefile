@@ -213,7 +213,7 @@ test-e2e:
 	@echo "$$TEST_E2E_HELP_INFO"
 else
 test-e2e: ginkgo generated_files
-	go run hack/e2e.go -- -v --build --up --test --down
+	go run hack/e2e.go -- --build --up --test --down
 endif
 
 define TEST_E2E_NODE_HELP_INFO
