@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -70,6 +71,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
 	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
+	verifyVolumeSpecExistsWithSpecNameInVolumeDsw(t, pod, volumeSpec, "volume-name", dsw)
 }
 
 // Calls AddPodToVolume() twice to add the same pod to the same volume
@@ -115,6 +117,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 		t, generatedVolumeName, false /* expectReportedInUse */, dsw)
 	verifyPodExistsInVolumeDsw(t, podName, generatedVolumeName, dsw)
 	verifyVolumeExistsWithSpecNameInVolumeDsw(t, podName, volumeSpec.Name(), dsw)
+	verifyVolumeSpecExistsWithSpecNameInVolumeDsw(t, pod, volumeSpec, "volume-name", dsw)
 }
 
 // Populates data struct with a new volume/pod
@@ -394,6 +397,40 @@ func verifyVolumeExistsWithSpecNameInVolumeDsw(
 		t.Fatalf(
 			"DSW VolumeExistsWithSpecNam returned incorrect value. Expected: <true> Actual: <%v>",
 			podExistsInVolume)
+	}
+}
+
+func verifyVolumeSpecExistsWithSpecNameInVolumeDsw(
+	t *testing.T,
+	expectedPod *v1.Pod,
+	expectedSpec *volume.Spec,
+	expectedOuterName string,
+	dsw DesiredStateOfWorld) {
+	podName := util.GetUniquePodName(expectedPod)
+	found, spec, outerName, pod := dsw.FindSpecWithName(
+		podName, expectedSpec.Name())
+	if !found {
+		t.Fatalf(
+			"DSW FindSpecWithName returned incorrect 'found' value. Expected: <true> Actual: <%v>",
+			found)
+	}
+	if !reflect.DeepEqual(pod, expectedPod) {
+		t.Fatalf(
+			"DSW FindSpecWithName returned incorrect pod. Expected: %+v\nActual: %v",
+			expectedPod,
+			pod)
+	}
+	if !reflect.DeepEqual(spec, expectedSpec) {
+		t.Fatalf(
+			"DSW FindSpecWithName returned incorrect spec. Expected: %+v\nActual: %v",
+			expectedSpec,
+			spec)
+	}
+	if outerName != expectedOuterName {
+		t.Fatalf(
+			"DSW FindSpecWithName returned incorrect outerName. Expected: %+v Actual: %v",
+			expectedOuterName,
+			outerName)
 	}
 }
 

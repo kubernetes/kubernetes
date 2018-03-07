@@ -105,6 +105,11 @@ type DesiredStateOfWorld interface {
 	// If a pod with the same name does not exist under the specified
 	// volume, false is returned.
 	VolumeExistsWithSpecName(podName types.UniquePodName, volumeSpecName string) bool
+
+	// FindSpecWithName returns detailed information about given volume,
+	// including volume spec itself. It returns `false` If such volume does not
+	// exist.
+	FindSpecWithName(podName types.UniquePodName, volumeSpecName string) (found bool, spec *volume.Spec, outerVolumeName string, pod *v1.Pod)
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -320,6 +325,19 @@ func (dsw *desiredStateOfWorld) VolumeExistsWithSpecName(podName types.UniquePod
 		}
 	}
 	return false
+}
+
+func (dsw *desiredStateOfWorld) FindSpecWithName(podName types.UniquePodName, volumeSpecName string) (bool, *volume.Spec, string, *v1.Pod) {
+	dsw.RLock()
+	defer dsw.RUnlock()
+	for _, volumeObj := range dsw.volumesToMount {
+		for name, podObj := range volumeObj.podsToMount {
+			if podName == name && podObj.spec.Name() == volumeSpecName {
+				return true, podObj.spec, podObj.outerVolumeSpecName, podObj.pod
+			}
+		}
+	}
+	return false, nil, "", nil
 }
 
 func (dsw *desiredStateOfWorld) GetPods() map[types.UniquePodName]bool {
