@@ -124,6 +124,9 @@ type MasterConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool
+
+	// The cluster name
+	ClusterName string
 }
 
 // API struct contains elements of API server address.
@@ -236,6 +239,8 @@ type NodeConfiguration struct {
 	Token string
 	// CRISocket is used to retrieve container runtime info.
 	CRISocket string
+	// The cluster name
+	ClusterName string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery

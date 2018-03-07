@@ -43,7 +43,7 @@ func For(cfg *kubeadmapi.NodeConfiguration) (*clientcmdapi.Config, error) {
 
 	return kubeconfigutil.CreateWithToken(
 		clusterinfo.Server,
-		"kubernetes",
+		cfg.ClusterName,
 		TokenUser,
 		clusterinfo.CertificateAuthorityData,
 		cfg.TLSBootstrapToken,
@@ -55,9 +55,9 @@ func GetValidatedClusterInfoObject(cfg *kubeadmapi.NodeConfiguration) (*clientcm
 	switch {
 	case len(cfg.DiscoveryFile) != 0:
 		if isHTTPSURL(cfg.DiscoveryFile) {
-			return https.RetrieveValidatedClusterInfo(cfg.DiscoveryFile)
+			return https.RetrieveValidatedClusterInfo(cfg.DiscoveryFile, cfg.ClusterName)
 		}
-		return file.RetrieveValidatedClusterInfo(cfg.DiscoveryFile)
+		return file.RetrieveValidatedClusterInfo(cfg.DiscoveryFile, cfg.ClusterName)
 	case len(cfg.DiscoveryToken) != 0:
 		return token.RetrieveValidatedClusterInfo(cfg)
 	default:

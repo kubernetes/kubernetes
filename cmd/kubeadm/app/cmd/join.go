@@ -102,7 +102,7 @@ var (
 
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{}
+	cfg := &kubeadmapiext.NodeConfiguration{ClusterName: "kubernetes"}
 	legacyscheme.Scheme.Default(cfg)
 
 	var skipPreFlight bool
@@ -153,6 +153,9 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfigurat
 	flagSet.StringVar(
 		&cfg.NodeName, "node-name", "",
 		"Specify the node name.")
+	flagSet.StringVar(
+		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
+		"Specify the cluster name.")
 	flagSet.StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
 		"A token used for TLS bootstrapping.")

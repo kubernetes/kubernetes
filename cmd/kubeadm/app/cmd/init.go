@@ -108,7 +108,7 @@ var (
 
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.MasterConfiguration{}
+	cfg := &kubeadmapiext.MasterConfiguration{ClusterName: "kubernetes"}
 	legacyscheme.Scheme.Default(cfg)
 
 	var cfgPath string
@@ -184,6 +184,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	flagSet.StringVar(
 		&cfg.NodeName, "node-name", cfg.NodeName,
 		`Specify the node name.`,
+	)
+	flagSet.StringVar(
+		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
+		`Specify the cluster name`,
 	)
 	flagSet.StringVar(
 		&cfg.Token, "token", cfg.Token,

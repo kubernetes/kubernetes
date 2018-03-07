@@ -51,9 +51,9 @@ var (
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.AdminKubeConfigFileName)
 
 	kubeletKubeconfigLongDesc = fmt.Sprintf(normalizer.LongDesc(`
-		Generates the kubeconfig file for the kubelet to use and saves it to %s file. 
+		Generates the kubeconfig file for the kubelet to use and saves it to %s file.
 
-		Please note that this should *only* be used for bootstrapping purposes. After your control plane is up, 
+		Please note that this should *only* be used for bootstrapping purposes. After your control plane is up,
 		you should request all kubelet credentials from the CSR API.
 		`+cmdutil.AlphaDisclaimer), filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName))
 
@@ -189,6 +189,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig (instead of client certificates)")
 			cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 		}
+		cmd.Flags().StringVar(&cfg.ClusterName, "cluster-name", cfg.ClusterName, "Specify the cluster name.")
 
 		subCmds = append(subCmds, cmd)
 	}
