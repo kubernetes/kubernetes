@@ -22,6 +22,20 @@ import (
 	"testing"
 )
 
+// localPort describes a port on specific IP address and protocol
+type localPort struct {
+	// description is the identity message of a given local port.
+	description string
+	// IP is the IP address part of a given local port.
+	// If this string is empty, the port binds to all local IP addresses.
+	IP string
+	// port is the port part of a given local port.
+	port int
+	// protocol is the protocol part of a given local port.
+	// The value is assumed to be lower-case. For example, "udp" not "UDP", "tcp" not "TCP".
+	protocol string
+}
+
 func TestIsIPv6String(t *testing.T) {
 	testCases := []struct {
 		ip         string
@@ -281,6 +295,135 @@ func TestFilterIncorrectCIDRVersion(t *testing.T) {
 		}
 		if !reflect.DeepEqual(tc.expectIncorrects, incorrects) {
 			t.Errorf("%v: want incorrects=%v, got %v", tc.desc, tc.expectIncorrects, incorrects)
+		}
+	}
+}
+
+type fakeClosable struct {
+	closed bool
+}
+
+func (c *fakeClosable) Close() error {
+	c.closed = true
+	return nil
+}
+
+func TestLocalPortString(t *testing.T) {
+	testCases := []struct {
+		description string
+		ip          string
+		port        int
+		protocol    string
+		expectedStr string
+	}{
+		{"IPv4 UDP", "1.2.3.4", 9999, "udp", "\"IPv4 UDP\" (1.2.3.4:9999/udp)"},
+		{"IPv4 TCP", "5.6.7.8", 1053, "tcp", "\"IPv4 TCP\" (5.6.7.8:1053/tcp)"},
+		{"IPv6 TCP", "2001:db8::1", 80, "tcp", "\"IPv6 TCP\" ([2001:db8::1]:80/tcp)"},
+	}
+
+	for _, tc := range testCases {
+		lp := &localPort{
+			description: tc.description,
+			IP:          tc.ip,
+			port:        tc.port,
+			protocol:    tc.protocol,
+		}
+		str := ToLocalPortString(lp.IP, lp.port, lp.protocol, lp.description)
+		if str != tc.expectedStr {
+			t.Errorf("Unexpected output for %s, expected: %s, got: %s", tc.description, tc.expectedStr, str)
+		}
+	}
+}
+
+func TestRevertPorts(t *testing.T) {
+	testCases := []struct {
+		replacementPorts []localPort
+		existingPorts    []localPort
+		expectToBeClose  []bool
+	}{
+		{
+			replacementPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+			},
+			existingPorts:   []localPort{},
+			expectToBeClose: []bool{true, true, true},
+		},
+		{
+			replacementPorts: []localPort{},
+			existingPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+			},
+			expectToBeClose: []bool{},
+		},
+		{
+			replacementPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+			},
+			existingPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+			},
+			expectToBeClose: []bool{false, false, false},
+		},
+		{
+			replacementPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+			},
+			existingPorts: []localPort{
+				{port: 5001},
+				{port: 5003},
+			},
+			expectToBeClose: []bool{false, true, false},
+		},
+		{
+			replacementPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+			},
+			existingPorts: []localPort{
+				{port: 5001},
+				{port: 5002},
+				{port: 5003},
+				{port: 5004},
+			},
+			expectToBeClose: []bool{false, false, false},
+		},
+	}
+
+	for i, tc := range testCases {
+		replacementPortsMap := make(map[string]Closeable)
+		for _, lp := range tc.replacementPorts {
+			lpStr := ToLocalPortString(lp.IP, lp.port, lp.protocol, lp.description)
+			replacementPortsMap[lpStr] = &fakeClosable{}
+		}
+		existingPortsMap := make(map[string]Closeable)
+		for _, lp := range tc.existingPorts {
+			lpStr := ToLocalPortString(lp.IP, lp.port, lp.protocol, lp.description)
+			existingPortsMap[lpStr] = &fakeClosable{}
+		}
+		CloseUnneededPorts(replacementPortsMap, existingPortsMap)
+		for j, expectation := range tc.expectToBeClose {
+			lp := tc.replacementPorts[j]
+			lpStr := ToLocalPortString(lp.IP, lp.port, lp.protocol, lp.description)
+			if replacementPortsMap[lpStr].(*fakeClosable).closed != expectation {
+				t.Errorf("Expect replacement localPort %v to be %v in test case %v", tc.replacementPorts[j], expectation, i)
+			}
+		}
+		for _, lp := range tc.existingPorts {
+			lpStr := ToLocalPortString(lp.IP, lp.port, lp.protocol, lp.description)
+			if existingPortsMap[lpStr].(*fakeClosable).closed == true {
+				t.Errorf("Expect existing localPort %v to be false in test case %v", lp, i)
+			}
 		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package net
+package hostport
 
 import (
 	"fmt"
@@ -24,70 +24,26 @@ import (
 	"github.com/golang/glog"
 )
 
-// IsIPv6 returns if netIP is IPv6.
-func IsIPv6(netIP net.IP) bool {
-	return netIP != nil && netIP.To4() == nil
-}
-
-// IsIPv6String returns if ip is IPv6.
-func IsIPv6String(ip string) bool {
-	netIP := net.ParseIP(ip)
-	return IsIPv6(netIP)
-}
-
-// IsIPv6CIDR returns if cidr is IPv6.
-// This assumes cidr is a valid CIDR.
-func IsIPv6CIDR(cidr string) bool {
-	ip, _, _ := net.ParseCIDR(cidr)
-	return IsIPv6(ip)
-}
-
-// FilterIncorrectIPVersion filters out the incorrect IP version case from a slice of IP strings.
-func FilterIncorrectIPVersion(ipStrings []string, isIPv6Mode bool) ([]string, []string) {
-	return filterWithCondition(ipStrings, isIPv6Mode, IsIPv6String)
-}
-
-// FilterIncorrectCIDRVersion filters out the incorrect IP version case from a slice of CIDR strings.
-func FilterIncorrectCIDRVersion(ipStrings []string, isIPv6Mode bool) ([]string, []string) {
-	return filterWithCondition(ipStrings, isIPv6Mode, IsIPv6CIDR)
-}
-
-func filterWithCondition(strs []string, expectedCondition bool, conditionFunc func(string) bool) ([]string, []string) {
-	var corrects, incorrects []string
-	for _, str := range strs {
-		if conditionFunc(str) != expectedCondition {
-			incorrects = append(incorrects, str)
-		} else {
-			corrects = append(corrects, str)
-		}
-	}
-	return corrects, incorrects
-}
-
-// ToLocalPortString translate <IP, port, protocol, description> to a localport string.
-func ToLocalPortString(IP string, port int, proto, desc string) string {
+func ToLcalPortString(IP string, port int, proto, desc string) string{
 	ipPort := net.JoinHostPort(IP, strconv.Itoa(port))
 	return fmt.Sprintf("%q (%s/%s)", desc, ipPort, proto)
 }
 
-// PortHolder holds the ports opened in previous and current sync loop.
 type PortHolder struct {
+	// Current -> Replacement
 	// Accumulate the set of local ports that we will be holding open once this update is complete
 	Current PortsMap
-	// Accumulate the set of local ports that were held in the previous sync loop.
 	Old PortsMap
 }
 
-// NewPortHolder initialize a PortHolder
-func NewPortHolder() *PortHolder {
+type PortsMap map[string]Closeable
+
+func NewPortHolder() *PortHolder{
 	return &PortHolder{
 		Current: make(map[string]Closeable),
-		Old:     make(map[string]Closeable),
+		Old: make(map[string]Closeable),
 	}
 }
-
-// PortsMap is localport string to Closeable interface.
-type PortsMap map[string]Closeable
 
 // Closeable is an interface around closing an port.
 type Closeable interface {
@@ -100,11 +56,13 @@ type PortOpener interface {
 	OpenLocalPort(IP string, port int, proto, desc string) (Closeable, error)
 }
 
-// CloseUnneededPorts is closing ports in unneeded but not in needed.
-func CloseUnneededPorts(unneeded, needed PortsMap) {
-	for k, v := range unneeded {
+// TODO: re-name to CloseUnneededPorts
+// RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
+// closes the ports opened in this sync.
+func RevertPorts(replacementPortsMap, originalPortsMap PortsMap) {
+	for k, v := range replacementPortsMap {
 		// Only close newly opened local ports - leave ones that were open before this update
-		if needed[k] == nil {
+		if originalPortsMap[k] == nil {
 			glog.V(2).Infof("Closing local port %s", k)
 			v.Close()
 		}
@@ -146,6 +104,6 @@ func OpenLocalPort(IP string, port int, proto, desc string) (Closeable, error) {
 	default:
 		return nil, fmt.Errorf("unknown protocol %q", proto)
 	}
-	glog.V(2).Infof("Opened local port %s", ToLocalPortString(IP, port, proto, desc))
+	glog.V(2).Infof("Opened local port %s", ToLcalPortString(IP, port, proto, desc))
 	return socket, nil
 }
