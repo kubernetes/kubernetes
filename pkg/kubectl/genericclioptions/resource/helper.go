@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+
+	"k8s.io/client-go/rest"
 )
 
 var metadataAccessor = meta.NewAccessor()
@@ -129,14 +131,12 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runt
 func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
 	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
 }
-func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
+func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) *rest.Request {
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
-		Body(data).
-		Do().
-		Get()
+		Body(data)
 }
 
 func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {

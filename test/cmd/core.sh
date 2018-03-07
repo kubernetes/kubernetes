@@ -469,6 +469,15 @@ run_pod_tests() {
   # Post-condition: valid-pod POD has expected image
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.1:'
 
+  # prove that patch can patch all
+  kubectl patch "${kube_flags[@]}" pod --all --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx3"}]'
+  # Post-condition: valid-pod POD has image nginx3
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx3:'
+  # prove that patch can patch all-namespaces
+  kubectl patch "${kube_flags[@]}" pod --all-namespaces --type="json" -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"nginx4"}]'
+  # Post-condition: valid-pod POD has image nginx4
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx4:'
+
   ## If resourceVersion is specified in the patch, it will be treated as a precondition, i.e., if the resourceVersion is different from that is stored in the server, the Patch should be rejected
   ERROR_FILE="${KUBE_TEMP}/conflict-error"
   ## If the resourceVersion is the same as the one stored in the server, the patch will be applied.

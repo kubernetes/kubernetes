@@ -736,7 +736,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return patch, obj, nil
 	}
 
-	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch)
+	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch).Do().Get()
 	return patch, patchedObj, err
 }
 
