@@ -16,12 +16,10 @@
 
 from __future__ import print_function
 
-import json
-import mmap
+import argparse
 import os
 import re
 import sys
-import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("filenames", help="list of files to check, all files if unspecified", nargs='*')
