@@ -578,7 +578,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			if err == io.EOF {
 				return nil
 			}
-			return err
+			return fmt.Errorf("error parsing %s: %v", v.Source, err)
 		}
 		// TODO: This needs to be able to handle object in other encodings and schemas.
 		ext.Raw = bytes.TrimSpace(ext.Raw)
