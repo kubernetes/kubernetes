@@ -57,7 +57,7 @@ var (
 		`)
 
 	kubeletEnableDynamicConfigLongDesc = normalizer.LongDesc(`
-		Enables dynamic kubelet configuration on node. This should be run on nodes.
+		Enables or updates dynamic kubelet configuration on node. This should be run on nodes.
 		Please note that the kubelet configuration can be passed to kubeadm as a value into the master configuration file.
 		` + cmdutil.AlphaDisclaimer)
 
@@ -160,7 +160,8 @@ func NewCmdKubeletEnableDynamicConfig() *cobra.Command {
 	var cfgPath string
 	cmd := &cobra.Command{
 		Use:     "enable",
-		Short:   "Enables dynamic kubelet configuration on node",
+		Aliases: []string{"update"},
+		Short:   "Enables or updates dynamic kubelet configuration on node",
 		Long:    kubeletEnableDynamicConfigLongDesc,
 		Example: kubeletEnableDynamicConfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
