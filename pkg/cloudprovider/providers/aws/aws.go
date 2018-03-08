@@ -97,6 +97,12 @@ const TagNameSubnetPublicELB = "kubernetes.io/role/elb"
 // value is "nlb"
 const ServiceAnnotationLoadBalancerType = "service.beta.kubernetes.io/aws-load-balancer-type"
 
+// ServiceAnnotationLoadBalancerName is the annotation used on the service
+// to set its name manually. The size of the name is limited by 32 characters.
+// Setting this annotation you should understand that Kubernetes will not control
+// ELB names uniqueness for you and you must be sure that the name will be unique by yourself.
+const ServiceAnnotationLoadBalancerName = "service.beta.kubernetes.io/aws-load-balancer-name"
+
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 // to indicate that we want an internal ELB.
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
@@ -3335,7 +3341,10 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
 		}
 
-		loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, apiService)
+		loadBalancerName, err := c.GetAWSLoadBalancerName(ctx, clusterName, apiService)
+		if err != nil {
+			return nil, err
+		}
 		serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 
 		instanceIDs := []string{}
@@ -3497,7 +3506,10 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		return nil, fmt.Errorf("could not find any suitable subnets for creating the ELB")
 	}
 
-	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, apiService)
+	loadBalancerName, err := c.GetAWSLoadBalancerName(ctx, clusterName, apiService)
+	if err != nil {
+		return nil, err
+	}
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 	securityGroupIDs, err := c.buildELBSecurityGroupList(serviceName, loadBalancerName, annotations)
 	if err != nil {
@@ -3620,7 +3632,10 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
-	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
+	loadBalancerName, err := c.GetAWSLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return nil, false, err
+	}
 
 	if isNLB(service.Annotations) {
 		lb, err := c.describeLoadBalancerv2(loadBalancerName)
@@ -3649,6 +3664,21 @@ func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service
 // GetLoadBalancerName is an implementation of LoadBalancer.GetLoadBalancerName
 func (c *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
 	return cloudprovider.DefaultLoadBalancerName(service)
+}
+
+// GetAWSLoadBalancerName is a specific implementation of GetLoadBalancerName that could return an error
+func (c *Cloud) GetAWSLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) (string, error) {
+	annotationName := service.Annotations[ServiceAnnotationLoadBalancerName]
+	if annotationName == "" {
+		return c.GetLoadBalancerName(ctx, clusterName, service), nil
+	}
+	if len(annotationName) > 32 {
+		return "", fmt.Errorf("AWS requires that the name of a load balancer "+
+			"is shorter than 32 bytes. Remove or change ServiceAnnotationLoadBalancerName: %s",
+			annotationName)
+	}
+
+	return annotationName, nil
 }
 
 func toStatus(lb *elb.LoadBalancerDescription) *v1.LoadBalancerStatus {
@@ -3889,7 +3919,10 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
 func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
-	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
+	loadBalancerName, err := c.GetAWSLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return err
+	}
 
 	if isNLB(service.Annotations) {
 		lb, err := c.describeLoadBalancerv2(loadBalancerName)
@@ -4137,7 +4170,10 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 		return err
 	}
 
-	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
+	loadBalancerName, err := c.GetAWSLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return err
+	}
 	if isNLB(service.Annotations) {
 		lb, err := c.describeLoadBalancerv2(loadBalancerName)
 		if err != nil {
