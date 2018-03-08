@@ -43,6 +43,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -267,6 +269,31 @@ func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *
 	return nil
 }
 
+func (f *fakePodControl) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+	f.Lock()
+	defer f.Unlock()
+	if err := f.FakePodControl.CreatePodsWithControllerRef(namespace, template, object, controllerRef); err != nil {
+		return fmt.Errorf("failed to create pod for DaemonSet")
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    template.Labels,
+			Namespace: namespace,
+		},
+	}
+
+	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%p-", pod))
+
+	if err := legacyscheme.Scheme.Convert(&template.Spec, &pod.Spec, nil); err != nil {
+		return fmt.Errorf("unable to convert pod template: %v", err)
+	}
+
+	f.podStore.Update(pod)
+	f.podIDMap[pod.Name] = pod
+	return nil
+}
+
 func (f *fakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
@@ -421,6 +448,95 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 	}
+}
+
+// When ScheduleDaemonSetPods is enabled, DaemonSets without node selectors should
+// launch pods on every node by NodeAffinity.
+func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
+	// Rollback feature gate.
+	defer func() {
+		if !enabled {
+			utilfeature.DefaultFeatureGate.Set("ScheduleDaemonSetPods=false")
+		}
+	}()
+
+	utilfeature.DefaultFeatureGate.Set("ScheduleDaemonSetPods=true")
+
+	nodeNum := 5
+
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("foo")
+		ds.Spec.UpdateStrategy = *strategy
+		manager, podControl, _, err := newTestController(ds)
+		if err != nil {
+			t.Fatalf("error creating DaemonSets controller: %v", err)
+		}
+		addNodes(manager.nodeStore, 0, nodeNum, nil)
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, nodeNum, 0, 0)
+
+		// Check for ScheduleDaemonSetPods feature
+		if len(podControl.podIDMap) != nodeNum {
+			t.Fatalf("failed to create pods for DaemonSet when enabled ScheduleDaemonSetPods.")
+		}
+
+		nodeMap := make(map[string]*v1.Node)
+		for _, node := range manager.nodeStore.List() {
+			n := node.(*v1.Node)
+			nodeMap[n.Name] = n
+		}
+
+		if len(nodeMap) != nodeNum {
+			t.Fatalf("not enough nodes in the store, expected: %v, got: %v",
+				nodeNum, len(nodeMap))
+		}
+
+		for _, pod := range podControl.podIDMap {
+			if len(pod.Spec.NodeName) != 0 {
+				t.Fatalf("the hostname of pod %v should be empty, but got %s",
+					pod.Name, pod.Spec.NodeName)
+			}
+			if pod.Spec.Affinity == nil {
+				t.Fatalf("the Affinity of pod %s is nil.", pod.Name)
+			}
+			if pod.Spec.Affinity.NodeAffinity == nil {
+				t.Fatalf("the NodeAffinity of pod %s is nil.", pod.Name)
+			}
+
+			nodeSelector := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+			if nodeSelector == nil {
+				t.Fatalf("the node selector of pod %s is nil.", pod.Name)
+			}
+			if len(nodeSelector.NodeSelectorTerms) != 1 {
+				t.Fatalf("incorrect node selector terms number of pod %s, expected: 1, got: %d.",
+					pod.Name, len(nodeSelector.NodeSelectorTerms))
+			}
+
+			if len(nodeSelector.NodeSelectorTerms[0].MatchExpressions) != 1 {
+				t.Fatalf("incorrect expression number of pod %s node selector term, expected: 1, got: %d.",
+					pod.Name, len(nodeSelector.NodeSelectorTerms[0].MatchExpressions))
+			}
+
+			exp := nodeSelector.NodeSelectorTerms[0].MatchExpressions[0]
+			if exp.Key == kubeletapis.LabelHostname {
+				if exp.Operator != v1.NodeSelectorOpIn {
+					t.Fatalf("the operation of hostname NodeAffinity is not %v", v1.NodeSelectorOpIn)
+				}
+
+				if len(exp.Values) != 1 {
+					t.Fatalf("incorrect hostname in node affinity: expected 1, got %v", len(exp.Values))
+				}
+
+				delete(nodeMap, exp.Values[0])
+			}
+		}
+
+		if len(nodeMap) != 0 {
+			t.Fatalf("did not foud pods on nodes %+v", nodeMap)
+		}
+	}
+
 }
 
 // Simulate a cluster with 100 nodes, but simulate a limit (like a quota limit)

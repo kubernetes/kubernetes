@@ -242,7 +242,7 @@ const (
 	// alpha: v1.10
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
-	NoDaemonSetScheduler utilfeature.Feature = "NoDaemonSetScheduler"
+	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
 
 	// owner: @mikedanese
 	// alpha: v1.10
@@ -308,7 +308,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
-	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
