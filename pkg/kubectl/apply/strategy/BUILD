@@ -18,6 +18,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
+        "merge_conflict_test.go",
         "merge_map_list_test.go",
         "merge_map_test.go",
         "merge_primitive_list_test.go",
