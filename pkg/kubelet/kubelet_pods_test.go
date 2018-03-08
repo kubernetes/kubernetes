@@ -516,6 +516,27 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
+			"hosts_test_file1",
+			[]v1.HostAlias{},
+			`# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+`,
+			`127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+`,
+		},
+		{
 			"hosts_test_file2",
 			[]v1.HostAlias{},
 			`# another hosts file for testing.
