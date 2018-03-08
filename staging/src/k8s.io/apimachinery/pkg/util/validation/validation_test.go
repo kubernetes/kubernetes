@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -509,5 +510,48 @@ func TestIsFullyQualifiedName(t *testing.T) {
 		case tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err):
 			t.Errorf("%q: expected %s, got %v", tc.name, tc.err, err)
 		}
+	}
+}
+
+func TestIsEnvVarName(t *testing.T) {
+	successCases := []string{
+		"my.env-name",
+		"MY_ENV.NAME",
+		"MyEnvName1",
+		"simpleEnvName",
+		"now-Env-names",
+		"end-with-num-1",
+		"cantendwithadash-",
+	}
+	for i := range successCases {
+		t.Run(fmt.Sprintf("successCases string %s", successCases[i]), func(t *testing.T) {
+			if errs := IsEnvVarName(successCases[i]); len(errs) != 0 {
+				t.Errorf("case[%d] EnvVarName=%s expected success: %v", i, successCases[i], errs)
+			}
+		})
+	}
+
+	errorCases := []string{
+		".",
+		"..",
+		"..EnvName",
+		"nospecialchars%^=@",
+		"env/name/slash",
+		"env.name/abc",
+		"env_name/abc",
+		"example.com/",
+		"/envname",
+		"1-starts-with-num",
+		"",
+		"env:name",
+		"env.name;",
+	}
+	for i := range errorCases {
+		t.Run(fmt.Sprintf("errorCases string %s", errorCases[i]), func(t *testing.T) {
+			if errs := IsEnvVarName(errorCases[i]); len(errs) == 0 {
+				//See https://tiswww.case.edu/php/chet/bash/bash.html
+				t.Errorf("case[%d] EnvVarName=%s expected failure", i, errorCases[i])
+			}
+		})
 	}
 }
