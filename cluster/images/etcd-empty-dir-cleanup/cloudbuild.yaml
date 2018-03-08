@@ -1,0 +1,35 @@
+timeout: 10800s
+
+substitutions:
+  { "_REGISTRY": "gcr.io/k8s-image-staging",
+    "_TAG": "3.1.10.0" }
+
+steps:
+- name: gcr.io/cloud-builders/git
+  id: git-clone
+  entrypoint: bash
+  args:
+  - "-c"
+  - |
+    set -ex
+    mkdir -p /workspace/src/k8s.io
+    cd /workspace/src/k8s.io
+    git clone https://github.com/kubernetes/kubernetes.git
+
+- name: gcr.io/k8s-image-staging/make
+  id: make-build
+  entrypoint: bash
+  dir: "/workspace/src/k8s.io/kubernetes/cluster/images/etcd-empty-dir-cleanup"
+  args:
+  - "-c"
+  - |
+    set -e
+    make build
+
+- name: gcr.io/cloud-builders/docker
+  id: docker-build
+  dir: "/workspace/src/k8s.io/kubernetes/cluster/images/etcd-empty-dir-cleanup"
+  args: ["build", "--pull", "-t", "${_REGISTRY}/etcd-empty-dir-cleanup:${_TAG}", "."]
+
+images:
+- "${_REGISTRY}/etcd-empty-dir-cleanup:${_TAG}"
