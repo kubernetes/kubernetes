@@ -15,36 +15,47 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "globalflags_linux.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "globalflags_other.go",
+            "osflags_others.go",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "globalflags_other.go",
+            "osflags_windows.go",
         ],
         "//conditions:default": [],
     }),

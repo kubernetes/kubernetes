@@ -125,6 +125,10 @@ type KubeletFlags struct {
 	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
 	CAdvisorPort int32
 
+	// WindowsService should be set to true if kubelet is running as a service on Windows.
+	// Its corresponding flag only gets registered in Windows builds.
+	WindowsService bool
+
 	// EXPERIMENTAL FLAGS
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// +optional
@@ -329,6 +333,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 // AddFlags adds flags for a specific KubeletFlags to the specified FlagSet
 func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	f.ContainerRuntimeOptions.AddFlags(fs)
+	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")

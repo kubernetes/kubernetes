@@ -58,9 +58,9 @@ data:
     .:53 {
         errors
         health
-        kubernetes {{ pillar['dns_domain'] }} {{ pillar['service_cluster_ip_range'] }} {
+        kubernetes {{ pillar['dns_domain'] }} in-addr.arpa ip6.arpa {
             pods insecure
-            upstream /etc/resolv.conf
+            upstream
             fallthrough in-addr.arpa ip6.arpa
         }
         prometheus :9153
@@ -98,21 +98,9 @@ spec:
           effect: NoSchedule
         - key: "CriticalAddonsOnly"
           operator: "Exists"
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: k8s-app
-                  operator: In
-                  values:
-                  - coredns
-                topologyKey: kubernetes.io/hostname
       containers:
       - name: coredns
-        image: coredns/coredns:1.0.4
+        image: coredns/coredns:1.0.6
         imagePullPolicy: IfNotPresent
         resources:
           limits:
