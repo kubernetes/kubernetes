@@ -45,6 +45,10 @@ docs/admin/kubeadm_alpha_phase_kubeconfig_controller-manager.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
+docs/admin/kubeadm_alpha_phase_kubelet.md
+docs/admin/kubeadm_alpha_phase_kubelet_enable.md
+docs/admin/kubeadm_alpha_phase_kubelet_init.md
+docs/admin/kubeadm_alpha_phase_kubelet_upload.md
 docs/admin/kubeadm_alpha_phase_mark-master.md
 docs/admin/kubeadm_alpha_phase_preflight.md
 docs/admin/kubeadm_alpha_phase_preflight_master.md
@@ -114,6 +118,10 @@ docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-enable.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-init.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-upload.1
+docs/man/man1/kubeadm-alpha-phase-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-mark-master.1
 docs/man/man1/kubeadm-alpha-phase-preflight-master.1
 docs/man/man1/kubeadm-alpha-phase-preflight-node.1
