@@ -353,6 +353,8 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 
 	allNames := sets.String{}
 	vols := make(map[string]core.VolumeSource)
+	pvcNames := sets.String{}
+
 	for i, vol := range volumes {
 		idxPath := fldPath.Index(i)
 		namePath := idxPath.Child("name")
@@ -365,6 +367,17 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 		if allNames.Has(vol.Name) {
 			el = append(el, field.Duplicate(namePath, vol.Name))
 		}
+
+		if vol.VolumeSource.PersistentVolumeClaim != nil {
+			claimName := vol.VolumeSource.PersistentVolumeClaim.ClaimName
+			claimFieldPath := idxPath.Child("persistentVolumeClaim", "claimName")
+			if pvcNames.Has(claimName) {
+				el = append(el, field.Duplicate(claimFieldPath, claimName))
+			} else {
+				pvcNames.Insert(claimName)
+			}
+		}
+
 		if len(el) == 0 {
 			allNames.Insert(vol.Name)
 			vols[vol.Name] = vol.VolumeSource
