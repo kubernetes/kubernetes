@@ -168,7 +168,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	cfg := rest.CopyConfig(restConfig)
-	cfg.Host = u.Host
+	cfg.Host = u.Scheme + "://" + u.Host
 	cfg.APIPath = u.Path
 
 	return complete(cfg)
