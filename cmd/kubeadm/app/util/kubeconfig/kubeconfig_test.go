@@ -178,3 +178,45 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 		}
 	}
 }
+
+func TestClientSetFromFile(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	var writeConfig = []struct {
+		name        string
+		cc          configClient
+		ccWithToken configClientWithToken
+		expected    error
+	}{
+		{"test1", configClient{clusterName: "k8s", userName: "user1"}, configClientWithToken{token: "abc"}, fmt.Errorf("failed to create API client configuration from kubeconfig: invalid configuration: no server found for cluster \"k8s\"")},
+		{"test2", configClient{clusterName: "kubernetes", userName: "user2", serverURL: "localhost:8080"}, configClientWithToken{token: "cba"}, nil},
+	}
+	for _, rt := range writeConfig {
+		c := CreateWithToken(
+			rt.cc.serverURL,
+			rt.cc.clusterName,
+			rt.cc.userName,
+			rt.cc.caCert,
+			rt.ccWithToken.token,
+		)
+		configPath := fmt.Sprintf("%s/etc/kubernetes/%s.conf", tmpdir, rt.name)
+		if err := WriteToDisk(configPath, c); err != nil {
+			t.Errorf("Write kubeconf to file got an unexception error: %s", err.Error())
+		}
+
+		_, err = ClientSetFromFile(configPath)
+		if (err != nil && rt.expected == nil) ||
+			(err == nil && rt.expected != nil) ||
+			(err != nil && rt.expected != nil && err.Error() != rt.expected.Error()) {
+			t.Errorf(
+				"failed ClientSetFromFile with an error:\n\texpected: %s\n\t  actual: %s",
+				rt.expected,
+				err,
+			)
+		}
+	}
+}
