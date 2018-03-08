@@ -17,8 +17,11 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -34,6 +37,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -240,14 +245,53 @@ type TestFactory struct {
 	ClientConfigVal    *restclient.Config
 	CommandVal         string
 
+	tempConfigFile *os.File
+
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
 }
 
 func NewTestFactory() *TestFactory {
+	// specify an optionalClientConfig to explicitly use in testing
+	// to avoid polluting an existing user config.
+	config, configFile := defaultFakeClientConfig()
 	return &TestFactory{
-		Factory: cmdutil.NewFactory(nil),
+		Factory:        cmdutil.NewFactory(config),
+		tempConfigFile: configFile,
 	}
+}
+
+func (f *TestFactory) Cleanup() {
+	if f.tempConfigFile == nil {
+		return
+	}
+
+	os.Remove(f.tempConfigFile.Name())
+}
+
+func defaultFakeClientConfig() (clientcmd.ClientConfig, *os.File) {
+	loadingRules, tmpFile, err := newDefaultFakeClientConfigLoadingRules()
+	if err != nil {
+		panic(fmt.Sprintf("unable to create a fake client config: %v", err))
+	}
+
+	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmdapi.Cluster{Server: "http://localhost:8080"}}
+	fallbackReader := bytes.NewBuffer([]byte{})
+
+	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, fallbackReader)
+	return clientConfig, tmpFile
+}
+
+func newDefaultFakeClientConfigLoadingRules() (*clientcmd.ClientConfigLoadingRules, *os.File, error) {
+	tmpFile, err := ioutil.TempFile("", "cmdtests_temp")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &clientcmd.ClientConfigLoadingRules{
+		Precedence:     []string{tmpFile.Name()},
+		MigrationRules: map[string]string{},
+	}, tmpFile, nil
 }
 
 func (f *TestFactory) CategoryExpander() categories.CategoryExpander {

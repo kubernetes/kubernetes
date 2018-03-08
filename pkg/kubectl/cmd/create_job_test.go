@@ -82,6 +82,8 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		return true, expectJob, nil
 	})
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
 	buf := bytes.NewBuffer([]byte{})
 	cmdOptions := &CreateJobOptions{
 		Name:      testJobName,

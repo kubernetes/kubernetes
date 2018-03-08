@@ -29,6 +29,8 @@ import (
 
 func TestValidate(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 
 	tests := map[string]struct {

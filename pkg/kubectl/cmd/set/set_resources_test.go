@@ -46,6 +46,7 @@ import (
 
 func TestResourcesLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -90,6 +91,7 @@ func TestResourcesLocal(t *testing.T) {
 
 func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -446,6 +448,7 @@ func TestSetResourcesRemote(t *testing.T) {
 			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
 			testapi.Default = testapi.Groups[input.testAPIGroup]
 			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
 			ns := legacyscheme.Codecs
 			tf.Namespace = "test"

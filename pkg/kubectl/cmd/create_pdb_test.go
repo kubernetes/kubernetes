@@ -32,6 +32,8 @@ import (
 func TestCreatePdb(t *testing.T) {
 	pdbName := "my-pdb"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{

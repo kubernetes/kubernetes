@@ -33,6 +33,8 @@ func TestCreateClusterRole(t *testing.T) {
 	clusterRoleName := "my-cluster-role"
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfigVal = defaultClientConfig()
@@ -148,6 +150,8 @@ func TestCreateClusterRole(t *testing.T) {
 
 func TestClusterRoleValidate(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 
 	tests := map[string]struct {

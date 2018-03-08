@@ -71,68 +71,72 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 		},
 	}
 	for _, test := range tests {
-		var err error
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-		ns := legacyscheme.Codecs
+		t.Run(test.name, func(t *testing.T) {
+			var err error
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.Client = &fake.RESTClient{
-			VersionedAPIPath:     "/api/v1",
-			GroupVersion:         schema.GroupVersion{Group: ""},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					// Ensures no GET is performed when deleting by name
-					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
-					return nil, nil
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
+
+			tf.Client = &fake.RESTClient{
+				VersionedAPIPath:     "/api/v1",
+				GroupVersion:         schema.GroupVersion{Group: ""},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == test.podPath && m == "GET":
+						body := objBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					default:
+						// Ensures no GET is performed when deleting by name
+						t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
+			ff := &fakePortForwarder{}
+			if test.pfErr {
+				ff.pfErr = fmt.Errorf("pf error")
+			}
+
+			opts := &PortForwardOptions{}
+			cmd := NewCmdPortForward(tf, os.Stdout, os.Stderr)
+			cmd.Run = func(cmd *cobra.Command, args []string) {
+				if err = opts.Complete(tf, cmd, args); err != nil {
+					return
 				}
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
-		ff := &fakePortForwarder{}
-		if test.pfErr {
-			ff.pfErr = fmt.Errorf("pf error")
-		}
+				opts.PortForwarder = ff
+				if err = opts.Validate(); err != nil {
+					return
+				}
+				err = opts.RunPortForward()
+			}
 
-		opts := &PortForwardOptions{}
-		cmd := NewCmdPortForward(tf, os.Stdout, os.Stderr)
-		cmd.Run = func(cmd *cobra.Command, args []string) {
-			if err = opts.Complete(tf, cmd, args); err != nil {
+			for name, value := range flags {
+				cmd.Flags().Set(name, value)
+			}
+			cmd.Run(cmd, args)
+
+			if test.pfErr && err != ff.pfErr {
+				t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
+			}
+			if !test.pfErr && err != nil {
+				t.Errorf("%s: Unexpected error: %v", test.name, err)
+			}
+			if test.pfErr {
 				return
 			}
-			opts.PortForwarder = ff
-			if err = opts.Validate(); err != nil {
-				return
+
+			if ff.url == nil || ff.url.Path != test.pfPath {
+				t.Errorf("%s: Did not get expected path for portforward request", test.name)
 			}
-			err = opts.RunPortForward()
-		}
-
-		for name, value := range flags {
-			cmd.Flags().Set(name, value)
-		}
-		cmd.Run(cmd, args)
-
-		if test.pfErr && err != ff.pfErr {
-			t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
-		}
-		if !test.pfErr && err != nil {
-			t.Errorf("%s: Unexpected error: %v", test.name, err)
-		}
-		if test.pfErr {
-			continue
-		}
-
-		if ff.url.Path != test.pfPath {
-			t.Errorf("%s: Did not get expected path for portforward request", test.name)
-		}
-		if ff.method != "POST" {
-			t.Errorf("%s: Did not get method for attach request: %s", test.name, ff.method)
-		}
+			if ff.method != "POST" {
+				t.Errorf("%s: Did not get method for attach request: %s", test.name, ff.method)
+			}
+		})
 	}
 }
 

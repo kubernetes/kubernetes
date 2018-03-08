@@ -38,6 +38,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 	}
 	secretObject.Name = "my-secret"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 
