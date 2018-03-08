@@ -576,9 +576,10 @@ func (m *managerImpl) evictPod(pod *v1.Pod, resourceName v1.ResourceName, evictM
 		glog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
 		return false
 	}
+	msg := fmt.Sprintf(message, resourceName)
 	status := v1.PodStatus{
 		Phase:   v1.PodFailed,
-		Message: fmt.Sprintf(message, resourceName),
+		Message: msg,
 		Reason:  reason,
 	}
 	// record that we are evicting the pod
@@ -586,8 +587,10 @@ func (m *managerImpl) evictPod(pod *v1.Pod, resourceName v1.ResourceName, evictM
 	gracePeriod := int64(0)
 	err := m.killPodFunc(pod, status, &gracePeriod)
 	if err != nil {
+		m.recorder.Eventf(pod, v1.EventTypeWarning, "KubeletEviction", "failed to delete pod,Err %v", err)
 		glog.Errorf("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
 	} else {
+		m.recorder.Eventf(pod, v1.EventTypeNormal, "KubeletEviction", "Successfully delete Pod as %s", msg)
 		glog.Infof("eviction manager: pod %s is evicted successfully", format.Pod(pod))
 	}
 	return true
