@@ -131,3 +131,32 @@ func TestAmountSign(t *testing.T) {
 		}
 	}
 }
+
+func TestInt64AmountAsScaledInt64(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		i      int64Amount
+		scaled Scale
+		result int64
+		ok     bool
+	}{
+		{"test when i.scale < scaled ", int64Amount{value: 100, scale: 0}, 5, 1, true},
+		{"test when i.scale = scaled", int64Amount{value: 100, scale: 1}, 1, 100, true},
+		{"test when i.scale > scaled and result doesn't overflow", int64Amount{value: 100, scale: 5}, 2, 100000, true},
+		{"test when i.scale > scaled and result overflows", int64Amount{value: 876, scale: 30}, 4, 0, false},
+		{"test when i.scale < 0 and fraction exists", int64Amount{value: 93, scale: -1}, 0, 10, true},
+		{"test when i.scale < 0 and fraction doesn't exist", int64Amount{value: 100, scale: -1}, 0, 10, true},
+		{"test when i.value < 0 and fraction exists", int64Amount{value: -1932, scale: 2}, 4, -20, true},
+		{"test when i.value < 0 and fraction doesn't exists", int64Amount{value: -1900, scale: 2}, 4, -19, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r, ok := test.i.AsScaledInt64(test.scaled)
+			if r != test.result {
+				t.Errorf("%v: expected result: %d, got result: %d", test.name, test.result, r)
+			}
+			if ok != test.ok {
+				t.Errorf("%v: expected ok: %t, got ok: %t", test.name, test.ok, ok)
+			}
+		})
+	}
+}
