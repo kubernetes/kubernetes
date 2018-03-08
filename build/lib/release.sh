@@ -477,9 +477,6 @@ Server binary tarballs are no longer included in the Kubernetes final tarball.
 Run cluster/get-kube-binaries.sh to download client and server binaries.
 EOF
 
-  mkdir -p "${release_stage}/third_party"
-  cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
-
   # Include hack/lib as a dependency for the cluster/ scripts
   mkdir -p "${release_stage}/hack"
   cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
