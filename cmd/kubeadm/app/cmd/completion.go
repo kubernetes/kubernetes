@@ -89,13 +89,17 @@ var (
 	}
 )
 
-// NewCmdCompletion return command for executing "kubeadm completion" command
-func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
+// GetSupportedShells returns a list of supported shells
+func GetSupportedShells() []string {
 	shells := []string{}
 	for s := range completionShells {
 		shells = append(shells, s)
 	}
+	return shells
+}
 
+// NewCmdCompletion returns the "kubeadm completion" command
+func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
 		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)."),
@@ -105,7 +109,7 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 			err := RunCompletion(out, boilerPlate, cmd, args)
 			kubeadmutil.CheckErr(err)
 		},
-		ValidArgs: shells,
+		ValidArgs: GetSupportedShells(),
 	}
 
 	return cmd
