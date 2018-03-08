@@ -552,7 +552,8 @@ func testWebhook(f *framework.Framework) {
 	client = f.ClientSet
 	// Creating the pod, the request should be rejected
 	pod = hangingPod(f)
-	_, err = client.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	result := &v1.Pod{}
+	err = client.CoreV1().RESTClient().Post().Namespace(f.Namespace.Name).Resource("pods").Body(pod).Param("timeout", "30s").Do().Into(result)
 	Expect(err).NotTo(BeNil())
 	expectedTimeoutErr := "request did not complete within allowed duration"
 	if !strings.Contains(err.Error(), expectedTimeoutErr) {
