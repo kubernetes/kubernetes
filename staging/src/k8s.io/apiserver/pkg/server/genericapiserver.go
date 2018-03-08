@@ -37,6 +37,8 @@ import (
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/bulk"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -118,6 +120,9 @@ type GenericAPIServer struct {
 	// DiscoveryGroupManager serves /apis
 	DiscoveryGroupManager discovery.GroupManager
 
+	// Proivides bulk get/watch API
+	bulkAPIManager *bulk.APIManager
+
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	swaggerConfig *swagger.Config
 	openAPIConfig *openapicommon.Config
@@ -151,6 +156,9 @@ type GenericAPIServer struct {
 
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
+
+	// Authorizer check whether the subject is allowed to make the request based on the RequestURI
+	authorizer authorizer.Authorizer
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -177,6 +185,9 @@ type DelegationTarget interface {
 
 	// NextDelegate returns the next delegationTarget in the chain of delegations
 	NextDelegate() DelegationTarget
+
+	// BulkAPIManager returns the bulk manager of the delegation target if exists, nil otherwise.
+	BulkAPIManager() *bulk.APIManager
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -194,6 +205,9 @@ func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
 }
 func (s *GenericAPIServer) ListedPaths() []string {
 	return s.listedPathProvider.ListedPaths()
+}
+func (s *GenericAPIServer) BulkAPIManager() *bulk.APIManager {
+	return s.bulkAPIManager
 }
 
 func (s *GenericAPIServer) NextDelegate() DelegationTarget {
@@ -227,6 +241,9 @@ func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
 	return s.requestContextMapper
 }
 func (s emptyDelegate) NextDelegate() DelegationTarget {
+	return nil
+}
+func (s emptyDelegate) BulkAPIManager() *bulk.APIManager {
 	return nil
 }
 
@@ -350,6 +367,21 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
 			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
+		}
+		if s.bulkAPIManager != nil {
+			preferred := apiGroupVersion.GroupVersion == apiGroupInfo.GroupMeta.GroupVersion
+			ginfo := bulk.LocalAPIGroupInfo{
+				GroupVersion: apiGroupVersion.GroupVersion,
+				Preferred:    preferred,
+				Linker:       apiGroupVersion.Linker,
+				Mapper:       apiGroupVersion.Mapper,
+				Serializer:   apiGroupVersion.Serializer,
+				Storage:      apiGroupVersion.Storage,
+				Authorizer:   s.authorizer,
+			}
+			if err := s.bulkAPIManager.RegisterLocalGroup(ginfo); err != nil {
+				return fmt.Errorf("Unable to add API %v to bulk manager: %v", ginfo, err)
+			}
 		}
 	}
 

@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/bulk"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -63,9 +64,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-
-	// install apis
-	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
+	// // install apis
+	// _ "k8s.io/apiserver/pkg/apis/apiserver/install"
+	// _ "k8s.io/apiserver/pkg/apis/bulk/install"
 )
 
 const (
@@ -491,9 +492,17 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		healthzChecks: c.HealthzChecks,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, c.RequestContextMapper),
-
+		DiscoveryGroupManager:        discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, c.RequestContextMapper),
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
+		authorizer:                   c.Authorization.Authorizer,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.BulkAPI) {
+		s.bulkAPIManager = bulk.APIManagerFactory{
+			ContextMapper: c.RequestContextMapper,
+			Root:          "/bulk",
+			Delegate:      delegationTarget.BulkAPIManager(),
+		}.New()
 	}
 
 	for k, v := range delegationTarget.PostStartHooks() {
@@ -593,6 +602,9 @@ func installAPI(s *GenericAPIServer, c *Config) {
 
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
+	}
+	if s.bulkAPIManager != nil {
+		s.bulkAPIManager.Install(s.Handler.NonGoRestfulMux)
 	}
 }
 

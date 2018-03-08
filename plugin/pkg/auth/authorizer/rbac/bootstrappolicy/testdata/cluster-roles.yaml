@@ -634,6 +634,8 @@ items:
     - /api/*
     - /apis
     - /apis/*
+    - /bulk
+    - /bulk/*
     - /healthz
     - /openapi
     - /openapi/*
@@ -645,6 +647,11 @@ items:
     - /version/
     verbs:
     - get
+  - nonResourceURLs:
+    - /bulk
+    - /bulk/*
+    verbs:
+    - post
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
