@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
 const (
@@ -134,6 +136,16 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
 		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
+			return lifecycle.PodAdmitResult{Admit: true}
+		}
+
+		// When node has memory pressure and TaintNodesByCondition is enabled, check BestEffort Pod's toleration:
+		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. OutOfDisk.
+		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) &&
+			v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
+				Key:    algorithm.TaintNodeMemoryPressure,
+				Effect: v1.TaintEffectNoSchedule,
+			}) {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
