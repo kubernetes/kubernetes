@@ -130,7 +130,8 @@ func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, nodeName string) (unboundVolumesSatisfied, boundVolumesSatisfied bool, err error) {
 	podName := getPodName(pod)
 
-	glog.V(4).Infof("FindPodVolumes for pod %q, node %q", podName, nodeName)
+	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
+	glog.V(5).Infof("FindPodVolumes for pod %q, node %q", podName, nodeName)
 
 	// Initialize to true for pods that don't have volumes
 	unboundVolumesSatisfied = true
