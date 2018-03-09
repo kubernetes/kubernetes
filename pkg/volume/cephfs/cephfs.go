@@ -333,7 +333,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	src += ":" + cephfsVolume.path
 
 	mountOptions := util.JoinMountOptions(cephfsVolume.mountOptions, opt)
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
+	if err = cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 
