@@ -54,7 +54,7 @@ type BatchConfig struct {
 	ThrottleEnable bool
 	// ThrottleQPS defines the allowed rate of batches per second sent to the delegate backend.
 	ThrottleQPS float32
-	// ThrottleBurst defines the maximum rate of batches per second sent to the delegate backend in case
+	// ThrottleBurst defines the maximum number of requests sent to the delegate backend at the same moment in case
 	// the capacity defined by ThrottleQPS was not utilized.
 	ThrottleBurst int
 }
