@@ -80,6 +80,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cmd_test.go",
         "reset_test.go",
         "token_test.go",
     ],
