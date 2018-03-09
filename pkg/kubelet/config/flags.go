@@ -81,7 +81,7 @@ type ContainerRuntimeOptions struct {
 
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	// General settings.
-	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'.")
+	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'remote', 'rkt (deprecated)'.")
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 
 	// Docker-specific settings.
