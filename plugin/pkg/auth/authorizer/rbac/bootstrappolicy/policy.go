@@ -442,6 +442,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 		{
 			// a role to use for the kube-dns pod
+			// deprecated and will be removed in a future version
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-dns"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("endpoints", "services").RuleOrDie(),
@@ -533,6 +534,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:node-proxier").Users(user.KubeProxy).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-controller-manager").Users(user.KubeControllerManager).BindingOrDie(),
+		// The default system:kube-dns cluster role binding is deprecated and will be removed in a future version
 		rbacv1helpers.NewClusterBinding("system:kube-dns").SAs("kube-system", "kube-dns").BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:kube-scheduler").Users(user.KubeScheduler).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:aws-cloud-provider").SAs("kube-system", "aws-cloud-provider").BindingOrDie(),

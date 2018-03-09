@@ -146,6 +146,26 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 		return err
 	}
 
+	kubeDNSClusterRoles := &rbac.ClusterRole{}
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(KubeDNSClusterRole), kubeDNSClusterRoles); err != nil {
+		return fmt.Errorf("unable to decode kube-dns clusterroles %v", err)
+	}
+
+	// Create the Clusterroles for kube-dns or update it in case it already exists
+	if err := apiclient.CreateOrUpdateClusterRole(client, kubeDNSClusterRoles); err != nil {
+		return err
+	}
+
+	kubeDNSClusterRolesBinding := &rbac.ClusterRoleBinding{}
+	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), []byte(KubeDNSClusterRoleBinding), kubeDNSClusterRolesBinding); err != nil {
+		return fmt.Errorf("unable to decode kube-dns clusterrolebindings %v", err)
+	}
+
+	// Create the Clusterrolebindings for kube-dns or update it in case it already exists
+	if err := apiclient.CreateOrUpdateClusterRoleBinding(client, kubeDNSClusterRolesBinding); err != nil {
+		return err
+	}
+
 	kubednsService := &v1.Service{}
 	return createDNSService(kubednsService, serviceBytes, client)
 }

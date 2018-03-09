@@ -208,6 +208,38 @@ spec:
     k8s-app: kube-dns
 `
 
+	// KubeDNSClusterRole is the kube-dns ClusterRole manifest
+	KubeDNSClusterRole = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeadm:kube-dns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  verbs:
+  - list
+  - watch
+`
+	// KubeDNSClusterRoleBinding is the kube-dns Clusterrolebinding manifest
+	KubeDNSClusterRoleBinding = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeadm:kube-dns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-dns
+subjects:
+- kind: ServiceAccount
+  name: kube-dns
+  namespace: kube-system
+`
+
 	// CoreDNSDeployment is the CoreDNS Deployment manifest
 	CoreDNSDeployment = `
 apiVersion: apps/v1
