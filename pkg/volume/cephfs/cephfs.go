@@ -18,6 +18,7 @@ package cephfs
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path"
@@ -59,12 +60,20 @@ func (plugin *cephfsPlugin) GetPluginName() string {
 }
 
 func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	mon, _, _, _, _, err := getVolumeSource(spec)
+	mon, _, _, _, _, srvRec, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%v", mon), nil
+	if len(mon) > 0 {
+		return fmt.Sprintf("%v", mon), nil
+	} else {
+		proto := srvRec.Protocol
+		if len(proto) == 0 {
+			proto = v1.ProtocolTCP
+		}
+		return fmt.Sprintf("_%s._%s.%s", srvRec.Name, proto, srvRec.Domain), nil
+	}
 }
 
 func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
@@ -117,7 +126,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 }
 
 func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	mon, path, id, secretFile, readOnly, err := getVolumeSource(spec)
+	mon, path, id, secretFile, readOnly, srvRec, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +155,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			id:           id,
 			secret_file:  secretFile,
 			readonly:     readOnly,
+			srvRec:       srvRec,
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: util.MountOptionFromSpec(spec),
@@ -190,6 +200,7 @@ type cephfs struct {
 	secret      string
 	secret_file string
 	readonly    bool
+	srvRec      *v1.SRVRecordSource
 	mounter     mount.Interface
 	plugin      *cephfsPlugin
 	volume.MetricsNil
@@ -313,18 +324,16 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	opt = append(opt, ceph_opt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
-	hosts := cephfsVolume.mon
-	l := len(hosts)
 	// pass all monitors and let ceph randomize and fail over
-	i := 0
-	src := ""
-	for i = 0; i < l-1; i++ {
-		src += hosts[i] + ","
+	src, err := cephfsVolume.getMonitorsAsString()
+	if err != nil {
+		glog.Errorf("CephFS: failed to create monitor list: %v", err)
+		return err
 	}
-	src += hosts[i] + ":" + cephfsVolume.path
+	src += ":" + cephfsVolume.path
 
 	mountOptions := util.JoinMountOptions(cephfsVolume.mountOptions, opt)
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
+	if err = cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 
@@ -387,15 +396,12 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	}
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
-	hosts := cephfsVolume.mon
-	l := len(hosts)
 	// pass all monitors and let ceph randomize and fail over
-	i := 0
-	src := ""
-	for i = 0; i < l-1; i++ {
-		src += hosts[i] + ","
+	src, err := cephfsVolume.getMonitorsAsString()
+	if err != nil {
+		glog.Errorf("CephFS: failed to create monitor list: %v", err)
+		return err
 	}
-	src += hosts[i]
 
 	mountArgs := []string{}
 	mountArgs = append(mountArgs, "-k")
@@ -418,14 +424,61 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, error) {
+// getMonitorsAsString returns monitors as a single, comma-separated string.
+// For backwards compatibility, the mon array is used as source. If the array
+// is empty, then the SRV record source is used to lookup monitor names/IPs from
+// DNS.
+func (cephfsVolume *cephfs) getMonitorsAsString() (string, error) {
+	hosts := cephfsVolume.mon
+	if len(hosts) == 0 {
+		var err error
+		hosts, err = cephfsVolume.lookupMonitors()
+		if err != nil {
+			glog.Errorf("failed to lookup monitors: %v", err)
+			return "", err
+		}
+	}
+	if len(hosts) == 0 {
+		return "", fmt.Errorf("no monitors found")
+	}
+	return strings.Join(hosts, ","), nil
+}
+
+// lookupMonitors perform a DNS search for the service, proto and domain
+// specified in the srvRec field. An array of monitors in the form "monitor:port"
+// is returned, or an error if that's the case.
+func (cephfsVolume *cephfs) lookupMonitors() ([]string, error) {
+	srvRec := cephfsVolume.srvRec
+	proto := "tcp"
+	if srvRec.Protocol == v1.ProtocolUDP {
+		proto = "udp"
+	}
+
+	_, addrs, err := net.LookupSRV(srvRec.Name, proto, srvRec.Domain)
+	if err != nil {
+		return nil, err
+	}
+	hosts := make([]string, len(addrs))
+	for i, srv := range addrs {
+		l := len(srv.Target)
+		if l > 0 && srv.Target[l-1] == '.' {
+			l--
+		}
+		tgt := srv.Target[0:l]
+		hosts[i] = net.JoinHostPort(tgt, fmt.Sprintf("%d", srv.Port))
+	}
+	return hosts, nil
+}
+
+func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, *v1.SRVRecordSource, error) {
 	if spec.Volume != nil && spec.Volume.CephFS != nil {
 		mon := spec.Volume.CephFS.Monitors
 		path := spec.Volume.CephFS.Path
 		user := spec.Volume.CephFS.User
 		secretFile := spec.Volume.CephFS.SecretFile
 		readOnly := spec.Volume.CephFS.ReadOnly
-		return mon, path, user, secretFile, readOnly, nil
+		srvRec := spec.Volume.CephFS.MonitorSRVRecord
+		return mon, path, user, secretFile, readOnly, srvRec, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.CephFS != nil {
 		mon := spec.PersistentVolume.Spec.CephFS.Monitors
@@ -433,10 +486,11 @@ func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool,
 		user := spec.PersistentVolume.Spec.CephFS.User
 		secretFile := spec.PersistentVolume.Spec.CephFS.SecretFile
 		readOnly := spec.PersistentVolume.Spec.CephFS.ReadOnly
-		return mon, path, user, secretFile, readOnly, nil
+		srvRec := spec.Volume.CephFS.MonitorSRVRecord
+		return mon, path, user, secretFile, readOnly, srvRec, nil
 	}
 
-	return nil, "", "", "", false, fmt.Errorf("Spec does not reference a CephFS volume type")
+	return nil, "", "", "", false, nil, fmt.Errorf("Spec does not reference a CephFS volume type")
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
