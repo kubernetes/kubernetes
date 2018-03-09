@@ -3916,17 +3916,24 @@ func WaitForKubeletUp(host string) error {
 	return fmt.Errorf("waiting for kubelet timed out")
 }
 
-func RestartApiserver(c discovery.ServerVersionInterface) error {
+func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
 		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
 	}
 	if ProviderIs("gce", "aws") {
-		return sshRestartMaster()
+		initialRestartCount, err := getApiserverRestartCount(cs)
+		if err != nil {
+			return fmt.Errorf("failed to get apiserver's restart count: %v", err)
+		}
+		if err := sshRestartMaster(); err != nil {
+			return fmt.Errorf("failed to restart apiserver: %v", err)
+		}
+		return waitForApiserverRestarted(cs, initialRestartCount)
 	}
 	// GKE doesn't allow ssh access, so use a same-version master
 	// upgrade to teardown/recreate master.
-	v, err := c.ServerVersion()
+	v, err := cs.Discovery().ServerVersion()
 	if err != nil {
 		return err
 	}
@@ -3962,10 +3969,10 @@ func WaitForApiserverUp(c clientset.Interface) error {
 	return fmt.Errorf("waiting for apiserver timed out")
 }
 
-// WaitForApiserverRestarted waits until apiserver's restart count increased.
-func WaitForApiserverRestarted(c clientset.Interface, initialRestartCount int32) error {
+// waitForApiserverRestarted waits until apiserver's restart count increased.
+func waitForApiserverRestarted(c clientset.Interface, initialRestartCount int32) error {
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		restartCount, err := GetApiserverRestartCount(c)
+		restartCount, err := getApiserverRestartCount(c)
 		if err != nil {
 			Logf("Failed to get apiserver's restart count: %v", err)
 			continue
@@ -3979,7 +3986,7 @@ func WaitForApiserverRestarted(c clientset.Interface, initialRestartCount int32)
 	return fmt.Errorf("timed out waiting for apiserver to be restarted")
 }
 
-func GetApiserverRestartCount(c clientset.Interface) (int32, error) {
+func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "kube-apiserver"}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
 	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
