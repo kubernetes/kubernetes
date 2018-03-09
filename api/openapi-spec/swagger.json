@@ -76446,8 +76446,12 @@
      "monitors"
     ],
     "properties": {
+     "monitorSRVRecord": {
+      "description": "Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for ceph monitors' SRV records, instead of setting the names/IPs directly.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SRVRecordSource"
+     },
      "monitors": {
-      "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Required: Monitors is a collection of Ceph monitors. Optional, if MonitorSRVRecord is set. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "array",
       "items": {
        "type": "string"
@@ -76477,12 +76481,13 @@
    },
    "io.k8s.api.core.v1.CephFSVolumeSource": {
     "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
-    "required": [
-     "monitors"
-    ],
     "properties": {
+     "monitorSRVRecord": {
+      "description": "Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for ceph monitors' SRV records, instead of setting the names/IPs directly.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SRVRecordSource"
+     },
      "monitors": {
-      "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
+      "description": "Required: Monitors is a collection of Ceph monitors. Optional, if MonitorSRVRecord is set. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it",
       "type": "array",
       "items": {
        "type": "string"
@@ -79794,7 +79799,6 @@
    "io.k8s.api.core.v1.RBDPersistentVolumeSource": {
     "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
     "required": [
-     "monitors",
      "image"
     ],
     "properties": {
@@ -79810,8 +79814,12 @@
       "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "string"
      },
+     "monitorSRVRecord": {
+      "description": "MonitorSRVRecord is the query data required to issue a DNS lookup for ceph monitors' SRV records, instead of setting the names/IPs directly.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SRVRecordSource"
+     },
      "monitors": {
-      "description": "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "A collection of Ceph monitors. Optional, if MonitorSRVRecord is set. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "array",
       "items": {
        "type": "string"
@@ -79838,7 +79846,6 @@
    "io.k8s.api.core.v1.RBDVolumeSource": {
     "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
     "required": [
-     "monitors",
      "image"
     ],
     "properties": {
@@ -79854,8 +79861,12 @@
       "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "string"
      },
+     "monitorSRVRecord": {
+      "description": "MonitorSRVRecord is the query data required to issue a DNS lookup for ceph monitors' SRV records, instead of setting the names/IPs directly.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SRVRecordSource"
+     },
      "monitors": {
-      "description": "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+      "description": "A collection of Ceph monitors. Optional, if MonitorSRVRecord is set. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
       "type": "array",
       "items": {
        "type": "string"
@@ -80206,6 +80217,27 @@
      },
      "user": {
       "description": "User is a SELinux user label that applies to the container.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.SRVRecordSource": {
+    "description": "Represents a DNS SRV record that can be used to lookup the real names/IPs, instead of hard-coding the information inline. Default protocol is TCP.",
+    "required": [
+     "name",
+     "domain"
+    ],
+    "properties": {
+     "domain": {
+      "description": "Required: Domain is the domain the service belongs to.",
+      "type": "string"
+     },
+     "name": {
+      "description": "Required: Name is the service as it's registered in DNS",
+      "type": "string"
+     },
+     "protocol": {
+      "description": "Optional: Protocol is the protocol to be lookedup for. Allowed values are \"TCP\" and \"UDP\". Default value is \"TCP\".",
       "type": "string"
      }
     }

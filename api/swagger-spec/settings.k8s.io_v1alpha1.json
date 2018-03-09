@@ -1970,7 +1970,6 @@
     "id": "v1.RBDVolumeSource",
     "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
     "required": [
-     "monitors",
      "image"
     ],
     "properties": {
@@ -1979,7 +1978,7 @@
       "items": {
        "type": "string"
       },
-      "description": "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+      "description": "A collection of Ceph monitors. Optional, if MonitorSRVRecord is set. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "image": {
       "type": "string",
@@ -2008,6 +2007,32 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "monitorSRVRecord": {
+      "$ref": "v1.SRVRecordSource",
+      "description": "MonitorSRVRecord is the query data required to issue a DNS lookup for ceph monitors' SRV records, instead of setting the names/IPs directly."
+     }
+    }
+   },
+   "v1.SRVRecordSource": {
+    "id": "v1.SRVRecordSource",
+    "description": "Represents a DNS SRV record that can be used to lookup the real names/IPs, instead of hard-coding the information inline. Default protocol is TCP.",
+    "required": [
+     "name",
+     "domain"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Required: Name is the service as it's registered in DNS"
+     },
+     "protocol": {
+      "type": "string",
+      "description": "Optional: Protocol is the protocol to be lookedup for. Allowed values are \"TCP\" and \"UDP\". Default value is \"TCP\"."
+     },
+     "domain": {
+      "type": "string",
+      "description": "Required: Domain is the domain the service belongs to."
      }
     }
    },
@@ -2068,16 +2093,13 @@
    "v1.CephFSVolumeSource": {
     "id": "v1.CephFSVolumeSource",
     "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
-    "required": [
-     "monitors"
-    ],
     "properties": {
      "monitors": {
       "type": "array",
       "items": {
        "type": "string"
       },
-      "description": "Required: Monitors is a collection of Ceph monitors More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+      "description": "Required: Monitors is a collection of Ceph monitors. Optional, if MonitorSRVRecord is set. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
      },
      "path": {
       "type": "string",
@@ -2098,6 +2120,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
+     },
+     "monitorSRVRecord": {
+      "$ref": "v1.SRVRecordSource",
+      "description": "Optional: MonitorSRVRecord is the query data required to issue a DNS lookup for ceph monitors' SRV records, instead of setting the names/IPs directly."
      }
     }
    },
