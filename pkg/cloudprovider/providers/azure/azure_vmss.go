@@ -243,22 +243,24 @@ func (ss *scaleSet) GetPrimaryVMSetName() string {
 	return ss.Config.PrimaryScaleSetName
 }
 
-// GetIPByNodeName gets machine IP by node name.
-func (ss *scaleSet) GetIPByNodeName(nodeName, vmSetName string) (string, error) {
+// GetIPByNodeName gets machine private IP and public IP by node name.
+// TODO(feiskyer): Azure vmss doesn't support associating a public IP to single virtual machine yet,
+// fix this after it is supported.
+func (ss *scaleSet) GetIPByNodeName(nodeName, vmSetName string) (string, string, error) {
 	nic, err := ss.GetPrimaryInterface(nodeName, vmSetName)
 	if err != nil {
 		glog.Errorf("error: ss.GetIPByNodeName(%s), GetPrimaryInterface(%q, %q), err=%v", nodeName, nodeName, vmSetName, err)
-		return "", err
+		return "", "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
 		glog.Errorf("error: ss.GetIPByNodeName(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
-		return "", err
+		return "", "", err
 	}
 
 	targetIP := *ipConfig.PrivateIPAddress
-	return targetIP, nil
+	return targetIP, "", nil
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
