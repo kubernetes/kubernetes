@@ -86,17 +86,35 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	return err
 }
 
+func locationParamGKE() string {
+	if TestContext.CloudConfig.Zone != "" {
+		return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	}
+	return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+}
+
+func appendContainerCommandGroupIfNeeded(args []string) []string {
+	if TestContext.CloudConfig.Region != "" {
+		// TODO(wojtek-t): Get rid of it once Regional Clusters go to GA.
+		return append([]string{"beta"}, args...)
+	}
+	return args
+}
+
 func masterUpgradeGKE(v string) error {
 	Logf("Upgrading master to %q", v)
-	_, _, err := RunCmd("gcloud", "container",
+	args := []string{
+		"container",
 		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
+		locationParamGKE(),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
-		"--quiet")
+		"--quiet",
+	}
+	_, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {
 		return err
 	}
@@ -202,7 +220,7 @@ func nodeUpgradeGKE(v string, img string) error {
 		"container",
 		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
+		locationParamGKE(),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		fmt.Sprintf("--cluster-version=%s", v),
@@ -211,7 +229,7 @@ func nodeUpgradeGKE(v string, img string) error {
 	if len(img) > 0 {
 		args = append(args, fmt.Sprintf("--image-type=%s", img))
 	}
-	_, _, err := RunCmd("gcloud", args...)
+	_, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
 
 	if err != nil {
 		return err
