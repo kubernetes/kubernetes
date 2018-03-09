@@ -22,6 +22,7 @@ import (
 
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -337,4 +338,284 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 			t.Error("DropDisabledAlphaFields for InitContainers failed")
 		}
 	}
+}
+
+func TestDropRunAsGroupField(t *testing.T) {
+	groupID := int64(2002)
+
+	testPod := api.Pod{
+		Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{
+				RunAsGroup: &groupID,
+			},
+			Containers: []api.Container{
+				{
+					Name:  "container1",
+					Image: "testimage1",
+					SecurityContext: &api.SecurityContext{
+						RunAsGroup: &groupID,
+					},
+				},
+				{
+					Name:  "container2",
+					Image: "testimage2",
+					SecurityContext: &api.SecurityContext{
+						RunAsGroup: &groupID,
+					},
+				},
+			},
+			InitContainers: []api.Container{
+				{
+					Name:  "container1",
+					Image: "testimage1",
+					SecurityContext: &api.SecurityContext{
+						RunAsGroup: &groupID,
+					},
+				},
+			},
+		},
+	}
+
+	// Enable feature RunAsGroup
+	err := utilfeature.DefaultFeatureGate.Set("RunAsGroup=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for RunAsGroup: %v", err)
+	}
+
+	// now test dropping the fields - should not be dropped
+	DropDisabledAlphaFields(&testPod.Spec)
+
+	// check to make sure RunAsGroup is still present
+	// if featureset is set to true
+	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+		if testPod.Spec.SecurityContext == nil {
+			t.Error("RunAsGroup in Pod should not have been dropped based on feature-gate")
+		}
+		for i := range testPod.Spec.Containers {
+			if testPod.Spec.Containers[i].SecurityContext == nil {
+				t.Error("RunAsGroup in Containers should not have been dropped based on feature-gate")
+			}
+		}
+		for i := range testPod.Spec.InitContainers {
+			if testPod.Spec.InitContainers[i].SecurityContext == nil {
+				t.Error("RunAsGroup in InitContainers should not have been dropped based on feature-gate")
+			}
+		}
+	} else {
+		t.Error("feature gate for RunAsGroup is not Enabled")
+	}
+
+	// Disable alpha feature RunAsGroup
+	err = utilfeature.DefaultFeatureGate.Set("RunAsGroup=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for RunAsGroup: %v", err)
+	}
+
+	// now test dropping the fields
+	DropDisabledAlphaFields(&testPod.Spec)
+
+	// check to make sure RunAsGroup is nil
+	// if featureset is set to false
+	if testPod.Spec.SecurityContext.RunAsGroup != nil {
+		t.Error("DropDisabledAlphaFields for Pod RunAsGroup failed")
+	}
+	for i := range testPod.Spec.Containers {
+		if testPod.Spec.Containers[i].SecurityContext.RunAsGroup != nil {
+			t.Error("DropDisabledAlphaFields for Containers RunAsGroup failed")
+		}
+	}
+	for i := range testPod.Spec.InitContainers {
+		if testPod.Spec.InitContainers[i].SecurityContext.RunAsGroup != nil {
+			t.Error("DropDisabledAlphaFields for InitContainers RunAsGroup failed")
+		}
+	}
+}
+
+func TestGetPodCondition(t *testing.T) {
+	time := metav1.Now()
+
+	tests := []struct {
+		name            string
+		status          *api.PodStatus
+		conditionType   api.PodConditionType
+		expectcondition *api.PodCondition
+		expectindex     int
+	}{
+		{
+			name: "get PodReady and expectindex 0",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Status:             api.ConditionTrue,
+						Type:               api.PodReady,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				},
+			},
+			conditionType: api.PodReady,
+			expectcondition: &api.PodCondition{
+				Status:             api.ConditionTrue,
+				Type:               api.PodReady,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			expectindex: 0,
+		},
+		{
+			name: "get PodScheduled and expectindex 1",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Status:             api.ConditionTrue,
+						Type:               api.PodReady,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000))},
+					{
+						Status:             api.ConditionTrue,
+						Type:               api.PodScheduled,
+						Reason:             "podscheduled",
+						Message:            "schedule pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				},
+			},
+			conditionType: api.PodScheduled,
+			expectcondition: &api.PodCondition{
+				Status:             api.ConditionTrue,
+				Type:               api.PodScheduled,
+				Reason:             "podscheduled",
+				Message:            "schedule pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			expectindex: 1,
+		},
+		{
+			name: "get PodScheduled and not present",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Status:             api.ConditionTrue,
+						Type:               api.PodReady,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				},
+			},
+			conditionType:   api.PodScheduled,
+			expectcondition: nil,
+			expectindex:     -1,
+		},
+	}
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			index, condition := GetPodCondition(test.status, test.conditionType)
+			if index != test.expectindex {
+				t.Errorf("case[%d]:%s: Expect index: %d, Got index: %d", i, test.name, test.expectindex, index)
+			}
+			if !isEqualCondition(test.expectcondition, condition) {
+				t.Errorf("case[%d]:%s: Expect condition: %#v, Got condition: %#v", i, test.name, *test.expectcondition, *condition)
+			}
+		})
+	}
+}
+
+func TestUpdatePodCondition(t *testing.T) {
+	time := metav1.Now()
+
+	tests := []struct {
+		name      string
+		status    *api.PodStatus
+		condition *api.PodCondition
+		ischanged bool
+	}{
+		{
+			name: "Condition is equal and ischanged false",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Status:             api.ConditionTrue,
+						Type:               api.PodReady,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000))},
+				},
+			},
+			condition: &api.PodCondition{
+				Status:             api.ConditionTrue,
+				Type:               api.PodReady,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			ischanged: false,
+		},
+		{
+			name: "Condition is not equal and ischanged true",
+			status: &api.PodStatus{
+				Conditions: []api.PodCondition{
+					{
+						Status:             api.ConditionTrue,
+						Type:               api.PodScheduled,
+						Reason:             "podscheduled",
+						Message:            "schedule pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(2000))},
+				},
+			},
+			condition: &api.PodCondition{
+				Status:             api.ConditionTrue,
+				Type:               api.PodReady,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			ischanged: true,
+		},
+		{
+			name:   "PodStatus.Condition is nil and ischanged true",
+			status: &api.PodStatus{},
+			condition: &api.PodCondition{
+				Status:             api.ConditionTrue,
+				Type:               api.PodReady,
+				Reason:             "successfully",
+				Message:            "sync pod successfully",
+				LastProbeTime:      time,
+				LastTransitionTime: metav1.NewTime(time.Add(1000))},
+			ischanged: true,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ischange := UpdatePodCondition(test.status, test.condition)
+			if ischange != test.ischanged {
+				t.Errorf("case[%d]:%s  Expect ischanged=%v, Got ischanged=%v", i, test.name, test.ischanged, ischange)
+			}
+		})
+		_, condition := GetPodCondition(test.status, test.condition.Type)
+		if !isEqualCondition(test.condition, condition) {
+			t.Errorf("case[%d]:%s: Expect condition: %#v, Got condition: %#v", i, test.name, *test.condition, *condition)
+		}
+	}
+}
+
+func isEqualCondition(leftcondition, rightcondition *api.PodCondition) bool {
+	if leftcondition == nil || rightcondition == nil {
+		if leftcondition == rightcondition {
+			return true
+		}
+		return false
+	}
+	isEqual := leftcondition.Status == rightcondition.Status &&
+		leftcondition.Reason == rightcondition.Reason &&
+		leftcondition.Message == rightcondition.Message &&
+		leftcondition.LastProbeTime.Equal(&rightcondition.LastProbeTime)
+	return isEqual
 }
