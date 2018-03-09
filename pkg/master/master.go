@@ -284,9 +284,6 @@ func (cfg *Config) Complete(informers informers.SharedInformerFactory) Completed
 		c.ExtraConfig.EndpointReconcilerConfig.Reconciler = cfg.createEndpointReconciler()
 	}
 
-	// this has always been hardcoded true in the past
-	c.GenericConfig.EnableMetrics = true
-
 	return CompletedConfig{&c}
 }
 
