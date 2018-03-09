@@ -36,14 +36,20 @@ func init() {
 
 type CacheMutationDetector interface {
 	AddObject(obj interface{})
+	DeleteObject(obj interface{})
 	Run(stopCh <-chan struct{})
 }
 
-func NewCacheMutationDetector(name string) CacheMutationDetector {
+func NewCacheMutationDetector(name string, keyFunc KeyFunc) CacheMutationDetector {
 	if !mutationDetectionEnabled {
 		return dummyMutationDetector{}
 	}
-	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second}
+	return &defaultCacheMutationDetector{
+		name:       name,
+		period:     1 * time.Second,
+		cachedObjs: make(map[string]cacheObj),
+		keyFunc:    keyFunc,
+	}
 }
 
 type dummyMutationDetector struct{}
@@ -51,6 +57,8 @@ type dummyMutationDetector struct{}
 func (dummyMutationDetector) Run(stopCh <-chan struct{}) {
 }
 func (dummyMutationDetector) AddObject(obj interface{}) {
+}
+func (dummyMutationDetector) DeleteObject(obj interface{}) {
 }
 
 // defaultCacheMutationDetector gives a way to detect if a cached object has been mutated
@@ -61,13 +69,17 @@ type defaultCacheMutationDetector struct {
 	period time.Duration
 
 	lock       sync.Mutex
-	cachedObjs []cacheObj
+	cachedObjs map[string]cacheObj
 
 	// failureFunc is injectable for unit testing.  If you don't have it, the process will panic.
 	// This panic is intentional, since turning on this detection indicates you want a strong
 	// failure signal.  This failure is effectively a p0 bug and you can't trust process results
 	// after a mutation anyway.
 	failureFunc func(message string)
+
+	// keyFunc is used to make the key for objects stored in and retrieved from items, and
+	// should be deterministic.
+	keyFunc KeyFunc
 }
 
 // cacheObj holds the actual object and a copy
@@ -92,16 +104,27 @@ func (d *defaultCacheMutationDetector) Run(stopCh <-chan struct{}) {
 // AddObject makes a deep copy of the object for later comparison.  It only works on runtime.Object
 // but that covers the vast majority of our cached objects
 func (d *defaultCacheMutationDetector) AddObject(obj interface{}) {
-	if _, ok := obj.(DeletedFinalStateUnknown); ok {
-		return
-	}
 	if obj, ok := obj.(runtime.Object); ok {
 		copiedObj := obj.DeepCopyObject()
-
+		key, err := d.keyFunc(obj)
+		if err != nil {
+			fmt.Printf("get key failed: %v\n", KeyError{obj, err})
+		}
 		d.lock.Lock()
 		defer d.lock.Unlock()
-		d.cachedObjs = append(d.cachedObjs, cacheObj{cached: obj, copied: copiedObj})
+		d.cachedObjs[key] = cacheObj{cached: obj, copied: copiedObj}
 	}
+}
+
+// DeleteObject removes obj from cache
+func (d *defaultCacheMutationDetector) DeleteObject(obj interface{}) {
+	key, err := d.keyFunc(obj)
+	if err != nil {
+		fmt.Printf("get key failed: %v\n", KeyError{obj, err})
+	}
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	delete(d.cachedObjs, key)
 }
 
 func (d *defaultCacheMutationDetector) CompareObjects() {
@@ -109,9 +132,9 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 	defer d.lock.Unlock()
 
 	altered := false
-	for i, obj := range d.cachedObjs {
+	for key, obj := range d.cachedObjs {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
-			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectDiff(obj.cached, obj.copied))
+			fmt.Printf("CACHE %s[%s] ALTERED!\n%v\n", d.name, key, diff.ObjectDiff(obj.cached, obj.copied))
 			altered = true
 		}
 	}

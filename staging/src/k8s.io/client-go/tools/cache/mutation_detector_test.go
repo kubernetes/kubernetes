@@ -47,20 +47,24 @@ func TestMutationDetector(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	addReceived := make(chan bool)
+	deleteReceived := make(chan bool)
 	mutationFound := make(chan bool)
 
 	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
-	informer.cacheMutationDetector = &defaultCacheMutationDetector{
-		name:   "name",
-		period: 1 * time.Second,
-		failureFunc: func(message string) {
-			mutationFound <- true
-		},
+	mutationDetectionEnabled = true
+	cacheMutationDetector := NewCacheMutationDetector("name", DeletionHandlingMetaNamespaceKeyFunc)
+	cacheMutationDetector.(*defaultCacheMutationDetector).failureFunc = func(message string) {
+		mutationFound <- true
 	}
+	informer.cacheMutationDetector = cacheMutationDetector
+
 	informer.AddEventHandler(
 		ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				addReceived <- true
+			},
+			DeleteFunc: func(obj interface{}) {
+				deleteReceived <- true
 			},
 		},
 	)
@@ -78,4 +82,9 @@ func TestMutationDetector(t *testing.T) {
 	case <-mutationFound:
 	}
 
+	fakeWatch.Delete(pod)
+
+	select {
+	case <-deleteReceived:
+	}
 }
