@@ -141,7 +141,6 @@ var _ = SIGDescribe("Load capacity", func() {
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		framework.Skipf("SKIP LOAD")
 		testPhaseDurations = timer.NewTestPhaseTimer()
 		clientset = f.ClientSet
 
