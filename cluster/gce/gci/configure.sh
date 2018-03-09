@@ -31,6 +31,7 @@ DEFAULT_NPD_SHA1="650ecfb2ae495175ee43706d0bd862a1ea7f1395"
 DEFAULT_CRICTL_VERSION="v1.12.0"
 DEFAULT_CRICTL_SHA1="82ef8b44849f9da0589c87e9865d4716573eec7f"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+DEFAULT_CONNTRACK_SHA1="0af7a8981074d84331f969f1616176a9b60aa22e"
 ###
 
 # Use --retry-connrefused opt only if it's supported by curl.
@@ -285,6 +286,17 @@ function install-exec-auth-plugin {
   mv "${KUBE_HOME}/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
 }
 
+function download-conntrack-binaries {
+  if [ -e "${KUBE_BIN}/conntrack" ]; then
+    echo "conntrack already installed."
+    return
+  fi
+  local -r ct_sha1="${DEFAULT_CONNTRACK_SHA1}"
+  echo "Downloading conntrack binary"
+  download-or-bust "${ct_sha1}" "https://storage.googleapis.com/kubernetes-release/conntrack/conntrack"
+  mv conntrack "${KUBE_BIN}"/conntrack
+}
+
 function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
@@ -412,6 +424,8 @@ function install-kube-binary-config {
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     install-cni-binaries
   fi
+
+  download-conntrack-binaries
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   install-kube-manifests

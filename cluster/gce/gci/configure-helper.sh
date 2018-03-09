@@ -1200,6 +1200,9 @@ function start-kubelet {
   local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-}"
   echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
   echo "KUBE_COVERAGE_FILE=\"/var/log/kubelet.cov\"" >> "${kubelet_env_file}"
+  # Include KUBE_HOME/bin in path so that kubelet can find conntrack binary
+  local -r new_path="${PATH}:${KUBE_HOME}/bin"
+  echo "PATH=\"${new_path}\"" >> "${kubelet_env_file}"
 
   # Write the systemd service file for kubelet.
   cat <<EOF >/etc/systemd/system/kubelet.service
