@@ -1320,7 +1320,7 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 			t.Errorf("column %d has no name", j)
 		}
 		switch column.Type {
-		case "string", "date", "integer":
+		case "string", "date", "integer", "number", "boolean":
 		default:
 			t.Errorf("column %d has unexpected type: %q", j, column.Type)
 		}
@@ -1342,13 +1342,14 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	}
 	for i, row := range table.Rows {
 		if len(row.Cells) != len(table.ColumnDefinitions) {
-			t.Errorf("row %d did not have the correct number of cells: %d in %v", i, len(table.ColumnDefinitions), row.Cells)
+			t.Errorf("row %d did not have the correct number of cells: %d in %v, expected %d", i, len(row.Cells), row.Cells, len(table.ColumnDefinitions))
 		}
 		for j, cell := range row.Cells {
 			// do not add to this test without discussion - may break clients
 			switch cell.(type) {
 			case float64, int64, int32, int, string, bool:
 			case []interface{}:
+			case nil:
 			default:
 				t.Errorf("row %d, cell %d has an unrecognized type, only JSON serialization safe types are allowed: %T ", i, j, cell)
 			}

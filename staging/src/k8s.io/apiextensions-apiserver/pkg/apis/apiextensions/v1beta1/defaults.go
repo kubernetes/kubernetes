@@ -19,8 +19,11 @@ package v1beta1
 import (
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&CustomResourceDefinition{}, func(obj interface{}) { SetDefaults_CustomResourceDefinition(obj.(*CustomResourceDefinition)) })
@@ -62,5 +65,10 @@ func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec)
 	// For backward compatibility set the version field to the first item in versions list.
 	if len(obj.Version) == 0 && len(obj.Versions) != 0 {
 		obj.Version = obj.Versions[0].Name
+	}
+	if len(obj.AdditionalPrinterColumns) == 0 {
+		obj.AdditionalPrinterColumns = []CustomResourceColumnDefinition{
+			{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
+		}
 	}
 }
