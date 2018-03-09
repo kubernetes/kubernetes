@@ -32,7 +32,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -131,9 +130,6 @@ func (a *ValidatingAdmissionWebhook) SetServiceResolver(sr config.ServiceResolve
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
-		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
-		}))
 		a.convertor.Scheme = scheme
 	}
 }
