@@ -22,14 +22,17 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	v1beta1 "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
 type cacheComparer struct {
 	nodeLister corelisters.NodeLister
 	podLister  corelisters.PodLister
+	pdbLister  v1beta1.PodDisruptionBudgetLister
 	cache      schedulercache.Cache
 
 	compareStrategy
@@ -44,10 +47,28 @@ func (c *cacheComparer) Compare() error {
 		return err
 	}
 
+	pods, err := c.podLister.List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
+	pdbs, err := c.pdbLister.List(labels.Everything())
+	if err != nil {
+		return err
+	}
+
 	snapshot := c.cache.Snapshot()
 
 	if missed, redundant := c.CompareNodes(nodes, snapshot.Nodes); len(missed)+len(redundant) != 0 {
 		glog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
+	}
+
+	if missed, redundant := c.ComparePods(pods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
+		glog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
+	}
+
+	if missed, redundant := c.ComparePdbs(pdbs, snapshot.Pdbs); len(missed)+len(redundant) != 0 {
+		glog.Warningf("cache mismatch: missed pdbs: %s; redundant pdbs: %s", missed, redundant)
 	}
 
 	return nil
@@ -57,8 +78,6 @@ type compareStrategy struct {
 }
 
 func (c compareStrategy) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
-	missed, redundant = []string{}, []string{}
-
 	actual := []string{}
 	for _, node := range nodes {
 		actual = append(actual, node.Name)
@@ -68,6 +87,42 @@ func (c compareStrategy) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*sc
 	for nodeName := range nodeinfos {
 		cached = append(cached, nodeName)
 	}
+
+	return compareStrings(actual, cached)
+}
+
+func (c compareStrategy) ComparePods(pods []*v1.Pod, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
+	actual := []string{}
+	for _, pod := range pods {
+		actual = append(actual, string(pod.UID))
+	}
+
+	cached := []string{}
+	for _, nodeinfo := range nodeinfos {
+		for _, pod := range nodeinfo.Pods() {
+			cached = append(cached, string(pod.UID))
+		}
+	}
+
+	return compareStrings(actual, cached)
+}
+
+func (c compareStrategy) ComparePdbs(pdbs []*policy.PodDisruptionBudget, pdbCache map[string]*policy.PodDisruptionBudget) (missed, redundant []string) {
+	actual := []string{}
+	for _, pdb := range pdbs {
+		actual = append(actual, string(pdb.Name))
+	}
+
+	cached := []string{}
+	for pdbName := range pdbCache {
+		cached = append(cached, pdbName)
+	}
+
+	return compareStrings(actual, cached)
+}
+
+func compareStrings(actual, cached []string) (missed, redundant []string) {
+	missed, redundant = []string{}, []string{}
 
 	sort.Strings(actual)
 	sort.Strings(cached)

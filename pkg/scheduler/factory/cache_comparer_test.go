@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
@@ -67,6 +69,121 @@ func TestCompareNodes(t *testing.T) {
 		}
 
 		m, r := compare.CompareNodes(nodes, nodeInfo)
+
+		if !reflect.DeepEqual(m, test.missing) {
+			t.Errorf("missing expected to be %s; got %s", test.missing, m)
+		}
+
+		if !reflect.DeepEqual(r, test.redundant) {
+			t.Errorf("redundant expected to be %s; got %s", test.redundant, r)
+		}
+	}
+}
+
+func TestComparePods(t *testing.T) {
+	compare := compareStrategy{}
+
+	tests := []struct {
+		actual    []string
+		cached    []string
+		missing   []string
+		redundant []string
+	}{
+		{
+			actual:    []string{"foo", "bar"},
+			cached:    []string{"bar", "foo", "foobar"},
+			missing:   []string{},
+			redundant: []string{"foobar"},
+		},
+		{
+			actual:    []string{"foo", "bar", "foobar"},
+			cached:    []string{"bar", "foo"},
+			missing:   []string{"foobar"},
+			redundant: []string{},
+		},
+		{
+			actual:    []string{"foo", "bar", "foobar"},
+			cached:    []string{"bar", "foobar", "foo"},
+			missing:   []string{},
+			redundant: []string{},
+		},
+	}
+
+	for _, test := range tests {
+		pods := []*v1.Pod{}
+		for _, uid := range test.actual {
+			pod := &v1.Pod{}
+			pod.UID = types.UID(uid)
+			pods = append(pods, pod)
+		}
+
+		nodeInfo := make(map[string]*schedulercache.NodeInfo)
+		for _, uid := range test.cached {
+			pod := &v1.Pod{}
+			pod.UID = types.UID(uid)
+			pod.Namespace = "ns"
+			pod.Name = uid
+
+			nodeInfo[uid] = schedulercache.NewNodeInfo(pod)
+		}
+
+		m, r := compare.ComparePods(pods, nodeInfo)
+
+		if !reflect.DeepEqual(m, test.missing) {
+			t.Errorf("missing expected to be %s; got %s", test.missing, m)
+		}
+
+		if !reflect.DeepEqual(r, test.redundant) {
+			t.Errorf("redundant expected to be %s; got %s", test.redundant, r)
+		}
+	}
+}
+
+func TestComparePdbs(t *testing.T) {
+	compare := compareStrategy{}
+
+	tests := []struct {
+		actual    []string
+		cached    []string
+		missing   []string
+		redundant []string
+	}{
+		{
+			actual:    []string{"foo", "bar"},
+			cached:    []string{"bar", "foo", "foobar"},
+			missing:   []string{},
+			redundant: []string{"foobar"},
+		},
+		{
+			actual:    []string{"foo", "bar", "foobar"},
+			cached:    []string{"bar", "foo"},
+			missing:   []string{"foobar"},
+			redundant: []string{},
+		},
+		{
+			actual:    []string{"foo", "bar", "foobar"},
+			cached:    []string{"bar", "foobar", "foo"},
+			missing:   []string{},
+			redundant: []string{},
+		},
+	}
+
+	for _, test := range tests {
+		pdbs := []*policy.PodDisruptionBudget{}
+		for _, name := range test.actual {
+			pdb := &policy.PodDisruptionBudget{}
+			pdb.Name = name
+			pdbs = append(pdbs, pdb)
+		}
+
+		cache := make(map[string]*policy.PodDisruptionBudget)
+		for _, name := range test.cached {
+			pdb := &policy.PodDisruptionBudget{}
+			pdb.Name = name
+			cache[name] = pdb
+		}
+
+		m, r := compare.ComparePdbs(pdbs, cache)
 
 		if !reflect.DeepEqual(m, test.missing) {
 			t.Errorf("missing expected to be %s; got %s", test.missing, m)
