@@ -182,25 +182,23 @@ func TestPodAndContainerAttach(t *testing.T) {
 func TestAttach(t *testing.T) {
 	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
-		name, version, podPath, fetchPodPath, attachPath, container string
-		pod                                                         *api.Pod
-		remoteAttachErr                                             bool
-		exepctedErr                                                 string
+		name, version, podPath, attachPath, container string
+		pod                                           *api.Pod
+		remoteAttachErr                               bool
+		exepctedErr                                   string
 	}{
 		{
-			name:         "pod attach",
-			version:      version,
-			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
-			fetchPodPath: "/namespaces/test/pods/foo",
-			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
-			pod:          attachPod(),
-			container:    "bar",
+			name:       "pod attach",
+			version:    version,
+			podPath:    "/api/" + version + "/namespaces/test/pods/foo",
+			attachPath: "/api/" + version + "/namespaces/test/pods/foo/attach",
+			pod:        attachPod(),
+			container:  "bar",
 		},
 		{
 			name:            "pod attach error",
 			version:         version,
 			podPath:         "/api/" + version + "/namespaces/test/pods/foo",
-			fetchPodPath:    "/namespaces/test/pods/foo",
 			attachPath:      "/api/" + version + "/namespaces/test/pods/foo/attach",
 			pod:             attachPod(),
 			remoteAttachErr: true,
@@ -208,14 +206,13 @@ func TestAttach(t *testing.T) {
 			exepctedErr:     "attach error",
 		},
 		{
-			name:         "container not found error",
-			version:      version,
-			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
-			fetchPodPath: "/namespaces/test/pods/foo",
-			attachPath:   "/api/" + version + "/namespaces/test/pods/foo/attach",
-			pod:          attachPod(),
-			container:    "foo",
-			exepctedErr:  "cannot attach to the container: container not found (foo)",
+			name:        "container not found error",
+			version:     version,
+			podPath:     "/api/" + version + "/namespaces/test/pods/foo",
+			attachPath:  "/api/" + version + "/namespaces/test/pods/foo/attach",
+			pod:         attachPod(),
+			container:   "foo",
+			exepctedErr: "cannot attach to the container: container not found (foo)",
 		},
 	}
 	for _, test := range tests {
@@ -224,14 +221,12 @@ func TestAttach(t *testing.T) {
 		ns := legacyscheme.Codecs
 
 		tf.Client = &fake.RESTClient{
+			VersionedAPIPath:     "/api/v1",
 			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				case p == test.fetchPodPath && m == "GET":
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
@@ -293,19 +288,18 @@ func TestAttach(t *testing.T) {
 func TestAttachWarnings(t *testing.T) {
 	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
-		name, container, version, podPath, fetchPodPath, expectedErr string
-		pod                                                          *api.Pod
-		stdin, tty                                                   bool
+		name, container, version, podPath, expectedErr string
+		pod                                            *api.Pod
+		stdin, tty                                     bool
 	}{
 		{
-			name:         "fallback tty if not supported",
-			version:      version,
-			podPath:      "/api/" + version + "/namespaces/test/pods/foo",
-			fetchPodPath: "/namespaces/test/pods/foo",
-			pod:          attachPod(),
-			stdin:        true,
-			tty:          true,
-			expectedErr:  "Unable to use a TTY - container bar did not allocate one",
+			name:        "fallback tty if not supported",
+			version:     version,
+			podPath:     "/api/" + version + "/namespaces/test/pods/foo",
+			pod:         attachPod(),
+			stdin:       true,
+			tty:         true,
+			expectedErr: "Unable to use a TTY - container bar did not allocate one",
 		},
 	}
 	for _, test := range tests {
@@ -314,14 +308,12 @@ func TestAttachWarnings(t *testing.T) {
 		ns := legacyscheme.Codecs
 
 		tf.Client = &fake.RESTClient{
+			VersionedAPIPath:     "/api/v1",
 			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				case p == test.fetchPodPath && m == "GET":
 					body := objBody(codec, test.pod)
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 				default:
