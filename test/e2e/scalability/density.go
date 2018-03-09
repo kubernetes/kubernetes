@@ -487,7 +487,7 @@ var _ = SIGDescribe("Density", func() {
 	}
 
 	isCanonical := func(test *Density) bool {
-		return test.kind == api.Kind("ReplicationController") && test.daemonsPerNode == 0 && test.secretsPerPod == 0 && test.configMapsPerPod == 0 && test.quotas
+		return test.kind == api.Kind("ReplicationController") && test.daemonsPerNode == 0 && test.secretsPerPod == 0 && test.configMapsPerPod == 0 && !test.quotas
 	}
 
 	for _, testArg := range densityTests {
