@@ -21,10 +21,12 @@ package storage
 
 import (
 	"k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/manifest"
 )
 
 const (
@@ -196,4 +198,60 @@ func csiHostPathPod(
 	// Wait for pod to come up
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, ret))
 	return ret
+}
+
+func csiGCEPDSetup(
+	client clientset.Interface,
+	config framework.VolumeTestConfig,
+	teardown bool,
+	f *framework.Framework,
+	nodeSA *v1.ServiceAccount,
+	controllerSA *v1.ServiceAccount,
+) {
+	// Get API Objects from manifests
+	nodeds, err := manifest.DaemonSetFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/node_ds.yaml", config.Namespace)
+	framework.ExpectNoError(err, "Failed to create DaemonSet from manifest")
+	nodeds.Spec.Template.Spec.ServiceAccountName = nodeSA.GetName()
+
+	controllerss, err := manifest.StatefulSetFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml", config.Namespace)
+	framework.ExpectNoError(err, "Failed to create StatefulSet from manifest")
+	controllerss.Spec.Template.Spec.ServiceAccountName = controllerSA.GetName()
+
+	controllerservice, err := manifest.SvcFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/controller_service.yaml")
+	framework.ExpectNoError(err, "Failed to create Service from manifest")
+
+	// Got all objects from manifests now try to delete objects
+	err = client.CoreV1().Services(config.Namespace).Delete(controllerservice.GetName(), nil)
+	if err != nil {
+		if !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to delete Service: %v", controllerservice.GetName())
+		}
+	}
+
+	err = client.AppsV1().StatefulSets(config.Namespace).Delete(controllerss.Name, nil)
+	if err != nil {
+		if !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to delete StatefulSet: %v", controllerss.GetName())
+		}
+	}
+	err = client.AppsV1().DaemonSets(config.Namespace).Delete(nodeds.Name, nil)
+	if err != nil {
+		if !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to delete DaemonSet: %v", nodeds.GetName())
+		}
+	}
+	if teardown {
+		return
+	}
+
+	// Create new API Objects through client
+	_, err = client.CoreV1().Services(config.Namespace).Create(controllerservice)
+	framework.ExpectNoError(err, "Failed to create Service: %v", controllerservice.Name)
+
+	_, err = client.AppsV1().StatefulSets(config.Namespace).Create(controllerss)
+	framework.ExpectNoError(err, "Failed to create StatefulSet: %v", controllerss.Name)
+
+	_, err = client.AppsV1().DaemonSets(config.Namespace).Create(nodeds)
+	framework.ExpectNoError(err, "Failed to create DaemonSet: %v", nodeds.Name)
+
 }

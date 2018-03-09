@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -28,10 +29,12 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -95,7 +98,7 @@ func csiServiceAccount(
 	componentName string,
 	teardown bool,
 ) *v1.ServiceAccount {
-	By("Creating a CSI service account")
+	By(fmt.Sprintf("Creating a CSI service account for %v", componentName))
 	serviceAccountName := config.Prefix + "-" + componentName + "-service-account"
 	serviceAccountClient := client.CoreV1().ServiceAccounts(config.Namespace)
 	sa := &v1.ServiceAccount{
@@ -130,7 +133,7 @@ func csiClusterRoleBindings(
 	sa *v1.ServiceAccount,
 	clusterRolesNames []string,
 ) {
-	By("Binding cluster roles to the CSI service account")
+	By(fmt.Sprintf("Binding cluster roles %v to the CSI service account %v", clusterRolesNames, sa.GetName()))
 	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
 	for _, clusterRoleName := range clusterRolesNames {
 
@@ -236,5 +239,62 @@ var _ = utils.SIGDescribe("CSI Volumes [Flaky]", func() {
 			claim.Spec.StorageClassName = &class.ObjectMeta.Name
 			testDynamicProvisioning(t, cs, claim, class)
 		})
+	})
+
+	Describe("[Feature: CSI] Sanity CSI plugin test using GCE-PD CSI driver", func() {
+		var (
+			controllerClusterRoles []string = []string{
+				csiExternalAttacherClusterRoleName,
+				csiExternalProvisionerClusterRoleName,
+			}
+			nodeClusterRoles []string = []string{
+				csiDriverRegistrarClusterRoleName,
+			}
+			controllerServiceAccount *v1.ServiceAccount
+			nodeServiceAccount       *v1.ServiceAccount
+		)
+
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			// Currently you will need to manually add the required GCP Credentials as a secret "cloud-sa"
+			// kubectl create generic cloud-sa --from-file=PATH/TO/cloud-sa.json --namespace={{config.Namespace}}
+			// TODO(GITHUBISSUE): Inject the necessary credentials automatically to the driver containers in e2e test
+			framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
+
+			By("deploying gce-pd driver")
+			controllerServiceAccount = csiServiceAccount(cs, config, "gce-controller", false)
+			nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false)
+			csiClusterRoleBindings(cs, config, false, controllerServiceAccount, controllerClusterRoles)
+			csiClusterRoleBindings(cs, config, false, nodeServiceAccount, nodeClusterRoles)
+			csiGCEPDSetup(cs, config, false, f, nodeServiceAccount, controllerServiceAccount)
+		})
+
+		AfterEach(func() {
+			By("uninstalling gce-pd driver")
+			csiGCEPDSetup(cs, config, true, f, nodeServiceAccount, controllerServiceAccount)
+			csiClusterRoleBindings(cs, config, true, controllerServiceAccount, controllerClusterRoles)
+			csiClusterRoleBindings(cs, config, true, nodeServiceAccount, nodeClusterRoles)
+			csiServiceAccount(cs, config, "gce-controller", true)
+			csiServiceAccount(cs, config, "gce-node", true)
+		})
+
+		It("should provision storage with a GCE-PD CSI driver", func() {
+			nodeZone, ok := node.GetLabels()[kubeletapis.LabelZoneFailureDomain]
+			Expect(ok).To(BeTrue(), "Could not get label %v from node %v", kubeletapis.LabelZoneFailureDomain, node.GetName())
+			t := storageClassTest{
+				name:         "csi-gce-pd",
+				provisioner:  "csi-gce-pd",
+				parameters:   map[string]string{"type": "pd-standard", "zone": nodeZone},
+				claimSize:    "5Gi",
+				expectedSize: "5Gi",
+				nodeName:     node.Name,
+			}
+
+			claim := newClaim(t, ns.GetName(), "")
+			class := newStorageClass(t, ns.GetName(), "")
+			claim.Spec.StorageClassName = &class.ObjectMeta.Name
+			testDynamicProvisioning(t, cs, claim, class)
+		})
+
 	})
 })
