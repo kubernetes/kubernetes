@@ -21,12 +21,15 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -72,8 +75,19 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 
 	status := &apiextensions.CustomResourceSubresourceStatus{}
 
-	// TODO: identify how to pass printer specification from the CRD
-	table, _ := tableconvertor.New(nil)
+	headers := []apiextensions.CustomResourceColumnDefinition{
+		{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
+		{Name: "Replicas", Type: "integer", JSONPath: ".spec.replicas"},
+		{Name: "Missing", Type: "string", JSONPath: ".spec.missing"},
+		{Name: "Invalid", Type: "integer", JSONPath: ".spec.string"},
+		{Name: "String", Type: "string", JSONPath: ".spec.string"},
+		{Name: "StringFloat64", Type: "string", JSONPath: ".spec.float64"},
+		{Name: "StringInt64", Type: "string", JSONPath: ".spec.replicas"},
+		{Name: "StringBool", Type: "string", JSONPath: ".spec.bool"},
+		{Name: "Float64", Type: "number", JSONPath: ".spec.float64"},
+		{Name: "Bool", Type: "boolean", JSONPath: ".spec.bool"},
+	}
+	table, _ := tableconvertor.New(headers)
 
 	storage := customresource.NewStorage(
 		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
@@ -112,11 +126,18 @@ func validNewCustomResource() *unstructured.Unstructured {
 			"apiVersion": "mygroup.example.com/v1beta1",
 			"kind":       "Noxu",
 			"metadata": map[string]interface{}{
-				"namespace": "default",
-				"name":      "foo",
+				"namespace":         "default",
+				"name":              "foo",
+				"creationTimestamp": time.Now().Add(-time.Hour*12 - 30*time.Minute).UTC().Format(time.RFC3339),
 			},
 			"spec": map[string]interface{}{
-				"replicas": int64(7),
+				"replicas":         int64(7),
+				"string":           "string",
+				"float64":          float64(3.1415926),
+				"bool":             true,
+				"stringList":       []interface{}{"foo", "bar"},
+				"mixedList":        []interface{}{"foo", int64(42)},
+				"nonPrimitiveList": []interface{}{"foo", []interface{}{int64(1), int64(2)}},
 			},
 		},
 	}
@@ -222,6 +243,77 @@ func TestCategories(t *testing.T) {
 	ok := reflect.DeepEqual(actual, expected)
 	if !ok {
 		t.Errorf("categories are not equal. expected = %v actual = %v", expected, actual)
+	}
+}
+
+func TestColumns(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.CustomResource.Store.DestroyFunc()
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+	key := "/noxus/" + metav1.NamespaceDefault + "/foo"
+	validCustomResource := validNewCustomResource()
+	if err := storage.CustomResource.Storage.Create(ctx, key, validCustomResource, nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	gottenList, err := storage.CustomResource.List(ctx, &metainternal.ListOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tbl, err := storage.CustomResource.ConvertToTable(ctx, gottenList, &metav1beta1.TableOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedColumns := []struct {
+		Name, Type string
+	}{
+		{"Name", "string"},
+		{"Age", "date"},
+		{"Replicas", "integer"},
+		{"Missing", "string"},
+		{"Invalid", "integer"},
+		{"String", "string"},
+		{"StringFloat64", "string"},
+		{"StringInt64", "string"},
+		{"StringBool", "string"},
+		{"Float64", "number"},
+		{"Bool", "boolean"},
+	}
+	if len(tbl.ColumnDefinitions) != len(expectedColumns) {
+		t.Fatalf("got %d columns, expected %d. Got: %+v", len(tbl.ColumnDefinitions), len(expectedColumns), tbl.ColumnDefinitions)
+	}
+	for i, d := range tbl.ColumnDefinitions {
+		if d.Name != expectedColumns[i].Name {
+			t.Errorf("got column %d name %q, expected %q", i, d.Name, expectedColumns[i].Name)
+		}
+		if d.Type != expectedColumns[i].Type {
+			t.Errorf("got column %d type %q, expected %q", i, d.Type, expectedColumns[i].Type)
+		}
+	}
+
+	expectedRows := [][]interface{}{
+		{
+			"foo",
+			"12h",
+			int64(7),
+			nil,
+			nil,
+			"string",
+			"3.1415926",
+			"7",
+			"true",
+			float64(3.1415926),
+			true,
+		},
+	}
+	for i, r := range tbl.Rows {
+		if !reflect.DeepEqual(r.Cells, expectedRows[i]) {
+			t.Errorf("got row %d with cells %#v, expected %#v", i, r.Cells, expectedRows[i])
+		}
 	}
 }
 

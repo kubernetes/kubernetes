@@ -370,6 +370,8 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
+var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
+
 func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
@@ -439,8 +441,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			scaleSpec = crd.Spec.Subresources.Scale
 		}
 
-		// TODO: identify how to pass printer specification from the CRD
-		table, err := tableconvertor.New(nil)
+		table, err := tableconvertor.New(crd.Spec.AdditionalPrinterColumns)
 		if err != nil {
 			glog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
 		}
