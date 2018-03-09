@@ -176,9 +176,11 @@ func (prober *flexVolumeProber) updateProbeNeeded() {
 // on its parent directory.
 func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
 	addWatch := func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			if err := prober.watcher.AddWatch(path); err != nil {
-				glog.Errorf("Error recursively adding watch: %v", err)
+		if err == nil {
+			if info.IsDir() {
+				if err := prober.watcher.AddWatch(path); err != nil {
+					glog.Errorf("Error recursively adding watch: %v", err)
+				}
 			}
 		}
 		return nil
