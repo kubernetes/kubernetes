@@ -23,11 +23,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 const (
@@ -222,6 +225,11 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 	if err := s.updateSymlink(certPath); err != nil {
 		return nil, err
 	}
+
+	if err := s.removeObsolete(pemFilename); err != nil {
+		return nil, err
+	}
+
 	return cert, nil
 }
 
@@ -321,4 +329,23 @@ func fileExists(filename string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// remove obsolete certificates belong to self, but reserve current one.
+func (s *fileStore) removeObsolete(filename string) error {
+	files, err := utilfile.ReadDirNoStat(s.certDirectory)
+	if err != nil {
+		return fmt.Errorf("unable to read dir %q: %v", s.certDirectory, err)
+	}
+	for _, file := range files {
+		if file == filename || file == s.filename(currentPair) {
+			continue
+		}
+		if strings.HasPrefix(file, s.pairNamePrefix) {
+			if err := os.Remove(path.Join(s.certDirectory, file)); err != nil {
+				return fmt.Errorf("unable to remove %q: %v", s.certDirectory, err)
+			}
+		}
+	}
+	return nil
 }
