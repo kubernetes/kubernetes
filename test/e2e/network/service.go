@@ -427,9 +427,15 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
+		initialRestartCount, err := framework.GetApiserverRestartCount(cs)
+		Expect(err).NotTo(HaveOccurred(), "failed to get apiserver's restart count")
 		By("Restarting apiserver")
 		if err := framework.RestartApiserver(cs.Discovery()); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
+		}
+		By("Waiting for apiserver to be restarted")
+		if err := framework.WaitForApiserverRestarted(cs, initialRestartCount); err != nil {
+			framework.Failf("error while waiting for apiserver to be restarted: %v", err)
 		}
 		By("Waiting for apiserver to come up by polling /healthz")
 		if err := framework.WaitForApiserverUp(cs); err != nil {

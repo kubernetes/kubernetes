@@ -287,7 +287,7 @@ outer:
 	return -1, fmt.Errorf("SecurityGroup priorities are exhausted")
 }
 
-func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
+func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
 	return az.vmSet.GetIPByNodeName(string(nodeName), "")
 }
 
@@ -424,21 +424,37 @@ func (as *availabilitySet) GetPrimaryVMSetName() string {
 	return as.Config.PrimaryAvailabilitySetName
 }
 
-// GetIPByNodeName gets machine IP by node name.
-func (as *availabilitySet) GetIPByNodeName(name, vmSetName string) (string, error) {
+// GetIPByNodeName gets machine private IP and public IP by node name.
+func (as *availabilitySet) GetIPByNodeName(name, vmSetName string) (string, string, error) {
 	nic, err := as.GetPrimaryInterface(name, vmSetName)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
 		glog.Errorf("error: as.GetIPByNodeName(%s), getPrimaryIPConfig(%v), err=%v", name, nic, err)
-		return "", err
+		return "", "", err
 	}
 
-	targetIP := *ipConfig.PrivateIPAddress
-	return targetIP, nil
+	privateIP := *ipConfig.PrivateIPAddress
+	publicIP := ""
+	if ipConfig.PublicIPAddress != nil && ipConfig.PublicIPAddress.ID != nil {
+		pipID := *ipConfig.PublicIPAddress.ID
+		pipName, err := getLastSegment(pipID)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to publicIP name for node %q with pipID %q", name, pipID)
+		}
+		pip, existsPip, err := as.getPublicIPAddress(as.ResourceGroup, pipName)
+		if err != nil {
+			return "", "", err
+		}
+		if existsPip {
+			publicIP = *pip.IPAddress
+		}
+	}
+
+	return privateIP, publicIP, nil
 }
 
 // getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds

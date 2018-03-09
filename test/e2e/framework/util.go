@@ -3962,6 +3962,42 @@ func WaitForApiserverUp(c clientset.Interface) error {
 	return fmt.Errorf("waiting for apiserver timed out")
 }
 
+// WaitForApiserverRestarted waits until apiserver's restart count increased.
+func WaitForApiserverRestarted(c clientset.Interface, initialRestartCount int32) error {
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		restartCount, err := GetApiserverRestartCount(c)
+		if err != nil {
+			Logf("Failed to get apiserver's restart count: %v", err)
+			continue
+		}
+		if restartCount > initialRestartCount {
+			Logf("Apiserver has restarted.")
+			return nil
+		}
+		Logf("Waiting for apiserver restart count to increase")
+	}
+	return fmt.Errorf("timed out waiting for apiserver to be restarted")
+}
+
+func GetApiserverRestartCount(c clientset.Interface) (int32, error) {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "kube-apiserver"}))
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
+	if err != nil {
+		return -1, err
+	}
+	if len(pods.Items) != 1 {
+		return -1, fmt.Errorf("unexpected number of apiserver pod: %d", len(pods.Items))
+	}
+	for _, s := range pods.Items[0].Status.ContainerStatuses {
+		if s.Name != "kube-apiserver" {
+			continue
+		}
+		return s.RestartCount, nil
+	}
+	return -1, fmt.Errorf("failed to find kube-apiserver container in pod")
+}
+
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
 	if !ProviderIs("gce", "aws") {
