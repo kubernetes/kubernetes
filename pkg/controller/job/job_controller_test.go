@@ -36,6 +36,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1336,5 +1337,72 @@ func TestJobBackoffReset(t *testing.T) {
 		if getCondition(actual, batch.JobFailed, "BackoffLimitExceeded") {
 			t.Errorf("%s: unexpected job failure", name)
 		}
+	}
+}
+
+var _ workqueue.RateLimitingInterface = &fakeRateLimitingQueue{}
+
+type fakeRateLimitingQueue struct {
+	workqueue.Interface
+	requeues int
+	item     interface{}
+	duration time.Duration
+}
+
+func (f *fakeRateLimitingQueue) AddRateLimited(item interface{}) {}
+func (f *fakeRateLimitingQueue) Forget(item interface{})         {}
+func (f *fakeRateLimitingQueue) NumRequeues(item interface{}) int {
+	return f.requeues
+}
+func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duration) {
+	f.item = item
+	f.duration = duration
+}
+
+func TestJobBackoff(t *testing.T) {
+	job := newJob(1, 1, 1)
+	oldPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
+	oldPod.Status.Phase = v1.PodRunning
+	oldPod.ResourceVersion = "1"
+	newPod := oldPod.DeepCopy()
+	newPod.ResourceVersion = "2"
+
+	testCases := map[string]struct {
+		// inputs
+		requeues int
+		phase    v1.PodPhase
+
+		// expectation
+		backoff int
+	}{
+		"1st failure": {0, v1.PodFailed, 0},
+		"2nd failure": {1, v1.PodFailed, 1},
+		"3rd failure": {2, v1.PodFailed, 2},
+		"1st success": {0, v1.PodSucceeded, 0},
+		"2nd success": {1, v1.PodSucceeded, 0},
+		"1st running": {0, v1.PodSucceeded, 0},
+		"2nd running": {1, v1.PodSucceeded, 0},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+			manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			queue := &fakeRateLimitingQueue{}
+			manager.queue = queue
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+
+			queue.requeues = tc.requeues
+			newPod.Status.Phase = tc.phase
+			manager.updatePod(oldPod, newPod)
+
+			if queue.duration.Nanoseconds() != int64(tc.backoff)*DefaultJobBackOff.Nanoseconds() {
+				t.Errorf("unexpected backoff %v", queue.duration)
+			}
+		})
 	}
 }
