@@ -20,6 +20,8 @@ package factory
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"reflect"
 	"time"
 
@@ -294,6 +296,27 @@ func NewConfigFactory(
 		// Setup volume binder
 		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer)
 	}
+
+	// Setup cache comparer
+	comparer := &cacheComparer{
+		podLister:  podInformer.Lister(),
+		nodeLister: nodeInformer.Lister(),
+		cache:      c.schedulerCache,
+	}
+
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, compareSignal)
+
+	go func() {
+		for {
+			select {
+			case <-c.StopEverything:
+				return
+			case <-ch:
+				comparer.Compare()
+			}
+		}
+	}()
 
 	return c
 }
