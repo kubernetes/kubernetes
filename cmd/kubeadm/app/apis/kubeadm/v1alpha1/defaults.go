@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"net/url"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,6 +69,9 @@ const (
 	DefaultProxyBindAddressv6 = "::"
 	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
 	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
+
+	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the NodeConfiguration)
+	DefaultDiscoveryTimeout = 5 * time.Minute
 )
 
 var (
@@ -175,6 +179,11 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 		u, err := url.Parse(obj.DiscoveryFile)
 		if err == nil && u.Scheme == "file" {
 			obj.DiscoveryFile = u.Path
+		}
+	}
+	if obj.DiscoveryTimeout == nil {
+		obj.DiscoveryTimeout = &metav1.Duration{
+			Duration: DefaultDiscoveryTimeout,
 		}
 	}
 }

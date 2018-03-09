@@ -59,7 +59,7 @@ func GetValidatedClusterInfoObject(cfg *kubeadmapi.NodeConfiguration) (*clientcm
 		}
 		return file.RetrieveValidatedClusterInfo(cfg.DiscoveryFile)
 	case len(cfg.DiscoveryToken) != 0:
-		return token.RetrieveValidatedClusterInfo(cfg.DiscoveryToken, cfg.DiscoveryTokenAPIServers, cfg.DiscoveryTokenCACertHashes)
+		return token.RetrieveValidatedClusterInfo(cfg)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration")
 	}
