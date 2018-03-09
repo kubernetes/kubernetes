@@ -450,7 +450,7 @@ func (s *CollectdValueError) MarshalJSON() ([]byte, error) {
 // matches on the exact content. In the future, it can be expanded to
 // allow for regular expressions and more complex matching.
 type ContentMatcher struct {
-	// Content: String content to match
+	// Content: String content to match (max 1024 bytes)
 	Content string `json:"content,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Content") to

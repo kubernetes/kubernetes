@@ -88,8 +88,8 @@ const (
 	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
 	gceHcUnhealthyThreshold = int64(5)
 
-	gceComputeAPIEndpoint      = "https://www.googleapis.com/compute/v1/"
-	gceComputeAPIEndpointAlpha = "https://www.googleapis.com/compute/alpha/"
+	gceComputeAPIEndpoint     = "https://www.googleapis.com/compute/v1/"
+	gceComputeAPIEndpointBeta = "https://www.googleapis.com/compute/beta/"
 )
 
 // gceObject is an abstraction of all GCE API object in go client
@@ -878,10 +878,10 @@ func (manager *gceServiceManager) getProjectsAPIEndpoint() string {
 	return projectsApiEndpoint
 }
 
-func (manager *gceServiceManager) getProjectsAPIEndpointAlpha() string {
-	projectsApiEndpoint := gceComputeAPIEndpointAlpha + "projects/"
+func (manager *gceServiceManager) getProjectsAPIEndpointBeta() string {
+	projectsApiEndpoint := gceComputeAPIEndpointBeta + "projects/"
 	if manager.gce.service != nil {
-		projectsApiEndpoint = manager.gce.serviceAlpha.BasePath
+		projectsApiEndpoint = manager.gce.serviceBeta.BasePath
 	}
 
 	return projectsApiEndpoint

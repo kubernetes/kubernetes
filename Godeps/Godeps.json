@@ -3033,51 +3033,51 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.alpha",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.beta",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/gensupport",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi/internal/uritemplates",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/logging/v2beta1",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/monitoring/v3",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/pubsub/v1",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/tpu/v1alpha1",
-			"Rev": "ab90adb3efa287b869ecb698db42f923cc734972"
+			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/genproto/googleapis/api/annotations",
