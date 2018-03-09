@@ -303,6 +303,15 @@ func (in *WebhookClientConfig) DeepCopyInto(out *WebhookClientConfig) {
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
+	if in.Timeout != nil {
+		in, out := &in.Timeout, &out.Timeout
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
+	}
 	return
 }
 

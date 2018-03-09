@@ -257,6 +257,7 @@ func autoConvert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookCli
 	out.URL = (*string)(unsafe.Pointer(in.URL))
 	out.Service = (*admissionregistration.ServiceReference)(unsafe.Pointer(in.Service))
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	out.Timeout = (*v1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
@@ -269,6 +270,7 @@ func autoConvert_admissionregistration_WebhookClientConfig_To_v1beta1_WebhookCli
 	out.URL = (*string)(unsafe.Pointer(in.URL))
 	out.Service = (*v1beta1.ServiceReference)(unsafe.Pointer(in.Service))
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
+	out.Timeout = (*v1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
