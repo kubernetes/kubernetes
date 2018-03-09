@@ -1152,10 +1152,29 @@ func validateLocalNonReservedPath(targetPath string, fldPath *field.Path) field.
 	return allErrs
 }
 
+// This validates that the name and the domain are set. The protocol, if set, must be supported.
+func validateSRVRecordSource(srvRec *core.SRVRecordSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(srvRec.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	if len(srvRec.Domain) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("domain"), ""))
+	}
+	if len(srvRec.Protocol) != 0 && !supportedPortProtocols.Has(string(srvRec.Protocol)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), srvRec.Protocol, supportedPortProtocols.List()))
+	}
+	return allErrs
+}
+
 func validateRBDVolumeSource(rbd *core.RBDVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rbd.CephMonitors) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
+		if rbd.MonitorSRVRecord != nil {
+			allErrs = append(allErrs, validateSRVRecordSource(rbd.MonitorSRVRecord, fldPath.Child("monitorSRVRecord"))...)
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), "required if monitorSRVRecord is unset"))
+		}
 	}
 	if len(rbd.RBDImage) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
@@ -1166,7 +1185,11 @@ func validateRBDVolumeSource(rbd *core.RBDVolumeSource, fldPath *field.Path) fie
 func validateRBDPersistentVolumeSource(rbd *core.RBDPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(rbd.CephMonitors) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
+		if rbd.MonitorSRVRecord != nil {
+			allErrs = append(allErrs, validateSRVRecordSource(rbd.MonitorSRVRecord, fldPath.Child("monitorSRVRecord"))...)
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), "required if monitorSRVRecord is unset"))
+		}
 	}
 	if len(rbd.RBDImage) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("image"), ""))
@@ -1206,7 +1229,11 @@ func validateCinderPersistentVolumeSource(cd *core.CinderPersistentVolumeSource,
 func validateCephFSVolumeSource(cephfs *core.CephFSVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cephfs.Monitors) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
+		if cephfs.MonitorSRVRecord != nil {
+			allErrs = append(allErrs, validateSRVRecordSource(cephfs.MonitorSRVRecord, fldPath.Child("monitorSRVRecord"))...)
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), "required if monitorSRVRecord is unset"))
+		}
 	}
 	return allErrs
 }
@@ -1214,7 +1241,11 @@ func validateCephFSVolumeSource(cephfs *core.CephFSVolumeSource, fldPath *field.
 func validateCephFSPersistentVolumeSource(cephfs *core.CephFSPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cephfs.Monitors) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), ""))
+		if cephfs.MonitorSRVRecord != nil {
+			allErrs = append(allErrs, validateSRVRecordSource(cephfs.MonitorSRVRecord, fldPath.Child("monitorSRVRecord"))...)
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("monitors"), "required if monitorSRVRecord is unset"))
+		}
 	}
 	return allErrs
 }

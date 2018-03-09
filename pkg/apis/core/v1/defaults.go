@@ -366,6 +366,12 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 	}
 }
 
+func SetDefaults_SRVRecordSource(obj *v1.SRVRecordSource) {
+	if obj.Protocol == "" {
+		obj.Protocol = v1.ProtocolTCP
+	}
+}
+
 func SetDefaults_RBDVolumeSource(obj *v1.RBDVolumeSource) {
 	if obj.RBDPool == "" {
 		obj.RBDPool = "rbd"
