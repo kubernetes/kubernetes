@@ -33,6 +33,7 @@ func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	deleted := false
@@ -89,6 +90,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	redisMasterDeleted := false
@@ -159,6 +161,7 @@ func TestReplaceDirectory(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	created := map[string]bool{}
@@ -216,6 +219,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{

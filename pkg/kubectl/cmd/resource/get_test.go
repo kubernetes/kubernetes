@@ -198,6 +198,7 @@ func testComponentStatusData() *api.ComponentStatusList {
 func TestGetUnknownSchemaObject(t *testing.T) {
 	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
 
@@ -272,6 +273,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := testapi.Default.Codec()
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
@@ -294,6 +296,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	// overide the openAPISchema function to return custom output
@@ -351,6 +354,7 @@ func TestGetObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -417,6 +421,8 @@ func TestGetObjectsFiltered(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+			defer tf.Cleanup()
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -458,6 +464,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	}
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -511,6 +518,7 @@ func TestGetSortedObjects(t *testing.T) {
 	}
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -544,6 +552,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -571,6 +580,7 @@ func TestGetListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -598,6 +608,7 @@ func TestGetAllListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -626,6 +637,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -667,6 +679,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 	}
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -717,6 +730,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -756,6 +770,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -858,6 +873,7 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -902,6 +918,7 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -954,6 +971,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	}
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -993,6 +1011,7 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1089,6 +1108,7 @@ func TestWatchLabelSelector(t *testing.T) {
 	pods, events := watchTestData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	podList := &api.PodList{
@@ -1141,6 +1161,7 @@ func TestWatchFieldSelector(t *testing.T) {
 	pods, events := watchTestData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	podList := &api.PodList{
@@ -1193,6 +1214,7 @@ func TestWatchResource(t *testing.T) {
 	pods, events := watchTestData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1237,6 +1259,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1282,6 +1305,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	pods, events := watchTestData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -1325,6 +1349,7 @@ func TestWatchOnlyList(t *testing.T) {
 	pods, events := watchTestData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	podList := &api.PodList{

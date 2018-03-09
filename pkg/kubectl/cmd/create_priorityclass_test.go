@@ -32,6 +32,8 @@ import (
 func TestCreatePriorityClass(t *testing.T) {
 	pcName := "my-pc"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{

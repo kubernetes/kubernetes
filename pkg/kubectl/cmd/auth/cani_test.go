@@ -117,64 +117,68 @@ func TestRunAccessCheck(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.o.Out = ioutil.Discard
-		test.o.Err = ioutil.Discard
+		t.Run(test.name, func(t *testing.T) {
+			test.o.Out = ioutil.Discard
+			test.o.Err = ioutil.Discard
 
-		tf := cmdtesting.NewTestFactory()
-		ns := legacyscheme.Codecs
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				expectPath := "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"
-				if req.URL.Path != expectPath {
-					t.Errorf("%s: expected %v, got %v", test.name, expectPath, req.URL.Path)
-					return nil, nil
-				}
-				bodyBits, err := ioutil.ReadAll(req.Body)
-				if err != nil {
-					t.Errorf("%s: %v", test.name, err)
-					return nil, nil
-				}
-				body := string(bodyBits)
+			ns := legacyscheme.Codecs
 
-				for _, expectedBody := range test.expectedBodyStrings {
-					if !strings.Contains(body, expectedBody) {
-						t.Errorf("%s expecting %s in %s", test.name, expectedBody, body)
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					expectPath := "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"
+					if req.URL.Path != expectPath {
+						t.Errorf("%s: expected %v, got %v", test.name, expectPath, req.URL.Path)
+						return nil, nil
 					}
-				}
+					bodyBits, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Errorf("%s: %v", test.name, err)
+						return nil, nil
+					}
+					body := string(bodyBits)
 
-				return &http.Response{
-						StatusCode: http.StatusOK,
-						Body: ioutil.NopCloser(bytes.NewBufferString(
-							fmt.Sprintf(`{"kind":"SelfSubjectAccessReview","apiVersion":"authorization.k8s.io/v1","status":{"allowed":%v}}`, test.allowed),
-						)),
-					},
-					test.serverErr
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
+					for _, expectedBody := range test.expectedBodyStrings {
+						if !strings.Contains(body, expectedBody) {
+							t.Errorf("%s expecting %s in %s", test.name, expectedBody, body)
+						}
+					}
 
-		if err := test.o.Complete(tf, test.args); err != nil {
-			t.Errorf("%s: %v", test.name, err)
-			continue
-		}
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body: ioutil.NopCloser(bytes.NewBufferString(
+								fmt.Sprintf(`{"kind":"SelfSubjectAccessReview","apiVersion":"authorization.k8s.io/v1","status":{"allowed":%v}}`, test.allowed),
+							)),
+						},
+						test.serverErr
+				}),
+			}
+			tf.Namespace = "test"
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
 
-		actualAllowed, err := test.o.RunAccessCheck()
-		switch {
-		case test.serverErr == nil && err == nil:
-			// pass
-		case err != nil && test.serverErr != nil && strings.Contains(err.Error(), test.serverErr.Error()):
-			// pass
-		default:
-			t.Errorf("%s: expected %v, got %v", test.name, test.serverErr, err)
-			continue
-		}
-		if actualAllowed != test.allowed {
-			t.Errorf("%s: expected %v, got %v", test.name, test.allowed, actualAllowed)
-			continue
-		}
+			if err := test.o.Complete(tf, test.args); err != nil {
+				t.Errorf("%s: %v", test.name, err)
+				return
+			}
+
+			actualAllowed, err := test.o.RunAccessCheck()
+			switch {
+			case test.serverErr == nil && err == nil:
+				// pass
+			case err != nil && test.serverErr != nil && strings.Contains(err.Error(), test.serverErr.Error()):
+				// pass
+			default:
+				t.Errorf("%s: expected %v, got %v", test.name, test.serverErr, err)
+				return
+			}
+			if actualAllowed != test.allowed {
+				t.Errorf("%s: expected %v, got %v", test.name, test.allowed, actualAllowed)
+				return
+			}
+		})
 	}
 }
