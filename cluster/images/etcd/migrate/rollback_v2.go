@@ -18,8 +18,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
-	"fmt"
 	"os"
 	"path"
 	"strconv"
@@ -49,17 +47,10 @@ import (
 
 const rollbackVersion = "2.2.0"
 
-var (
-	migrateDatadir = flag.String("data-dir", "", "Path to the data directory")
-	ttl            = flag.Duration("ttl", time.Hour, "TTL of event keys (default 1 hour)")
-)
-
-func main() {
-	flag.Parse()
-	if len(*migrateDatadir) == 0 {
-		glog.Fatal("need to set '--data-dir'")
-	}
-	dbpath := path.Join(*migrateDatadir, "member", "snap", "db")
+// RollbackV3ToV2 rolls back an etcd 3.0.x data directory to the 2.x.x version specified by rollbackVersion.
+func RollbackV3ToV2(migrateDatadir string, ttl time.Duration) error {
+	dbpath := path.Join(migrateDatadir, "member", "snap", "db")
+	glog.Infof("Rolling db file %s back to etcd 2.x", dbpath)
 
 	// etcd3 store backend. We will use it to parse v3 data files and extract information.
 	be := backend.NewDefaultBackend(dbpath)
@@ -67,7 +58,7 @@ func main() {
 
 	// etcd2 store backend. We will use v3 data to update this and then save snapshot to disk.
 	st := store.New(etcdserver.StoreClusterPrefix, etcdserver.StoreKeysPrefix)
-	expireTime := time.Now().Add(*ttl)
+	expireTime := time.Now().Add(ttl)
 
 	tx.Lock()
 	err := tx.UnsafeForEach([]byte("key"), func(k, v []byte) error {
@@ -97,43 +88,43 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		glog.Fatal(err)
+		return err
 	}
 	tx.Unlock()
 
 	if err := traverseAndDeleteEmptyDir(st, "/"); err != nil {
-		glog.Fatal(err)
+		return err
 	}
 
 	// rebuild cluster state.
-	metadata, hardstate, oldSt, err := rebuild(*migrateDatadir)
+	metadata, hardstate, oldSt, err := rebuild(migrateDatadir)
 	if err != nil {
-		glog.Fatal(err)
+		return err
 	}
 
 	// In the following, it's low level logic that saves metadata and data into v2 snapshot.
-	backupPath := *migrateDatadir + ".rollback.backup"
-	if err := os.Rename(*migrateDatadir, backupPath); err != nil {
-		glog.Fatal(err)
+	backupPath := migrateDatadir + ".rollback.backup"
+	if err := os.Rename(migrateDatadir, backupPath); err != nil {
+		return err
 	}
-	if err := os.MkdirAll(path.Join(*migrateDatadir, "member", "snap"), 0700); err != nil {
-		glog.Fatal(err)
+	if err := os.MkdirAll(path.Join(migrateDatadir, "member", "snap"), 0777); err != nil {
+		return err
 	}
-	walDir := path.Join(*migrateDatadir, "member", "wal")
+	walDir := path.Join(migrateDatadir, "member", "wal")
 
 	w, err := oldwal.Create(walDir, metadata)
 	if err != nil {
-		glog.Fatal(err)
+		return err
 	}
 	err = w.SaveSnapshot(walpb.Snapshot{Index: hardstate.Commit, Term: hardstate.Term})
-	if err != nil {
-		glog.Fatal(err)
-	}
 	w.Close()
+	if err != nil {
+		return err
+	}
 
 	event, err := oldSt.Get(etcdserver.StoreClusterPrefix, true, false)
 	if err != nil {
-		glog.Fatal(err)
+		return err
 	}
 	// nodes (members info) for ConfState
 	nodes := []uint64{}
@@ -148,7 +139,7 @@ func main() {
 				v = rollbackVersion
 			}
 			if _, err := st.Set(n.Key, n.Dir, v, store.TTLOptionSet{}); err != nil {
-				glog.Fatal(err)
+				glog.Error(err)
 			}
 
 			// update nodes
@@ -165,7 +156,7 @@ func main() {
 
 	data, err := st.Save()
 	if err != nil {
-		glog.Fatal(err)
+		return err
 	}
 	raftSnap := raftpb.Snapshot{
 		Data: data,
@@ -177,11 +168,12 @@ func main() {
 			},
 		},
 	}
-	snapshotter := snap.New(path.Join(*migrateDatadir, "member", "snap"))
+	snapshotter := snap.New(path.Join(migrateDatadir, "member", "snap"))
 	if err := snapshotter.SaveSnap(raftSnap); err != nil {
-		glog.Fatal(err)
+		return err
 	}
-	fmt.Println("Finished successfully")
+	glog.Infof("Finished successfully")
+	return nil
 }
 
 func traverseMetadata(head *store.NodeExtern, handleFunc func(*store.NodeExtern)) {
