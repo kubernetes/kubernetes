@@ -22,6 +22,12 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,12 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-
-	"fmt"
-	"sync"
-	"time"
-
-	"github.com/golang/glog"
 )
 
 func init() {
