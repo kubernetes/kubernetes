@@ -89,24 +89,6 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	return jobsBySj
 }
 
-// getNextStartTimeAfter gets the latest scheduled start time that is less than "now", or an error.
-func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
-	// Using robfig/cron for cron scheduled parsing and next runtime
-	// computation. Not using the entire library because:
-	// - I want to detect when we missed a runtime due to being down.
-	//   - How do I set the time such that I can detect the last known runtime?
-	// - I guess the functions could launch a go-routine to start the job and
-	// then return.
-	// How to handle concurrency control.
-	// How to detect changes to schedules or deleted schedules and then
-	// update the jobs?
-	sched, err := cron.Parse(schedule)
-	if err != nil {
-		return time.Unix(0, 0), fmt.Errorf("Unparseable schedule: %s : %s", schedule, err)
-	}
-	return sched.Next(now), nil
-}
-
 // getRecentUnmetScheduleTimes gets a slice of times (from oldest to latest) that have passed when a Job should have started but did not.
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
