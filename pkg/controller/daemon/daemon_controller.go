@@ -934,7 +934,22 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 		for i := pos; i < pos+batchSize; i++ {
 			go func(ix int) {
 				defer createWait.Done()
-				err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, metav1.NewControllerRef(ds, controllerKind))
+				var err error
+
+				podTemplate := &template
+
+				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+					podTemplate = template.DeepCopy()
+					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodHostnameNodeAffinity(
+						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
+
+					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
+						ds, metav1.NewControllerRef(ds, controllerKind))
+				} else {
+					err = dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, podTemplate,
+						ds, metav1.NewControllerRef(ds, controllerKind))
+				}
+
 				if err != nil && errors.IsTimeout(err) {
 					// Pod is created but its initialization has timed out.
 					// If the initialization is successful eventually, the
@@ -1267,6 +1282,9 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 		return false, false, false, err
 	}
 
+	// TODO(k82cn): When 'ScheduleDaemonSetPods' upgrade to beta or GA, remove unnecessary check on failure reason,
+	//              e.g. InsufficientResourceError; and simplify "wantToRun, shouldSchedule, shouldContinueRunning"
+	//              into one result, e.g. selectedNode.
 	var insufficientResourceErr error
 	for _, r := range reasons {
 		glog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
@@ -1341,11 +1359,50 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	return newPod
 }
 
+// nodeSelectionPredicates runs a set of predicates that select candidate nodes for the DaemonSet;
+// the predicates include:
+//   - PodFitsHost: checks pod's NodeName against node
+//   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
+func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	var predicateFails []algorithm.PredicateFailureReason
+	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
+
+	fit, reasons, err = predicates.PodMatchNodeSelector(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
+	return len(predicateFails) == 0, predicateFails, nil
+}
+
 // Predicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
 // and PodToleratesNodeTaints predicate
 func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
-	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(pod)
+
+	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
+		if err != nil {
+			return false, predicateFails, err
+		}
+		if !fit {
+			predicateFails = append(predicateFails, reasons...)
+		}
+
+		return len(predicateFails) == 0, predicateFails, nil
+	}
+
+	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+		kubelettypes.IsCriticalPod(pod)
 
 	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil {
