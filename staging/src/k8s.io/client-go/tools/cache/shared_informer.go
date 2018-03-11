@@ -85,9 +85,10 @@ func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEve
 		objectType:                      objType,
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType), DeletionHandlingMetaNamespaceKeyFunc),
 		clock: realClock,
 	}
+
 	return sharedIndexInformer
 }
 
@@ -363,6 +364,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 				s.processor.distribute(addNotification{newObj: d.Object}, isSync)
 			}
 		case Deleted:
+			s.cacheMutationDetector.DeleteObject(d.Object)
 			if err := s.indexer.Delete(d.Object); err != nil {
 				return err
 			}
