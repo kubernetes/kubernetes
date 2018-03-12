@@ -290,7 +290,15 @@ filename | sha256 hash
 
 ## Changelog since v1.7.13
 
-**No notable changes for this release**
+### Other notable changes
+
+* Fixes CVE-2017-1002101 - See https://issue.k8s.io/60813 for details ([#61047](https://github.com/kubernetes/kubernetes/pull/61047), [@liggitt](https://github.com/liggitt))
+* fix CreateVolume func: use search mode instead ([#54687](https://github.com/kubernetes/kubernetes/pull/54687), [@andyzhangx](https://github.com/andyzhangx))
+* Automated cherry pick of [#49259](https://github.com/kubernetes/kubernetes/pull/49259): update json-patch to fix nil value issue when creating mergepatch ([#59324](https://github.com/kubernetes/kubernetes/pull/59324), [@yue9944882](https://github.com/yue9944882))
+* fix the create azure file pvc failure if there is no storage account in current resource group ([#56557](https://github.com/kubernetes/kubernetes/pull/56557), [@andyzhangx](https://github.com/andyzhangx))
+* Changes secret, configMap, downwardAPI and projected volumes to mount read-only, instead of allowing applications to write data and then reverting it automatically. Until version 1.11, setting the feature gate ReadOnlyAPIDataVolumes=false will preserve the old behavior. ([#58720](https://github.com/kubernetes/kubernetes/pull/58720), [@joelsmith](https://github.com/joelsmith))
+* fix device name change issue for azure disk ([#60346](https://github.com/kubernetes/kubernetes/pull/60346), [@andyzhangx](https://github.com/andyzhangx))
+* fix race condition issue when detaching azure disk ([#60183](https://github.com/kubernetes/kubernetes/pull/60183), [@andyzhangx](https://github.com/andyzhangx))
 
 
 
