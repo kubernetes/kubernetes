@@ -25,6 +25,7 @@ import (
 
 func TestValidateArgs(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
 
 	tests := []struct {
 		testName  string

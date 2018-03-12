@@ -35,6 +35,8 @@ func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfigVal = defaultClientConfig()
@@ -147,6 +149,8 @@ func TestCreateRole(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 
 	tests := map[string]struct {
@@ -346,6 +350,8 @@ func TestComplete(t *testing.T) {
 	roleName := "my-role"
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfigVal = defaultClientConfig()

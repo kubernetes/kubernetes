@@ -34,6 +34,8 @@ func TestExtraArgsFail(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
 	c := NewCmdCreate(f, buf, errBuf)
 	options := CreateOptions{}
 	if options.ValidateArgs(c, []string{"rc"}) == nil {
@@ -47,6 +49,8 @@ func TestCreateObject(t *testing.T) {
 	rc.Items[0].Name = "redis-master-controller"
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -82,6 +86,8 @@ func TestCreateMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -121,6 +127,8 @@ func TestCreateDirectory(t *testing.T) {
 	rc.Items[0].Name = "name"
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{

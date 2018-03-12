@@ -207,6 +207,8 @@ func TestEdit(t *testing.T) {
 			}
 
 			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
 			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 				versionedAPIPath := ""
 				if mapping.GroupVersionKind.Group == "" {

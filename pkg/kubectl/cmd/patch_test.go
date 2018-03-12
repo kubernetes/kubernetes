@@ -32,6 +32,8 @@ func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -72,6 +74,8 @@ func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -108,6 +112,8 @@ func TestPatchNoop(t *testing.T) {
 	patchObject := &svc.Items[0]
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -154,6 +160,8 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	svcCopy.Labels["post-patch"] = "post-patch-value"
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{

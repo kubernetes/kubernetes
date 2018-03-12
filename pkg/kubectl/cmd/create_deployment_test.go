@@ -75,6 +75,8 @@ func Test_generatorFromName(t *testing.T) {
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -104,6 +106,8 @@ func TestCreateDeployment(t *testing.T) {
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{

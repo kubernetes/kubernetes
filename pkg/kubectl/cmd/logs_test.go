@@ -48,39 +48,43 @@ func TestLog(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		logContent := "test log content"
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-		ns := legacyscheme.Codecs
+		t.Run(test.name, func(t *testing.T) {
+			logContent := "test log content"
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				case p == test.logPath && m == "GET":
-					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					// Ensures no GET is performed when deleting by name
-					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
-		buf := bytes.NewBuffer([]byte{})
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
 
-		cmd := NewCmdLogs(tf, buf, buf)
-		cmd.Flags().Set("namespace", "test")
-		cmd.Run(cmd, []string{"foo"})
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == test.podPath && m == "GET":
+						body := objBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					case p == test.logPath && m == "GET":
+						body := ioutil.NopCloser(bytes.NewBufferString(logContent))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					default:
+						// Ensures no GET is performed when deleting by name
+						t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
+			buf := bytes.NewBuffer([]byte{})
 
-		if buf.String() != logContent {
-			t.Errorf("%s: did not get expected log content. Got: %s", test.name, buf.String())
-		}
+			cmd := NewCmdLogs(tf, buf, buf)
+			cmd.Flags().Set("namespace", "test")
+			cmd.Run(cmd, []string{"foo"})
+
+			if buf.String() != logContent {
+				t.Errorf("%s: did not get expected log content. Got: %s", test.name, buf.String())
+			}
+		})
 	}
 }
 
@@ -101,6 +105,7 @@ func testPod() *api.Pod {
 
 func TestValidateLogFlags(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
 
 	tests := []struct {
 		name     string
@@ -152,6 +157,7 @@ func TestValidateLogFlags(t *testing.T) {
 
 func TestLogComplete(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
 
 	tests := []struct {
 		name     string

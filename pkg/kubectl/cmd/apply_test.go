@@ -69,6 +69,8 @@ func TestApplyExtraArgsFail(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
 	c := NewCmdApply("kubectl", f, buf, errBuf)
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
@@ -332,55 +334,59 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.UnstructuredClient = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == pathRC && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == "/namespaces/test/replicationcontrollers" && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == "/namespaces/test/replicationcontrollers/no-match" && m == "GET":
-					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
-				case p == "/api/v1/namespaces/test" && m == "GET":
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == "/namespaces/test/replicationcontrollers/no-match" && m == "GET":
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+					case p == "/api/v1/namespaces/test" && m == "GET":
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
+			buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				if str != test.expectedErr {
+					t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
 				}
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
-		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+			})
 
-		cmdutil.BehaviorOnFatal(func(str string, code int) {
-			if str != test.expectedErr {
-				t.Errorf("%s: unexpected error: %s\nexpected: %s", test.name, str, test.expectedErr)
+			cmd := NewCmdApplyViewLastApplied(tf, buf, errBuf)
+			if test.filePath != "" {
+				cmd.Flags().Set("filename", test.filePath)
+			}
+			if test.outputFormat != "" {
+				cmd.Flags().Set("output", test.outputFormat)
+			}
+			if test.selector != "" {
+				cmd.Flags().Set("selector", test.selector)
+			}
+
+			cmd.Run(cmd, test.args)
+			if buf.String() != test.expectedOut {
+				t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
 			}
 		})
-
-		cmd := NewCmdApplyViewLastApplied(tf, buf, errBuf)
-		if test.filePath != "" {
-			cmd.Flags().Set("filename", test.filePath)
-		}
-		if test.outputFormat != "" {
-			cmd.Flags().Set("output", test.outputFormat)
-		}
-		if test.selector != "" {
-			cmd.Flags().Set("selector", test.selector)
-		}
-
-		cmd.Run(cmd, test.args)
-		if buf.String() != test.expectedOut {
-			t.Fatalf("%s: unexpected output: %s\nexpected: %s", test.name, buf.String(), test.expectedOut)
-		}
 	}
 }
 
@@ -390,6 +396,8 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -433,42 +441,46 @@ func TestApplyObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == pathRC && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == pathRC && m == "PATCH":
-					validatePatchApplication(t, req)
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run("test apply when a local object is specified", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameRC)
-		cmd.Flags().Set("output", "name")
-		cmd.Run(cmd, []string{})
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == pathRC && m == "PATCH":
+						validatePatchApplication(t, req)
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		// uses the name from the file, not the response
-		expectRC := "replicationcontroller/" + nameRC + "\n"
-		if buf.String() != expectRC {
-			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("output", "name")
+			cmd.Run(cmd, []string{})
+
+			// uses the name from the file, not the response
+			expectRC := "replicationcontroller/" + nameRC + "\n"
+			if buf.String() != expectRC {
+				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+		})
 	}
 }
 
@@ -494,43 +506,47 @@ func TestApplyObjectOutput(t *testing.T) {
 	}
 
 	for _, fn := range testingOpenAPISchemaFns {
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == pathRC && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == pathRC && m == "PATCH":
-					validatePatchApplication(t, req)
-					bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run("test apply returns correct output", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameRC)
-		cmd.Flags().Set("output", "yaml")
-		cmd.Run(cmd, []string{})
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == pathRC && m == "PATCH":
+						validatePatchApplication(t, req)
+						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		if !strings.Contains(buf.String(), "test-rc") {
-			t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "test-rc")
-		}
-		if !strings.Contains(buf.String(), "post-patch: value") {
-			t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "post-patch: value")
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("output", "yaml")
+			cmd.Run(cmd, []string{})
+
+			if !strings.Contains(buf.String(), "test-rc") {
+				t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "test-rc")
+			}
+			if !strings.Contains(buf.String(), "post-patch: value") {
+				t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "post-patch: value")
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+		})
 	}
 }
 
@@ -540,58 +556,62 @@ func TestApplyRetry(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		firstPatch := true
-		retry := false
-		getCount := 0
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == pathRC && m == "GET":
-					getCount++
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == pathRC && m == "PATCH":
-					if firstPatch {
-						firstPatch = false
-						statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
-						bodyBytes, _ := json.Marshal(statusErr)
-						bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
-						return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
+		t.Run("test apply retries on conflict error", func(t *testing.T) {
+			firstPatch := true
+			retry := false
+			getCount := 0
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						getCount++
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == pathRC && m == "PATCH":
+						if firstPatch {
+							firstPatch = false
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							bodyBytes, _ := json.Marshal(statusErr)
+							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
+							return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
+						}
+						retry = true
+						validatePatchApplication(t, req)
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
 					}
-					retry = true
-					validatePatchApplication(t, req)
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameRC)
-		cmd.Flags().Set("output", "name")
-		cmd.Run(cmd, []string{})
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("output", "name")
+			cmd.Run(cmd, []string{})
 
-		if !retry || getCount != 2 {
-			t.Fatalf("apply didn't retry when get conflict error")
-		}
+			if !retry || getCount != 2 {
+				t.Fatalf("apply didn't retry when get conflict error")
+			}
 
-		// uses the name from the file, not the response
-		expectRC := "replicationcontroller/" + nameRC + "\n"
-		if buf.String() != expectRC {
-			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
+			// uses the name from the file, not the response
+			expectRC := "replicationcontroller/" + nameRC + "\n"
+			if buf.String() != expectRC {
+				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expectRC)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+		})
 	}
 }
 
@@ -601,6 +621,8 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathNameRC := pathRC + "/" + nameRC
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -645,6 +667,8 @@ func TestApplyEmptyPatch(t *testing.T) {
 	var body []byte
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -718,59 +742,63 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
 	for _, fn := range testingOpenAPISchemaFns {
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == pathRC && m == "GET":
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == pathRC && m == "PATCH":
-					validatePatchApplication(t, req)
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case p == pathSVC && m == "GET":
-					bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
-				case p == pathSVC && m == "PATCH":
-					validatePatchApplication(t, req)
-					bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run("test apply on multiple objects", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		if asList {
-			cmd.Flags().Set("filename", filenameRCSVC)
-		} else {
-			cmd.Flags().Set("filename", filenameRC)
-			cmd.Flags().Set("filename", filenameSVC)
-		}
-		cmd.Flags().Set("output", "name")
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == pathRC && m == "PATCH":
+						validatePatchApplication(t, req)
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case p == pathSVC && m == "GET":
+						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
+					case p == pathSVC && m == "PATCH":
+						validatePatchApplication(t, req)
+						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodySVC}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		cmd.Run(cmd, []string{})
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			if asList {
+				cmd.Flags().Set("filename", filenameRCSVC)
+			} else {
+				cmd.Flags().Set("filename", filenameRC)
+				cmd.Flags().Set("filename", filenameSVC)
+			}
+			cmd.Flags().Set("output", "name")
 
-		// Names should come from the REST response, NOT the files
-		expectRC := "replicationcontroller/" + nameRC + "\n"
-		expectSVC := "service/" + nameSVC + "\n"
-		// Test both possible orders since output is non-deterministic.
-		expectOne := expectRC + expectSVC
-		expectTwo := expectSVC + expectRC
-		if buf.String() != expectOne && buf.String() != expectTwo {
-			t.Fatalf("unexpected output: %s\nexpected: %s OR %s", buf.String(), expectOne, expectTwo)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
+			cmd.Run(cmd, []string{})
+
+			// Names should come from the REST response, NOT the files
+			expectRC := "replicationcontroller/" + nameRC + "\n"
+			expectSVC := "service/" + nameSVC + "\n"
+			// Test both possible orders since output is non-deterministic.
+			expectOne := expectRC + expectSVC
+			expectTwo := expectSVC + expectRC
+			if buf.String() != expectOne && buf.String() != expectTwo {
+				t.Fatalf("unexpected output: %s\nexpected: %s OR %s", buf.String(), expectOne, expectTwo)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+		})
 	}
 }
 
@@ -801,66 +829,70 @@ func TestApplyNULLPreservation(t *testing.T) {
 	deploymentBytes := readDeploymentFromFile(t, filenameDeployObjServerside)
 
 	for _, fn := range testingOpenAPISchemaFns {
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == deploymentPath && m == "GET":
-					body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				case p == deploymentPath && m == "PATCH":
-					patch, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatal(err)
+		t.Run("test apply preserves NULL fields", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == deploymentPath && m == "GET":
+						body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					case p == deploymentPath && m == "PATCH":
+						patch, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatal(err)
+						}
+
+						patchMap := map[string]interface{}{}
+						if err := json.Unmarshal(patch, &patchMap); err != nil {
+							t.Fatal(err)
+						}
+						annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+						if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
+							t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+						}
+						strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
+						if value, ok := strategy["rollingUpdate"]; !ok || value != nil {
+							t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
+						}
+						verifiedPatch = true
+
+						// The real API server would had returned the patched object but Kubectl
+						// is ignoring the actual return object.
+						// TODO: Make this match actual server behavior by returning the patched object.
+						body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
 					}
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-					patchMap := map[string]interface{}{}
-					if err := json.Unmarshal(patch, &patchMap); err != nil {
-						t.Fatal(err)
-					}
-					annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-					if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
-						t.Fatalf("patch does not contain annotation:\n%s\n", patch)
-					}
-					strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
-					if value, ok := strategy["rollingUpdate"]; !ok || value != nil {
-						t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
-					}
-					verifiedPatch = true
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameDeployObjClientside)
+			cmd.Flags().Set("output", "name")
 
-					// The real API server would had returned the patched object but Kubectl
-					// is ignoring the actual return object.
-					// TODO: Make this match actual server behavior by returning the patched object.
-					body := ioutil.NopCloser(bytes.NewReader(deploymentBytes))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+			cmd.Run(cmd, []string{})
 
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameDeployObjClientside)
-		cmd.Flags().Set("output", "name")
-
-		cmd.Run(cmd, []string{})
-
-		expected := "deployment.extensions/" + deploymentName + "\n"
-		if buf.String() != expected {
-			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
-		if !verifiedPatch {
-			t.Fatal("No server-side patch call detected")
-		}
+			expected := "deployment.extensions/" + deploymentName + "\n"
+			if buf.String() != expected {
+				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+			if !verifiedPatch {
+				t.Fatal("No server-side patch call detected")
+			}
+		})
 	}
 }
 
@@ -873,56 +905,60 @@ func TestUnstructuredApply(t *testing.T) {
 	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == path && m == "GET":
-					body := ioutil.NopCloser(bytes.NewReader(curr))
-					return &http.Response{
-						StatusCode: 200,
-						Header:     defaultHeader(),
-						Body:       body}, nil
-				case p == path && m == "PATCH":
-					contentType := req.Header.Get("Content-Type")
-					if contentType != "application/merge-patch+json" {
-						t.Fatalf("Unexpected Content-Type: %s", contentType)
+		t.Run("test apply works correctly with unstructured objects", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == path && m == "GET":
+						body := ioutil.NopCloser(bytes.NewReader(curr))
+						return &http.Response{
+							StatusCode: 200,
+							Header:     defaultHeader(),
+							Body:       body}, nil
+					case p == path && m == "PATCH":
+						contentType := req.Header.Get("Content-Type")
+						if contentType != "application/merge-patch+json" {
+							t.Fatalf("Unexpected Content-Type: %s", contentType)
+						}
+						validatePatchApplication(t, req)
+						verifiedPatch = true
+
+						body := ioutil.NopCloser(bytes.NewReader(curr))
+						return &http.Response{
+							StatusCode: 200,
+							Header:     defaultHeader(),
+							Body:       body}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
 					}
-					validatePatchApplication(t, req)
-					verifiedPatch = true
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-					body := ioutil.NopCloser(bytes.NewReader(curr))
-					return &http.Response{
-						StatusCode: 200,
-						Header:     defaultHeader(),
-						Body:       body}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameWidgetClientside)
+			cmd.Flags().Set("output", "name")
+			cmd.Run(cmd, []string{})
 
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameWidgetClientside)
-		cmd.Flags().Set("output", "name")
-		cmd.Run(cmd, []string{})
-
-		expected := "widget.unit-test.test.com/" + name + "\n"
-		if buf.String() != expected {
-			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
-		if !verifiedPatch {
-			t.Fatal("No server-side patch call detected")
-		}
+			expected := "widget.unit-test.test.com/" + name + "\n"
+			if buf.String() != expected {
+				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+			if !verifiedPatch {
+				t.Fatal("No server-side patch call detected")
+			}
+		})
 	}
 }
 
@@ -940,79 +976,83 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	verifiedPatch := false
 
 	for _, fn := range testingOpenAPISchemaFns {
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == path && m == "GET":
-					body := ioutil.NopCloser(bytes.NewReader(serversideData))
-					return &http.Response{
-						StatusCode: 200,
-						Header:     defaultHeader(),
-						Body:       body}, nil
-				case p == path && m == "PATCH":
-					// In idempotent updates, kubectl sends a logically empty
-					// request body with the PATCH request.
-					// Should look like this:
-					// Request Body: {"metadata":{"annotations":{}}}
+		t.Run("test repeated apply operations on an unstructured object", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-					patch, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatal(err)
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == path && m == "GET":
+						body := ioutil.NopCloser(bytes.NewReader(serversideData))
+						return &http.Response{
+							StatusCode: 200,
+							Header:     defaultHeader(),
+							Body:       body}, nil
+					case p == path && m == "PATCH":
+						// In idempotent updates, kubectl sends a logically empty
+						// request body with the PATCH request.
+						// Should look like this:
+						// Request Body: {"metadata":{"annotations":{}}}
+
+						patch, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatal(err)
+						}
+
+						contentType := req.Header.Get("Content-Type")
+						if contentType != "application/merge-patch+json" {
+							t.Fatalf("Unexpected Content-Type: %s", contentType)
+						}
+
+						patchMap := map[string]interface{}{}
+						if err := json.Unmarshal(patch, &patchMap); err != nil {
+							t.Fatal(err)
+						}
+						if len(patchMap) != 1 {
+							t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
+						}
+
+						annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+						if len(annotationsMap) != 0 {
+							t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
+						}
+
+						verifiedPatch = true
+
+						body := ioutil.NopCloser(bytes.NewReader(serversideData))
+						return &http.Response{
+							StatusCode: 200,
+							Header:     defaultHeader(),
+							Body:       body}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
 					}
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-					contentType := req.Header.Get("Content-Type")
-					if contentType != "application/merge-patch+json" {
-						t.Fatalf("Unexpected Content-Type: %s", contentType)
-					}
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameWidgetClientside)
+			cmd.Flags().Set("output", "name")
+			cmd.Run(cmd, []string{})
 
-					patchMap := map[string]interface{}{}
-					if err := json.Unmarshal(patch, &patchMap); err != nil {
-						t.Fatal(err)
-					}
-					if len(patchMap) != 1 {
-						t.Fatalf("Unexpected Patch. Has more than 1 entry. path: %s", patch)
-					}
-
-					annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-					if len(annotationsMap) != 0 {
-						t.Fatalf("Unexpected Patch. Found unexpected annotation: %s", patch)
-					}
-
-					verifiedPatch = true
-
-					body := ioutil.NopCloser(bytes.NewReader(serversideData))
-					return &http.Response{
-						StatusCode: 200,
-						Header:     defaultHeader(),
-						Body:       body}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
-
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameWidgetClientside)
-		cmd.Flags().Set("output", "name")
-		cmd.Run(cmd, []string{})
-
-		expected := "widget.unit-test.test.com/widget\n"
-		if buf.String() != expected {
-			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
-		if !verifiedPatch {
-			t.Fatal("No server-side patch call detected")
-		}
+			expected := "widget.unit-test.test.com/widget\n"
+			if buf.String() != expected {
+				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+			if !verifiedPatch {
+				t.Fatal("No server-side patch call detected")
+			}
+		})
 	}
 }
 
@@ -1069,6 +1109,8 @@ func TestRunApplySetLastApplied(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
 			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
@@ -1158,104 +1200,108 @@ func TestForceApply(t *testing.T) {
 	}
 
 	for _, fn := range testingOpenAPISchemaFns {
-		deleted := false
-		isScaledDownToZero := false
-		counts := map[string]int{}
-		tf := cmdtesting.NewTestFactory()
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: unstructuredSerializer,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case strings.HasSuffix(p, pathRC) && m == "GET":
-					if deleted {
-						counts["getNotFound"]++
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
-					}
-					counts["getOk"]++
-					var bodyRC io.ReadCloser
-					if isScaledDownToZero {
-						rcObj := readReplicationControllerFromFile(t, filenameRC)
-						rcObj.Spec.Replicas = 0
-						rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+		t.Run("test apply with --force", func(t *testing.T) {
+			deleted := false
+			isScaledDownToZero := false
+			counts := map[string]int{}
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: unstructuredSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case strings.HasSuffix(p, pathRC) && m == "GET":
+						if deleted {
+							counts["getNotFound"]++
+							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
+						}
+						counts["getOk"]++
+						var bodyRC io.ReadCloser
+						if isScaledDownToZero {
+							rcObj := readReplicationControllerFromFile(t, filenameRC)
+							rcObj.Spec.Replicas = 0
+							rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+							if err != nil {
+								t.Fatal(err)
+							}
+							bodyRC = ioutil.NopCloser(bytes.NewReader(rcBytes))
+						} else {
+							bodyRC = ioutil.NopCloser(bytes.NewReader(currentRC))
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case strings.HasSuffix(p, pathRCList) && m == "GET":
+						counts["getList"]++
+						rcObj := readUnstructuredFromFile(t, filenameRC)
+						list := &unstructured.UnstructuredList{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "ReplicationControllerList",
+							},
+							Items: []unstructured.Unstructured{*rcObj},
+						}
+						listBytes, err := runtime.Encode(testapi.Default.Codec(), list)
 						if err != nil {
 							t.Fatal(err)
 						}
-						bodyRC = ioutil.NopCloser(bytes.NewReader(rcBytes))
-					} else {
-						bodyRC = ioutil.NopCloser(bytes.NewReader(currentRC))
+						bodyRCList := ioutil.NopCloser(bytes.NewReader(listBytes))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRCList}, nil
+					case strings.HasSuffix(p, pathRC) && m == "PATCH":
+						counts["patch"]++
+						if counts["patch"] <= 6 {
+							statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
+							bodyBytes, _ := json.Marshal(statusErr)
+							bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
+							return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
+						}
+						t.Fatalf("unexpected request: %#v after %v tries\n%#v", req.URL, counts["patch"], req)
+						return nil, nil
+					case strings.HasSuffix(p, pathRC) && m == "DELETE":
+						counts["delete"]++
+						deleted = true
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
+					case strings.HasSuffix(p, pathRC) && m == "PUT":
+						counts["put"]++
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						isScaledDownToZero = true
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					case strings.HasSuffix(p, pathRCList) && m == "POST":
+						counts["post"]++
+						deleted = false
+						isScaledDownToZero = false
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case strings.HasSuffix(p, pathRCList) && m == "GET":
-					counts["getList"]++
-					rcObj := readUnstructuredFromFile(t, filenameRC)
-					list := &unstructured.UnstructuredList{
-						Object: map[string]interface{}{
-							"apiVersion": "v1",
-							"kind":       "ReplicationControllerList",
-						},
-						Items: []unstructured.Unstructured{*rcObj},
-					}
-					listBytes, err := runtime.Encode(testapi.Default.Codec(), list)
-					if err != nil {
-						t.Fatal(err)
-					}
-					bodyRCList := ioutil.NopCloser(bytes.NewReader(listBytes))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRCList}, nil
-				case strings.HasSuffix(p, pathRC) && m == "PATCH":
-					counts["patch"]++
-					if counts["patch"] <= 6 {
-						statusErr := kubeerr.NewConflict(schema.GroupResource{Group: "", Resource: "rc"}, "test-rc", fmt.Errorf("the object has been modified. Please apply at first."))
-						bodyBytes, _ := json.Marshal(statusErr)
-						bodyErr := ioutil.NopCloser(bytes.NewReader(bodyBytes))
-						return &http.Response{StatusCode: http.StatusConflict, Header: defaultHeader(), Body: bodyErr}, nil
-					}
-					t.Fatalf("unexpected request: %#v after %v tries\n%#v", req.URL, counts["patch"], req)
-					return nil, nil
-				case strings.HasSuffix(p, pathRC) && m == "DELETE":
-					counts["delete"]++
-					deleted = true
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte{}))}, nil
-				case strings.HasSuffix(p, pathRC) && m == "PUT":
-					counts["put"]++
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					isScaledDownToZero = true
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				case strings.HasSuffix(p, pathRCList) && m == "POST":
-					counts["post"]++
-					deleted = false
-					isScaledDownToZero = false
-					bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.OpenAPISchemaFunc = fn
-		tf.Client = tf.UnstructuredClient
-		tf.ClientConfigVal = &restclient.Config{}
-		tf.Namespace = "test"
-		buf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
-
-		cmd := NewCmdApply("kubectl", tf, buf, errBuf)
-		cmd.Flags().Set("filename", filenameRC)
-		cmd.Flags().Set("output", "name")
-		cmd.Flags().Set("force", "true")
-		cmd.Run(cmd, []string{})
-
-		for method, exp := range expected {
-			if exp != counts[method] {
-				t.Errorf("Unexpected amount of %q API calls, wanted %v got %v", method, exp, counts[method])
+				}),
 			}
-		}
+			tf.OpenAPISchemaFunc = fn
+			tf.Client = tf.UnstructuredClient
+			tf.ClientConfigVal = &restclient.Config{}
+			tf.Namespace = "test"
+			buf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
 
-		if expected := "replicationcontroller/" + nameRC + "\n"; buf.String() != expected {
-			t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
-		}
-		if errBuf.String() != "" {
-			t.Fatalf("unexpected error output: %s", errBuf.String())
-		}
+			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("output", "name")
+			cmd.Flags().Set("force", "true")
+			cmd.Run(cmd, []string{})
+
+			for method, exp := range expected {
+				if exp != counts[method] {
+					t.Errorf("Unexpected amount of %q API calls, wanted %v got %v", method, exp, counts[method])
+				}
+			}
+
+			if expected := "replicationcontroller/" + nameRC + "\n"; buf.String() != expected {
+				t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+		})
 	}
 }

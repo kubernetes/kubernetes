@@ -47,6 +47,8 @@ import (
 
 func TestSetEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},
@@ -83,6 +85,8 @@ func TestSetEnvLocal(t *testing.T) {
 
 func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -122,12 +126,14 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 
 func TestSetEnvRemote(t *testing.T) {
 	inputs := []struct {
+		name                            string
 		object                          runtime.Object
 		apiPrefix, apiGroup, apiVersion string
 		testAPIGroup                    string
 		args                            []string
 	}{
 		{
+			name: "test extensions.v1beta1 replicaset",
 			object: &extensionsv1beta1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: extensionsv1beta1.ReplicaSetSpec{
@@ -148,6 +154,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"replicaset", "nginx", "env=prod"},
 		},
 		{
+			name: "test apps.v1beta2 replicaset",
 			object: &appsv1beta2.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.ReplicaSetSpec{
@@ -168,6 +175,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"replicaset", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1 replicaset",
 			object: &appsv1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.ReplicaSetSpec{
@@ -188,6 +196,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"replicaset", "nginx", "env=prod"},
 		},
 		{
+			name: "test extensions.v1beta1 daemonset",
 			object: &extensionsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: extensionsv1beta1.DaemonSetSpec{
@@ -208,6 +217,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"daemonset", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1beta2 daemonset",
 			object: &appsv1beta2.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.DaemonSetSpec{
@@ -228,6 +238,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"daemonset", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1 daemonset",
 			object: &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.DaemonSetSpec{
@@ -248,6 +259,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"daemonset", "nginx", "env=prod"},
 		},
 		{
+			name: "test extensions.v1beta1 deployment",
 			object: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: extensionsv1beta1.DeploymentSpec{
@@ -268,6 +280,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"deployment", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1bta1 deployment",
 			object: &appsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta1.DeploymentSpec{
@@ -288,6 +301,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"deployment", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1beta2n deployment",
 			object: &appsv1beta2.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.DeploymentSpec{
@@ -308,6 +322,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"deployment", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1 deployment",
 			object: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.DeploymentSpec{
@@ -328,6 +343,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"deployment", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1beta1 statefulset",
 			object: &appsv1beta1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta1.StatefulSetSpec{
@@ -348,6 +364,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"statefulset", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1beta2 statefulset",
 			object: &appsv1beta2.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.StatefulSetSpec{
@@ -368,6 +385,7 @@ func TestSetEnvRemote(t *testing.T) {
 			args: []string{"statefulset", "nginx", "env=prod"},
 		},
 		{
+			name: "test appsv1 statefulset",
 			object: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.StatefulSetSpec{
@@ -429,48 +447,52 @@ func TestSetEnvRemote(t *testing.T) {
 		},
 	}
 	for _, input := range inputs {
-		groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
-		testapi.Default = testapi.Groups[input.testAPIGroup]
-		tf := cmdtesting.NewTestFactory()
-		codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
-		ns := legacyscheme.Codecs
-		tf.Namespace = "test"
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         groupVersion,
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
-				switch p, m := req.URL.Path, req.Method; {
-				case p == resourcePath && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
-				case p == resourcePath && m == http.MethodPatch:
-					stream, err := req.GetBody()
-					if err != nil {
-						return nil, err
+		t.Run(input.name, func(t *testing.T) {
+			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
+			testapi.Default = testapi.Groups[input.testAPIGroup]
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			codec := scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(groupVersion), scheme.Codecs.UniversalDecoder(groupVersion), groupVersion, groupVersion)
+			ns := legacyscheme.Codecs
+			tf.Namespace = "test"
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         groupVersion,
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
+					switch p, m := req.URL.Path, req.Method; {
+					case p == resourcePath && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+					case p == resourcePath && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := ioutil.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
+						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
+						return nil, fmt.Errorf("unexpected request")
 					}
-					bytes, err := ioutil.ReadAll(stream)
-					if err != nil {
-						return nil, err
-					}
-					assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, input.object)}, nil
-				default:
-					t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
-					return nil, fmt.Errorf("unexpected request")
-				}
-			}),
-			VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
-		}
-		out := new(bytes.Buffer)
-		cmd := NewCmdEnv(tf, out, out, out)
-		cmd.SetOutput(out)
-		cmd.Flags().Set("output", "yaml")
-		opts := EnvOptions{
-			Out:   out,
-			Local: false}
-		err := opts.Complete(tf, cmd, input.args)
-		assert.NoError(t, err)
-		err = opts.RunEnv(tf)
-		assert.NoError(t, err)
+				}),
+				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
+			}
+			out := new(bytes.Buffer)
+			cmd := NewCmdEnv(tf, out, out, out)
+			cmd.SetOutput(out)
+			cmd.Flags().Set("output", "yaml")
+			opts := EnvOptions{
+				Out:   out,
+				Local: false}
+			err := opts.Complete(tf, cmd, input.args)
+			assert.NoError(t, err)
+			err = opts.RunEnv(tf)
+			assert.NoError(t, err)
+		})
 	}
 }
