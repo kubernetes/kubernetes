@@ -86,24 +86,49 @@ func TestComparePods(t *testing.T) {
 	tests := []struct {
 		actual    []string
 		cached    []string
+		queued    []string
 		missing   []string
 		redundant []string
 	}{
 		{
 			actual:    []string{"foo", "bar"},
 			cached:    []string{"bar", "foo", "foobar"},
+			queued:    []string{},
+			missing:   []string{},
+			redundant: []string{"foobar"},
+		},
+		{
+			actual:    []string{"foo", "bar"},
+			cached:    []string{"foo", "foobar"},
+			queued:    []string{"bar"},
 			missing:   []string{},
 			redundant: []string{"foobar"},
 		},
 		{
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foo"},
+			queued:    []string{},
+			missing:   []string{"foobar"},
+			redundant: []string{},
+		},
+		{
+			actual:    []string{"foo", "bar", "foobar"},
+			cached:    []string{"foo"},
+			queued:    []string{"bar"},
 			missing:   []string{"foobar"},
 			redundant: []string{},
 		},
 		{
 			actual:    []string{"foo", "bar", "foobar"},
 			cached:    []string{"bar", "foobar", "foo"},
+			queued:    []string{},
+			missing:   []string{},
+			redundant: []string{},
+		},
+		{
+			actual:    []string{"foo", "bar", "foobar"},
+			cached:    []string{"foobar", "foo"},
+			queued:    []string{"bar"},
 			missing:   []string{},
 			redundant: []string{},
 		},
@@ -117,6 +142,13 @@ func TestComparePods(t *testing.T) {
 			pods = append(pods, pod)
 		}
 
+		queuedPods := []*v1.Pod{}
+		for _, uid := range test.queued {
+			pod := &v1.Pod{}
+			pod.UID = types.UID(uid)
+			queuedPods = append(queuedPods, pod)
+		}
+
 		nodeInfo := make(map[string]*schedulercache.NodeInfo)
 		for _, uid := range test.cached {
 			pod := &v1.Pod{}
@@ -127,7 +159,7 @@ func TestComparePods(t *testing.T) {
 			nodeInfo[uid] = schedulercache.NewNodeInfo(pod)
 		}
 
-		m, r := compare.ComparePods(pods, nodeInfo)
+		m, r := compare.ComparePods(pods, queuedPods, nodeInfo)
 
 		if !reflect.DeepEqual(m, test.missing) {
 			t.Errorf("missing expected to be %s; got %s", test.missing, m)

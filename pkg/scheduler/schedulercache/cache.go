@@ -80,7 +80,8 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
-// Snapshot takes a snapshot of the current schedulerCache.
+// Snapshot takes a snapshot of the current schedulerCache. The method has performance impact,
+// and should be only used in non-critical path.
 func (cache *schedulerCache) Snapshot() *Snapshot {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	v1beta1 "k8s.io/client-go/listers/policy/v1beta1"
+	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
@@ -34,6 +35,7 @@ type cacheComparer struct {
 	podLister  corelisters.PodLister
 	pdbLister  v1beta1.PodDisruptionBudgetLister
 	cache      schedulercache.Cache
+	podQueue   core.SchedulingQueue
 
 	compareStrategy
 }
@@ -59,11 +61,13 @@ func (c *cacheComparer) Compare() error {
 
 	snapshot := c.cache.Snapshot()
 
+	waitingPods := c.podQueue.WaitingPods()
+
 	if missed, redundant := c.CompareNodes(nodes, snapshot.Nodes); len(missed)+len(redundant) != 0 {
 		glog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
 	}
 
-	if missed, redundant := c.ComparePods(pods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
+	if missed, redundant := c.ComparePods(pods, waitingPods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
 		glog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
 	}
 
@@ -91,7 +95,7 @@ func (c compareStrategy) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*sc
 	return compareStrings(actual, cached)
 }
 
-func (c compareStrategy) ComparePods(pods []*v1.Pod, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
+func (c compareStrategy) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, pod := range pods {
 		actual = append(actual, string(pod.UID))
@@ -102,6 +106,9 @@ func (c compareStrategy) ComparePods(pods []*v1.Pod, nodeinfos map[string]*sched
 		for _, pod := range nodeinfo.Pods() {
 			cached = append(cached, string(pod.UID))
 		}
+	}
+	for _, pod := range waitingPods {
+		cached = append(cached, string(pod.UID))
 	}
 
 	return compareStrings(actual, cached)
