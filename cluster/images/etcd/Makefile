@@ -26,8 +26,8 @@
 # Except from etcd-$(tag) and etcdctl-$(tag) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last tag from $(TAGS).
-TAGS?=2.2.1 2.3.7 3.0.17 3.1.11
-REGISTRY_TAG?=3.1.11
+TAGS?=2.2.1 2.3.7 3.0.17 3.1.11 3.2.16
+REGISTRY_TAG?=3.2.16
 # ROLLBACK_REGISTRY_TAG specified the tag that REGISTRY_TAG may be rolled back to.
 ROLLBACK_REGISTRY_TAG?=3.1.11
 ARCH?=amd64
