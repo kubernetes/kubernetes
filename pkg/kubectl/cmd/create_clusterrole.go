@@ -38,7 +38,7 @@ var (
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
 		# Create a ClusterRole named "pod-reader" with ResourceName specified
-		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod --resource-name=anotherpod
+		kubectl create clusterrole pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
 		# Create a ClusterRole named "foo" with API Group specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
