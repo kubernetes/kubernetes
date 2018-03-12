@@ -228,3 +228,42 @@ aliases:
     - cblecker
     - thockin
     - sttts
+  feature-approvers:
+    - AdoHe           # CLI
+    - bgrant0607      # Architecture
+    - brancz          # Instrumentation
+    - bsalamat        # Scheduling
+    - calebamiles     # Release
+    - caseydavenport  # Network
+    - childsb         # Storage
+    - countspongebob  # Scalability
+    - csbell          # Multicluster
+    - dcbw            # Network
+    - dchen1107       # Node
+    - deads2k         # API Machinery
+    - derekwaynecarr  # Node
+    - dghubble        # On Premise
+    - directxman12    # Autoscaling
+    - ericchiang      # Auth
+    - jdumars         # Architecture, Cluster Ops, Release
+    - kow3ns          # Apps
+    - lavalamp        # API Machinery
+    - liggitt         # Auth
+    - lukemarsden     # Cluster Lifecycle
+    - luxas           # Cluster Lifecycle
+    - marcoceppi      # On Premise
+    - mattfarina      # Apps
+    - michmike        # Windows
+    - mwielgus        # Autoscaling
+    - piosz           # Instrumentation
+    - prydonius       # Apps
+    - pwittrock       # CLI
+    - quinton-hoole   # Multicluster
+    - roberthbailey   # Cluster Lifecycle
+    - saad-ali        # Storage
+    - soltysh         # CLI
+    - tallclair       # Auth
+    - thockin         # Network
+    - timothysc       # Cluster Lifecycle, Scheduling
+    - wojtek-t        # Scalability
+    - zehicle         # Cluster Ops
