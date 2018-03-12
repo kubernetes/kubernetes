@@ -53,7 +53,17 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    deps = ["//vendor/k8s.io/utils/exec/testing:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/golang/glog:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

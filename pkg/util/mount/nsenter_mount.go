@@ -22,10 +22,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
+	utilio "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/utils/exec"
+)
+
+const (
+	// hostProcSelfStatusPath is the default path to /proc/self/status on the host
+	hostProcSelfStatusPath = "/rootfs/proc/self/status"
+)
+
+var (
+	// pidRegExp matches "Pid:	<pid>" in /proc/self/status
+	pidRegExp = regexp.MustCompile(`\nPid:\t([0-9]*)\n`)
 )
 
 // NsenterMounter is part of experimental support for running the kubelet
@@ -301,4 +314,42 @@ func (n *NsenterMounter) MakeRShared(path string) error {
 		n.absHostPath("mount"),
 	}
 	return doMakeRShared(path, hostProcMountinfoPath, nsenterCmd, nsenterArgs)
+}
+
+func (mounter *NsenterMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return doCleanSubPaths(mounter, podDir, volumeName)
+}
+
+// getPidOnHost returns kubelet's pid in the host pid namespace
+func (mounter *NsenterMounter) getPidOnHost(procStatusPath string) (int, error) {
+	// Get the PID from /rootfs/proc/self/status
+	statusBytes, err := utilio.ConsistentRead(procStatusPath, maxListTries)
+	if err != nil {
+		return 0, fmt.Errorf("error reading %s: %s", procStatusPath, err)
+	}
+	matches := pidRegExp.FindSubmatch(statusBytes)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("cannot parse %s: no Pid:", procStatusPath)
+	}
+	return strconv.Atoi(string(matches[1]))
+}
+
+func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	hostPid, err := mounter.getPidOnHost(hostProcSelfStatusPath)
+	if err != nil {
+		return "", nil, err
+	}
+	glog.V(4).Infof("Kubelet's PID on the host is %d", hostPid)
+
+	// Bind-mount the subpath to avoid using symlinks in subpaths.
+	newHostPath, err = doBindSubPath(mounter, subPath, hostPid)
+
+	// There is no action when the container starts. Bind-mount will be cleaned
+	// when container stops by CleanSubPaths.
+	cleanupAction = nil
+	return newHostPath, cleanupAction, err
+}
+
+func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return doSafeMakeDir(pathname, base, perm)
 }

@@ -53,6 +53,7 @@ go_test(
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/util/file:go_default_library",
+            "//pkg/util/mount:go_default_library",
             "//pkg/volume:go_default_library",
             "//pkg/volume/testing:go_default_library",
             "//vendor/k8s.io/api/core/v1:go_default_library",

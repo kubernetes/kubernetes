@@ -98,7 +98,7 @@ type OperationExecutor interface {
 
 	// UnmountVolume unmounts the volume from the pod specified in
 	// volumeToUnmount and updates the actual state of the world to reflect that.
-	UnmountVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	UnmountVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) error
 
 	// UnmountDevice unmounts the volumes global mount path from the device (for
 	// attachable volumes only, freeing it for detach. It then updates the
@@ -690,10 +690,11 @@ func (oe *operationExecutor) MountVolume(
 
 func (oe *operationExecutor) UnmountVolume(
 	volumeToUnmount MountedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	podsDir string) error {
 
 	unmountFunc, plugin, err :=
-		oe.operationGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld)
+		oe.operationGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld, podsDir)
 	if err != nil {
 		return err
 	}

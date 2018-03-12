@@ -63,6 +63,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
+	mountutil "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
@@ -129,7 +130,7 @@ func makeAbsolutePath(goos, path string) string {
 }
 
 // makeMounts determines the mount points for the given container.
-func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
+func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface) ([]kubecontainer.Mount, func(), error) {
 	// Kubernetes only mounts on /etc/hosts if:
 	// - container is not an infrastructure (pause) container
 	// - container is not already mounting on /etc/hosts
@@ -139,7 +140,8 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	mountEtcHostsFile := len(podIP) > 0 && runtime.GOOS != "windows"
 	glog.V(3).Infof("container: %v/%v/%v podIP: %q creating hosts mount: %v", pod.Namespace, pod.Name, container.Name, podIP, mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
-	for _, mount := range container.VolumeMounts {
+	var cleanupAction func() = nil
+	for i, mount := range container.VolumeMounts {
 		// do not mount /etc/hosts if container is already mounting on the path
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
@@ -158,25 +160,33 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 		hostPath, err := volume.GetPath(vol.Mounter)
 		if err != nil {
-			return nil, err
+			return nil, cleanupAction, err
 		}
 		if mount.SubPath != "" {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) {
+				return nil, cleanupAction, fmt.Errorf("volume subpaths are disabled")
+			}
+
 			if filepath.IsAbs(mount.SubPath) {
-				return nil, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
+				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", mount.SubPath)
 			}
 
 			err = volumevalidation.ValidatePathNoBacksteps(mount.SubPath)
 			if err != nil {
-				return nil, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
+				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
 			}
 
 			fileinfo, err := os.Lstat(hostPath)
 			if err != nil {
-				return nil, err
+				return nil, cleanupAction, err
 			}
 			perm := fileinfo.Mode()
 
-			hostPath = filepath.Join(hostPath, mount.SubPath)
+			volumePath, err := filepath.EvalSymlinks(hostPath)
+			if err != nil {
+				return nil, cleanupAction, err
+			}
+			hostPath = filepath.Join(volumePath, mount.SubPath)
 
 			if subPathExists, err := utilfile.FileOrSymlinkExists(hostPath); err != nil {
 				glog.Errorf("Could not determine if subPath %s exists; will not attempt to change its permissions", hostPath)
@@ -185,16 +195,24 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				// incorrect ownership and mode. For example, the sub path directory must have at least g+rwx
 				// when the pod specifies an fsGroup, and if the directory is not created here, Docker will
 				// later auto-create it with the incorrect mode 0750
-				if err := os.MkdirAll(hostPath, perm); err != nil {
-					glog.Errorf("failed to mkdir:%s", hostPath)
-					return nil, err
+				// Make extra care not to escape the volume!
+				if err := mounter.SafeMakeDir(hostPath, volumePath, perm); err != nil {
+					glog.Errorf("failed to mkdir %q: %v", hostPath, err)
+					return nil, cleanupAction, err
 				}
-
-				// chmod the sub path because umask may have prevented us from making the sub path with the same
-				// permissions as the mounter path
-				if err := os.Chmod(hostPath, perm); err != nil {
-					return nil, err
-				}
+			}
+			hostPath, cleanupAction, err = mounter.PrepareSafeSubpath(mountutil.Subpath{
+				VolumeMountIndex: i,
+				Path:             hostPath,
+				VolumeName:       mount.Name,
+				VolumePath:       volumePath,
+				PodDir:           podDir,
+				ContainerName:    container.Name,
+			})
+			if err != nil {
+				// Don't pass detailed error back to the user because it could give information about host filesystem
+				glog.Errorf("failed to prepare subPath for volumeMount %q of container %q: %v", mount.Name, container.Name, err)
+				return nil, cleanupAction, fmt.Errorf("failed to prepare subPath for volumeMount %q of container %q", mount.Name, container.Name)
 			}
 		}
 
@@ -211,7 +229,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 		propagation, err := translateMountPropagation(mount.MountPropagation)
 		if err != nil {
-			return nil, err
+			return nil, cleanupAction, err
 		}
 		glog.V(5).Infof("Pod %q container %q mount %q has propagation %q", format.Pod(pod), container.Name, mount.Name, propagation)
 
@@ -230,11 +248,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		hostAliases := pod.Spec.HostAliases
 		hostsMount, err := makeHostsMount(podDir, podIP, hostName, hostDomain, hostAliases, pod.Spec.HostNetwork)
 		if err != nil {
-			return nil, err
+			return nil, cleanupAction, err
 		}
 		mounts = append(mounts, *hostsMount)
 	}
-	return mounts, nil
+	return mounts, cleanupAction, nil
 }
 
 // translateMountPropagation transforms v1.MountPropagationMode to
@@ -400,18 +418,18 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
+func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, func(), error) {
 	useClusterFirstPolicy := false
 	opts, err := kl.containerManager.GetResources(pod, container, kl.GetActivePods())
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	cgroupParent := kl.GetPodCgroupParent(pod)
 	opts.CgroupParent = cgroupParent
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	opts.Hostname = hostname
 	podName := volumehelper.GetUniquePodName(pod)
@@ -421,19 +439,19 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
 	devices, err := kl.makeDevices(pod, container)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	opts.Devices = append(opts.Devices, devices...)
 
-	mounts, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
+	mounts, cleanupAction, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes, kl.mounter)
 	if err != nil {
-		return nil, false, err
+		return nil, false, cleanupAction, err
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
 
 	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
-		return nil, false, err
+		return nil, false, cleanupAction, err
 	}
 	opts.Envs = append(opts.Envs, envs...)
 
@@ -450,7 +468,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.DNS, opts.DNSSearch, useClusterFirstPolicy, err = kl.GetClusterDNS(pod)
 	if err != nil {
-		return nil, false, err
+		return nil, false, cleanupAction, err
 	}
 
 	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
@@ -458,7 +476,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
-	return opts, useClusterFirstPolicy, nil
+	return opts, useClusterFirstPolicy, cleanupAction, nil
 }
 
 var masterServices = sets.NewString("kubernetes")

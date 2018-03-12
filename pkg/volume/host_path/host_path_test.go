@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilmount "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -325,6 +326,18 @@ type fakeFileTypeChecker struct {
 
 func (fftc *fakeFileTypeChecker) getFileType(_ os.FileInfo) (v1.HostPathType, error) {
 	return *newHostPathType(fftc.desiredType), nil
+}
+
+func (fftc *fakeFileTypeChecker) PrepareSafeSubpath(subPath utilmount.Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return "", nil, nil
+}
+
+func (fftc *fakeFileTypeChecker) CleanSubPaths(_, _ string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
+	return nil
 }
 
 func setUp() error {
