@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/golang/glog"
@@ -76,7 +77,7 @@ type OperationGenerator interface {
 	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) (func() error, error)
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
-	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error)
+	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (func() error, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
 	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error)
@@ -494,7 +495,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	volumeToUnmount MountedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	podsDir string) (func() error, error) {
 	// Get mountable plugin
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginByName(volumeToUnmount.PluginName)
@@ -509,6 +511,14 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	}
 
 	return func() error {
+		mounter := og.volumePluginMgr.Host.GetMounter()
+
+		// Remove all bind-mounts for subPaths
+		podDir := path.Join(podsDir, string(volumeToUnmount.PodUID))
+		if err := mounter.CleanSubPaths(podDir, volumeToUnmount.OuterVolumeSpecName); err != nil {
+			return volumeToUnmount.GenerateErrorDetailed("error cleaning subPath mounts", err)
+		}
+
 		// Execute unmount
 		unmountErr := volumeUnmounter.TearDown()
 		if unmountErr != nil {

@@ -126,8 +126,12 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	for src, dst := range config.ServerVolumes {
 		mountName := fmt.Sprintf("path%d", i)
 		volumes[i].Name = mountName
-		volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
-			Path: src,
+		if src == "" {
+			volumes[i].VolumeSource.EmptyDir = &v1.EmptyDirVolumeSource{}
+		} else {
+			volumes[i].VolumeSource.HostPath = &v1.HostPathVolumeSource{
+				Path: src,
+			}
 		}
 
 		mounts[i].Name = mountName
@@ -378,4 +382,63 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	ExpectNoError(err, "Failed to create injector pod: %v", err)
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+// NFS-specific wrapper for CreateStorageServer.
+func NewNFSServer(cs clientset.Interface, namespace string, args []string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+	config = VolumeTestConfig{
+		Namespace:     namespace,
+		Prefix:        "nfs",
+		ServerImage:   NfsServerImage,
+		ServerPorts:   []int{2049},
+		ServerVolumes: map[string]string{"": "/exports"},
+	}
+	if len(args) > 0 {
+		config.ServerArgs = args
+	}
+	pod = StartVolumeServer(cs, config)
+	return config, pod, pod.Status.PodIP
+}
+
+// GlusterFS-specific wrapper for CreateStorageServer. Also creates the gluster endpoints object.
+func NewGlusterfsServer(cs clientset.Interface, namespace string) (config VolumeTestConfig, pod *v1.Pod, ip string) {
+	config = VolumeTestConfig{
+		Namespace:   namespace,
+		Prefix:      "gluster",
+		ServerImage: GlusterfsServerImage,
+		ServerPorts: []int{24007, 24008, 49152},
+	}
+	pod = StartVolumeServer(cs, config)
+	ip = pod.Status.PodIP
+
+	By("creating Gluster endpoints")
+	endpoints := &v1.Endpoints{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-server",
+		},
+		Subsets: []v1.EndpointSubset{
+			{
+				Addresses: []v1.EndpointAddress{
+					{
+						IP: ip,
+					},
+				},
+				Ports: []v1.EndpointPort{
+					{
+						Name:     "gluster",
+						Port:     24007,
+						Protocol: v1.ProtocolTCP,
+					},
+				},
+			},
+		},
+	}
+	endpoints, err := cs.CoreV1().Endpoints(namespace).Create(endpoints)
+	Expect(err).NotTo(HaveOccurred(), "failed to create endpoints for Gluster server")
+
+	return config, pod, ip
 }

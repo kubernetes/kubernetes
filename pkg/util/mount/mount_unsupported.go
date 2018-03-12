@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -17,6 +17,10 @@ limitations under the License.
 */
 
 package mount
+
+import (
+	"os"
+)
 
 type Mounter struct {
 	mounterPath string
@@ -64,4 +68,16 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, nil
+}
+
+func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return subPath.Path, nil, nil
+}
+
+func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+
+func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
 }

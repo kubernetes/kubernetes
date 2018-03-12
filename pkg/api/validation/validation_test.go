@@ -10144,3 +10144,56 @@ func TestValidateFlexVolumeSource(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDisabledSubpath(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("VolumeSubpath=false")
+	defer utilfeature.DefaultFeatureGate.Set("VolumeSubpath=true")
+
+	volumes := []api.Volume{
+		{Name: "abc", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
+		{Name: "abc-123", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
+		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo/baz"}}},
+	}
+	vols, v1err := ValidateVolumes(volumes, field.NewPath("field"))
+	if len(v1err) > 0 {
+		t.Errorf("Invalid test volume - expected success %v", v1err)
+		return
+	}
+
+	cases := map[string]struct {
+		mounts      []api.VolumeMount
+		expectError bool
+	}{
+		"subpath not specified": {
+			[]api.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+				},
+			},
+			false,
+		},
+		"subpath specified": {
+			[]api.VolumeMount{
+				{
+					Name:      "abc-123",
+					MountPath: "/bab",
+					SubPath:   "baz",
+				},
+			},
+			true,
+		},
+	}
+
+	for name, test := range cases {
+		errs := ValidateVolumeMounts(test.mounts, vols, field.NewPath("field"))
+
+		if len(errs) != 0 && !test.expectError {
+			t.Errorf("test %v failed: %+v", name, errs)
+		}
+
+		if len(errs) == 0 && test.expectError {
+			t.Errorf("test %v failed, expected error", name)
+		}
+	}
+}
