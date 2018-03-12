@@ -5192,12 +5192,13 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
 	}
-
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
 		if zone, found := node.Labels[kubeletapis.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
+		} else {
+			return zones, fmt.Errorf("zone name for node %s not found. No label with key %s", node.Name, kubeletapis.LabelZoneFailureDomain)
 		}
 	}
 	return zones, nil
