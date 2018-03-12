@@ -238,15 +238,12 @@ const (
 	// gate is present only for backward compatibility, it will be removed in the 1.11 release.
 	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
 
-<<<<<<< HEAD
 	// owner: @k82cn
 	// alpha: v1.10
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
 	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
 
-=======
->>>>>>> 58cf8dec55... Revert "Task 0: Added Alpha flag for NoDaemonSetScheduler feature."
 	// owner: @mikedanese
 	// alpha: v1.10
 	//
