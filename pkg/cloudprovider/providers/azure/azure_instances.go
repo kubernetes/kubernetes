@@ -30,9 +30,39 @@ import (
 
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+	addressGetter := func(nodeName types.NodeName) ([]v1.NodeAddress, error) {
+		ip, publicIP, err := az.GetIPForMachineWithRetry(nodeName)
+		if err != nil {
+			glog.V(2).Infof("NodeAddresses(%s) abort backoff", nodeName)
+			return nil, err
+		}
+
+		addresses := []v1.NodeAddress{
+			{Type: v1.NodeInternalIP, Address: ip},
+			{Type: v1.NodeHostName, Address: string(name)},
+		}
+		if len(publicIP) > 0 {
+			addresses = append(addresses, v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: publicIP,
+			})
+		}
+		return addresses, nil
+	}
+
 	if az.UseInstanceMetadata {
+		isLocalInstance, err := az.isCurrentInstance(name)
+		if err != nil {
+			return nil, err
+		}
+
+		// Not local instance, get addresses from Azure ARM API.
+		if !isLocalInstance {
+			return addressGetter(name)
+		}
+
 		ipAddress := IPAddress{}
-		err := az.metadata.Object("instance/network/interface/0/ipv4/ipAddress/0", &ipAddress)
+		err = az.metadata.Object("instance/network/interface/0/ipv4/ipAddress/0", &ipAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -49,25 +79,8 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		}
 		return addresses, nil
 	}
-	ip, err := az.getIPForMachine(name)
-	if err != nil {
-		if az.CloudProviderBackoff {
-			glog.V(2).Infof("NodeAddresses(%s) backing off", name)
-			ip, err = az.GetIPForMachineWithRetry(name)
-			if err != nil {
-				glog.V(2).Infof("NodeAddresses(%s) abort backoff", name)
-				return nil, err
-			}
-		} else {
-			glog.Errorf("error: az.NodeAddresses, az.getIPForMachine(%s), err=%v", name, err)
-			return nil, err
-		}
-	}
 
-	return []v1.NodeAddress{
-		{Type: v1.NodeInternalIP, Address: ip},
-		{Type: v1.NodeHostName, Address: string(name)},
-	}, nil
+	return addressGetter(name)
 }
 
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
