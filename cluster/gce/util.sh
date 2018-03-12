@@ -1199,6 +1199,9 @@ minVersion = version.LooseVersion("1.3.0")
 required = [ "alpha", "beta", "core" ]
 data = json.loads(sys.argv[1])
 rel = data.get("Google Cloud SDK")
+if "CL @" in rel:
+  print("Using dev version of gcloud: %s" %rel)
+  exit(0)
 if rel != "HEAD" and version.LooseVersion(rel) < minVersion:
   print("gcloud version out of date ( < %s )" % minVersion)
   exit(1)
