@@ -103,7 +103,7 @@ func (az *Cloud) CreateRoute(clusterName string, nameHint string, kubeRoute *clo
 		}
 	}
 
-	targetIP, err := az.getIPForMachine(kubeRoute.TargetNode)
+	targetIP, _, err := az.getIPForMachine(kubeRoute.TargetNode)
 	if err != nil {
 		return err
 	}
