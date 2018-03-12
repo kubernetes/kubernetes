@@ -111,6 +111,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 	podGet.Status.Phase = v1.PodFailed
 
+	fakePodManager.DeletePod(pod)
 	//pod is added to fakePodManager but fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 
@@ -220,7 +221,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
 	}
 	podGet.Status.Phase = v1.PodFailed
-
+	fakePodManager.DeletePod(pod)
 	//pod is added to fakePodManager but fakeRuntime can not get the pod,so here findAndRemoveDeletedPods() will remove the pod and volumes it is mounted
 	dswp.findAndRemoveDeletedPods()
 

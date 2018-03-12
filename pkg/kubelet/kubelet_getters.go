@@ -274,6 +274,24 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	return volumes, nil
 }
 
+func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string, error) {
+	mountedVolumes := []string{}
+	volumePaths, err := kl.getPodVolumePathListFromDisk(podUID)
+	if err != nil {
+		return mountedVolumes, err
+	}
+	for _, volumePath := range volumePaths {
+		isNotMount, err := kl.mounter.IsLikelyNotMountPoint(volumePath)
+		if err != nil {
+			return mountedVolumes, err
+		}
+		if !isNotMount {
+			mountedVolumes = append(mountedVolumes, volumePath)
+		}
+	}
+	return mountedVolumes, nil
+}
+
 // GetVersionInfo returns information about the version of cAdvisor in use.
 func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
 	return kl.cadvisor.VersionInfo()
