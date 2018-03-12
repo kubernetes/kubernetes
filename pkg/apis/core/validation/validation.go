@@ -2894,6 +2894,9 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
+	if len(pod.Spec.Hostname) == 0 {
+		pod.Spec.Hostname = pod.Name
+	}
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, field.NewPath("spec"))...)
 
 	// we do additional validation only pertinent for pods and not pod templates
