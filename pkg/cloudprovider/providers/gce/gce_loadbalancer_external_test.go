@@ -30,39 +30,32 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
-const serviceName = ""
-
 func TestEnsureStaticIP(t *testing.T) {
-	projectID := "test-project"
-	region := "us-central1"
-	zoneName := "us-central1-b"
-
-	gce, err := fakeGCECloud(projectID, region, zoneName)
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
 	ipName := "some-static-ip"
+	serviceName := "some-service"
 
 	// First ensure call
-	ip, existed, err := ensureStaticIP(gce, ipName, serviceName, region, "", cloud.NetworkTierDefault)
+	ip, existed, err := ensureStaticIP(gce, ipName, serviceName, gce.region, "", cloud.NetworkTierDefault)
 	if err != nil || existed {
-		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, "") = %v, %v, %v; want valid ip, false, nil`, gce, ipName, serviceName, region, ip, existed, err)
+		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, "") = %v, %v, %v; want valid ip, false, nil`, gce, ipName, serviceName, gce.region, ip, existed, err)
 	}
 
 	// Second ensure call
 	var ipPrime string
-	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, region, ip, cloud.NetworkTierDefault)
+	ipPrime, existed, err = ensureStaticIP(gce, ipName, serviceName, gce.region, ip, cloud.NetworkTierDefault)
 	if err != nil || !existed || ip != ipPrime {
-		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, region, ip, ipPrime, existed, err, ip)
+		t.Fatalf(`ensureStaticIP(%v, %v, %v, %v, %v) = %v, %v, %v; want %v, true, nil`, gce, ipName, serviceName, gce.region, ip, ipPrime, existed, err, ip)
 	}
 }
 
 func TestEnsureStaticIPWithTier(t *testing.T) {
-	projectID := "test-project"
-	region := "us-central1"
-	zoneName := "us-central1-b"
-
-	s, err := fakeGCECloud(projectID, region, zoneName)
+	s, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
+
+	serviceName := "some-service"
 
 	for desc, tc := range map[string]struct {
 		name     string
@@ -81,13 +74,13 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			ip, existed, err := ensureStaticIP(s, tc.name, serviceName, region, "", tc.netTier)
+			ip, existed, err := ensureStaticIP(s, tc.name, serviceName, s.region, "", tc.netTier)
 			assert.NoError(t, err)
 			assert.False(t, existed)
 			assert.NotEqual(t, ip, "")
 			// Get the Address from the fake address service and verify that the tier
 			// is set correctly.
-			alphaAddr, err := s.GetAlphaRegionAddress(tc.name, region)
+			alphaAddr, err := s.GetAlphaRegionAddress(tc.name, s.region)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, alphaAddr.NetworkTier)
 		})
@@ -96,7 +89,6 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 
 func TestVerifyRequestedIP(t *testing.T) {
 	lbRef := "test-lb"
-	region := "us-central1"
 
 	for desc, tc := range map[string]struct {
 		requestedIP     string
@@ -137,13 +129,13 @@ func TestVerifyRequestedIP(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			s, err := fakeGCECloud("test-project", region, "us-central1a")
+			s, err := fakeGCECloud(DefaultTestClusterValues())
 			require.NoError(t, err)
 
 			for _, addr := range tc.addrList {
-				s.ReserveAlphaRegionAddress(addr, region)
+				s.ReserveAlphaRegionAddress(addr, s.region)
 			}
-			isUserOwnedIP, err := verifyUserRequestedIP(s, region, tc.requestedIP, tc.fwdRuleIP, lbRef, tc.netTier)
+			isUserOwnedIP, err := verifyUserRequestedIP(s, s.region, tc.requestedIP, tc.fwdRuleIP, lbRef, tc.netTier)
 			assert.Equal(t, tc.expectErr, err != nil, fmt.Sprintf("err: %v", err))
 			assert.Equal(t, tc.expectUserOwned, isUserOwnedIP)
 		})
@@ -154,9 +146,8 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 	// Common variables among the tests.
 	ports := []v1.ServicePort{{Name: "foo", Protocol: v1.ProtocolTCP, Port: int32(123)}}
 	target := "test-target-pool"
-	svcName := "foo-svc"
-	projectID := "test-project"
-	region := "us-central1"
+	vals := DefaultTestClusterValues()
+	serviceName := "foo-svc"
 
 	baseLinkUrl := "https://www.googleapis.com/compute/%v/projects/%v/regions/%v/forwardingRules/%v"
 
@@ -174,7 +165,7 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "PREMIUM",
-				SelfLink:    fmt.Sprintf(baseLinkUrl, "v1", projectID, region, "lb-1"),
+				SelfLink:    fmt.Sprintf(baseLinkUrl, "v1", vals.ProjectID, vals.Region, "lb-1"),
 			},
 		},
 		"Standard tier": {
@@ -187,21 +178,21 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 				PortRange:   "123-123",
 				Target:      target,
 				NetworkTier: "STANDARD",
-				SelfLink:    fmt.Sprintf(baseLinkUrl, "alpha", projectID, region, "lb-2"),
+				SelfLink:    fmt.Sprintf(baseLinkUrl, "alpha", vals.ProjectID, vals.Region, "lb-2"),
 			},
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			s, err := fakeGCECloud(projectID, region, "us-central1a")
+			s, err := fakeGCECloud(vals)
 			require.NoError(t, err)
 
 			lbName := tc.expectedRule.Name
 			ipAddr := tc.expectedRule.IPAddress
 
-			err = createForwardingRule(s, lbName, svcName, region, ipAddr, target, ports, tc.netTier)
+			err = createForwardingRule(s, lbName, serviceName, s.region, ipAddr, target, ports, tc.netTier)
 			assert.NoError(t, err)
 
-			alphaRule, err := s.GetAlphaRegionForwardingRule(lbName, region)
+			alphaRule, err := s.GetAlphaRegionForwardingRule(lbName, s.region)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedRule, alphaRule)
 		})
@@ -210,9 +201,8 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 
 func TestDeleteAddressWithWrongTier(t *testing.T) {
 	lbRef := "test-lb"
-	region := "us-central1"
 
-	s, err := fakeGCECloud("test-region", region, "us-central1a")
+	s, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
 	// Enable the cloud.NetworkTiers feature
@@ -249,17 +239,17 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			for _, addr := range tc.addrList {
-				s.ReserveAlphaRegionAddress(addr, region)
+				s.ReserveAlphaRegionAddress(addr, s.region)
 			}
 
 			// Sanity check to ensure we inject the right address.
-			_, err = s.GetRegionAddress(tc.addrName, region)
+			_, err = s.GetRegionAddress(tc.addrName, s.region)
 			require.NoError(t, err)
 
-			err = deleteAddressWithWrongTier(s, region, tc.addrName, lbRef, tc.netTier)
+			err = deleteAddressWithWrongTier(s, s.region, tc.addrName, lbRef, tc.netTier)
 			assert.NoError(t, err)
 			// Check whether the address still exists.
-			_, err = s.GetRegionAddress(tc.addrName, region)
+			_, err = s.GetRegionAddress(tc.addrName, s.region)
 			if tc.expectDelete {
 				assert.True(t, isNotFound(err))
 			} else {
@@ -285,27 +275,23 @@ func createExternalLoadBalancer(gce *GCECloud, nodeNames []string, clusterName, 
 }
 
 func TestEnsureExternalLoadBalancer(t *testing.T) {
-	projectID := "test-project"
-	region := "us-central1"
-	zoneName := "us-central1-b"
-	clusterName := "Test Cluster Name"
-	clusterID := "test-cluster-id"
+	vals := DefaultTestClusterValues()
 	nodeName := "test-node-1"
 
-	gce, err := fakeGCECloud(projectID, region, zoneName)
+	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	status, err := createExternalLoadBalancer(gce, []string{nodeName}, clusterName, clusterID, zoneName)
+	status, err := createExternalLoadBalancer(gce, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
 
 	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-	hcName := MakeNodesHealthCheckName(clusterID)
+	hcName := MakeNodesHealthCheckName(vals.ClusterID)
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
 		MakeFirewallName(lbName),
-		MakeHealthCheckFirewallName(clusterID, hcName, true),
+		MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
 	}
 
 	for _, fwName := range fwNames {
@@ -316,7 +302,7 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	}
 
 	// Check that TargetPool is Created
-	pool, err := gce.GetTargetPool(lbName, region)
+	pool, err := gce.GetTargetPool(lbName, gce.region)
 	require.NoError(t, err)
 	assert.Equal(t, lbName, pool.Name)
 	assert.NotEmpty(t, pool.HealthChecks)
@@ -328,7 +314,7 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	assert.Equal(t, hcName, healthcheck.Name)
 
 	// Check that ForwardingRule is created
-	fwdRule, err := gce.GetRegionForwardingRule(lbName, region)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
 	require.NoError(t, err)
 	assert.Equal(t, lbName, fwdRule.Name)
 	assert.Equal(t, "TCP", fwdRule.IPProtocol)
@@ -336,22 +322,17 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 }
 
 func TestUpdateExternalLoadBalancer(t *testing.T) {
-	projectID := "test-project"
-	region := "us-central1"
-	zoneName := "us-central1-b"
-	clusterName := "Test Cluster Name"
-	clusterID := "test-cluster-1"
-
+	vals := DefaultTestClusterValues()
 	nodeName := "test-node-1"
 
-	gce, err := fakeGCECloud(projectID, region, zoneName)
+	gce, err := fakeGCECloud((DefaultTestClusterValues()))
 	require.NoError(t, err)
 
-	_, err = createExternalLoadBalancer(gce, []string{nodeName}, clusterName, clusterID, zoneName)
+	_, err = createExternalLoadBalancer(gce, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	newNodeName := "test-node-2"
-	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName}, zoneName)
+	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName}, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Add the new node, then check that it is properly added to the TargetPool
@@ -360,64 +341,59 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 
 	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
 
-	pool, err := gce.GetTargetPool(lbName, region)
+	pool, err := gce.GetTargetPool(lbName, gce.region)
 	require.NoError(t, err)
 
 	// TODO: when testify is updated to v1.2.0+, use ElementsMatch instead
 	assert.Contains(
 		t,
 		pool.Instances,
-		fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName),
+		fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName),
 	)
 
 	assert.Contains(
 		t,
 		pool.Instances,
-		fmt.Sprintf("/zones/%s/instances/%s", zoneName, newNodeName),
+		fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, newNodeName),
 	)
 
-	newNodes, err = createAndInsertNodes(gce, []string{nodeName}, zoneName)
+	newNodes, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Remove the new node by calling updateExternalLoadBalancer with a list
 	// only containing the old node, and test that the TargetPool no longer
 	// contains the new node.
-	err = gce.updateExternalLoadBalancer(clusterName, fakeApiService, newNodes)
+	err = gce.updateExternalLoadBalancer(vals.ClusterName, fakeApiService, newNodes)
 	assert.NoError(t, err)
 
-	pool, err = gce.GetTargetPool(lbName, region)
+	pool, err = gce.GetTargetPool(lbName, gce.region)
 	require.NoError(t, err)
 
 	assert.Equal(
 		t,
-		[]string{fmt.Sprintf("/zones/%s/instances/%s", zoneName, nodeName)},
+		[]string{fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName)},
 		pool.Instances,
 	)
 }
 
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
-	projectID := "test-project"
-	region := "us-central1"
-	zoneName := "us-central1-b"
-	clusterName := "Test Cluster Name"
-	clusterID := "test-cluster-id"
-
-	gce, err := fakeGCECloud(projectID, region, zoneName)
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, clusterName, clusterID, zoneName)
+	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
-	err = gce.ensureExternalLoadBalancerDeleted(clusterName, clusterID, fakeApiService)
+	err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
 	assert.NoError(t, err)
 
 	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-	hcName := MakeNodesHealthCheckName(clusterID)
+	hcName := MakeNodesHealthCheckName(vals.ClusterID)
 
 	// Check that Firewalls are deleted for the LoadBalancer and the HealthCheck
 	fwNames := []string{
 		MakeFirewallName(lbName),
-		MakeHealthCheckFirewallName(clusterID, hcName, true),
+		MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
 	}
 
 	for _, fwName := range fwNames {
@@ -427,7 +403,7 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	}
 
 	// Check that TargetPool is deleted
-	pool, err := gce.GetTargetPool(lbName, region)
+	pool, err := gce.GetTargetPool(lbName, gce.region)
 	require.Error(t, err)
 	assert.Nil(t, pool)
 
@@ -437,19 +413,14 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	assert.Nil(t, healthcheck)
 
 	// Check forwarding rule is deleted
-	fwdRule, err := gce.GetRegionForwardingRule(lbName, region)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
 	require.Error(t, err)
 	assert.Nil(t, fwdRule)
 }
 
 func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
-	projectID := "test-project"
-	region := "us-central1"
-	zoneName := "us-central1-b"
-	clusterName := "Test Cluster Name"
-	clusterID := "test-cluster-id"
-
-	gce, err := fakeGCECloud(projectID, region, zoneName)
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
 	// Enable the cloud.NetworkTiers feature
@@ -469,7 +440,7 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 		gce,
 		lbName,
 		serviceName.String(),
-		region,
+		gce.region,
 		"",
 		gce.targetPoolURL(lbName),
 		fakeApiService.Spec.Ports,
@@ -483,18 +454,18 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 		NetworkTier: cloud.NetworkTierStandard.ToGCEValue(),
 	}
 
-	err = gce.ReserveAlphaRegionAddress(addressObj, region)
+	err = gce.ReserveAlphaRegionAddress(addressObj, gce.region)
 	require.NoError(t, err)
 
-	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, clusterName, clusterID, zoneName)
+	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	require.NoError(t, err)
 
 	// Expect forwarding rule tier to not be Standard
-	tier, err := gce.getNetworkTierFromForwardingRule(lbName, region)
+	tier, err := gce.getNetworkTierFromForwardingRule(lbName, gce.region)
 	assert.NoError(t, err)
 	assert.Equal(t, cloud.NetworkTierDefault.ToGCEValue(), tier)
 
 	// Expect address to be deleted
-	_, err = gce.GetRegionAddress(lbName, region)
+	_, err = gce.GetRegionAddress(lbName, gce.region)
 	assert.True(t, isNotFound(err))
 }

@@ -34,6 +34,24 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
+type TestClusterValues struct {
+	ProjectID   string
+	Region      string
+	ZoneName    string
+	ClusterID   string
+	ClusterName string
+}
+
+func DefaultTestClusterValues() TestClusterValues {
+	return TestClusterValues{
+		ProjectID:   "test-project",
+		Region:      "us-central1",
+		ZoneName:    "us-central1-b",
+		ClusterID:   "test-cluster-id",
+		ClusterName: "Test Cluster Name",
+	}
+}
+
 var fakeApiService = &v1.Service{
 	Spec: v1.ServiceSpec{
 		SessionAffinity: v1.ServiceAffinityClientIP,
@@ -48,7 +66,7 @@ func (*fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("err: test used fake http client")
 }
 
-func fakeGCECloud(projectID, region, zoneName string) (*GCECloud, error) {
+func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 	client := &http.Client{Transport: &fakeRoundTripper{}}
 
 	service, err := compute.New(client)
@@ -57,8 +75,8 @@ func fakeGCECloud(projectID, region, zoneName string) (*GCECloud, error) {
 	}
 
 	// Used in disk unit tests
-	fakeManager := newFakeManager(projectID, region)
-	zonesWithNodes := createNodeZones([]string{zoneName})
+	fakeManager := newFakeManager(vals.ProjectID, vals.Region)
+	zonesWithNodes := createNodeZones([]string{vals.ZoneName})
 
 	alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
 	if err != nil {
@@ -66,12 +84,12 @@ func fakeGCECloud(projectID, region, zoneName string) (*GCECloud, error) {
 	}
 
 	gce := &GCECloud{
-		region:             region,
+		region:             vals.Region,
 		service:            service,
 		manager:            fakeManager,
-		managedZones:       []string{zoneName},
-		projectID:          projectID,
-		networkProjectID:   projectID,
+		managedZones:       []string{vals.ZoneName},
+		projectID:          vals.ProjectID,
+		networkProjectID:   vals.ProjectID,
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          zonesWithNodes,
 		nodeInformerSynced: func() bool { return true },
@@ -94,7 +112,7 @@ func fakeGCECloud(projectID, region, zoneName string) (*GCECloud, error) {
 
 	keyGA := meta.GlobalKey("key-ga")
 	c.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
-		Obj: &compute.Zone{Name: zoneName, Region: gce.getRegionLink(region)},
+		Obj: &compute.Zone{Name: vals.ZoneName, Region: gce.getRegionLink(vals.Region)},
 	}
 
 	gce.c = c
