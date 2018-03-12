@@ -2813,3 +2813,31 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		}
 	}
 }
+
+func Test_validatePSPRunAsUser(t *testing.T) {
+	var testCases = []struct {
+		name              string
+		runAsUserStrategy extensions.RunAsUserStrategyOptions
+		fail              bool
+	}{
+		{"Invalid RunAsUserStrategy", extensions.RunAsUserStrategyOptions{Rule: extensions.RunAsUserStrategy("someInvalidStrategy")}, true},
+		{"RunAsUserStrategyMustRunAs", extensions.RunAsUserStrategyOptions{Rule: extensions.RunAsUserStrategyMustRunAs}, false},
+		{"RunAsUserStrategyMustRunAsNonRoot", extensions.RunAsUserStrategyOptions{Rule: extensions.RunAsUserStrategyMustRunAsNonRoot}, false},
+		{"RunAsUserStrategyMustRunAsNonRoot With Valid Range", extensions.RunAsUserStrategyOptions{Rule: extensions.RunAsUserStrategyMustRunAs, Ranges: []extensions.UserIDRange{{Min: 2, Max: 3}, {Min: 4, Max: 5}}}, false},
+		{"RunAsUserStrategyMustRunAsNonRoot With Invalid Range", extensions.RunAsUserStrategyOptions{Rule: extensions.RunAsUserStrategyMustRunAs, Ranges: []extensions.UserIDRange{{Min: 2, Max: 3}, {Min: 5, Max: 4}}}, true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPRunAsUser(field.NewPath("status"), &testCase.runAsUserStrategy)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
