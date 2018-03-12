@@ -128,6 +128,9 @@ func (a *ValidatingAdmissionWebhook) SetServiceResolver(sr config.ServiceResolve
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
+		// TODO: we should not mutate a scheme we don't own. We should have a fallback serializer instead.
+		admissionv1beta1.AddToScheme(scheme)
+
 		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
 			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
 		}))
