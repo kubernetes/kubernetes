@@ -18,6 +18,7 @@ package filters
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -54,13 +55,22 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 		if longRunning(req, requestInfo) {
 			return nil, nil, nil
 		}
-		metricFn := func() {
+
+		ctx, cancel := context.WithCancel(ctx)
+		if err := requestContextMapper.Update(req, ctx); err != nil {
+			return time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("failed to update context during timeout"))
+		}
+
+		postTimeoutFn := func() {
+			cancel()
 			metrics.Record(req, requestInfo, "", http.StatusGatewayTimeout, 0, 0)
 		}
-		return time.After(timeout), metricFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
+		return time.After(timeout), postTimeoutFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
+
+type timeoutFunc = func(*http.Request) (timeout <-chan time.Time, postTimeoutFunc func(), err *apierrors.StatusError)
 
 // WithTimeout returns an http.Handler that runs h with a timeout
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
@@ -71,17 +81,17 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 // http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
 // timeout will be enforced. recordFn is a function that will be invoked whenever
 // a timeout happens.
-func WithTimeout(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, recordFn func(), err *apierrors.StatusError)) http.Handler {
+func WithTimeout(h http.Handler, timeoutFunc timeoutFunc) http.Handler {
 	return &timeoutHandler{h, timeoutFunc}
 }
 
 type timeoutHandler struct {
 	handler http.Handler
-	timeout func(*http.Request) (<-chan time.Time, func(), *apierrors.StatusError)
+	timeout timeoutFunc
 }
 
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	after, recordFn, err := t.timeout(r)
+	after, postTimeoutFn, err := t.timeout(r)
 	if after == nil {
 		t.handler.ServeHTTP(w, r)
 		return
@@ -97,7 +107,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-done:
 		return
 	case <-after:
-		recordFn()
+		postTimeoutFn()
 		tw.timeout(err)
 	}
 }
