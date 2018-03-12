@@ -28,6 +28,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	alpha "google.golang.org/api/compute/v0.alpha"
 	beta "google.golang.org/api/compute/v0.beta"
@@ -228,9 +229,75 @@ func InsertAlphaAddressHook(ctx context.Context, key *meta.Key, obj *alpha.Addre
 	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionAlpha, projectID)
 }
 
-// Map from InstanceGroup key to list of Instances
-type instanceGroupAttributes struct {
-	instanceMap map[meta.Key][]*ga.InstanceWithNamedPorts
+// InstanceGroupAttributes maps from InstanceGroup key to a map of Instances
+type InstanceGroupAttributes struct {
+	InstanceMap map[meta.Key]map[string]*ga.InstanceWithNamedPorts
+	Lock        *sync.Mutex
+}
+
+// AddInstances adds a list of Instances passed by InstanceReference
+func (igAttrs *InstanceGroupAttributes) AddInstances(key *meta.Key, instanceRefs []*ga.InstanceReference) error {
+	igAttrs.Lock.Lock()
+	defer igAttrs.Lock.Unlock()
+
+	instancesWithNamedPorts, ok := igAttrs.InstanceMap[*key]
+	if !ok {
+		instancesWithNamedPorts = make(map[string]*ga.InstanceWithNamedPorts)
+	}
+
+	for _, instance := range instanceRefs {
+		iWithPort := &ga.InstanceWithNamedPorts{
+			Instance: instance.Instance,
+		}
+
+		instancesWithNamedPorts[instance.Instance] = iWithPort
+	}
+
+	igAttrs.InstanceMap[*key] = instancesWithNamedPorts
+	return nil
+}
+
+// RemoveInstances removes a list of Instances passed by InstanceReference
+func (igAttrs *InstanceGroupAttributes) RemoveInstances(key *meta.Key, instanceRefs []*ga.InstanceReference) error {
+	igAttrs.Lock.Lock()
+	defer igAttrs.Lock.Unlock()
+
+	instancesWithNamedPorts, ok := igAttrs.InstanceMap[*key]
+	if !ok {
+		instancesWithNamedPorts = make(map[string]*ga.InstanceWithNamedPorts)
+	}
+
+	for _, instanceToRemove := range instanceRefs {
+		if _, ok := instancesWithNamedPorts[instanceToRemove.Instance]; ok {
+			delete(instancesWithNamedPorts, instanceToRemove.Instance)
+		} else {
+			return &googleapi.Error{
+				Code:    http.StatusBadRequest,
+				Message: fmt.Sprintf("%s is not a member of %s", instanceToRemove.Instance, key.String()),
+			}
+		}
+	}
+
+	igAttrs.InstanceMap[*key] = instancesWithNamedPorts
+	return nil
+}
+
+// List gets a list of InstanceWithNamedPorts
+func (igAttrs *InstanceGroupAttributes) List(key *meta.Key) []*ga.InstanceWithNamedPorts {
+	igAttrs.Lock.Lock()
+	defer igAttrs.Lock.Unlock()
+
+	instancesWithNamedPorts, ok := igAttrs.InstanceMap[*key]
+	if !ok {
+		instancesWithNamedPorts = make(map[string]*ga.InstanceWithNamedPorts)
+	}
+
+	var instanceList []*ga.InstanceWithNamedPorts
+	for _, val := range instancesWithNamedPorts {
+		instanceList = append(instanceList, val)
+	}
+
+	return instanceList
 }
 
 // AddInstancesHook mocks adding instances from an InstanceGroup
@@ -243,29 +310,9 @@ func AddInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroups
 		}
 	}
 
-	if m.X == nil {
-		m.X = instanceGroupAttributes{
-			instanceMap: make(map[meta.Key][]*ga.InstanceWithNamedPorts),
-		}
-	}
-
-	var attrs instanceGroupAttributes
-	attrs = m.X.(instanceGroupAttributes)
-
-	instances, ok := attrs.instanceMap[*key]
-	if !ok {
-		instances = []*ga.InstanceWithNamedPorts{}
-	}
-
-	for _, instance := range req.Instances {
-		iWithPort := &ga.InstanceWithNamedPorts{
-			Instance: instance.Instance,
-		}
-
-		instances = append(instances, iWithPort)
-	}
-
-	attrs.instanceMap[*key] = instances
+	var attrs InstanceGroupAttributes
+	attrs = m.X.(InstanceGroupAttributes)
+	attrs.AddInstances(key, req.Instances)
 	m.X = attrs
 	return nil
 }
@@ -280,17 +327,9 @@ func ListInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroup
 		}
 	}
 
-	if m.X == nil {
-		m.X = instanceGroupAttributes{instanceMap: make(map[meta.Key][]*ga.InstanceWithNamedPorts)}
-	}
-
-	var attrs instanceGroupAttributes
-	attrs = m.X.(instanceGroupAttributes)
-
-	instances, ok := attrs.instanceMap[*key]
-	if !ok {
-		instances = []*ga.InstanceWithNamedPorts{}
-	}
+	var attrs InstanceGroupAttributes
+	attrs = m.X.(InstanceGroupAttributes)
+	instances := attrs.List(key)
 
 	return instances, nil
 }
@@ -305,32 +344,9 @@ func RemoveInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGro
 		}
 	}
 
-	if m.X == nil {
-		m.X = instanceGroupAttributes{
-			instanceMap: make(map[meta.Key][]*ga.InstanceWithNamedPorts),
-		}
-	}
-
-	var attrs instanceGroupAttributes
-	attrs = m.X.(instanceGroupAttributes)
-
-	instances, ok := attrs.instanceMap[*key]
-	if !ok {
-		instances = []*ga.InstanceWithNamedPorts{}
-	}
-
-	for _, instanceToRemove := range req.Instances {
-		for i, instance := range instances {
-			if instanceToRemove.Instance == instance.Instance {
-				// Delete instance from instances without preserving order
-				instances[i] = instances[len(instances)-1]
-				instances = instances[:len(instances)-1]
-				break
-			}
-		}
-	}
-
-	attrs.instanceMap[*key] = instances
+	var attrs InstanceGroupAttributes
+	attrs = m.X.(InstanceGroupAttributes)
+	attrs.RemoveInstances(key, req.Instances)
 	m.X = attrs
 	return nil
 }

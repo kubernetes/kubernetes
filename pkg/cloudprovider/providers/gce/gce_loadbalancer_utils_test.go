@@ -23,6 +23,7 @@ package gce
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
 	compute "google.golang.org/api/compute/v1"
 
@@ -102,6 +103,10 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 	c.MockAddresses.InsertHook = mock.InsertAddressHook
 	c.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
 
+	c.MockInstanceGroups.X = mock.InstanceGroupAttributes{
+		InstanceMap: make(map[meta.Key]map[string]*compute.InstanceWithNamedPorts),
+		Lock:        &sync.Mutex{},
+	}
 	c.MockInstanceGroups.AddInstancesHook = mock.AddInstancesHook
 	c.MockInstanceGroups.RemoveInstancesHook = mock.RemoveInstancesHook
 	c.MockInstanceGroups.ListInstancesHook = mock.ListInstancesHook
