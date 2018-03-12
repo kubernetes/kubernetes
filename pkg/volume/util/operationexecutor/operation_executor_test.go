@@ -124,7 +124,7 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins(t *testi
 				PodUID:     pod.UID,
 			}
 		}
-		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */)
+		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */, "" /*podsDir*/)
 	}
 
 	// Assert
@@ -318,7 +318,7 @@ func TestOperationExecutor_UnmountVolume_ConcurrentUnmountForAllPlugins_VolumeMo
 				VolumeSpec: tmpSpec,
 			}
 		}
-		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */)
+		oe.UnmountVolume(volumesToUnmount[i], nil /* actualStateOfWorldMounterUpdater */, "" /* podsDir */)
 	}
 
 	// Assert
@@ -372,7 +372,7 @@ func (fopg *fakeOperationGenerator) GenerateMountVolumeFunc(waitForAttachTimeout
 		OperationFunc: opFunc,
 	}, nil
 }
-func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (fopg *fakeOperationGenerator) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil, nil

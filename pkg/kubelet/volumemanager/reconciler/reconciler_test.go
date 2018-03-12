@@ -908,7 +908,7 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			volumeToUnmount := operationexecutor.MountedVolume{
 				PluginName: "fake-file-plugin",
 				VolumeSpec: tmpSpec}
-			err := oex.UnmountVolume(volumeToUnmount, asw)
+			err := oex.UnmountVolume(volumeToUnmount, asw, "" /* podsDir */)
 			// Assert
 			if assert.Error(t, err) {
 				assert.Contains(t, err.Error(), tc.expectedErrMsg)
