@@ -109,10 +109,14 @@ func (p *csiPlugin) NewMounter(
 		glog.Error(log("failed to get a kubernetes client"))
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
-
+	ro, err := getReadOnlyOfVolumeMount(pod, spec)
+	if err != nil {
+		glog.Error(log("failed to get ReadOnly attribute for pod: %s volume: %s error: %v", pod.Name, pvSource.VolumeHandle, err))
+	}
 	mounter := &csiMountMgr{
 		plugin:       p,
 		k8s:          k8s,
+		readOnly:     ro,
 		spec:         spec,
 		pod:          pod,
 		podUID:       pod.UID,
@@ -122,6 +126,27 @@ func (p *csiPlugin) NewMounter(
 		csiClient:    client,
 	}
 	return mounter, nil
+}
+
+func getReadOnlyOfVolumeMount(pod *api.Pod, spec *volume.Spec) (bool, error) {
+	if spec.PersistentVolume.Spec.ClaimRef == nil {
+		return false, errors.New("persistent volume has empty ClaimRef")
+	}
+	claimName := spec.PersistentVolume.Spec.ClaimRef
+	for _, v := range pod.Spec.Volumes {
+		if v.VolumeSource.PersistentVolumeClaim.ClaimName != claimName.Name {
+			continue
+		}
+		volName := v.Name
+		for _, c := range pod.Spec.Containers {
+			for _, vm := range c.VolumeMounts {
+				if vm.Name == volName {
+					return vm.ReadOnly, nil
+				}
+			}
+		}
+	}
+	return false, errors.New("pod has no volume mounts")
 }
 
 func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
