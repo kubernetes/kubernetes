@@ -104,6 +104,7 @@ const (
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
+	cleanFlagSet.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletConfig, err := options.NewKubeletConfiguration()
 	// programmer error
