@@ -517,7 +517,7 @@ func TestMultiScheduler(t *testing.T) {
 	informerFactory2 := informers.NewSharedInformerFactory(context.clientSet, 0)
 	podInformer2 := factory.NewPodInformer(context.clientSet, 0, fooScheduler)
 
-	schedulerConfigFactory2 := CreateConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2)
+	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
