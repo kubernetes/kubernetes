@@ -377,6 +377,7 @@ data:
       disable_retry_limit
       # Use multiple threads for processing.
       num_threads 2
+      use_grpc true
       labels {
         # The logging backend will take responsibility for double writing to
         # the necessary resource types when this label is set.
@@ -404,6 +405,7 @@ data:
       max_retry_wait 30
       disable_retry_limit
       num_threads 2
+      use_grpc true
       labels {
         # The logging backend will take responsibility for double writing to
         # the necessary resource types when this label is set.
