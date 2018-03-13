@@ -153,6 +153,15 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	attribs := csiSource.VolumeAttributes
 
+	nodePublishSecrets := map[string]string{}
+	if csiSource.NodePublishSecretRef != nil {
+		nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
+		if err != nil {
+			return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v",
+				csiSource.NodePublishSecretRef.Namespace, csiSource.NodePublishSecretRef.Name, err)
+		}
+	}
+
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		glog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
@@ -187,10 +196,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	fsType := csiSource.FSType
 	if len(fsType) == 0 {
 		fsType = defaultFSType
-	}
-	nodePublishSecrets := map[string]string{}
-	if csiSource.NodePublishSecretRef != nil {
-		nodePublishSecrets = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
 	}
 	err = csi.NodePublishVolume(
 		ctx,
