@@ -55,12 +55,12 @@ func UntilFirstEntryFromLog(log string) IngestionPred {
 	}
 }
 
-// UntilFirstEntryFromZone is a IngestionPred that checks that at least one
+// UntilFirstEntryFromLocation is a IngestionPred that checks that at least one
 // entry from the log with a given name was ingested.
-func UntilFirstEntryFromZone(zone string) IngestionPred {
+func UntilFirstEntryFromLocation(location string) IngestionPred {
 	return func(_ string, entries []LogEntry) (bool, error) {
 		for _, e := range entries {
-			if e.Location == zone {
+			if e.Location == location {
 				return true, nil
 			}
 		}
