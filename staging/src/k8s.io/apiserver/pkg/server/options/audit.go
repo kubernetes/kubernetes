@@ -364,7 +364,7 @@ func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
 		return nil
 	}
 
-	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, auditv1beta1.SchemeGroupVersion)
+	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, auditv1beta1.SchemeGroupVersion, o.InitialBackoff)
 	if err != nil {
 		return fmt.Errorf("initializing audit webhook: %v", err)
 	}

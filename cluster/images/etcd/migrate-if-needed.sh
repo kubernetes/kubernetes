@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.17', '3.1.11')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.17', '3.1.12')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -28,7 +28,7 @@
 # The update workflow support the following upgrade steps:
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
 # - 2.3.7/etcd2 -> 3.0.17/etcd2
-# - 3.0.17/etcd3 -> 3.1.11/etcd3
+# - 3.0.17/etcd3 -> 3.1.12/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -64,7 +64,7 @@ rollback_etcd3_minor_version() {
   echo "Starting etcd version ${START_VERSION} to capture rollback snapshot."
   if ! start_etcd; then
     echo "Unable to automatically downgrade etcd: starting etcd version ${START_VERSION} to capture rollback snapshot failed."
-    echo "See https://coreos.com/etcd/docs/3.1.11/op-guide/recovery.html for manual downgrade options."
+    echo "See https://coreos.com/etcd/docs/latest/op-guide/recovery.html for manual downgrade options."
     exit 1
   else
     ETCDCTL_API=3 ${ETCDCTL_CMD} snapshot --endpoints "http://127.0.0.1:${ETCD_PORT}" save "${SNAPSHOT_FILE}"
@@ -138,7 +138,7 @@ fi
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
 # We cannot use array since sh doesn't support it.
-SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.17 3.1.11"
+SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.17 3.1.12"
 SUPPORTED_VERSIONS=$(echo "${SUPPORTED_VERSIONS_STRING}" | tr " " "\n")
 
 VERSION_FILE="version.txt"
