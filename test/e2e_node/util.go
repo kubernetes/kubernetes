@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -56,7 +57,7 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
-var busyboxImage = "busybox"
+var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
