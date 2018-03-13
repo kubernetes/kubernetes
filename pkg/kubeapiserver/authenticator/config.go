@@ -82,7 +82,6 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	var authenticators []authenticator.Request
 	var tokenAuthenticators []authenticator.Token
 	securityDefinitions := spec.SecurityDefinitions{}
-	hasBasicAuth := false
 
 	// front-proxy, BasicAuth methods, local first, then remote
 	// Add the front proxy authenticator if requested
@@ -100,13 +99,20 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		authenticators = append(authenticators, requestHeaderAuthenticator)
 	}
 
+	// basic auth
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, basicAuth)
-		hasBasicAuth = true
+
+		securityDefinitions["HTTPBasic"] = &spec.SecurityScheme{
+			SecuritySchemeProps: spec.SecuritySchemeProps{
+				Type:        "basic",
+				Description: "HTTP Basic authentication",
+			},
+		}
 	}
 
 	// X509 methods
@@ -167,15 +173,6 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		tokenAuthenticators = append(tokenAuthenticators, webhookTokenAuth)
 	}
 
-	if hasBasicAuth {
-		securityDefinitions["HTTPBasic"] = &spec.SecurityScheme{
-			SecuritySchemeProps: spec.SecuritySchemeProps{
-				Type:        "basic",
-				Description: "HTTP Basic authentication",
-			},
-		}
-	}
-
 	if len(tokenAuthenticators) > 0 {
 		// Union the token authenticators
 		tokenAuth := tokenunion.New(tokenAuthenticators...)
@@ -200,8 +197,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		}
 	}
 
-	switch len(authenticators) {
-	case 0:
+	if len(authenticators) == 0 {
 		return nil, &securityDefinitions, nil
 	}
 
