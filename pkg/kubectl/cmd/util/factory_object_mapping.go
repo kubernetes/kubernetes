@@ -304,13 +304,13 @@ func (f *ring1Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
 
 func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 	clientset, clientsetErr := f.clientAccessFactory.ClientSet()
+	if clientsetErr != nil {
+		return nil, clientsetErr
+	}
 	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
 
 	if kubectl.IsNoSuchReaperError(reaperErr) {
 		return nil, reaperErr
-	}
-	if clientsetErr != nil {
-		return nil, clientsetErr
 	}
 	return reaper, reaperErr
 }
