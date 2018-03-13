@@ -310,7 +310,8 @@ func (os *OpenStack) OperationPending(diskName string) (bool, string, error) {
 	}
 	volumeStatus := volume.Status
 	if volumeStatus == volumeErrorStatus {
-		return false, volumeStatus, nil
+		err = fmt.Errorf("status of volume %s is %s", diskName, volumeStatus)
+		return false, volumeStatus, err
 	}
 	if volumeStatus == volumeAvailableStatus || volumeStatus == volumeInUseStatus || volumeStatus == volumeDeletedStatus {
 		return false, volume.Status, nil
