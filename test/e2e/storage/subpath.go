@@ -104,6 +104,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-secret"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
+						Name:         "test",
 						Image:        mountImage,
 						Args:         []string{"--file_content=" + volumePath},
 						VolumeMounts: []v1.VolumeMount{{Name: "secret", MountPath: volumePath, SubPath: "secret-key"}},
@@ -122,6 +123,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-configmap"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
+						Name:         "test",
 						Image:        mountImage,
 						Args:         []string{"--file_content=" + volumePath},
 						VolumeMounts: []v1.VolumeMount{{Name: "configmap", MountPath: volumePath, SubPath: "configmap-key"}},
@@ -140,6 +142,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-downward"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
+						Name:         "test",
 						Image:        mountImage,
 						Args:         []string{"--file_content=" + volumePath},
 						VolumeMounts: []v1.VolumeMount{{Name: "downward", MountPath: volumePath, SubPath: "downward/podname"}},
@@ -164,6 +167,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-secret"},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
+						Name:         "test",
 						Image:        mountImage,
 						Args:         []string{"--file_content=" + volumePath},
 						VolumeMounts: []v1.VolumeMount{{Name: "projected", MountPath: volumePath, SubPath: "projected/configmap-key"}},
