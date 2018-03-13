@@ -2434,7 +2434,7 @@ func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.
 	return allErrors
 }
 
-func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+func ValidatePortNumOrName(port intstr.Int32OrString, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if port.Type == intstr.Int {
 		for _, msg := range validation.IsValidPortNum(port.IntValue()) {

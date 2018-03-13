@@ -119,7 +119,7 @@ func TestUpdate(t *testing.T) {
 					Ports: []networking.NetworkPolicyPort{
 						{
 							Protocol: &protocolICMP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+							Port:     &intstr.Int32OrString{Type: intstr.Int, IntVal: 80},
 						},
 					},
 				},

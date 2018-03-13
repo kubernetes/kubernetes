@@ -144,7 +144,7 @@ type NetworkPolicyPort struct {
 	// The port on the given protocol. This can either be a numerical or named port on
 	// a pod. If this field is not provided, this matches all port names and numbers.
 	// +optional
-	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
+	Port *intstr.Int32OrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 
 // IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods

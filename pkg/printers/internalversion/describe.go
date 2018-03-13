@@ -2069,7 +2069,7 @@ func (i *IngressDescriber) describeIngress(ing *extensions.Ingress, describerSet
 			// default backend in the kube-system namespace.
 			def = &extensions.IngressBackend{
 				ServiceName: "default-http-backend",
-				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+				ServicePort: intstr.Int32OrString{Type: intstr.Int, IntVal: 80},
 			}
 			ns = metav1.NamespaceSystem
 		}

@@ -28,7 +28,7 @@ type PodDisruptionBudgetSpec struct {
 	// absence of the evicted pod.  So for example you can prevent all voluntary
 	// evictions by specifying "100%".
 	// +optional
-	MinAvailable *intstr.IntOrString
+	MinAvailable *intstr.Int32OrString
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
@@ -40,7 +40,7 @@ type PodDisruptionBudgetSpec struct {
 	// the evicted pod. For example, one can prevent all voluntary evictions
 	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
 	// +optional
-	MaxUnavailable *intstr.IntOrString
+	MaxUnavailable *intstr.Int32OrString
 }
 
 // PodDisruptionBudgetStatus represents information about the status of a

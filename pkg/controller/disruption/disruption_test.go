@@ -139,7 +139,7 @@ func newSelFooBar() *metav1.LabelSelector {
 	return newSel(map[string]string{"foo": "bar"})
 }
 
-func newMinAvailablePodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
+func newMinAvailablePodDisruptionBudget(t *testing.T, minAvailable intstr.Int32OrString) (*policy.PodDisruptionBudget, string) {
 
 	pdb := &policy.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
@@ -163,7 +163,7 @@ func newMinAvailablePodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrS
 	return pdb, pdbName
 }
 
-func newMaxUnavailablePodDisruptionBudget(t *testing.T, maxUnavailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
+func newMaxUnavailablePodDisruptionBudget(t *testing.T, maxUnavailable intstr.Int32OrString) (*policy.PodDisruptionBudget, string) {
 	pdb := &policy.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{

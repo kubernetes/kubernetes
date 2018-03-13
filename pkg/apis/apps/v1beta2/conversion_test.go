@@ -529,7 +529,7 @@ func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
 }
 
 func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
-	nilIntStr := intstr.IntOrString{}
+	nilIntStr := intstr.Int32OrString{}
 	maxUnavailable := intstr.FromInt(2)
 	maxSurge := intstr.FromInt(2)
 	testcases := map[string]struct {

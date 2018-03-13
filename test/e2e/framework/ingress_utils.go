@@ -1532,7 +1532,7 @@ func GenerateReencryptionIngressSpec() *extensions.Ingress {
 		Spec: extensions.IngressSpec{
 			Backend: &extensions.IngressBackend{
 				ServiceName: "echoheaders-reencryption",
-				ServicePort: intstr.IntOrString{
+				ServicePort: intstr.Int32OrString{
 					Type:   intstr.Int,
 					IntVal: 443,
 				},

@@ -38,21 +38,21 @@ func TestFromString(t *testing.T) {
 	}
 }
 
-type IntOrStringHolder struct {
-	IOrS IntOrString `json:"val"`
+type Int32OrStringHolder struct {
+	IOrS Int32OrString `json:"val"`
 }
 
-func TestIntOrStringUnmarshalJSON(t *testing.T) {
+func TestInt32OrStringUnmarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  string
-		result IntOrString
+		result Int32OrString
 	}{
 		{"{\"val\": 123}", FromInt(123)},
 		{"{\"val\": \"123\"}", FromString("123")},
 	}
 
 	for _, c := range cases {
-		var result IntOrStringHolder
+		var result Int32OrStringHolder
 		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
 			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
 		}
@@ -62,9 +62,9 @@ func TestIntOrStringUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestIntOrStringMarshalJSON(t *testing.T) {
+func TestInt32OrStringMarshalJSON(t *testing.T) {
 	cases := []struct {
-		input  IntOrString
+		input  Int32OrString
 		result string
 	}{
 		{FromInt(123), "{\"val\":123}"},
@@ -72,7 +72,7 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		input := IntOrStringHolder{c.input}
+		input := Int32OrStringHolder{c.input}
 		result, err := json.Marshal(&input)
 		if err != nil {
 			t.Errorf("Failed to marshal input '%v': %v", input, err)
@@ -83,22 +83,22 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
+func TestInt32OrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 	cases := []struct {
-		input IntOrString
+		input Int32OrString
 	}{
 		{FromInt(123)},
 		{FromString("123")},
 	}
 
 	for _, c := range cases {
-		input := IntOrStringHolder{c.input}
+		input := Int32OrStringHolder{c.input}
 		jsonMarshalled, err := json.Marshal(&input)
 		if err != nil {
 			t.Errorf("1: Failed to marshal input: '%v': %v", input, err)
 		}
 
-		var result IntOrStringHolder
+		var result Int32OrStringHolder
 		err = yaml.Unmarshal(jsonMarshalled, &result)
 		if err != nil {
 			t.Errorf("2: Failed to unmarshal '%+v': %v", string(jsonMarshalled), err)
@@ -112,7 +112,7 @@ func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 
 func TestGetValueFromIntOrPercent(t *testing.T) {
 	tests := []struct {
-		input     IntOrString
+		input     Int32OrString
 		total     int
 		roundUp   bool
 		expectErr bool

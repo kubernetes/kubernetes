@@ -306,13 +306,13 @@ func Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 
 func Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *appsv1beta1.RollingUpdateDeployment, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
-		out.MaxUnavailable = &intstr.IntOrString{}
+		out.MaxUnavailable = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
 	}
 	if out.MaxSurge == nil {
-		out.MaxSurge = &intstr.IntOrString{}
+		out.MaxSurge = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err
