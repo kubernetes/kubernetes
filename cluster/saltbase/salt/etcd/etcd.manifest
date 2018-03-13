@@ -60,6 +60,9 @@
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
+      },
+      { "name": "ETCD_CREDS",
+        "value": "{{ etcd_creds }}"
       }
         ],
     "livenessProbe": {
