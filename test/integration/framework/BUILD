@@ -28,7 +28,6 @@ go_library(
         "//pkg/master:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/version:go_default_library",
-        "//plugin/pkg/admission/admit:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
