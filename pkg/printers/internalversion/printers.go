@@ -340,7 +340,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podSecurityPolicyColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Data", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
+		{Name: "Priv", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
 		{Name: "Caps", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
 		{Name: "SELinux", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
 		{Name: "RunAsUser", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
