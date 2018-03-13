@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -76,6 +77,120 @@ var _ = SIGDescribe("Subpath", func() {
 	)
 
 	f := framework.NewDefaultFramework("subpath")
+
+	Context("Atomic writer volumes", func() {
+		var err error
+
+		BeforeEach(func() {
+			By("Setting up data")
+			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "my-secret"}, Data: map[string][]byte{"secret-key": []byte("secret-value")}}
+			secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			configmap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap"}, Data: map[string]string{"configmap-key": "configmap-value"}}
+			configmap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+
+		gracePeriod := int64(1)
+
+		It("should support subpaths with secret pod", func() {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-secret"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:         "test",
+						Image:        mountImage,
+						Args:         []string{"--file_content=" + volumePath},
+						VolumeMounts: []v1.VolumeMount{{Name: "secret", MountPath: volumePath, SubPath: "secret-key"}},
+					}},
+					RestartPolicy:                 v1.RestartPolicyNever,
+					TerminationGracePeriodSeconds: &gracePeriod,
+					Volumes: []v1.Volume{{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}}},
+				},
+			}
+			By(fmt.Sprintf("Creating pod %s", pod.Name))
+			f.TestContainerOutput("secret", pod, 0, []string{"secret-value"})
+		})
+
+		It("should support subpaths with configmap pod", func() {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-configmap"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:         "test",
+						Image:        mountImage,
+						Args:         []string{"--file_content=" + volumePath},
+						VolumeMounts: []v1.VolumeMount{{Name: "configmap", MountPath: volumePath, SubPath: "configmap-key"}},
+					}},
+					RestartPolicy:                 v1.RestartPolicyNever,
+					TerminationGracePeriodSeconds: &gracePeriod,
+					Volumes: []v1.Volume{{Name: "configmap", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}}},
+				},
+			}
+			By(fmt.Sprintf("Creating pod %s", pod.Name))
+			f.TestContainerOutput("configmap", pod, 0, []string{"configmap-value"})
+		})
+
+		It("should support subpaths with downward pod", func() {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-downward"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:         "test",
+						Image:        mountImage,
+						Args:         []string{"--file_content=" + volumePath},
+						VolumeMounts: []v1.VolumeMount{{Name: "downward", MountPath: volumePath, SubPath: "downward/podname"}},
+					}},
+					RestartPolicy:                 v1.RestartPolicyNever,
+					TerminationGracePeriodSeconds: &gracePeriod,
+					Volumes: []v1.Volume{
+						{Name: "downward", VolumeSource: v1.VolumeSource{
+							DownwardAPI: &v1.DownwardAPIVolumeSource{
+								Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
+							},
+						}},
+					},
+				},
+			}
+			By(fmt.Sprintf("Creating pod %s", pod.Name))
+			f.TestContainerOutput("downward", pod, 0, []string{"content of file \"" + volumePath + "\": " + pod.Name})
+		})
+
+		It("should support subpaths with projected pod", func() {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-subpath-test-secret"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:         "test",
+						Image:        mountImage,
+						Args:         []string{"--file_content=" + volumePath},
+						VolumeMounts: []v1.VolumeMount{{Name: "projected", MountPath: volumePath, SubPath: "projected/configmap-key"}},
+					}},
+					RestartPolicy:                 v1.RestartPolicyNever,
+					TerminationGracePeriodSeconds: &gracePeriod,
+					Volumes: []v1.Volume{
+						{Name: "projected", VolumeSource: v1.VolumeSource{
+							Projected: &v1.ProjectedVolumeSource{
+								Sources: []v1.VolumeProjection{
+									{ConfigMap: &v1.ConfigMapProjection{
+										LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"},
+										Items:                []v1.KeyToPath{{Path: "projected/configmap-key", Key: "configmap-key"}},
+									}},
+								},
+							},
+						}},
+					},
+				},
+			}
+			By(fmt.Sprintf("Creating pod %s", pod.Name))
+			f.TestContainerOutput("projected", pod, 0, []string{"configmap-value"})
+		})
+	})
 
 	for volType, volInit := range initVolSources {
 		curVolType := volType
