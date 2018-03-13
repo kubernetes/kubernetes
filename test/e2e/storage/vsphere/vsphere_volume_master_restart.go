@@ -103,10 +103,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 
 			nodeName := pod.Spec.NodeName
 			By(fmt.Sprintf("Verify volume %s is attached to the pod %s", volumePath, nodeName))
-			isAttached, err := diskIsAttached(volumePath, nodeName)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
-
+			expectVolumeToBeAttached(nodeName, volumePath)
 		}
 
 		By("Restarting kubelet on master node")
@@ -121,10 +118,9 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		for i, pod := range pods {
 			volumePath := volumePaths[i]
 			nodeName := pod.Spec.NodeName
+
 			By(fmt.Sprintf("After master restart, verify volume %v is attached to the pod %v", volumePath, nodeName))
-			isAttached, err := diskIsAttached(volumePaths[i], nodeName)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+			expectVolumeToBeAttached(nodeName, volumePath)
 
 			By(fmt.Sprintf("Deleting pod on node %s", nodeName))
 			err = framework.DeletePodWithWait(f, client, pod)

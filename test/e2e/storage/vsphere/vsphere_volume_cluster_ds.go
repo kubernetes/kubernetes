@@ -17,7 +17,6 @@ limitations under the License.
 package vsphere
 
 import (
-	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,9 +97,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		nodeName := pod.Spec.NodeName
 
 		By("Verifying volume is attached")
-		isAttached, err := diskIsAttached(volumePath, nodeName)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node: %v", volumePath, nodeName))
+		expectVolumeToBeAttached(nodeName, volumePath)
 
 		By("Deleting pod")
 		err = framework.DeletePodWithWait(f, client, pod)
