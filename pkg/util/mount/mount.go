@@ -288,9 +288,15 @@ func pathWithinBase(fullPath, basePath string) bool {
 	if err != nil {
 		return false
 	}
-	if strings.HasPrefix(rel, "..") {
+	if startsWithBackstep(rel) {
 		// Needed to escape the base path
 		return false
 	}
 	return true
+}
+
+// startsWithBackstep checks if the given path starts with a backstep segment
+func startsWithBackstep(rel string) bool {
+	// normalize to / and check for ../
+	return rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../")
 }

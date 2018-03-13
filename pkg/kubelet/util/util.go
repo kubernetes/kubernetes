@@ -19,8 +19,6 @@ package util
 import (
 	"fmt"
 	"net/url"
-	"path/filepath"
-	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -46,15 +44,4 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	} else {
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 	}
-}
-
-func pathWithinBase(fullPath, basePath string) bool {
-	rel, err := filepath.Rel(basePath, fullPath)
-	if err != nil {
-		return false
-	}
-	if strings.HasPrefix(rel, "..") {
-		return false
-	}
-	return true
 }
