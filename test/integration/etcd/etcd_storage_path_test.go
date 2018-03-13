@@ -537,7 +537,7 @@ var kindWhiteList = sets.NewString(
 	"WatchEvent",
 	// --
 
-	// k8s.io/kubernetes/pkg/api/unversioned
+	// k8s.io/apimachinery/pkg/apis/meta/v1
 	"Status",
 	// --
 )

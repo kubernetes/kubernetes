@@ -14,7 +14,6 @@ pkg/api/ref
 pkg/api/testapi
 pkg/api/testing
 pkg/api/testing/compat
-pkg/api/unversioned
 pkg/api/v1/endpoints
 pkg/api/v1/pod
 pkg/api/v1/resource
