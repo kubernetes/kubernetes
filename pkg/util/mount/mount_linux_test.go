@@ -402,6 +402,12 @@ func TestPathWithinBase(t *testing.T) {
 			basePath: "/a",
 			expected: false,
 		},
+		{
+			name:     "configmap subpath",
+			fullPath: "/var/lib/kubelet/pods/uuid/volumes/kubernetes.io~configmap/config/..timestamp/file.txt",
+			basePath: "/var/lib/kubelet/pods/uuid/volumes/kubernetes.io~configmap/config",
+			expected: true,
+		},
 	}
 	for _, test := range tests {
 		if pathWithinBase(test.fullPath, test.basePath) != test.expected {

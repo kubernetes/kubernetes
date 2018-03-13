@@ -538,6 +538,11 @@ func TestPathWithinBase(t *testing.T) {
 			basePath:       `c:\tmp\a\b\c`,
 			expectedResult: false,
 		},
+		{
+			fullPath:       `c:\kubelet\pods\uuid\volumes\kubernetes.io~configmap\config\..timestamp\file.txt`,
+			basePath:       `c:\kubelet\pods\uuid\volumes\kubernetes.io~configmap\config`,
+			expectedResult: true,
+		},
 	}
 
 	for _, test := range tests {
