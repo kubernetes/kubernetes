@@ -162,8 +162,11 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 			}()
 
 			ginkgo.By("Waiting for events to ingest")
-			zone := framework.TestContext.CloudConfig.Zone
-			c := utils.NewLogChecker(p, utils.UntilFirstEntryFromZone(zone), utils.JustTimeout, "")
+			location := framework.TestContext.CloudConfig.Zone
+			if framework.TestContext.CloudConfig.MultiZone {
+				location = framework.TestContext.CloudConfig.Region
+			}
+			c := utils.NewLogChecker(p, utils.UntilFirstEntryFromLocation(location), utils.JustTimeout, "")
 			err := utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 			framework.ExpectNoError(err)
 		})
