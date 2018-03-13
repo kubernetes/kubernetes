@@ -5253,8 +5253,6 @@ run_initializer_tests() {
   output_message=$(kubectl get deployments web 2>&1 "${kube_flags[@]}")
   # Post-condition: I assume "web" is the deployment name
   kube::test::if_has_string "${output_message}" 'web'
-  # Command
-  output_message=$(kubectl get deployments --show-all 2>&1 "${kube_flags[@]}")
   # Post-condition: The text "No resources found" should be part of the output
   kube::test::if_has_string "${output_message}" 'No resources found'
 

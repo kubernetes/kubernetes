@@ -127,9 +127,6 @@ type ClientAccessFactory interface {
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
 	BindExternalFlags(flags *pflag.FlagSet)
 
-	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
-	DefaultResourceFilterFunc() kubectl.Filters
-
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
 
