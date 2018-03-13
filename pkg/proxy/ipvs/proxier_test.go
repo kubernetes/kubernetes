@@ -120,36 +120,38 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
 	}
 	return &Proxier{
-		exec:               fexec,
-		serviceMap:         make(proxy.ServiceMap),
-		serviceChanges:     proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
-		endpointsMap:       make(proxy.EndpointsMap),
-		endpointsChanges:   proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil),
-		iptables:           ipt,
-		ipvs:               ipvs,
-		ipset:              ipset,
-		clusterCIDR:        "10.0.0.0/24",
-		hostname:           testHostname,
-		portsMap:           make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		portMapper:         &fakePortOpener{[]*utilproxy.LocalPort{}},
-		healthChecker:      newFakeHealthChecker(),
-		ipvsScheduler:      DefaultScheduler,
-		ipGetter:           &fakeIPGetter{nodeIPs: nodeIPs},
-		iptablesData:       bytes.NewBuffer(nil),
-		natChains:          bytes.NewBuffer(nil),
-		natRules:           bytes.NewBuffer(nil),
-		netlinkHandle:      netlinktest.NewFakeNetlinkHandle(),
-		loopbackSet:        NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
-		clusterIPSet:       NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
-		externalIPSet:      NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
-		lbIngressSet:       NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
-		lbMasqSet:          NewIPSet(ipset, KubeLoadBalancerMasqSet, utilipset.HashIPPort, false),
-		lbWhiteListIPSet:   NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
-		lbWhiteListCIDRSet: NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
-		nodePortSetTCP:     NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
-		nodePortSetUDP:     NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
-		nodePortAddresses:  make([]string, 0),
-		networkInterfacer:  proxyutiltest.NewFakeNetwork(),
+		exec:                fexec,
+		serviceMap:          make(proxy.ServiceMap),
+		serviceChanges:      proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
+		endpointsMap:        make(proxy.EndpointsMap),
+		endpointsChanges:    proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil),
+		iptables:            ipt,
+		ipvs:                ipvs,
+		ipset:               ipset,
+		clusterCIDR:         "10.0.0.0/24",
+		hostname:            testHostname,
+		portsMap:            make(map[utilproxy.LocalPort]utilproxy.Closeable),
+		portMapper:          &fakePortOpener{[]*utilproxy.LocalPort{}},
+		healthChecker:       newFakeHealthChecker(),
+		ipvsScheduler:       DefaultScheduler,
+		ipGetter:            &fakeIPGetter{nodeIPs: nodeIPs},
+		iptablesData:        bytes.NewBuffer(nil),
+		natChains:           bytes.NewBuffer(nil),
+		natRules:            bytes.NewBuffer(nil),
+		netlinkHandle:       netlinktest.NewFakeNetlinkHandle(),
+		loopbackSet:         NewIPSet(ipset, KubeLoopBackIPSet, utilipset.HashIPPortIP, false),
+		clusterIPSet:        NewIPSet(ipset, KubeClusterIPSet, utilipset.HashIPPort, false),
+		externalIPSet:       NewIPSet(ipset, KubeExternalIPSet, utilipset.HashIPPort, false),
+		lbIngressSet:        NewIPSet(ipset, KubeLoadBalancerSet, utilipset.HashIPPort, false),
+		lbIngressLocalSet:   NewIPSet(ipset, KubeLoadBalancerIngressLocalSet, utilipset.HashIPPort, false),
+		lbWhiteListIPSet:    NewIPSet(ipset, KubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, false),
+		lbWhiteListCIDRSet:  NewIPSet(ipset, KubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, false),
+		nodePortSetTCP:      NewIPSet(ipset, KubeNodePortSetTCP, utilipset.BitmapPort, false),
+		nodePortLocalSetTCP: NewIPSet(ipset, KubeNodePortLocalSetTCP, utilipset.BitmapPort, false),
+		nodePortLocalSetUDP: NewIPSet(ipset, KubeNodePortLocalSetUDP, utilipset.BitmapPort, false),
+		nodePortSetUDP:      NewIPSet(ipset, KubeNodePortSetUDP, utilipset.BitmapPort, false),
+		nodePortAddresses:   make([]string, 0),
+		networkInterfacer:   proxyutiltest.NewFakeNetwork(),
 	}
 }
 
@@ -976,12 +978,6 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 			Protocol: strings.ToLower(string(api.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		},
-		KubeLoadBalancerMasqSet: {
-			IP:       svcLBIP,
-			Port:     svcPort,
-			Protocol: strings.ToLower(string(api.ProtocolTCP)),
-			SetType:  utilipset.HashIPPort,
-		},
 		KubeLoadBalancerSourceCIDRSet: {
 			IP:       svcLBIP,
 			Port:     svcPort,
@@ -1004,9 +1000,6 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 	// Check iptables chain and rules
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	kubeFWRules := ipt.GetRules(string(KubeFireWallChain))
-	if !hasJump(kubeSvcRules, string(KubeMarkMasqChain), KubeLoadBalancerMasqSet) {
-		t.Errorf("Didn't find jump from chain %v match set %v to MASQUERADE", kubeServicesChain, KubeLoadBalancerMasqSet)
-	}
 	if !hasJump(kubeSvcRules, string(KubeFireWallChain), KubeLoadBalancerSet) {
 		t.Errorf("Didn't find jump from chain %v match set %v to %v", kubeServicesChain,
 			KubeLoadBalancerSet, KubeFireWallChain)
