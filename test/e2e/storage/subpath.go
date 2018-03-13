@@ -667,7 +667,7 @@ func (s *emptydirSource) cleanupVolume(f *framework.Framework) {
 }
 
 type gcepdSource struct {
-	diskName string
+	pvc *v1.PersistentVolumeClaim
 }
 
 func initGCEPD() volSource {
@@ -678,21 +678,29 @@ func initGCEPD() volSource {
 func (s *gcepdSource) createVolume(f *framework.Framework) volInfo {
 	var err error
 
-	framework.Logf("Creating GCE PD volume")
-	s.diskName, err = framework.CreatePDWithRetry()
-	framework.ExpectNoError(err, "Error creating PD")
+	framework.Logf("Creating GCE PD volume via dynamic provisioning")
+	testCase := storageClassTest{
+		name:      "subpath",
+		claimSize: "2G",
+	}
+
+	pvc := newClaim(testCase, f.Namespace.Name, "subpath")
+	s.pvc, err = framework.CreatePVC(f.ClientSet, f.Namespace.Name, pvc)
+	framework.ExpectNoError(err, "Error creating PVC")
 
 	return volInfo{
 		source: &v1.VolumeSource{
-			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: s.diskName},
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: s.pvc.Name,
+			},
 		},
 	}
 }
 
 func (s *gcepdSource) cleanupVolume(f *framework.Framework) {
-	if s.diskName != "" {
-		err := framework.DeletePDWithRetry(s.diskName)
-		framework.ExpectNoError(err, "Error deleting PD")
+	if s.pvc != nil {
+		err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Delete(s.pvc.Name, nil)
+		framework.ExpectNoError(err, "Error deleting PVC")
 	}
 }
 
