@@ -77,6 +77,7 @@ go_library(
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/ssh:go_default_library",
         "//pkg/util/file:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/system:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/util/version:go_default_library",

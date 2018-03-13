@@ -97,6 +97,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -3200,16 +3201,11 @@ func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 // NodeAddresses returns the first address of the given type of each node.
 func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
 	hosts := []string{}
+	addrTypes := []v1.NodeAddressType{addrType}
 	for _, n := range nodelist.Items {
-		for _, addr := range n.Status.Addresses {
-			// Use the first external IP address we find on the node, and
-			// use at most one per node.
-			// TODO(roberthbailey): Use the "preferred" address for the node, once
-			// such a thing is defined (#2462).
-			if addr.Type == addrType {
-				hosts = append(hosts, addr.Address)
-				break
-			}
+		host, err := utilnode.GetPreferredNodeAddress(&n, addrTypes)
+		if err == nil {
+			hosts = append(hosts, host)
 		}
 	}
 	return hosts
@@ -3221,7 +3217,6 @@ func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string 
 func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(c)
 
-	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
 	hosts := NodeAddresses(nodelist, v1.NodeExternalIP)
 
 	// Error if any node didn't have an external IP.
