@@ -30,12 +30,23 @@ import (
 	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/printers"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+var removedAlphaTableTransform = utilversion.MustParseSemantic("v1.10.0-alpha.0")
+
 var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
+
+	BeforeEach(func() {
+		removedAlphaTableTransform, err := framework.ServerVersionGTE(removedAlphaTableTransform, f.ClientSet.Discovery())
+		Expect(err).NotTo(HaveOccurred())
+		if removedAlphaTableTransform {
+			framework.Skipf("Skipping v1alpha1.Table tests for server versions that moved Table to v1beta1")
+		}
+	})
 
 	It("should return pod details", func() {
 		ns := f.Namespace.Name
