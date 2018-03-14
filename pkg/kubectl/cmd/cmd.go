@@ -141,7 +141,7 @@ __kubectl_get_containers()
 {
     local template
     template="{{ range .spec.containers  }}{{ .name }} {{ end }}"
-    __debug "${FUNCNAME} nouns are ${nouns[*]}"
+    __kubectl_debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
     if [[ ${len} -ne 1 ]]; then
