@@ -326,7 +326,7 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 			zone := fedframework.GetZoneFromClusterName(name)
 			serviceLBName := cloudprovider.GetLoadBalancerName(cSvc)
 			framework.Logf("cleaning cloud provider resource for service %q in namespace %q, in cluster %q", service.Name, namespace, name)
-			framework.CleanupServiceResources(c.Clientset, serviceLBName, zone)
+			framework.CleanupServiceResources(c.Clientset, serviceLBName, "", zone)
 		}
 
 		err = cleanupServiceShard(c.Clientset, name, namespace, cSvc, fedframework.FederatedDefaultTestTimeout)

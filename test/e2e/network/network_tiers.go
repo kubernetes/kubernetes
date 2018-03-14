@@ -55,7 +55,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
