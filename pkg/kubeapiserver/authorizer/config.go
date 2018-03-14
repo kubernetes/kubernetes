@@ -17,7 +17,6 @@ limitations under the License.
 package authorizer
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -60,20 +59,15 @@ type AuthorizationConfig struct {
 // based on the authorizationMode or an error.
 func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(config.AuthorizationModes) == 0 {
-		return nil, nil, errors.New("At least one authorization mode should be passed")
+		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
 	var (
 		authorizers   []authorizer.Authorizer
 		ruleResolvers []authorizer.RuleResolver
 	)
-	authorizerMap := make(map[string]bool)
 
 	for _, authorizationMode := range config.AuthorizationModes {
-		if authorizerMap[authorizationMode] {
-			return nil, nil, fmt.Errorf("Authorization mode %s specified more than once", authorizationMode)
-		}
-
 		// Keep cases in sync with constant list above.
 		switch authorizationMode {
 		case modes.ModeNode:
@@ -96,9 +90,6 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			authorizers = append(authorizers, alwaysDenyAuthorizer)
 			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
 		case modes.ModeABAC:
-			if config.PolicyFile == "" {
-				return nil, nil, errors.New("ABAC's authorization policy file not passed")
-			}
 			abacAuthorizer, err := abac.NewFromFile(config.PolicyFile)
 			if err != nil {
 				return nil, nil, err
@@ -106,9 +97,6 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			authorizers = append(authorizers, abacAuthorizer)
 			ruleResolvers = append(ruleResolvers, abacAuthorizer)
 		case modes.ModeWebhook:
-			if config.WebhookConfigFile == "" {
-				return nil, nil, errors.New("Webhook's configuration file not passed")
-			}
 			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL)
@@ -127,16 +115,8 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			authorizers = append(authorizers, rbacAuthorizer)
 			ruleResolvers = append(ruleResolvers, rbacAuthorizer)
 		default:
-			return nil, nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
+			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", authorizationMode)
 		}
-		authorizerMap[authorizationMode] = true
-	}
-
-	if !authorizerMap[modes.ModeABAC] && config.PolicyFile != "" {
-		return nil, nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
-	}
-	if !authorizerMap[modes.ModeWebhook] && config.WebhookConfigFile != "" {
-		return nil, nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
 	}
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil

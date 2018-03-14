@@ -733,7 +733,7 @@ func startRealMasterOrDie(t *testing.T, certDir string) (*allClient, clientv3.KV
 		kubeAPIServerOptions.Etcd.StorageConfig.ServerList = []string{framework.GetEtcdURL()}
 		kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // TODO use protobuf?
 		kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
-		kubeAPIServerOptions.Authorization.Mode = "RBAC"
+		kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
 		kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
 
 		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)

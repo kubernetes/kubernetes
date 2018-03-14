@@ -67,6 +67,9 @@ func (s *ServerRunOptions) Validate() []error {
 	if errs := s.Authentication.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
+	if errs := s.Authorization.Validate(); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
 	if errs := s.Audit.Validate(); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
