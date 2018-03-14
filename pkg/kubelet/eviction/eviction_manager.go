@@ -587,10 +587,10 @@ func (m *managerImpl) evictPod(pod *v1.Pod, resourceName v1.ResourceName, evictM
 	gracePeriod := int64(0)
 	err := m.killPodFunc(pod, status, &gracePeriod)
 	if err != nil {
-		m.recorder.Eventf(pod, v1.EventTypeWarning, "KubeletEviction", "failed to delete pod,Err %v", err)
+		m.recorder.Eventf(pod, v1.EventTypeWarning, "KubeletEviction", "Error deleting: %v", err)
 		glog.Errorf("eviction manager: pod %s failed to evict %v", format.Pod(pod), err)
 	} else {
-		m.recorder.Eventf(pod, v1.EventTypeNormal, "KubeletEviction", "Successfully delete Pod as %s", msg)
+		m.recorder.Eventf(pod, v1.EventTypeNormal, "KubeletEviction", "Successfully deleted Pod as %s", msg)
 		glog.Infof("eviction manager: pod %s is evicted successfully", format.Pod(pod))
 	}
 	return true
