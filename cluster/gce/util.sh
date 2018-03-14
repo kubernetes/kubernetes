@@ -838,7 +838,7 @@ function create-network() {
       network_mode="custom"
     fi
     echo "Creating new ${network_mode} network: ${NETWORK}"
-    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode="${network_mode}"
+    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --subnet-mode="${network_mode}"
   else
     PREEXISTING_NETWORK=true
     PREEXISTING_NETWORK_MODE="$(check-network-mode)"
@@ -873,8 +873,8 @@ function create-network() {
 }
 
 function expand-default-subnetwork() {
-  gcloud compute networks switch-mode "${NETWORK}" \
-    --mode custom \
+  gcloud compute networks update "${NETWORK}" \
+    --switch-to-custom-subnet-mode \
     --project "${NETWORK_PROJECT}" \
     --quiet || true
   gcloud compute networks subnets expand-ip-range "${NETWORK}" \
