@@ -95,6 +95,10 @@ const (
 	// GCPMaxInstancesInInstanceGroup is the maximum number of instances supported in
 	// one instance group on GCP.
 	GCPMaxInstancesInInstanceGroup = 2000
+
+	// AffinityConfirmCount is the number of needed continuous requests to confirm that
+	// affinity is enabled.
+	AffinityConfirmCount = 15
 )
 
 // This should match whatever the default/configured range is
@@ -1207,26 +1211,13 @@ func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName strin
 	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }
 
-// StartServeHostnameService creates a replication controller that serves its hostname and a service on top of it.
-func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
+// StartServeHostnameService creates a replication controller that serves its
+// hostname and a service on top of it.
+func StartServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
-
+	name := svc.ObjectMeta.Name
 	By("creating service " + name + " in namespace " + ns)
-	_, err := c.CoreV1().Services(ns).Create(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
-				Port:       int32(port),
-				TargetPort: intstr.FromInt(9376),
-				Protocol:   "TCP",
-			}},
-			Selector: map[string]string{
-				"name": name,
-			},
-		},
-	})
+	_, err := c.CoreV1().Services(ns).Create(svc)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1464,4 +1455,98 @@ func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration
 		return LoadBalancerCreateTimeoutLarge
 	}
 	return LoadBalancerCreateTimeoutDefault
+}
+
+// affinityTracker tracks the destination of a request for the affinity tests.
+type affinityTracker struct {
+	hostTrace []string
+}
+
+// Record the response going to a given host.
+func (at *affinityTracker) recordHost(host string) {
+	at.hostTrace = append(at.hostTrace, host)
+}
+
+// Check that we got a constant count requests going to the same host.
+func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds bool) {
+	fulfilled = (len(at.hostTrace) >= count)
+	if len(at.hostTrace) == 0 {
+		return fulfilled, true
+	}
+	last := at.hostTrace[0:]
+	if len(at.hostTrace)-count >= 0 {
+		last = at.hostTrace[len(at.hostTrace)-count:]
+	}
+	host := at.hostTrace[len(at.hostTrace)-1]
+	for _, h := range last {
+		if h != host {
+			return fulfilled, false
+		}
+	}
+	return fulfilled, true
+}
+
+func checkAffinityFailed(tracker affinityTracker, err string) {
+	Logf("%v", tracker.hostTrace)
+	Failf(err)
+}
+
+// CheckAffinity function tests whether the service affinity works as expected.
+// If affinity is expected and transitionState is true, the test will
+// return true once affinityConfirmCount number of same response observed in a
+// row. If affinity is not expected, the test will keep observe until different
+// responses observed. The function will return false only when no expected
+// responses observed before timeout. If transitionState is false, the test will
+// fail once different host is given if shouldHold is true.
+func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, targetPort int, shouldHold, transitionState bool) bool {
+	targetIpPort := net.JoinHostPort(targetIp, strconv.Itoa(targetPort))
+	cmd := fmt.Sprintf(`wget -qO- http://%s/ -T 2`, targetIpPort)
+	timeout := ServiceTestTimeout
+	if execPod == nil {
+		timeout = LoadBalancerPollTimeout
+	}
+	var tracker affinityTracker
+	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+		if execPod != nil {
+			if stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+				Logf("Failed to get response from %s. Retry until timeout", targetIpPort)
+				return false, nil
+			} else {
+				tracker.recordHost(stdout)
+			}
+		} else {
+			rawResponse := jig.GetHTTPContent(targetIp, targetPort, timeout, "")
+			tracker.recordHost(rawResponse.String())
+		}
+		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
+		if !shouldHold && !affinityHolds {
+			return true, nil
+		}
+		if shouldHold {
+			if !transitionState && !affinityHolds {
+				return true, fmt.Errorf("Affintity should hold but didn't.")
+			}
+			if trackerFulfilled && affinityHolds {
+				return true, nil
+			}
+		}
+		return false, nil
+	}); pollErr != nil {
+		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
+		if pollErr != wait.ErrWaitTimeout {
+			checkAffinityFailed(tracker, pollErr.Error())
+			return false
+		} else {
+			if !trackerFulfilled {
+				checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
+			}
+			if shouldHold {
+				checkAffinityFailed(tracker, "Affintity should hold but didn't.")
+			} else {
+				checkAffinityFailed(tracker, "Affintity shouldn't hold but did.")
+			}
+			return true
+		}
+	}
+	return true
 }
