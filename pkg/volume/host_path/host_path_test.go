@@ -376,6 +376,18 @@ func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, erro
 	return utilmount.FileType(fftc.desiredType), nil
 }
 
+func (fftc *fakeFileTypeChecker) PrepareSafeSubpath(subPath utilmount.Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return "", nil, nil
+}
+
+func (fftc *fakeFileTypeChecker) CleanSubPaths(_, _ string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
+	return nil
+}
+
 func setUp() error {
 	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
 	if err != nil {

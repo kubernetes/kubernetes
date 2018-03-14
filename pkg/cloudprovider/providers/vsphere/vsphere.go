@@ -35,7 +35,6 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -54,8 +53,6 @@ const (
 	MacOuiVC                      = "00:50:56"
 	MacOuiEsx                     = "00:0c:29"
 	CleanUpDummyVMRoutineInterval = 5
-	UUIDPath                      = "/sys/class/dmi/id/product_serial"
-	UUIDPrefix                    = "VMware-"
 )
 
 var cleanUpRoutineInitialized = false
@@ -72,6 +69,7 @@ type VSphere struct {
 	vsphereInstanceMap map[string]*VSphereInstance
 	// Responsible for managing discovery of k8s node, their location etc.
 	nodeManager *NodeManager
+	vmUUID      string
 }
 
 // Represents a vSphere instance where one or more kubernetes nodes are running.
@@ -211,21 +209,23 @@ func init() {
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
 func (vs *VSphere) Initialize(clientBuilder controller.ControllerClientBuilder) {
+}
+
+// Initialize Node Informers
+func (vs *VSphere) SetInformers(informerFactory informers.SharedInformerFactory) {
 	if vs.cfg == nil {
 		return
 	}
 
 	// Only on controller node it is required to register listeners.
 	// Register callbacks for node updates
-	client := clientBuilder.ClientOrDie("vsphere-cloud-provider")
-	factory := informers.NewSharedInformerFactory(client, 5*time.Minute)
-	nodeInformer := factory.Core().V1().Nodes()
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	glog.V(4).Infof("Setting up node informers for vSphere Cloud Provider")
+	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    vs.NodeAdded,
 		DeleteFunc: vs.NodeDeleted,
 	})
-	go nodeInformer.Informer().Run(wait.NeverStop)
-	glog.V(4).Infof("vSphere cloud provider initialized")
+	glog.V(4).Infof("Node informers in vSphere cloud provider initialized")
 }
 
 // Creates new worker node interface and returns
@@ -237,7 +237,11 @@ func newWorkerNode() (*VSphere, error) {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
 		return nil, err
 	}
-
+	vs.vmUUID, err = GetVMUUID()
+	if err != nil {
+		glog.Errorf("Failed to get uuid. err: %+v", err)
+		return nil, err
+	}
 	return &vs, nil
 }
 
@@ -401,6 +405,11 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	vs.hostName, err = os.Hostname()
 	if err != nil {
 		glog.Errorf("Failed to get hostname. err: %+v", err)
+		return nil, err
+	}
+	vs.vmUUID, err = GetVMUUID()
+	if err != nil {
+		glog.Errorf("Failed to get uuid. err: %+v", err)
 		return nil, err
 	}
 	runtime.SetFinalizer(&vs, logout)
@@ -584,7 +593,23 @@ func (vs *VSphere) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
-	_, err := vs.InstanceID(convertToK8sType(providerID))
+	var nodeName string
+	nodes, err := vs.nodeManager.GetNodeDetails()
+	if err != nil {
+		glog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		return false, err
+	}
+	for _, node := range nodes {
+		if node.VMUUID == GetUUIDFromProviderID(providerID) {
+			nodeName = node.NodeName
+			break
+		}
+	}
+	if nodeName == "" {
+		msg := fmt.Sprintf("Error while obtaining Kubernetes nodename for providerID %s.", providerID)
+		return false, errors.New(msg)
+	}
+	_, err = vs.InstanceID(convertToK8sType(nodeName))
 	if err == nil {
 		return true, nil
 	}
@@ -597,7 +622,7 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 
 	instanceIDInternal := func() (string, error) {
 		if vs.hostName == convertToString(nodeName) {
-			return vs.hostName, nil
+			return vs.vmUUID, nil
 		}
 
 		// Below logic can be performed only on master node where VC details are preset.
@@ -631,7 +656,7 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 			return "", err
 		}
 		if isActive {
-			return convertToString(nodeName), nil
+			return vs.vmUUID, nil
 		}
 		glog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
 		return "", cloudprovider.InstanceNotFound

@@ -18,6 +18,7 @@ go_library(
         "fs_unsupported.go",
         "io_util.go",
         "metrics.go",
+        "nested_volumes.go",
         "util.go",
         "util_unsupported.go",
     ] + select({
@@ -63,6 +64,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "finalizer_test.go",
+        "nested_volumes_test.go",
         "util_test.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
@@ -79,6 +81,7 @@ go_test(
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [

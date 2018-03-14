@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -440,7 +441,7 @@ func getAddressesByName(client *gophercloud.ServiceClient, name types.NodeName) 
 	return nodeAddresses(srv)
 }
 
-func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (string, error) {
+func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName, needIPv6 bool) (string, error) {
 	addrs, err := getAddressesByName(client, name)
 	if err != nil {
 		return "", err
@@ -449,12 +450,20 @@ func getAddressByName(client *gophercloud.ServiceClient, name types.NodeName) (s
 	}
 
 	for _, addr := range addrs {
-		if addr.Type == v1.NodeInternalIP {
+		isIPv6 := net.ParseIP(addr.Address).To4() == nil
+		if (addr.Type == v1.NodeInternalIP) && (isIPv6 == needIPv6) {
 			return addr.Address, nil
 		}
 	}
 
-	return addrs[0].Address, nil
+	for _, addr := range addrs {
+		isIPv6 := net.ParseIP(addr.Address).To4() == nil
+		if (addr.Type == v1.NodeExternalIP) && (isIPv6 == needIPv6) {
+			return addr.Address, nil
+		}
+	}
+	// It should never return an address from a different IP Address family than the one needed
+	return "", ErrNoAddressFound
 }
 
 // getAttachedInterfacesByID returns the node interfaces of the specified instance.

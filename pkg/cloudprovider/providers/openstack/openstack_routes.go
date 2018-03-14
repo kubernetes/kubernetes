@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"errors"
+	"net"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -145,7 +146,10 @@ func (r *Routes) CreateRoute(clusterName string, nameHint string, route *cloudpr
 
 	onFailure := NewCaller()
 
-	addr, err := getAddressByName(r.compute, route.TargetNode)
+	ip, _, _ := net.ParseCIDR(route.DestinationCIDR)
+	isCIDRv6 := ip.To4() == nil
+	addr, err := getAddressByName(r.compute, route.TargetNode, isCIDRv6)
+
 	if err != nil {
 		return err
 	}
@@ -217,7 +221,10 @@ func (r *Routes) DeleteRoute(clusterName string, route *cloudprovider.Route) err
 
 	onFailure := NewCaller()
 
-	addr, err := getAddressByName(r.compute, route.TargetNode)
+	ip, _, _ := net.ParseCIDR(route.DestinationCIDR)
+	isCIDRv6 := ip.To4() == nil
+	addr, err := getAddressByName(r.compute, route.TargetNode, isCIDRv6)
+
 	if err != nil {
 		return err
 	}

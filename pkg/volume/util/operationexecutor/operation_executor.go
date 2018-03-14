@@ -100,7 +100,7 @@ type OperationExecutor interface {
 
 	// UnmountVolume unmounts the volume from the pod specified in
 	// volumeToUnmount and updates the actual state of the world to reflect that.
-	UnmountVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	UnmountVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) error
 
 	// UnmountDevice unmounts the volumes global mount path from the device (for
 	// attachable volumes only, freeing it for detach. It then updates the
@@ -722,10 +722,11 @@ func (oe *operationExecutor) MountVolume(
 
 func (oe *operationExecutor) UnmountVolume(
 	volumeToUnmount MountedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	podsDir string) error {
 
 	unmountFunc, plugin, err :=
-		oe.operationGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld)
+		oe.operationGenerator.GenerateUnmountVolumeFunc(volumeToUnmount, actualStateOfWorld, podsDir)
 	if err != nil {
 		return err
 	}
@@ -847,7 +848,7 @@ type VolumeStateHandler interface {
 	// Volume is attached, mount/map it
 	MountVolumeHandler(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, isRemount bool, remountingLogStr string) error
 	// Volume is mounted/mapped, unmount/unmap it
-	UnmountVolumeHandler(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	UnmountVolumeHandler(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) error
 	// Volume is not referenced from pod, unmount/unmap and detach it
 	UnmountDeviceHandler(attachedVolume AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) error
 	// Reconstruct volume from mount path
@@ -913,11 +914,12 @@ func (f FilesystemVolumeHandler) MountVolumeHandler(waitForAttachTimeout time.Du
 
 // UnmountVolumeHandler unmount a volume if a volume is mounted
 // This method is handler for filesystem volume
-func (f FilesystemVolumeHandler) UnmountVolumeHandler(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+func (f FilesystemVolumeHandler) UnmountVolumeHandler(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) error {
 	glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 	err := f.oe.UnmountVolume(
 		mountedVolume,
-		actualStateOfWorld)
+		actualStateOfWorld,
+		podsDir)
 	return err
 }
 
@@ -976,7 +978,7 @@ func (b BlockVolumeHandler) MountVolumeHandler(waitForAttachTimeout time.Duratio
 
 // UnmountVolumeHandler unmap a volume if a volume is mapped
 // This method is handler for block volume
-func (b BlockVolumeHandler) UnmountVolumeHandler(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+func (b BlockVolumeHandler) UnmountVolumeHandler(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) error {
 	glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmapVolume", ""))
 	err := b.oe.UnmapVolume(
 		mountedVolume,

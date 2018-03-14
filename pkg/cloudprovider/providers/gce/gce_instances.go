@@ -26,7 +26,6 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
-	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 
@@ -387,7 +386,7 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	if err != nil {
 		return err
 	}
-	instance, err := gce.serviceAlpha.Instances.Get(gce.projectID, v1instance.Zone, v1instance.Name).Do()
+	instance, err := gce.serviceBeta.Instances.Get(gce.projectID, v1instance.Zone, v1instance.Name).Do()
 	if err != nil {
 		return err
 	}
@@ -401,14 +400,16 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 			nodeName, instance.NetworkInterfaces)
 	}
 
-	iface := instance.NetworkInterfaces[0]
-	iface.AliasIpRanges = append(iface.AliasIpRanges, &computealpha.AliasIpRange{
+	iface := &computebeta.NetworkInterface{}
+	iface.Name = instance.NetworkInterfaces[0].Name
+	iface.Fingerprint = instance.NetworkInterfaces[0].Fingerprint
+	iface.AliasIpRanges = append(iface.AliasIpRanges, &computebeta.AliasIpRange{
 		IpCidrRange:         alias.String(),
 		SubnetworkRangeName: gce.secondaryRangeName,
 	})
 
 	mc := newInstancesMetricContext("addalias", v1instance.Zone)
-	op, err := gce.serviceAlpha.Instances.UpdateNetworkInterface(
+	op, err := gce.serviceBeta.Instances.UpdateNetworkInterface(
 		gce.projectID, lastComponent(instance.Zone), instance.Name, iface.Name, iface).Do()
 	if err != nil {
 		return mc.Observe(err)

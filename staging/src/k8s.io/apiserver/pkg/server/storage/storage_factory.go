@@ -314,8 +314,10 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	backends := []Backend{}
 	for server := range servers {
 		backends = append(backends, Backend{
-			Server:    server,
-			TLSConfig: tlsConfig,
+			Server: server,
+			// We can't share TLSConfig across different backends to avoid races.
+			// For more details see: http://pr.k8s.io/59338
+			TLSConfig: tlsConfig.Clone(),
 		})
 	}
 	return backends

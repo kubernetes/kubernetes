@@ -20,6 +20,7 @@ package mount
 
 import (
 	"errors"
+	"os"
 )
 
 type Mounter struct {
@@ -107,4 +108,16 @@ func (mounter *Mounter) MakeFile(pathname string) error {
 
 func (mounter *Mounter) ExistsPath(pathname string) bool {
 	return true
+}
+
+func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return subPath.Path, nil, nil
+}
+
+func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+
+func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
 }
