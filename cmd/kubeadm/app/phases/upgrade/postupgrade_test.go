@@ -29,7 +29,6 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 func TestBackupAPIServerCertAndKey(t *testing.T) {
@@ -139,20 +138,13 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 
 	for desc, test := range map[string]struct {
 		adjustedExpiry time.Duration
-		k8sVersion     *version.Version
 		expected       bool
 	}{
-		"1.8 version doesn't need to backup": {
-			k8sVersion: version.MustParseSemantic("v1.8.0"),
-			expected:   false,
+		"default: cert not older than 180 days doesn't needs to backup": {
+			expected: false,
 		},
-		"1.9 version with cert not older than 180 days doesn't needs to backup": {
-			k8sVersion: version.MustParseSemantic("v1.9.0"),
-			expected:   false,
-		},
-		"1.9 version with cert older than 180 days need to backup": {
+		"cert older than 180 days need to backup": {
 			adjustedExpiry: expiry + 100*time.Hour,
-			k8sVersion:     version.MustParseSemantic("v1.9.0"),
 			expected:       true,
 		},
 	} {
@@ -180,7 +172,7 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 			}
 		}
 
-		shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir, test.k8sVersion)
+		shouldBackup, err := shouldBackupAPIServerCertAndKey(tmpdir)
 		if err != nil {
 			t.Fatalf("Test %s: failed to check shouldBackupAPIServerCertAndKey: %v", desc, err)
 		}

@@ -8,7 +8,6 @@ go_library(
         "health.go",
         "policy.go",
         "postupgrade.go",
-        "postupgrade_v18_19.go",
         "prepull.go",
         "selfhosted.go",
         "staticpods.go",
@@ -49,6 +48,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
 )
 
@@ -71,7 +71,7 @@ go_test(
     srcs = [
         "compute_test.go",
         "policy_test.go",
-        "postupgrade_v18_19_test.go",
+        "postupgrade_test.go",
         "prepull_test.go",
         "staticpods_test.go",
     ],
