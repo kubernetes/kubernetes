@@ -83,10 +83,10 @@ func main() {
 	}
 
 	// Trim unnecessary trailing 0x0 signs which are not accepted
-	TrimmedYamlDeployment := strings.TrimRight(string(yamlDeployment), string(byte(0)))
+	trimmedYamlDeployment := strings.TrimRight(string(yamlDeployment), string(byte(0)))
 
 	// Decode deployment resource from YAML to JSON
-	jsonDeployment, _, err := decode([]byte(TrimmedYamlDeployment), nil, nil)
+	jsonDeployment, _, err := decode([]byte(trimmedYamlDeployment), nil, nil)
 	if err != nil {
 		panic(err)
 	}
