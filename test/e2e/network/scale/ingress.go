@@ -384,7 +384,7 @@ func generateScaleTestIngressSpec(suffix string, enableTLS bool) *extensions.Ing
 									Path: "/scale",
 									Backend: extensions.IngressBackend{
 										ServiceName: fmt.Sprintf("%s-%s", scaleTestBackendName, suffix),
-										ServicePort: intstr.IntOrString{
+										ServicePort: intstr.Int32OrString{
 											Type:   intstr.Int,
 											IntVal: 80,
 										},

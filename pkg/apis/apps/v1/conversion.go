@@ -153,13 +153,13 @@ func Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in
 
 func Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *appsv1.RollingUpdateDeployment, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
-		out.MaxUnavailable = &intstr.IntOrString{}
+		out.MaxUnavailable = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
 	}
 	if out.MaxSurge == nil {
-		out.MaxSurge = &intstr.IntOrString{}
+		out.MaxSurge = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err
@@ -218,7 +218,7 @@ func Convert_extensions_Deployment_To_v1_Deployment(in *extensions.Deployment, o
 
 func Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *appsv1.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
-		out.MaxUnavailable = &intstr.IntOrString{}
+		out.MaxUnavailable = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err

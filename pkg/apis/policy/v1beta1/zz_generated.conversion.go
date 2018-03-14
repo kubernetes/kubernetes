@@ -236,9 +236,9 @@ func Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(i
 }
 
 func autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *v1beta1.PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
+	out.MinAvailable = (*intstr.Int32OrString)(unsafe.Pointer(in.MinAvailable))
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
+	out.MaxUnavailable = (*intstr.Int32OrString)(unsafe.Pointer(in.MaxUnavailable))
 	return nil
 }
 
@@ -248,9 +248,9 @@ func Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(i
 }
 
 func autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *v1beta1.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
+	out.MinAvailable = (*intstr.Int32OrString)(unsafe.Pointer(in.MinAvailable))
 	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
+	out.MaxUnavailable = (*intstr.Int32OrString)(unsafe.Pointer(in.MaxUnavailable))
 	return nil
 }
 

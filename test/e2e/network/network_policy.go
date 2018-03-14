@@ -187,7 +187,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 					// Allow traffic only to one port.
 					Ingress: []networkingv1.NetworkPolicyIngressRule{{
 						Ports: []networkingv1.NetworkPolicyPort{{
-							Port: &intstr.IntOrString{IntVal: 81},
+							Port: &intstr.Int32OrString{IntVal: 81},
 						}},
 					}},
 				},
@@ -217,7 +217,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 					// Allow traffic only to one port.
 					Ingress: []networkingv1.NetworkPolicyIngressRule{{
 						Ports: []networkingv1.NetworkPolicyPort{{
-							Port: &intstr.IntOrString{IntVal: 80},
+							Port: &intstr.Int32OrString{IntVal: 80},
 						}},
 					}},
 				},
@@ -241,7 +241,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 					// Allow traffic only to one port.
 					Ingress: []networkingv1.NetworkPolicyIngressRule{{
 						Ports: []networkingv1.NetworkPolicyPort{{
-							Port: &intstr.IntOrString{IntVal: 81},
+							Port: &intstr.Int32OrString{IntVal: 81},
 						}},
 					}},
 				},
@@ -293,7 +293,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 					// Allow traffic to only one named port: "serve-80".
 					Ingress: []networkingv1.NetworkPolicyIngressRule{{
 						Ports: []networkingv1.NetworkPolicyPort{{
-							Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
+							Port: &intstr.Int32OrString{Type: intstr.String, StrVal: "serve-80"},
 						}},
 					}},
 				},
@@ -329,12 +329,12 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 					Egress: []networkingv1.NetworkPolicyEgressRule{{
 						Ports: []networkingv1.NetworkPolicyPort{
 							{
-								Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
+								Port: &intstr.Int32OrString{Type: intstr.String, StrVal: "serve-80"},
 							},
 							// Allow DNS look-ups
 							{
 								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+								Port:     &intstr.Int32OrString{Type: intstr.Int, IntVal: 53},
 							},
 						},
 					}},
@@ -477,7 +477,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 				Handler: v1.Handler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/",
-						Port: intstr.IntOrString{
+						Port: intstr.Int32OrString{
 							IntVal: int32(port),
 						},
 						Scheme: v1.URISchemeHTTP,

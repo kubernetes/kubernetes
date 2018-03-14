@@ -31,7 +31,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-func intOrStrP(val int) *intstr.IntOrString {
+func intOrStrP(val int) *intstr.Int32OrString {
 	intOrStr := intstr.FromInt(val)
 	return &intOrStr
 }

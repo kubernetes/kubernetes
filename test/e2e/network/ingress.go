@@ -174,7 +174,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					},
 					Backend: &extensions.IngressBackend{
 						ServiceName: "echoheaders-notexist",
-						ServicePort: intstr.IntOrString{
+						ServicePort: intstr.Int32OrString{
 							Type:   intstr.Int,
 							IntVal: 80,
 						},
@@ -204,7 +204,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 											Path: "/foo",
 											Backend: extensions.IngressBackend{
 												ServiceName: "echoheaders-notexist",
-												ServicePort: intstr.IntOrString{
+												ServicePort: intstr.Int32OrString{
 													Type:   intstr.Int,
 													IntVal: 80,
 												},

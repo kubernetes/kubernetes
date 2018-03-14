@@ -77,13 +77,13 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 	}
 }
 
-// resolvePort attempts to turn an IntOrString port reference into a concrete port number.
+// resolvePort attempts to turn an Int32OrString port reference into a concrete port number.
 // If portReference has an int value, it is treated as a literal, and simply returns that value.
 // If portReference is a string, an attempt is first made to parse it as an integer.  If that fails,
 // an attempt is made to find a port with the same name in the container spec.
 // If a port with the same name is found, it's ContainerPort value is returned.  If no matching
 // port is found, an error is returned.
-func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int, error) {
+func resolvePort(portReference intstr.Int32OrString, container *v1.Container) (int, error) {
 	if portReference.Type == intstr.Int {
 		return portReference.IntValue(), nil
 	}

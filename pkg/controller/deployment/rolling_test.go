@@ -29,7 +29,7 @@ import (
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
-		maxSurge            intstr.IntOrString
+		maxSurge            intstr.Int32OrString
 		oldReplicas         int
 		newReplicas         int
 		scaleExpected       bool
@@ -119,7 +119,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
-		maxUnavailable      intstr.IntOrString
+		maxUnavailable      intstr.Int32OrString
 		oldReplicas         int
 		newReplicas         int
 		readyPodsFromOldRS  int
@@ -280,7 +280,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing.T) {
 	tests := []struct {
 		deploymentReplicas  int
-		maxUnavailable      intstr.IntOrString
+		maxUnavailable      intstr.Int32OrString
 		readyPods           int
 		oldReplicas         int
 		scaleExpected       bool

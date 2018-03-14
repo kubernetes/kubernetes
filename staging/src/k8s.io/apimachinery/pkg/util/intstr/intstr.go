@@ -28,48 +28,47 @@ import (
 	"github.com/google/gofuzz"
 )
 
-// IntOrString is a type that can hold an int32 or a string.  When used in
+// Int32OrString is a type that can hold an int32 or a string.  When used in
 // JSON or YAML marshalling and unmarshalling, it produces or consumes the
 // inner type.  This allows you to have, for example, a JSON field that can
 // accept a name or number.
-// TODO: Rename to Int32OrString
 //
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:openapi-gen=true
-type IntOrString struct {
+type Int32OrString struct {
 	Type   Type   `protobuf:"varint,1,opt,name=type,casttype=Type"`
 	IntVal int32  `protobuf:"varint,2,opt,name=intVal"`
 	StrVal string `protobuf:"bytes,3,opt,name=strVal"`
 }
 
-// Type represents the stored type of IntOrString.
+// Type represents the stored type of Int32OrString.
 type Type int
 
 const (
-	Int    Type = iota // The IntOrString holds an int.
-	String             // The IntOrString holds a string.
+	Int    Type = iota // The Int32OrString holds an int.
+	String             // The Int32OrString holds a string.
 )
 
-// FromInt creates an IntOrString object with an int32 value. It is
+// FromInt creates an Int32OrString object with an int32 value. It is
 // your responsibility not to call this method with a value greater
 // than int32.
 // TODO: convert to (val int32)
-func FromInt(val int) IntOrString {
+func FromInt(val int) Int32OrString {
 	if val > math.MaxInt32 || val < math.MinInt32 {
 		glog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
 	}
-	return IntOrString{Type: Int, IntVal: int32(val)}
+	return Int32OrString{Type: Int, IntVal: int32(val)}
 }
 
-// FromString creates an IntOrString object with a string value.
-func FromString(val string) IntOrString {
-	return IntOrString{Type: String, StrVal: val}
+// FromString creates an Int32OrString object with a string value.
+func FromString(val string) Int32OrString {
+	return Int32OrString{Type: String, StrVal: val}
 }
 
 // Parse the given string and try to convert it to an integer before
 // setting it as a string value.
-func Parse(val string) IntOrString {
+func Parse(val string) Int32OrString {
 	i, err := strconv.Atoi(val)
 	if err != nil {
 		return FromString(val)
@@ -78,7 +77,7 @@ func Parse(val string) IntOrString {
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
-func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
+func (intstr *Int32OrString) UnmarshalJSON(value []byte) error {
 	if value[0] == '"' {
 		intstr.Type = String
 		return json.Unmarshal(value, &intstr.StrVal)
@@ -88,7 +87,7 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 }
 
 // String returns the string value, or the Itoa of the int value.
-func (intstr *IntOrString) String() string {
+func (intstr *Int32OrString) String() string {
 	if intstr.Type == String {
 		return intstr.StrVal
 	}
@@ -97,7 +96,7 @@ func (intstr *IntOrString) String() string {
 
 // IntValue returns the IntVal if type Int, or if
 // it is a String, will attempt a conversion to int.
-func (intstr *IntOrString) IntValue() int {
+func (intstr *Int32OrString) IntValue() int {
 	if intstr.Type == String {
 		i, _ := strconv.Atoi(intstr.StrVal)
 		return i
@@ -106,14 +105,14 @@ func (intstr *IntOrString) IntValue() int {
 }
 
 // MarshalJSON implements the json.Marshaller interface.
-func (intstr IntOrString) MarshalJSON() ([]byte, error) {
+func (intstr Int32OrString) MarshalJSON() ([]byte, error) {
 	switch intstr.Type {
 	case Int:
 		return json.Marshal(intstr.IntVal)
 	case String:
 		return json.Marshal(intstr.StrVal)
 	default:
-		return []byte{}, fmt.Errorf("impossible IntOrString.Type")
+		return []byte{}, fmt.Errorf("impossible Int32OrString.Type")
 	}
 }
 
@@ -121,13 +120,13 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 // the OpenAPI spec of this type.
 //
 // See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
-func (_ IntOrString) OpenAPISchemaType() []string { return []string{"string"} }
+func (_ Int32OrString) OpenAPISchemaType() []string { return []string{"string"} }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
-func (_ IntOrString) OpenAPISchemaFormat() string { return "int-or-string" }
+func (_ Int32OrString) OpenAPISchemaFormat() string { return "int-or-string" }
 
-func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
+func (intstr *Int32OrString) Fuzz(c fuzz.Continue) {
 	if intstr == nil {
 		return
 	}
@@ -142,10 +141,10 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 	}
 }
 
-func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
+func GetValueFromIntOrPercent(intOrPercent *Int32OrString, total int, roundUp bool) (int, error) {
 	value, isPercent, err := getIntOrPercentValue(intOrPercent)
 	if err != nil {
-		return 0, fmt.Errorf("invalid value for IntOrString: %v", err)
+		return 0, fmt.Errorf("invalid value for Int32OrString: %v", err)
 	}
 	if isPercent {
 		if roundUp {
@@ -157,7 +156,7 @@ func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool
 	return value, nil
 }
 
-func getIntOrPercentValue(intOrStr *IntOrString) (int, bool, error) {
+func getIntOrPercentValue(intOrStr *Int32OrString) (int, bool, error) {
 	switch intOrStr.Type {
 	case Int:
 		return intOrStr.IntValue(), false, nil

@@ -944,7 +944,7 @@ func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextens
 // 1 desired, max unavailable 25%, surge 1% - should scale new(+1), then old(-1)
 // 2 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
 // 1 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1)
-func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired int32) (int32, int32, error) {
+func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.Int32OrString, desired int32) (int32, int32, error) {
 	surge, err := intstrutil.GetValueFromIntOrPercent(maxSurge, int(desired), true)
 	if err != nil {
 		return 0, 0, err

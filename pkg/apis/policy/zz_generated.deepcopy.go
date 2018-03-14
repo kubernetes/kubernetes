@@ -130,7 +130,7 @@ func (in *PodDisruptionBudgetSpec) DeepCopyInto(out *PodDisruptionBudgetSpec) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}
@@ -148,7 +148,7 @@ func (in *PodDisruptionBudgetSpec) DeepCopyInto(out *PodDisruptionBudgetSpec) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(intstr.IntOrString)
+			*out = new(intstr.Int32OrString)
 			**out = **in
 		}
 	}

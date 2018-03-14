@@ -206,7 +206,7 @@ type RollingUpdateDeployment struct {
 	// that at least 70% of original number of pods are available at all times
 	// during the update.
 	// +optional
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable intstr.Int32OrString
 
 	// The maximum number of pods that can be scheduled above the original number of
 	// pods.
@@ -219,7 +219,7 @@ type RollingUpdateDeployment struct {
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of original pods.
 	// +optional
-	MaxSurge intstr.IntOrString
+	MaxSurge intstr.Int32OrString
 }
 
 type DeploymentStatus struct {
@@ -345,7 +345,7 @@ type RollingUpdateDaemonSet struct {
 	// that at least 70% of original number of DaemonSet pods are available at
 	// all times during the update.
 	// +optional
-	MaxUnavailable intstr.IntOrString
+	MaxUnavailable intstr.Int32OrString
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -667,7 +667,7 @@ type IngressBackend struct {
 	ServiceName string
 
 	// Specifies the port of the referenced service.
-	ServicePort intstr.IntOrString
+	ServicePort intstr.Int32OrString
 }
 
 // +genclient

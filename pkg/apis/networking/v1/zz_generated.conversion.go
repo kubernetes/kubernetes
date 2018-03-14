@@ -200,7 +200,7 @@ func Convert_networking_NetworkPolicyPeer_To_v1_NetworkPolicyPeer(in *networking
 
 func autoConvert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1.NetworkPolicyPort, out *networking.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*core.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
+	out.Port = (*intstr.Int32OrString)(unsafe.Pointer(in.Port))
 	return nil
 }
 
@@ -211,7 +211,7 @@ func Convert_v1_NetworkPolicyPort_To_networking_NetworkPolicyPort(in *v1.Network
 
 func autoConvert_networking_NetworkPolicyPort_To_v1_NetworkPolicyPort(in *networking.NetworkPolicyPort, out *v1.NetworkPolicyPort, s conversion.Scope) error {
 	out.Protocol = (*core_v1.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
+	out.Port = (*intstr.Int32OrString)(unsafe.Pointer(in.Port))
 	return nil
 }
 

@@ -496,7 +496,7 @@ var httpProbe = &v1.Probe{
 	Handler: v1.Handler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: "/index.html",
-			Port: intstr.IntOrString{IntVal: 80},
+			Port: intstr.Int32OrString{IntVal: 80},
 		},
 	},
 	PeriodSeconds:    1,

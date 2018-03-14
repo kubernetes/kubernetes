@@ -1371,7 +1371,7 @@ message HTTPGetAction {
   // Name or number of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString port = 2;
 
   // Host name to connect to, defaults to the pod IP. You probably want to set
   // "Host" in httpHeaders instead.
@@ -4171,7 +4171,7 @@ message ServicePort {
   // omitted or set equal to the 'port' field.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString targetPort = 4;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString targetPort = 4;
 
   // The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
   // Usually assigned by the system. If specified, it will be allocated to the service
@@ -4404,7 +4404,7 @@ message TCPSocketAction {
   // Number or name of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString port = 1;
 
   // Optional: Host name to connect to, defaults to the pod IP.
   // +optional

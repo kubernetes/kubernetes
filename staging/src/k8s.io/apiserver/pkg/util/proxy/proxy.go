@@ -31,7 +31,7 @@ import (
 )
 
 // findServicePort finds the service port by name or numerically.
-func findServicePort(svc *v1.Service, port intstr.IntOrString) (*v1.ServicePort, error) {
+func findServicePort(svc *v1.Service, port intstr.Int32OrString) (*v1.ServicePort, error) {
 	for _, svcPort := range svc.Spec.Ports {
 		if (port.Type == intstr.Int && int32(svcPort.Port) == port.IntVal) || (port.Type == intstr.String && svcPort.Name == port.StrVal) {
 			return &svcPort, nil

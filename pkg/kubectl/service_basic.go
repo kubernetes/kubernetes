@@ -82,7 +82,7 @@ func (ServiceExternalNameGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-func parsePorts(portString string) (int32, intstr.IntOrString, error) {
+func parsePorts(portString string) (int32, intstr.Int32OrString, error) {
 	portStringSlice := strings.Split(portString, ":")
 
 	port, err := strconv.Atoi(portStringSlice[0])
@@ -98,7 +98,7 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 		return int32(port), intstr.FromInt(int(port)), nil
 	}
 
-	var targetPort intstr.IntOrString
+	var targetPort intstr.Int32OrString
 	if portNum, err := strconv.Atoi(portStringSlice[1]); err != nil {
 		if errs := validation.IsValidPortName(portStringSlice[1]); len(errs) != 0 {
 			return 0, intstr.FromInt(0), fmt.Errorf(strings.Join(errs, ","))

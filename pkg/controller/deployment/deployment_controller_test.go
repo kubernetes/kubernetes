@@ -76,7 +76,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 	return rs
 }
 
-func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
+func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.Int32OrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
@@ -89,8 +89,8 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 			Strategy: extensions.DeploymentStrategy{
 				Type: extensions.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &extensions.RollingUpdateDeployment{
-					MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
-					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
+					MaxUnavailable: func() *intstr.Int32OrString { i := intstr.FromInt(0); return &i }(),
+					MaxSurge:       func() *intstr.Int32OrString { i := intstr.FromInt(0); return &i }(),
 				},
 			},
 			Replicas: func() *int32 { i := int32(replicas); return &i }(),

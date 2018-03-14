@@ -396,7 +396,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/healthz",
-				Port: intstr.IntOrString{IntVal: EndpointHttpPort},
+				Port: intstr.Int32OrString{IntVal: EndpointHttpPort},
 			},
 		},
 	}

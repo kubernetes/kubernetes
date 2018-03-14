@@ -76,8 +76,8 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 	evictionCases := []struct {
 		description        string
-		minAvailable       intstr.IntOrString
-		maxUnavailable     intstr.IntOrString
+		minAvailable       intstr.Int32OrString
+		maxUnavailable     intstr.Int32OrString
 		podCount           int
 		replicaSetSize     int32
 		shouldDeny         bool
@@ -216,7 +216,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 	}
 })
 
-func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.IntOrString) {
+func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.Int32OrString) {
 	pdb := policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -231,7 +231,7 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
+func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.Int32OrString) {
 	pdb := policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",

@@ -1870,7 +1870,7 @@ type HTTPGetAction struct {
 	Path string
 	// Required: Name or number of the port to access on the container.
 	// +optional
-	Port intstr.IntOrString
+	Port intstr.Int32OrString
 	// Optional: Host name to connect to, defaults to the pod IP. You
 	// probably want to set "Host" in httpHeaders instead.
 	// +optional
@@ -1897,7 +1897,7 @@ const (
 type TCPSocketAction struct {
 	// Required: Port to connect to.
 	// +optional
-	Port intstr.IntOrString
+	Port intstr.Int32OrString
 	// Optional: Host name to connect to, defaults to the pod IP.
 	// +optional
 	Host string
@@ -3239,7 +3239,7 @@ type ServicePort struct {
 	// of the 'port' field is used (an identity map).
 	// This field is ignored for services with clusterIP=None, and should be
 	// omitted or set equal to the 'port' field.
-	TargetPort intstr.IntOrString
+	TargetPort intstr.Int32OrString
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.

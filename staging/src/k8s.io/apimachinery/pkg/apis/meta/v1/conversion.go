@@ -35,7 +35,7 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
 
-		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_intstr_Int32OrString_To_intstr_Int32OrString,
 
 		Convert_unversioned_Time_To_unversioned_Time,
 		Convert_unversioned_MicroTime_To_unversioned_MicroTime,
@@ -191,7 +191,7 @@ func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *ListMeta, s c
 }
 
 // +k8s:conversion-fn=copy-only
-func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
+func Convert_intstr_Int32OrString_To_intstr_Int32OrString(in, out *intstr.Int32OrString, s conversion.Scope) error {
 	*out = *in
 	return nil
 }

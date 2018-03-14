@@ -70,7 +70,7 @@ func TestTypeTags(t *testing.T) {
 // but are also registered in internal versions (or referenced from internal types),
 // so we explicitly allow tags for them
 var typesAllowedTags = map[reflect.Type]bool{
-	reflect.TypeOf(intstr.IntOrString{}):          true,
+	reflect.TypeOf(intstr.Int32OrString{}):          true,
 	reflect.TypeOf(metav1.Time{}):                 true,
 	reflect.TypeOf(metav1.MicroTime{}):            true,
 	reflect.TypeOf(metav1.Duration{}):             true,

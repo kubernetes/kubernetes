@@ -93,7 +93,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 
 func Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *extensions.RollingUpdateDaemonSet, out *appsv1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
-		out.MaxUnavailable = &intstr.IntOrString{}
+		out.MaxUnavailable = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
@@ -375,13 +375,13 @@ func Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 
 func Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *appsv1beta2.RollingUpdateDeployment, s conversion.Scope) error {
 	if out.MaxUnavailable == nil {
-		out.MaxUnavailable = &intstr.IntOrString{}
+		out.MaxUnavailable = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxUnavailable, out.MaxUnavailable, 0); err != nil {
 		return err
 	}
 	if out.MaxSurge == nil {
-		out.MaxSurge = &intstr.IntOrString{}
+		out.MaxSurge = &intstr.Int32OrString{}
 	}
 	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
 		return err

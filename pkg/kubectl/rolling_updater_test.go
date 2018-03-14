@@ -124,8 +124,8 @@ func TestUpdate(t *testing.T) {
 		newRc *api.ReplicationController
 		// whether newRc existed (false means it was created)
 		newRcExists bool
-		maxUnavail  intstr.IntOrString
-		maxSurge    intstr.IntOrString
+		maxUnavail  intstr.Int32OrString
+		maxSurge    intstr.Int32OrString
 		// expected is the sequence of up/down events that will be simulated and
 		// verified
 		expected []interface{}

@@ -145,7 +145,7 @@ func failureTrap(c clientset.Interface, ns string) {
 	}
 }
 
-func intOrStrP(num int) *intstr.IntOrString {
+func intOrStrP(num int) *intstr.Int32OrString {
 	intstr := intstr.FromInt(num)
 	return &intstr
 }

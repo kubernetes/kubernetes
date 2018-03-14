@@ -699,11 +699,11 @@ func TestNewRSNewReplicas(t *testing.T) {
 			*(newDeployment.Spec.Replicas) = test.depReplicas
 			newDeployment.Spec.Strategy = extensions.DeploymentStrategy{Type: test.strategyType}
 			newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
-				MaxUnavailable: func(i int) *intstr.IntOrString {
+				MaxUnavailable: func(i int) *intstr.Int32OrString {
 					x := intstr.FromInt(i)
 					return &x
 				}(1),
-				MaxSurge: func(i int) *intstr.IntOrString {
+				MaxSurge: func(i int) *intstr.Int32OrString {
 					x := intstr.FromInt(i)
 					return &x
 				}(test.maxSurge),
@@ -889,8 +889,8 @@ func TestDeploymentComplete(t *testing.T) {
 				Replicas: &desired,
 				Strategy: extensions.DeploymentStrategy{
 					RollingUpdate: &extensions.RollingUpdateDeployment{
-						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
+						MaxUnavailable: func(i int) *intstr.Int32OrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
+						MaxSurge:       func(i int) *intstr.Int32OrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
 					},
 					Type: extensions.RollingUpdateDeploymentStrategyType,
 				},
@@ -1129,13 +1129,13 @@ func TestDeploymentTimedOut(t *testing.T) {
 }
 
 func TestMaxUnavailable(t *testing.T) {
-	deployment := func(replicas int32, maxUnavailable intstr.IntOrString) extensions.Deployment {
+	deployment := func(replicas int32, maxUnavailable intstr.Int32OrString) extensions.Deployment {
 		return extensions.Deployment{
 			Spec: extensions.DeploymentSpec{
 				Replicas: func(i int32) *int32 { return &i }(replicas),
 				Strategy: extensions.DeploymentStrategy{
 					RollingUpdate: &extensions.RollingUpdateDeployment{
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+						MaxSurge:       func(i int) *intstr.Int32OrString { x := intstr.FromInt(i); return &x }(int(1)),
 						MaxUnavailable: &maxUnavailable,
 					},
 					Type: extensions.RollingUpdateDeploymentStrategyType,

@@ -141,7 +141,7 @@ message NetworkPolicyPort {
   // The port on the given protocol. This can either be a numerical or named port on
   // a pod. If this field is not provided, this matches all port names and numbers.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString port = 2;
 }
 
 // NetworkPolicySpec provides the specification of a NetworkPolicy
