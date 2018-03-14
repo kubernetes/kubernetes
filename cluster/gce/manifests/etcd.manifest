@@ -45,6 +45,9 @@
       },
       { "name": "ETCD_CREDS",
         "value": "{{ etcd_creds }}"
+      },
+      { "name": "ETCD_SNAPSHOT_COUNT",
+        "value": "10000"
       }
         ],
     "livenessProbe": {
