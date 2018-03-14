@@ -42,6 +42,8 @@ func main() {
 	flag.Parse()
 
 	// use the current context in kubeconfig
+	// you can also use clusterIp:apiserverPort like e.g. :
+	// config, err := clientcmd.BuildConfigFromFlags("ip:port", "")
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err.Error())
@@ -82,7 +84,7 @@ func main() {
 
 func homeDir() string {
 	if h := os.Getenv("HOME"); h != "" {
-		return h
+		return h // linux
 	}
 	return os.Getenv("USERPROFILE") // windows
 }
