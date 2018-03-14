@@ -4813,14 +4813,17 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
-func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (retErr error) {
+func CleanupGCEResources(c clientset.Interface, loadBalancerName, region, zone string) (retErr error) {
 	gceCloud, err := GetGCECloud()
 	if err != nil {
 		return err
 	}
-	region, err := gcecloud.GetGCERegion(zone)
-	if err != nil {
-		return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+	if region == "" {
+		// Attempt to parse region from zone if no region is given.
+		region, err = gcecloud.GetGCERegion(zone)
+		if err != nil {
+			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+		}
 	}
 	if err := gceCloud.DeleteFirewall(gcecloud.MakeFirewallName(loadBalancerName)); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
