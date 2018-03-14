@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -53,12 +54,15 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&GetOptions{},
 		&DeleteOptions{},
 	)
-	scheme.AddConversionFuncs(
-		Convert_versioned_Event_to_watch_Event,
-		Convert_versioned_InternalEvent_to_versioned_Event,
-		Convert_watch_Event_to_versioned_Event,
-		Convert_versioned_Event_to_versioned_InternalEvent,
+	scheme_err := scheme.AddConversionFuncs(
+			Convert_versioned_Event_to_watch_Event,
+			Convert_versioned_InternalEvent_to_versioned_Event,
+			Convert_watch_Event_to_versioned_Event,
+			Convert_versioned_Event_to_versioned_InternalEvent,
 	)
+	if scheme_err != nil {
+		fmt.Errorf("scheme.AddConversionFuncs: %v", scheme_err.Error())
+	}
 
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
@@ -70,8 +74,16 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	AddConversionFuncs(scheme)
-	RegisterDefaults(scheme)
+	err := AddConversionFuncs(scheme)
+	if err != nil {
+		fmt.Errorf("scheme.AddConversionFuncs: %v", err.Error())
+	}
+
+	// Should always return nil
+	check_err := RegisterDefaults(scheme)
+	if check_err != nil {
+		fmt.Errorf("scheme.AddConversionFuncs: %v", check_err.Error())
+	}
 }
 
 // scheme is the registry for the common types that adhere to the meta v1 API spec.
@@ -89,5 +101,8 @@ func init() {
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	RegisterDefaults(scheme)
+	err := RegisterDefaults(scheme)
+	if err != nil {
+		fmt.Errorf("scheme.AddConversionFuncs: %v", err.Error())
+	}
 }
