@@ -491,7 +491,7 @@ message RollingUpdateDaemonSet {
   // that at least 70% of original number of DaemonSet pods are available at
   // all times during the update.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString maxUnavailable = 1;
 }
 
 // Spec to control the desired behavior of rolling update.
@@ -507,7 +507,7 @@ message RollingUpdateDeployment {
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString maxUnavailable = 1;
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
@@ -521,7 +521,7 @@ message RollingUpdateDeployment {
   // new RC can be scaled up further, ensuring that total number of pods running
   // at any time during the update is at most 130% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString maxSurge = 2;
 }
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.

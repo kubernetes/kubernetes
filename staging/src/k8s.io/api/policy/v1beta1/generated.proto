@@ -115,7 +115,7 @@ message PodDisruptionBudgetSpec {
   // "selector" will still be available after the eviction, i.e. even in the
   // absence of the evicted pod.  So for example you can prevent all voluntary
   // evictions by specifying "100%".
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString minAvailable = 1;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString minAvailable = 1;
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
@@ -125,7 +125,7 @@ message PodDisruptionBudgetSpec {
   // "selector" are unavailable after the eviction, i.e. even in absence of
   // the evicted pod. For example, one can prevent all voluntary evictions
   // by specifying 0. This is a mutually exclusive setting with "minAvailable".
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 3;
+  optional k8s.io.apimachinery.pkg.util.intstr.Int32OrString maxUnavailable = 3;
 }
 
 // PodDisruptionBudgetStatus represents information about the status of a
