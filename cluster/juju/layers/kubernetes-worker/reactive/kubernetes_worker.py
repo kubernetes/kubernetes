@@ -21,6 +21,8 @@ import shutil
 import subprocess
 import time
 
+from yaml import safe_load as load
+
 from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
@@ -903,6 +905,53 @@ def enable_gpu():
 
     set_state('kubernetes-worker.gpu.enabled')
     set_state('kubernetes-worker.restart-needed')
+
+
+@when('docker-nvidia.ready','kubernetes-worker.config.created')
+@when_not('docker-nvidia.daemonset.ready')
+def nvidia_daemonset_create():
+    hookenv.log('nvidia_daemonset_create')
+    # the world isn't ready for us yet
+    if not os.path.isfile(kubeclientconfig_path):
+        return
+
+    y = load(kubectl('get', 'daemonset',
+                     '-o', 'yaml',
+                     '--namespace', 'kube-system'))
+    for i in y['items']:
+        if i['metadata']['name'] == 'nvidia-device-plugin-daemonset':
+            hookenv.log('daemonset "nvidia-device-plugin-daemonset" already exists.')  # noqa
+            return
+
+    render('nvidia-device-plugin.yaml',
+           '/etc/kubernetes/addons/nvidia-device-plugin.yaml',
+           context={})
+    kubectl_manifest('create',
+                     '/etc/kubernetes/addons/nvidia-device-plugin.yaml')
+    hookenv.log('daemonset "nvidia-device-plugin-daemonset" created.')
+    set_state('docker-nvidia.daemonset.ready')
+
+
+@when_not('docker-nvidia.ready')
+@when('docker-nvidia.daemonset.ready', 'docker.ready')
+def nvidia_daemonset_remove():
+    hookenv.log('nvidia_daemonset_remove')
+    # the world isn't ready for us yet
+    if not os.path.isfile(kubeclientconfig_path):
+        return
+
+    y = load(kubectl('get', 'daemonset',
+                     '-o', 'yaml',
+                     '--namespace', 'kube-system'))
+    for i in y['items']:
+        if i['metadata']['name'] == 'nvidia-device-plugin-daemonset':
+            render('nvidia-device-plugin.yaml',
+                   '/etc/kubernetes/addons/nvidia-device-plugin.yaml',
+                   context={})
+            kubectl_manifest('delete',
+                             '/etc/kubernetes/addons/nvidia-device-plugin.yaml') # noqa
+            hookenv.log('daemonset "nvidia-device-plugin-daemonset" removed.')
+    remove_state('docker-nvidia.daemonset.ready')
 
 
 @when('kubernetes-worker.gpu.enabled')
