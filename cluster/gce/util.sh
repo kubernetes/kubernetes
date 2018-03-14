@@ -776,7 +776,7 @@ function create-network() {
     echo "Creating new network: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
-    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode=auto
+    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --subnet-mode=auto
   else
     PREEXISTING_NETWORK=true
     PREEXISTING_NETWORK_MODE="$(gcloud compute networks list ${NETWORK} --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
@@ -811,8 +811,8 @@ function create-network() {
 }
 
 function expand-default-subnetwork() {
-  gcloud compute networks switch-mode "${NETWORK}" \
-    --mode custom \
+  gcloud compute networks update "${NETWORK}" \
+    --switch-to-custom-subnet-mode \
     --project "${NETWORK_PROJECT}" \
     --quiet || true
   gcloud compute networks subnets expand-ip-range "${NETWORK}" \
