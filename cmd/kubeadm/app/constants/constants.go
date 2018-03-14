@@ -208,10 +208,10 @@ const (
 	KubeletBaseConfigurationFile = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.1.12"
+	MinExternalEtcdVersion = "3.2.17"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.1.12"
+	DefaultEtcdVersion = "3.2.18"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
