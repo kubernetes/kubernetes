@@ -404,37 +404,37 @@ outer:
 	return -1, fmt.Errorf("SecurityGroup priorities are exhausted")
 }
 
-func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
+func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
 	if az.Config.VMType == vmTypeVMSS {
-		ip, err := az.getIPForVmssMachine(nodeName)
+		ip, publicIP, err := az.getIPForVmssMachine(nodeName)
 		if err == cloudprovider.InstanceNotFound || err == ErrorNotVmssInstance {
 			return az.getIPForStandardMachine(nodeName)
 		}
 
-		return ip, err
+		return ip, publicIP, err
 	}
 
 	return az.getIPForStandardMachine(nodeName)
 }
 
-func (az *Cloud) getIPForStandardMachine(nodeName types.NodeName) (string, error) {
+func (az *Cloud) getIPForStandardMachine(nodeName types.NodeName) (string, string, error) {
 	az.operationPollRateLimiter.Accept()
 	machine, err := az.getVirtualMachine(nodeName)
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), az.getVirtualMachine(%s), err=%v", nodeName, nodeName, err)
-		return "", err
+		return "", "", err
 	}
 
 	nicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryInterfaceID(%v), err=%v", nodeName, machine, err)
-		return "", err
+		return "", "", err
 	}
 
 	nicName, err := getLastSegment(nicID)
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), getLastSegment(%s), err=%v", nodeName, nicID, err)
-		return "", err
+		return "", "", err
 	}
 
 	az.operationPollRateLimiter.Accept()
@@ -443,17 +443,33 @@ func (az *Cloud) getIPForStandardMachine(nodeName types.NodeName) (string, error
 	glog.V(10).Infof("InterfacesClient.Get(%q): end", nicName)
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), az.InterfacesClient.Get(%s, %s, %s), err=%v", nodeName, az.ResourceGroup, nicName, "", err)
-		return "", err
+		return "", "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
 		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
-		return "", err
+		return "", "", err
 	}
 
-	targetIP := *ipConfig.PrivateIPAddress
-	return targetIP, nil
+	privateIP := *ipConfig.PrivateIPAddress
+	publicIP := ""
+	if ipConfig.PublicIPAddress != nil && ipConfig.PublicIPAddress.ID != nil {
+		pipID := *ipConfig.PublicIPAddress.ID
+		pipName, err := getLastSegment(pipID)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get publicIP name for node %q with pipID %q", nodeName, pipID)
+		}
+		pip, existsPip, err := az.getPublicIPAddress(pipName)
+		if err != nil {
+			return "", "", err
+		}
+		if existsPip {
+			publicIP = *pip.IPAddress
+		}
+	}
+
+	return privateIP, publicIP, nil
 }
 
 // splitProviderID converts a providerID to a NodeName.

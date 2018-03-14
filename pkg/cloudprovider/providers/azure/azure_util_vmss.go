@@ -27,27 +27,30 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-func (az *Cloud) getIPForVmssMachine(nodeName types.NodeName) (string, error) {
+// getIPForVmssMachine gets machine private IP and public IP by node name.
+// TODO(feiskyer): Azure vmss doesn't support associating a public IP to single virtual machine yet,
+// fix this after it is supported.
+func (az *Cloud) getIPForVmssMachine(nodeName types.NodeName) (string, string, error) {
 	az.operationPollRateLimiter.Accept()
 	machine, exists, err := az.getVmssVirtualMachine(nodeName)
 	if !exists {
-		return "", cloudprovider.InstanceNotFound
+		return "", "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
 		glog.Errorf("error: az.getIPForVmssMachine(%s), az.getVmssVirtualMachine(%s), err=%v", nodeName, nodeName, err)
-		return "", err
+		return "", "", err
 	}
 
 	nicID, err := getPrimaryInterfaceIDForVmssMachine(machine)
 	if err != nil {
 		glog.Errorf("error: az.getIPForVmssMachine(%s), getPrimaryInterfaceID(%v), err=%v", nodeName, machine, err)
-		return "", err
+		return "", "", err
 	}
 
 	nicName, err := getLastSegment(nicID)
 	if err != nil {
 		glog.Errorf("error: az.getIPForVmssMachine(%s), getLastSegment(%s), err=%v", nodeName, nicID, err)
-		return "", err
+		return "", "", err
 	}
 
 	az.operationPollRateLimiter.Accept()
@@ -56,17 +59,17 @@ func (az *Cloud) getIPForVmssMachine(nodeName types.NodeName) (string, error) {
 	glog.V(10).Infof("InterfacesClient.Get(%q): end", nicName)
 	if err != nil {
 		glog.Errorf("error: az.getIPForVmssMachine(%s), az.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, az.ResourceGroup, nicName, "", err)
-		return "", err
+		return "", "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
 		glog.Errorf("error: az.getIPForVmssMachine(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
-		return "", err
+		return "", "", err
 	}
 
 	targetIP := *ipConfig.PrivateIPAddress
-	return targetIP, nil
+	return targetIP, "", nil
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
