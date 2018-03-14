@@ -73,6 +73,16 @@ var (
 			ResourceRequest: true,
 			Path:            "/api/v1/namespaces/default/pods/busybox",
 		},
+		"Unauthorized": &authorizer.AttributesRecord{
+			Verb:            "get",
+			Namespace:       "default",
+			APIGroup:        "", // Core
+			APIVersion:      "v1",
+			Resource:        "pods",
+			Name:            "busybox",
+			ResourceRequest: true,
+			Path:            "/api/v1/namespaces/default/pods/busybox",
+		},
 	}
 
 	rules = map[string]audit.PolicyRule{
@@ -209,6 +219,10 @@ func testAuditLevel(t *testing.T, stages []audit.Stage) {
 
 	test(t, "subresource", audit.LevelRequest, stages, stages, "getPodLogs", "getPods")
 
+	test(t, "Unauthorized", audit.LevelNone, stages, stages, "tims")
+	test(t, "Unauthorized", audit.LevelMetadata, stages, stages, "tims", "default")
+	test(t, "Unauthorized", audit.LevelNone, stages, stages, "humans")
+	test(t, "Unauthorized", audit.LevelMetadata, stages, stages, "humans", "default")
 }
 
 func TestChecker(t *testing.T) {
