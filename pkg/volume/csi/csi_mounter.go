@@ -207,9 +207,8 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	if err != nil {
 		glog.Errorf(log("mounter.SetupAt failed: %v", err))
-		if err := removeMountDir(c.plugin, dir); err != nil {
-			glog.Error(log("mounter.SetuAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, err))
-			return err
+		if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
+			glog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 		}
 		return err
 	}

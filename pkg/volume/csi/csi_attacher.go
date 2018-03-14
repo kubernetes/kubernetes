@@ -352,9 +352,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	if err != nil {
 		glog.Errorf(log("attacher.MountDevice failed: %v", err))
-		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-			glog.Error(log("attacher.MountDevice failed to remove mount dir after a NodeStageVolume() error [%s]: %v", deviceMountPath, err))
-			return err
+		if removeMountDirErr := removeMountDir(c.plugin, deviceMountPath); removeMountDirErr != nil {
+			glog.Error(log("attacher.MountDevice failed to remove mount dir after a NodeStageVolume() error [%s]: %v", deviceMountPath, removeMountDirErr))
 		}
 		return err
 	}
