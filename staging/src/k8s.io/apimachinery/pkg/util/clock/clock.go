@@ -228,26 +228,28 @@ func (i *IntervalClock) Since(ts time.Time) time.Duration {
 	return i.Time.Sub(ts)
 }
 
-// Unimplemented, will panic.
-// TODO: make interval clock use FakeClock so this can be implemented.
-func (*IntervalClock) After(d time.Duration) <-chan time.Time {
-	panic("IntervalClock doesn't implement After")
+//make interval clock use FakeClock so After can be implemented.
+func (i *IntervalClock) After(d time.Duration) <-chan time.Time {
+	fakeclock := NewFakeClock(i.Time)
+	return fakeclock.After(d)
 }
 
-// Unimplemented, will panic.
-// TODO: make interval clock use FakeClock so this can be implemented.
-func (*IntervalClock) NewTimer(d time.Duration) Timer {
-	panic("IntervalClock doesn't implement NewTimer")
+//make interval clock use FakeClock so NewTimer can be implemented.
+func (i *IntervalClock) NewTimer(d time.Duration) Timer {
+	fakeclock := NewFakeClock(i.Time)
+	return fakeclock.NewTimer(d)
 }
 
-// Unimplemented, will panic.
-// TODO: make interval clock use FakeClock so this can be implemented.
-func (*IntervalClock) Tick(d time.Duration) <-chan time.Time {
-	panic("IntervalClock doesn't implement Tick")
+//make interval clock use FakeClock so Tick can be implemented.
+func (i *IntervalClock) Tick(d time.Duration) <-chan time.Time {
+	fakeclock := NewFakeClock(i.Time)
+	return fakeclock.Tick(d)
 }
 
-func (*IntervalClock) Sleep(d time.Duration) {
-	panic("IntervalClock doesn't implement Sleep")
+//make interval clock use FakeClock so Sleep can be implemented.
+func (i *IntervalClock) Sleep(d time.Duration) {
+	fakeclock := NewFakeClock(i.Time)
+	fakeclock.Sleep(d)
 }
 
 // Timer allows for injecting fake or real timers into code that
