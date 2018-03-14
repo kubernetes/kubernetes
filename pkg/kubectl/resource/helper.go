@@ -72,6 +72,7 @@ func (m *Helper) List(namespace, apiVersion string, export bool, options *metav1
 		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
+
 	return req.Do().Get()
 }
 

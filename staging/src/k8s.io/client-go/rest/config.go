@@ -110,6 +110,9 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// If true, set the header "Accept: application/json;as=Table;v=v1alpha1;g=meta.k8s.io" as part of a request to a resource endpoint
+	ResponseAsTable bool
+
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(network, addr string) (net.Conn, error)
 
@@ -213,6 +216,10 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		}
 	}
 
+	if config.ResponseAsTable {
+		config.ContentConfig.AcceptContentTypes = "application/json;as=Table;v=v1alpha1;g=meta.k8s.io"
+	}
+
 	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
 }
 
@@ -245,6 +252,10 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	if versionConfig.GroupVersion == nil {
 		v := metav1.SchemeGroupVersion
 		versionConfig.GroupVersion = &v
+	}
+
+	if config.ResponseAsTable {
+		config.ContentConfig.ContentType = "application/json;as=Table;v=v1alpha1;g=meta.k8s.io"
 	}
 
 	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)

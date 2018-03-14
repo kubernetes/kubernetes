@@ -140,6 +140,8 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		clientConfig.Timeout = timeout
 	}
 
+	clientConfig.ResponseAsTable = config.overrides.ResponseAsTable
+
 	if u, err := url.ParseRequestURI(clientConfig.Host); err == nil && u.Opaque == "" && len(u.Path) > 1 {
 		u.RawQuery = ""
 		u.Fragment = ""
