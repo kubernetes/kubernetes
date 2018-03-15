@@ -91,8 +91,12 @@ func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {
-			// TODO(proppy): report which containers failed the pod.
-			glog.Infof("failed to start pod %q: %v", format.Pod(res.Pod), res.Err)
+			faliedContainerName, err := kl.getFailedContainers(res.Pod)
+			if err != nil {
+				glog.Infof("unable to get failed containers' names for pod %q, error:%v", format.Pod(res.Pod), err)
+			} else {
+				glog.Infof("unable to start pod %q because container:%v failed", format.Pod(res.Pod), faliedContainerName)
+			}
 			failedPods = append(failedPods, format.Pod(res.Pod))
 		} else {
 			glog.Infof("started pod %q", format.Pod(res.Pod))
@@ -155,4 +159,19 @@ func (kl *Kubelet) isPodRunning(pod *v1.Pod, status *kubecontainer.PodStatus) bo
 		}
 	}
 	return true
+}
+
+// getFailedContainer returns failed container name for pod.
+func (kl *Kubelet) getFailedContainers(pod *v1.Pod) ([]string, error) {
+	status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
+	}
+	var containerNames []string
+	for _, cs := range status.ContainerStatuses {
+		if cs.State != kubecontainer.ContainerStateRunning && cs.ExitCode != 0 {
+			containerNames = append(containerNames, cs.Name)
+		}
+	}
+	return containerNames, nil
 }
