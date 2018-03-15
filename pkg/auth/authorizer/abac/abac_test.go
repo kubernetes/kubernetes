@@ -800,10 +800,6 @@ func TestSubjectMatches(t *testing.T) {
 
 	for k, tc := range testCases {
 		policy := &abac.Policy{}
-		if err := abac.Scheme.Convert(tc.Policy, policy, nil); err != nil {
-			t.Errorf("%s: error converting: %v", k, err)
-			continue
-		}
 		attr := authorizer.AttributesRecord{
 			User: &tc.User,
 		}
@@ -1255,10 +1251,6 @@ func TestPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		policy := &abac.Policy{}
-		if err := abac.Scheme.Convert(test.policy, policy, nil); err != nil {
-			t.Errorf("%s: error converting: %v", test.name, err)
-			continue
-		}
 		matches := matches(*policy, test.attr)
 		if test.matches != matches {
 			t.Errorf("%s: expected: %t, saw: %t", test.name, test.matches, matches)

@@ -54,9 +54,6 @@ func TestV1Beta1Conversion(t *testing.T) {
 	}
 	for k, tc := range testcases {
 		internal := &abac.Policy{}
-		if err := abac.Scheme.Convert(tc.old, internal, nil); err != nil {
-			t.Errorf("%s: unexpected error: %v", k, err)
-		}
 		if !reflect.DeepEqual(internal, tc.expected) {
 			t.Errorf("%s: expected\n\t%#v, got \n\t%#v", k, tc.expected, internal)
 		}
