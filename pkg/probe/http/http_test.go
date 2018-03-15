@@ -231,7 +231,7 @@ func TestHTTPSProbeChecker(t *testing.T) {
 	}
 	certBytes, err := ioutil.ReadFile(filepath.Join(currentPath, "kubelet-ca.crt"))
 	if err != nil {
-		t.Errorf("Unable to read cert.pem: %v", err)
+		t.Errorf("Unable to read kubelet-ca.crt: %v", err)
 	}
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(certBytes); !ok {

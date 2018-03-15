@@ -21,7 +21,11 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["http_test.go"],
-    data = ["kubelet-ca.crt"],
+    data = [
+        "kubelet-ca.crt",
+        "kubelet-client.crt",
+        "kubelet-client.key",
+    ],
     embed = [":go_default_library"],
     deps = ["//pkg/probe:go_default_library"],
 )
