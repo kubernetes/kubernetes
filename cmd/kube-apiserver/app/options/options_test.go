@@ -231,6 +231,7 @@ func TestAddFlags(t *testing.T) {
 						ThrottleEnable: false,
 						ThrottleQPS:    43.5,
 						ThrottleBurst:  44,
+						AsyncDelegate:  true,
 					},
 				},
 				TruncateOptions: apiserveroptions.AuditTruncateOptions{
