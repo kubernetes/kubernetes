@@ -31,7 +31,7 @@ var (
 	TransformerOperationalLatencies = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: valueSubsystem,
-			Name:      "storage_transformation_latency_microseconds",
+			Name:      "apiserver_storage_transformation_latency_microseconds",
 			Help:      "Latency in microseconds of value transformation operations.",
 		},
 		[]string{"transformation_type"},
@@ -47,9 +47,9 @@ func RegisterMetrics() {
 }
 
 func RecordTransformation(transformationType string, start time.Time) {
-	TransformerOperationalLatencies.WithLabelValues(transformationType).Observe(sinceInMicroseconds(start))
+	TransformerOperationalLatencies.WithLabelValues(transformationType).Observe(float64(sinceInMicroseconds(start)))
 }
 
-func sinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+func sinceInMicroseconds(start time.Time) time.Duration {
+	return time.Since(start) / time.Microsecond
 }

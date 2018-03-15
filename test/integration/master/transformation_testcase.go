@@ -48,7 +48,7 @@ const (
 	encryptionConfigFileName    = "encryption.conf"
 	testNamespace               = "secret-encryption-test"
 	testSecret                  = "test-secret"
-	latencySummaryMetricsFamily = "value_storage_transformation_latency_microseconds"
+	latencySummaryMetricsFamily = "value_apiserver_storage_transformation_latency_microseconds"
 )
 
 type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
@@ -241,6 +241,7 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 }
 
 func (e *transformTest) printMetrics() error {
+	e.logger.Logf("Transformation Metrics:")
 	metrics, err := prometheus.DefaultGatherer.Gather()
 	if err != nil {
 		return fmt.Errorf("failed to gather metrics: %s", err)
