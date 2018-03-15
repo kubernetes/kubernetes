@@ -17,7 +17,9 @@ limitations under the License.
 package preflight
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/url"
 	"time"
@@ -59,9 +61,17 @@ func parseServerURI(serverURI string) (*url.URL, error) {
 // CheckEtcdServers will attempt to reach all etcd servers once. If any
 // can be reached, return true.
 func (con EtcdConnection) CheckEtcdServers() (done bool, err error) {
-	// Attempt to reach every Etcd server in order
-	for _, serverURI := range con.ServerList {
-		host, err := parseServerURI(serverURI)
+
+	rand.Seed(time.Now().UnixNano())
+
+	// Attempt to reach every Etcd server randomly.
+	serverNumber := len(con.ServerList)
+	if serverNumber == 0 {
+		return false, errors.New("Found no etcd server.")
+	}
+	serverPerms := rand.Perm(serverNumber)
+	for _, index := range serverPerms {
+		host, err := parseServerURI(con.ServerList[index])
 		if err != nil {
 			return false, err
 		}
@@ -70,4 +80,5 @@ func (con EtcdConnection) CheckEtcdServers() (done bool, err error) {
 		}
 	}
 	return false, nil
+
 }
