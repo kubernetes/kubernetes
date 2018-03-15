@@ -27,7 +27,10 @@ go_test(
         "kubelet-client.key",
     ],
     embed = [":go_default_library"],
-    deps = ["//pkg/probe:go_default_library"],
+    deps = [
+        "//pkg/probe:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+    ],
 )
 
 filegroup(
