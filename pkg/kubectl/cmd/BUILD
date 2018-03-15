@@ -178,7 +178,6 @@ go_test(
     data = [
         "testdata",
         "//api/openapi-spec:swagger-spec",
-        "//examples:config",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],
