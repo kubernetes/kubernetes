@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -52,6 +53,8 @@ const (
 	proxyHTTPCallTimeout = 30 * time.Second
 )
 
+var deprecatedProxyPrefixRemovedVersion = utilversion.MustParseSemantic("v1.10.0-alpha.0")
+
 var _ = SIGDescribe("Proxy", func() {
 	version := testapi.Groups[v1.GroupName].GroupVersion().Version
 	Context("version "+version, func() {
@@ -61,21 +64,32 @@ var _ = SIGDescribe("Proxy", func() {
 		f := framework.NewFramework("proxy", options, nil)
 		prefix := "/api/" + version
 
+		skipPrefixProxyTests := false
+		BeforeEach(func() {
+			var err error
+			skipPrefixProxyTests, err = framework.ServerVersionGTE(deprecatedProxyPrefixRemovedVersion, f.ClientSet.Discovery())
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		// Port here has to be kept in sync with default kubelet port.
 		/*
 			    Testname: proxy-prefix-node-logs-port
 			    Description: Ensure that proxy on node logs works with generic top
 				level prefix proxy and explicit kubelet port.
 		*/
-		framework.ConformanceIt("should proxy logs on node with explicit kubelet port ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
+		if !skipPrefixProxyTests {
+			framework.ConformanceIt("should proxy logs on node with explicit kubelet port ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
+		}
 
 		/*
 			    Testname: proxy-prefix-node-logs
 			    Description: Ensure that proxy on node logs works with generic top
 				level prefix proxy.
 		*/
-		framework.ConformanceIt("should proxy logs on node ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
-		It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
+		if !skipPrefixProxyTests {
+			framework.ConformanceIt("should proxy logs on node ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
+			It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
+		}
 
 		/*
 			    Testname: proxy-subresource-node-logs-port
@@ -198,8 +212,18 @@ var _ = SIGDescribe("Proxy", func() {
 				return prefix + "/namespaces/" + f.Namespace.Name + "/pods/" + net.JoinSchemeNamePort(scheme, pods[0].Name, port) + "/proxy"
 			}
 
+			appendIf := func(to map[string]string, condition bool, from map[string]string) {
+				if condition {
+					for k, v := range from {
+						to[k] = v
+					}
+				}
+			}
+
 			// construct the table
-			expectations := map[string]string{
+			expectations := map[string]string{}
+
+			appendIf(expectations, !skipPrefixProxyTests, map[string]string{
 				svcProxyURL("", "portname1") + "/": "foo",
 				svcProxyURL("", "80") + "/":        "foo",
 				svcProxyURL("", "portname2") + "/": "bar",
@@ -214,14 +238,18 @@ var _ = SIGDescribe("Proxy", func() {
 				svcProxyURL("https", "443") + "/":          "tls baz",
 				svcProxyURL("https", "tlsportname2") + "/": "tls qux",
 				svcProxyURL("https", "444") + "/":          "tls qux",
+			})
 
+			appendIf(expectations, true, map[string]string{
 				subresourceServiceProxyURL("", "portname1") + "/":         "foo",
 				subresourceServiceProxyURL("http", "portname1") + "/":     "foo",
 				subresourceServiceProxyURL("", "portname2") + "/":         "bar",
 				subresourceServiceProxyURL("http", "portname2") + "/":     "bar",
 				subresourceServiceProxyURL("https", "tlsportname1") + "/": "tls baz",
 				subresourceServiceProxyURL("https", "tlsportname2") + "/": "tls qux",
+			})
 
+			appendIf(expectations, !skipPrefixProxyTests, map[string]string{
 				podProxyURL("", "1080") + "/": `<a href="` + podProxyURL("", "1080") + `/rewriteme">test</a>`,
 				podProxyURL("", "160") + "/":  "foo",
 				podProxyURL("", "162") + "/":  "bar",
@@ -229,7 +257,9 @@ var _ = SIGDescribe("Proxy", func() {
 				podProxyURL("http", "1080") + "/": `<a href="` + podProxyURL("http", "1080") + `/rewriteme">test</a>`,
 				podProxyURL("http", "160") + "/":  "foo",
 				podProxyURL("http", "162") + "/":  "bar",
+			})
 
+			appendIf(expectations, true, map[string]string{
 				subresourcePodProxyURL("", "") + "/":         `<a href="` + subresourcePodProxyURL("", "") + `/rewriteme">test</a>`,
 				subresourcePodProxyURL("", "1080") + "/":     `<a href="` + subresourcePodProxyURL("", "1080") + `/rewriteme">test</a>`,
 				subresourcePodProxyURL("http", "1080") + "/": `<a href="` + subresourcePodProxyURL("http", "1080") + `/rewriteme">test</a>`,
@@ -241,11 +271,10 @@ var _ = SIGDescribe("Proxy", func() {
 				subresourcePodProxyURL("https", "443") + "/": `<a href="` + subresourcePodProxyURL("https", "443") + `/tlsrewriteme">test</a>`,
 				subresourcePodProxyURL("https", "460") + "/": "tls baz",
 				subresourcePodProxyURL("https", "462") + "/": "tls qux",
-
 				// TODO: below entries don't work, but I believe we should make them work.
 				// podPrefix + ":dest1": "foo",
 				// podPrefix + ":dest2": "bar",
-			}
+			})
 
 			wg := sync.WaitGroup{}
 			errs := []string{}

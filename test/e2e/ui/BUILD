@@ -9,6 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/ui",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/util/version:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
