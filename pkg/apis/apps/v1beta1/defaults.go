@@ -65,8 +65,8 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 
 // SetDefaults_Deployment sets additional defaults compared to its counterpart
 // in extensions. These addons are:
-// - MaxUnavailable during rolling update set to 25% (1 in extensions)
-// - MaxSurge value during rolling update set to 25% (1 in extensions)
+// - MaxUnavailable during rolling update set to 25%
+// - MaxSurge value during rolling update set to 25%
 // - RevisionHistoryLimit set to 2 (not set in extensions)
 // - ProgressDeadlineSeconds set to 600s (not set in extensions)
 func SetDefaults_Deployment(obj *appsv1beta1.Deployment) {

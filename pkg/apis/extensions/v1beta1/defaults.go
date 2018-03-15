@@ -100,13 +100,13 @@ func SetDefaults_Deployment(obj *extensionsv1beta1.Deployment) {
 			strategy.RollingUpdate = &rollingUpdate
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
-			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			// Set default MaxUnavailable as 25% by default.
+			maxUnavailable := intstr.FromString("25%")
 			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if strategy.RollingUpdate.MaxSurge == nil {
-			// Set default MaxSurge as 1 by default.
-			maxSurge := intstr.FromInt(1)
+			// Set default MaxSurge as 25% by default.
+			maxSurge := intstr.FromString("25%")
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}
