@@ -29,14 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/version"
 
-	"crypto/x509"
 	"github.com/golang/glog"
 )
 
 const (
 	defaultKubeletClientCertificateFile = "kubelet-client.crt"
 	defaultKubeletClientKeyFile         = "kubelet-client.key"
-	defaultKubeletCACertificateFile     = "kubelet-ca.crt"
 )
 
 func NewHttpProber() HTTPProber {
@@ -53,30 +51,18 @@ func NewHTTPSProber(certDir string) HTTPProber {
 	certPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientCertificateFile))
 	if err != nil {
 		glog.Errorf("unable to build HTTPS prober cert path: %v", err)
-		return NewHttpProber()
 	}
 	keyPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientKeyFile))
 	if err != nil {
 		glog.Errorf("unable to build HTTPS prober key path: %v", err)
-		return NewHttpProber()
 	}
 	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		glog.Errorf("unable to read and parse key/cert for HTTPS prober: %v", err)
-		return NewHttpProber()
 	}
-
-	caCert, err := ioutil.ReadFile(filepath.Join(certDir, defaultKubeletCACertificateFile))
-	if err != nil {
-		glog.Errorf("unable to read CA cert: %v", err)
-		return NewHttpProber()
-	}
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(caCert)
 
 	tlsConfig := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
-		RootCAs:            certPool,
 		InsecureSkipVerify: true,
 	}
 	tlsConfig.BuildNameToCertificate()
