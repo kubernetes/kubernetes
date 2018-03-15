@@ -36,7 +36,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
-	externalclientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -536,7 +535,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	})
 }
 
-func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
+func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
 	t.Helper()
 	trev, err := cs.AuthenticationV1().TokenReviews().Create(&authenticationv1.TokenReview{
 		Spec: authenticationv1.TokenReviewSpec{
