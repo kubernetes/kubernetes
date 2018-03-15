@@ -42,6 +42,16 @@ import (
 	pluginwebhook "k8s.io/apiserver/plugin/pkg/audit/webhook"
 )
 
+const (
+	// Default configuration values for ModeBatch.
+	defaultBatchBufferSize = 10000 // Buffer up to 10000 events before starting discarding.
+	// These batch parameters are only used by the webhook backend.
+	defaultBatchMaxSize       = 400              // Only send up to 400 events at a time.
+	defaultBatchMaxWait       = 30 * time.Second // Send events at least twice a minute.
+	defaultBatchThrottleQPS   = 10               // Limit the send rate by 10 QPS.
+	defaultBatchThrottleBurst = 15               // Allow up to 15 QPS burst.
+)
+
 func appendBackend(existing, newBackend audit.Backend) audit.Backend {
 	if existing == nil {
 		return newBackend
@@ -129,15 +139,12 @@ type AuditWebhookOptions struct {
 }
 
 func NewAuditOptions() *AuditOptions {
-	defaultLogBatchConfig := pluginbuffered.NewDefaultBatchConfig()
-	defaultLogBatchConfig.ThrottleEnable = false
-
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{
 			InitialBackoff: pluginwebhook.DefaultInitialBackoff,
 			BatchOptions: AuditBatchOptions{
 				Mode:        ModeBatch,
-				BatchConfig: pluginbuffered.NewDefaultBatchConfig(),
+				BatchConfig: defaultWebhookBatchConfig(),
 			},
 			TruncateOptions: NewAuditTruncateOptions(),
 			// TODO(audit): use v1 API in release 1.13
@@ -147,7 +154,7 @@ func NewAuditOptions() *AuditOptions {
 			Format: pluginlog.FormatJson,
 			BatchOptions: AuditBatchOptions{
 				Mode:        ModeBlocking,
-				BatchConfig: defaultLogBatchConfig,
+				BatchConfig: defaultLogBatchConfig(),
 			},
 			TruncateOptions: NewAuditTruncateOptions(),
 			// TODO(audit): use v1 API in release 1.13
@@ -213,11 +220,13 @@ func validateBackendBatchOptions(pluginName string, options AuditBatchOptions) e
 	if config.MaxBatchSize <= 0 {
 		return fmt.Errorf("invalid audit batch %s max batch size %v, must be a positive number", pluginName, config.MaxBatchSize)
 	}
-	if config.ThrottleQPS <= 0 {
-		return fmt.Errorf("invalid audit batch %s throttle QPS %v, must be a positive number", pluginName, config.ThrottleQPS)
-	}
-	if config.ThrottleBurst <= 0 {
-		return fmt.Errorf("invalid audit batch %s throttle burst %v, must be a positive number", pluginName, config.ThrottleBurst)
+	if config.ThrottleEnable {
+		if config.ThrottleQPS <= 0 {
+			return fmt.Errorf("invalid audit batch %s throttle QPS %v, must be a positive number", pluginName, config.ThrottleQPS)
+		}
+		if config.ThrottleBurst <= 0 {
+			return fmt.Errorf("invalid audit batch %s throttle burst %v, must be a positive number", pluginName, config.ThrottleBurst)
+		}
 	}
 	return nil
 }
@@ -524,4 +533,32 @@ func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
 	webhook = o.TruncateOptions.wrapBackend(webhook, groupVersion)
 	c.AuditBackend = appendBackend(c.AuditBackend, webhook)
 	return nil
+}
+
+// defaultWebhookBatchConfig returns the default BatchConfig used by the Webhook backend.
+func defaultWebhookBatchConfig() pluginbuffered.BatchConfig {
+	return pluginbuffered.BatchConfig{
+		BufferSize:   defaultBatchBufferSize,
+		MaxBatchSize: defaultBatchMaxSize,
+		MaxBatchWait: defaultBatchMaxWait,
+
+		ThrottleEnable: true,
+		ThrottleQPS:    defaultBatchThrottleQPS,
+		ThrottleBurst:  defaultBatchThrottleBurst,
+
+		AsyncDelegate: true,
+	}
+}
+
+// defaultLogBatchConfig returns the default BatchConfig used by the Log backend.
+func defaultLogBatchConfig() pluginbuffered.BatchConfig {
+	return pluginbuffered.BatchConfig{
+		BufferSize: defaultBatchBufferSize,
+		// Batching is not useful for the log-file backend.
+		// MaxBatchWait ignored.
+		MaxBatchSize:   1,
+		ThrottleEnable: false,
+		// Asynchronous log threads just create lock contention.
+		AsyncDelegate: false,
+	}
 }
