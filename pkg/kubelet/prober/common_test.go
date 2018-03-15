@@ -108,6 +108,7 @@ func newTestManager() *manager {
 		nil, // runner
 		refManager,
 		&record.FakeRecorder{},
+		// Pass an empty cert directory, the prober will send liveness/readiness probe check in HTTP.
 		"",
 	).(*manager)
 	// Don't actually execute probes.
