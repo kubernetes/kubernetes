@@ -212,12 +212,6 @@ func TestHTTPProbeChecker(t *testing.T) {
 }
 
 func TestHTTPSProbeChecker(t *testing.T) {
-	var currentPath string
-	currentPath, err := os.Getwd()
-	if err != nil {
-		glog.Errorf("fail to get path of current directory %v", err)
-	}
-
 	httpsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello, client")
 		if r.TLS != nil {
@@ -230,6 +224,11 @@ func TestHTTPSProbeChecker(t *testing.T) {
 		}
 	}))
 
+	var currentPath string
+	currentPath, err := os.Getwd()
+	if err != nil {
+		glog.Errorf("fail to get path of current directory %v", err)
+	}
 	certBytes, err := ioutil.ReadFile(filepath.Join(currentPath, "kubelet-ca.crt"))
 	if err != nil {
 		t.Errorf("Unable to read cert.pem: %v", err)
