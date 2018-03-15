@@ -111,6 +111,13 @@ type AuditWebhookOptions struct {
 func NewAuditOptions() *AuditOptions {
 	defaultLogBatchConfig := pluginbuffered.NewDefaultBatchConfig()
 	defaultLogBatchConfig.ThrottleEnable = false
+	// Set the max batch size to 1, and scale the throttle accordingly.
+	defaultLogBatchConfig.ThrottleQPS = defaultLogBatchConfig.ThrottleQPS * float32(defaultLogBatchConfig.MaxBatchSize)
+	defaultLogBatchConfig.ThrottleBurst = defaultLogBatchConfig.ThrottleBurst * defaultLogBatchConfig.MaxBatchSize
+	defaultLogBatchConfig.MaxBatchSize = 1
+	// TODO: Allow infinite wait times.
+	defaultLogBatchConfig.MaxBatchWait = time.Hour * 24 * 360
+	defaultLogBatchConfig.AsyncDelegate = false
 
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{
