@@ -29,12 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func noDefault(*api.Pod) error { return nil }
+func noDefault(*core.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
@@ -60,7 +59,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext: &v1.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SchedulerName:   core.DefaultSchedulerName,
 		},
 	}
 	json, err := runtime.Encode(testapi.Default.Codec(), pod)
@@ -123,7 +122,7 @@ func TestDecodePodList(t *testing.T) {
 				SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext: &v1.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SchedulerName:   core.DefaultSchedulerName,
 		},
 	}
 	podList := &v1.PodList{
