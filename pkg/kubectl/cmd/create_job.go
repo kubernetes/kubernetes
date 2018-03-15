@@ -38,7 +38,7 @@ var (
 
 	jobExample = templates.Examples(i18n.T(`
 		# Create a job from a CronJob named "a-cronjob"
-		kubectl create job --from=cronjob/a-cronjob`))
+		kubectl create job test-job --from=cronjob/a-cronjob`))
 )
 
 type CreateJobOptions struct {
