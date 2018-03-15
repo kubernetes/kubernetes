@@ -810,7 +810,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.livenessManager,
 		klet.runner,
 		containerRefManager,
-		kubeDeps.Recorder)
+		kubeDeps.Recorder,
+		certDirectory)
 
 	klet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)

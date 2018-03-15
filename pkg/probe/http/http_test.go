@@ -17,16 +17,22 @@ limitations under the License.
 package http
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -62,7 +68,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 		}
 	}
 
-	prober := New()
+	prober := NewHttpProber()
 	testCases := []struct {
 		handler    func(w http.ResponseWriter, r *http.Request)
 		reqHeaders http.Header
@@ -202,5 +208,65 @@ func TestHTTPProbeChecker(t *testing.T) {
 				}
 			}
 		}()
+	}
+}
+
+func TestHTTPSProbeChecker(t *testing.T) {
+	var currentPath string
+	currentPath, err := os.Getwd()
+	if err != nil {
+		glog.Errorf("fail to get path of current directory %v", err)
+	}
+
+	httpsServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello, client")
+		if r.TLS != nil {
+			if r.TLS.PeerCertificates[0].EmailAddresses[0] != "a@a.com" {
+				t.Errorf("client sends a certificate that does not have correct email address. Expect a@a.com, got %s",
+					r.TLS.PeerCertificates[0].EmailAddresses[0])
+			}
+		} else {
+			t.Error("request is not from TLS enabled connection")
+		}
+	}))
+
+	certBytes, err := ioutil.ReadFile(filepath.Join(currentPath, "kubelet-ca.crt"))
+	if err != nil {
+		t.Errorf("Unable to read cert.pem: %v", err)
+	}
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(certBytes); !ok {
+		t.Error("Unable to add certificate to certificate pool")
+	}
+
+	tlsConfig := &tls.Config{
+		// Reject any TLS certificate that cannot be validated
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		// Ensure that we only use our "CA" to validate certificates
+		ClientCAs: certPool,
+		// PFS because we can
+		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
+		// Force it server side
+		PreferServerCipherSuites: true,
+		// TLS 1.2 because we can
+		MinVersion: tls.VersionTLS12,
+	}
+	tlsConfig.BuildNameToCertificate()
+	httpsServer.TLS = tlsConfig
+
+	httpsServer.StartTLS()
+	defer httpsServer.Close()
+
+	u, err := url.Parse(httpsServer.URL)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	httpsProber := NewHTTPSProber(currentPath)
+	health, output, err := httpsProber.Probe(u, http.Header{}, 1*time.Second)
+	if health != probe.Success {
+		t.Errorf("Unexpected probe response, got %v", health)
+	}
+	if !strings.Contains(output, "Hello, client") {
+		t.Errorf("Unexpected probe response output, got %v", output)
 	}
 }

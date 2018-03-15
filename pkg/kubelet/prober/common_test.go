@@ -108,6 +108,7 @@ func newTestManager() *manager {
 		nil, // runner
 		refManager,
 		&record.FakeRecorder{},
+		"",
 	).(*manager)
 	// Don't actually execute probes.
 	m.prober.exec = fakeExecProber{probe.Success, nil}

@@ -50,13 +50,16 @@ type prober struct {
 	// probe types needs different httprobe instances so they don't
 	// share a connection pool which can cause collsions to the
 	// same host:port and transient failures. See #49740.
-	readinessHttp httprobe.HTTPProber
-	livenessHttp  httprobe.HTTPProber
-	tcp           tcprobe.TCPProber
-	runner        kubecontainer.ContainerCommandRunner
+	readinessHttp  httprobe.HTTPProber
+	livenessHttp   httprobe.HTTPProber
+	readinessHttps httprobe.HTTPProber
+	livenessHttps  httprobe.HTTPProber
+	tcp            tcprobe.TCPProber
+	runner         kubecontainer.ContainerCommandRunner
 
 	refManager *kubecontainer.RefManager
 	recorder   record.EventRecorder
+	certDir    string
 }
 
 // NewProber creates a Prober, it takes a command runner and
@@ -64,16 +67,19 @@ type prober struct {
 func newProber(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) *prober {
+	recorder record.EventRecorder,
+	certDirectory string) *prober {
 
 	return &prober{
-		exec:          execprobe.New(),
-		readinessHttp: httprobe.New(),
-		livenessHttp:  httprobe.New(),
-		tcp:           tcprobe.New(),
-		runner:        runner,
-		refManager:    refManager,
-		recorder:      recorder,
+		exec:           execprobe.New(),
+		readinessHttp:  httprobe.NewHttpProber(),
+		livenessHttp:   httprobe.NewHttpProber(),
+		readinessHttps: httprobe.NewHTTPSProber(certDirectory),
+		livenessHttps:  httprobe.NewHTTPSProber(certDirectory),
+		tcp:            tcprobe.New(),
+		runner:         runner,
+		refManager:     refManager,
+		recorder:       recorder,
 	}
 }
 
@@ -167,9 +173,17 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
 		glog.V(4).Infof("HTTP-Probe Headers: %v", headers)
 		if probeType == liveness {
-			return pb.livenessHttp.Probe(url, headers, timeout)
+			if p.HTTPGet.Scheme == v1.URISchemeHTTP {
+				return pb.livenessHttp.Probe(url, headers, timeout)
+			} else {
+				return pb.livenessHttps.Probe(url, headers, timeout)
+			}
 		} else { // readiness
-			return pb.readinessHttp.Probe(url, headers, timeout)
+			if p.HTTPGet.Scheme == v1.URISchemeHTTP {
+				return pb.readinessHttp.Probe(url, headers, timeout)
+			} else {
+				return pb.readinessHttps.Probe(url, headers, timeout)
+			}
 		}
 	}
 	if p.TCPSocket != nil {
