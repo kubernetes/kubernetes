@@ -17,9 +17,11 @@ limitations under the License.
 package securitycontext
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestParseSELinuxOptions(t *testing.T) {
@@ -214,5 +216,158 @@ func TestAddNoNewPrivileges(t *testing.T) {
 		if actual != v.expect {
 			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
 		}
+	}
+}
+
+func TestDetermineEffectiveSecurityContext(t *testing.T) {
+	privileged := true
+	runAsUser := int64(1)
+	runAsUserPod := int64(12)
+	runAsGroup := int64(123)
+	runAsNonRoot := true
+	runAsNonRootPod := false
+	readOnlyRootFilesystem := true
+	allowPrivilegeEscalation := true
+
+	containerWithoutSc := &v1.Container{Name: "containerWithoutSc"}
+
+	containerWithSc := &v1.Container{
+		Name: "containerWithSc",
+		SecurityContext: &v1.SecurityContext{
+			SELinuxOptions: &v1.SELinuxOptions{
+				User:  "user_c",
+				Role:  "role_c",
+				Type:  "type_c",
+				Level: "s0_c",
+			},
+			Capabilities: &v1.Capabilities{
+				Add:  []v1.Capability{"foo_c"},
+				Drop: []v1.Capability{"bar_c"},
+			},
+			Privileged:               &privileged,
+			ReadOnlyRootFilesystem:   &readOnlyRootFilesystem,
+			RunAsUser:                &runAsUser,
+			RunAsNonRoot:             &runAsNonRoot,
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+		},
+	}
+
+	podSc := &v1.PodSecurityContext{
+		SELinuxOptions: &v1.SELinuxOptions{
+			User:  "user_p",
+			Role:  "role_p",
+			Type:  "type_p",
+			Level: "s0_p",
+		},
+		RunAsGroup:   &runAsGroup,
+		RunAsUser:    &runAsUserPod,
+		RunAsNonRoot: &runAsNonRootPod,
+	}
+
+	podWithoutSc := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "podWithoutSc",
+			Namespace:   "namespace",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName: "default",
+		},
+	}
+
+	podWithSc := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "podWithSc",
+			Namespace:   "namespace",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName: "default",
+			SecurityContext:    podSc,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		pod       *v1.Pod
+		container *v1.Container
+		expect    *v1.SecurityContext
+	}{
+		{
+			name:      "none SecurityContext",
+			pod:       podWithoutSc,
+			container: containerWithoutSc,
+			expect:    nil,
+		},
+		{
+			name:      "pod SecurityContext",
+			pod:       podWithSc,
+			container: containerWithoutSc,
+			expect: &v1.SecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
+					User:  "user_p",
+					Role:  "role_p",
+					Type:  "type_p",
+					Level: "s0_p",
+				},
+				RunAsGroup:   &runAsGroup,
+				RunAsUser:    &runAsUserPod,
+				RunAsNonRoot: &runAsNonRootPod,
+			},
+		},
+		{
+			name:      "container SecurityContext",
+			pod:       podWithoutSc,
+			container: containerWithSc,
+			expect: &v1.SecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
+					User:  "user_c",
+					Role:  "role_c",
+					Type:  "type_c",
+					Level: "s0_c",
+				},
+				Capabilities: &v1.Capabilities{
+					Add:  []v1.Capability{"foo_c"},
+					Drop: []v1.Capability{"bar_c"},
+				},
+				Privileged:               &privileged,
+				ReadOnlyRootFilesystem:   &readOnlyRootFilesystem,
+				RunAsUser:                &runAsUser,
+				RunAsNonRoot:             &runAsNonRoot,
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			},
+		},
+		{
+			name:      "pod SecurityContext and container SecurityContext",
+			pod:       podWithSc,
+			container: containerWithSc,
+			expect: &v1.SecurityContext{
+				SELinuxOptions: &v1.SELinuxOptions{
+					User:  "user_c",
+					Role:  "role_c",
+					Type:  "type_c",
+					Level: "s0_c",
+				},
+				Capabilities: &v1.Capabilities{
+					Add:  []v1.Capability{"foo_c"},
+					Drop: []v1.Capability{"bar_c"},
+				},
+				Privileged:               &privileged,
+				ReadOnlyRootFilesystem:   &readOnlyRootFilesystem,
+				RunAsGroup:               &runAsGroup,
+				RunAsUser:                &runAsUser,
+				RunAsNonRoot:             &runAsNonRoot,
+				AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := DetermineEffectiveSecurityContext(test.pod, test.container)
+			if !reflect.DeepEqual(result, test.expect) {
+				t.Errorf("Expected SecurityContext: %v, Got SecurityContext: %v", test.expect, result)
+			}
+		})
 	}
 }
