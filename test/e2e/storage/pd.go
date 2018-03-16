@@ -62,6 +62,8 @@ var _ = SIGDescribe("Pod Disks", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessNodeCountIsAtLeast(2)
 
+		framework.SkipIfMultizone(f.ClientSet)
+
 		podClient = f.ClientSet.Core().Pods(f.Namespace.Name)
 		nodeClient = f.ClientSet.Core().Nodes()
 		nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
