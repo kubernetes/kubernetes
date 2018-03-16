@@ -107,15 +107,20 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 			// iptables-restore version check
 			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
+			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, error) { return []byte{}, nil },
 			// Exists.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -133,12 +138,12 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	if exists {
 		t.Errorf("%s new chain: Expected exists = false", protoStr)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("%s new chain: Expected 3 CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("%s new chain: Expected 4 CombinedOutput() calls, got %d", protoStr, fcmd.CombinedOutputCalls)
 	}
 	cmd := iptablesCommand(protocol)
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
-		t.Errorf("%s new chain: Expected cmd containing '%s -t nat -N FOOBAR', got %s", protoStr, cmd, fcmd.CombinedOutputLog[2])
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll(cmd, "-t", "nat", "-S", "FOOBAR") {
+		t.Errorf("%s new chain: Expected cmd containing '%s -t nat -S FOOBAR', got %s", protoStr, cmd, fcmd.CombinedOutputLog[2])
 	}
 	// Exists.
 	exists, err = runner.EnsureChain(TableNAT, Chain("FOOBAR"))
@@ -213,12 +218,14 @@ func TestDeleteChain(t *testing.T) {
 			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, error) { return []byte{}, nil },
 			// Failure.
 			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -232,11 +239,11 @@ func TestDeleteChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
 	// Failure.
 	err = runner.DeleteChain(TableNAT, Chain("FOOBAR"))
@@ -710,6 +717,7 @@ func TestWaitFlagUnavailable(t *testing.T) {
 			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, error) { return []byte{}, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -717,6 +725,7 @@ func TestWaitFlagUnavailable(t *testing.T) {
 			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			// iptables-restore version check
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -727,11 +736,11 @@ func TestWaitFlagUnavailable(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny(WaitString, WaitSecondsString) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if sets.NewString(fcmd.CombinedOutputLog[3]...).HasAny(WaitString, WaitSecondsString) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
 }
 
@@ -744,10 +753,12 @@ func TestWaitFlagOld(t *testing.T) {
 			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, error) { return []byte{}, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -759,14 +770,14 @@ func TestWaitFlagOld(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 4 {
+		t.Errorf("expected 4 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", WaitString) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny(WaitSecondsString) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if sets.NewString(fcmd.CombinedOutputLog[3]...).HasAny(WaitSecondsString) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
 }
 
@@ -779,10 +790,12 @@ func TestWaitFlagNew(t *testing.T) {
 			func() ([]byte, error) { return []byte("iptables-restore v1.9.22"), nil },
 			// Success.
 			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, error) { return []byte{}, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -794,14 +807,14 @@ func TestWaitFlagNew(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
+	if fcmd.CombinedOutputCalls != 4 {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitSecondsString) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", WaitSecondsString) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny(WaitString) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if sets.NewString(fcmd.CombinedOutputLog[3]...).HasAny(WaitString) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
 }
 
@@ -822,6 +835,7 @@ func TestReload(t *testing.T) {
 
 			// first reload
 			// EnsureChain
+			func() ([]byte, error) { return []byte{}, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, error) { return []byte{}, nil },
 			// EnsureRule abc check
 			func() ([]byte, error) { return []byte{}, &fakeexec.FakeExitError{Status: 1} },
@@ -830,6 +844,7 @@ func TestReload(t *testing.T) {
 
 			// second reload
 			// EnsureChain
+			func() ([]byte, error) { return []byte{}, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, error) { return []byte{}, nil },
 			// EnsureRule abc check
 			func() ([]byte, error) { return []byte{}, &fakeexec.FakeExitError{Status: 1} },
@@ -839,6 +854,8 @@ func TestReload(t *testing.T) {
 	}
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -879,17 +896,20 @@ func TestReload(t *testing.T) {
 	<-reloaded
 	<-reloaded
 
-	if fcmd.CombinedOutputCalls != 5 {
-		t.Errorf("expected 5 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != 6 {
+		t.Errorf("expected 6 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-S", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[3]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[4]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[4]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[4])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[5]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[5])
 	}
 
 	go func() { time.Sleep(time.Second / 100); reloaded <- true }()
@@ -897,7 +917,7 @@ func TestReload(t *testing.T) {
 	dbusConn.EmitSignal("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameOwnerChanged", "io.k8s.Something", "", ":1.1")
 	<-reloaded
 
-	if fcmd.CombinedOutputCalls != 5 {
+	if fcmd.CombinedOutputCalls != 6 {
 		t.Errorf("Incorrect signal caused a reload")
 	}
 
@@ -905,17 +925,20 @@ func TestReload(t *testing.T) {
 	<-reloaded
 	<-reloaded
 
-	if fcmd.CombinedOutputCalls != 8 {
+	if fcmd.CombinedOutputCalls != 10 {
 		t.Errorf("expected 8 CombinedOutput() calls total, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[5]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[5])
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[6]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[6]...).HasAll("iptables", "-t", "nat", "-S", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[6])
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[7]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+	if !sets.NewString(fcmd.CombinedOutputLog[7]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[7])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[8]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[8])
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[9]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[9])
 	}
 }
 

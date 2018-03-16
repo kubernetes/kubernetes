@@ -223,13 +223,12 @@ func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
+	exist, err := runner.checkChain(table, chain)
+	if exist {
+		return true, nil
+	}
 	out, err := runner.run(opCreateChain, fullArgs)
 	if err != nil {
-		if ee, ok := err.(utilexec.ExitError); ok {
-			if ee.Exited() && ee.ExitStatus() == 1 {
-				return true, nil
-			}
-		}
 		return false, fmt.Errorf("error creating chain %q: %v: %s", chain, err, out)
 	}
 	return false, nil
@@ -256,7 +255,10 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	// TODO: we could call iptables -S first, ignore the output and check for non-zero return (more like DeleteRule)
+	_, err := runner.checkChain(table, chain)
+	if err != nil {
+		return err
+	}
 	out, err := runner.run(opDeleteChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
@@ -421,6 +423,15 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 	// Don't log err here - callers might not think it is an error.
 }
 
+func (runner *runner) checkChain(table Table, chain Chain) (bool, error) {
+	fullArgs := makeFullArgs(table, chain)
+	out, err := runner.run(opListRule, fullArgs)
+	if err != nil {
+		return false, fmt.Errorf("error check chain %q: %v: %s", chain, err, out)
+	}
+	return true, nil
+}
+
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
@@ -512,6 +523,7 @@ const (
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
+	opListRule    operation = "-S"
 )
 
 func makeFullArgs(table Table, chain Chain, args ...string) []string {
