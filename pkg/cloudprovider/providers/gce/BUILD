@@ -115,6 +115,7 @@ go_test(
         "//pkg/cloudprovider/providers/gce/cloud/meta:go_default_library",
         "//pkg/cloudprovider/providers/gce/cloud/mock:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
+        "//pkg/util/net/sets:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
@@ -126,6 +127,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
 

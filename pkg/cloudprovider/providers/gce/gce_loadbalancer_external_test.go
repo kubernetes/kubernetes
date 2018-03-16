@@ -17,17 +17,26 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	computealpha "google.golang.org/api/compute/v0.alpha"
+	compute "google.golang.org/api/compute/v1"
 
+	ga "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
+	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
 
 func TestEnsureStaticIP(t *testing.T) {
@@ -468,4 +477,479 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	// Expect address to be deleted
 	_, err = gce.GetRegionAddress(lbName, gce.region)
 	assert.True(t, isNotFound(err))
+}
+
+func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+	nodeNames := []string{"test-node-1"}
+
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+
+	// Enable the cloud.NetworkTiers feature
+	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
+	fakeApiService.Annotations = map[string]string{NetworkTierAnnotationKey: wrongTier}
+
+	_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, fakeApiService, nil, nodes)
+	require.Error(t, err)
+	assert.EqualError(t, err, errStrUnsupportedTier)
+}
+
+func TestEnsureExternalLoadBalancerFailsWithNoNodes(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, fakeApiService, nil, []*v1.Node{})
+	require.Error(t, err)
+	assert.EqualError(t, err, errStrLbNoHosts)
+}
+
+func TestForwardingRuleNeedsUpdate(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+	status, err := createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	require.NotNil(t, status)
+	require.NoError(t, err)
+
+	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	ipAddr := status.Ingress[0].IP
+
+	lbIP := fakeApiService.Spec.LoadBalancerIP
+	wrongPorts := []v1.ServicePort{fakeApiService.Spec.Ports[0]}
+	wrongPorts[0].Port = wrongPorts[0].Port + 1
+
+	wrongProtocolPorts := []v1.ServicePort{fakeApiService.Spec.Ports[0]}
+	wrongProtocolPorts[0].Protocol = v1.ProtocolUDP
+
+	for desc, tc := range map[string]struct {
+		lbIP         string
+		ports        []v1.ServicePort
+		exists       bool
+		needsUpdate  bool
+		expectIpAddr string
+		expectError  bool
+	}{
+		"When the loadBalancerIP does not equal the FwdRule IP address.": {
+			lbIP:         "1.2.3.4",
+			ports:        fakeApiService.Spec.Ports,
+			exists:       true,
+			needsUpdate:  true,
+			expectIpAddr: ipAddr,
+			expectError:  false,
+		},
+		"When loadBalancerPortRange returns an error.": {
+			lbIP:         lbIP,
+			ports:        []v1.ServicePort{},
+			exists:       true,
+			needsUpdate:  false,
+			expectIpAddr: "",
+			expectError:  true,
+		},
+		"When portRange not equals to the forwardingRule port range.": {
+			lbIP:         lbIP,
+			ports:        wrongPorts,
+			exists:       true,
+			needsUpdate:  true,
+			expectIpAddr: ipAddr,
+			expectError:  false,
+		},
+		"When the ports protocol does not equal the ForwardingRuel IP Protocol.": {
+			lbIP:         lbIP,
+			ports:        wrongProtocolPorts,
+			exists:       true,
+			needsUpdate:  true,
+			expectIpAddr: ipAddr,
+			expectError:  false,
+		},
+		"When basic workflow.": {
+			lbIP:         lbIP,
+			ports:        fakeApiService.Spec.Ports,
+			exists:       true,
+			needsUpdate:  false,
+			expectIpAddr: ipAddr,
+			expectError:  false,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			exists, needsUpdate, ipAddress, err := gce.forwardingRuleNeedsUpdate(lbName, vals.Region, tc.lbIP, tc.ports)
+			assert.Equal(t, tc.exists, exists, "'exists' didn't return as expected "+desc)
+			assert.Equal(t, tc.needsUpdate, needsUpdate, "'needsUpdate' didn't return as expected "+desc)
+			assert.Equal(t, tc.expectIpAddr, ipAddress, "'ipAddress' didn't return as expected "+desc)
+			if tc.expectError {
+				assert.Error(t, err, "Should returns an error "+desc)
+			} else {
+				assert.NoError(t, err, "Should not returns an error "+desc)
+			}
+		})
+	}
+}
+
+func TestTargetPoolNeedsRecreation(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	serviceName := fakeApiService.ObjectMeta.Name
+	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	hostNames := nodeNames(nodes)
+	hosts, err := gce.getInstancesByNames(hostNames)
+
+	var instances []string
+	for _, host := range hosts {
+		instances = append(instances, host.makeComparableHostPath())
+	}
+	pool := &compute.TargetPool{
+		Name:            lbName,
+		Description:     fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
+		Instances:       instances,
+		SessionAffinity: translateAffinityType(v1.ServiceAffinityNone),
+	}
+	err = gce.CreateTargetPool(pool, vals.Region)
+	require.NoError(t, err)
+
+	c := gce.c.(*cloud.MockGCE)
+	c.MockTargetPools.GetHook = mock.GetTargetPoolInternalErrHook
+	exists, needsRecreation, err := gce.targetPoolNeedsRecreation(lbName, vals.Region, v1.ServiceAffinityNone)
+	assert.True(t, exists)
+	assert.False(t, needsRecreation)
+	require.NotNil(t, err)
+	assert.True(t, strings.HasPrefix(err.Error(), errPrefixGetTargetPool))
+	c.MockTargetPools.GetHook = nil
+
+	exists, needsRecreation, err = gce.targetPoolNeedsRecreation(lbName, vals.Region, v1.ServiceAffinityClientIP)
+	assert.True(t, exists)
+	assert.True(t, needsRecreation)
+	assert.NoError(t, err)
+
+	exists, needsRecreation, err = gce.targetPoolNeedsRecreation(lbName, vals.Region, v1.ServiceAffinityNone)
+	assert.True(t, exists)
+	assert.False(t, needsRecreation)
+	assert.NoError(t, err)
+}
+
+func TestFirewallNeedsUpdate(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+	status, err := createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	require.NotNil(t, status)
+	require.NoError(t, err)
+	svcName := "/" + fakeApiService.ObjectMeta.Name
+	region := vals.Region
+
+	ipAddr := status.Ingress[0].IP
+	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+
+	ipnet, err := netsets.ParseIPNets("0.0.0.0/0")
+	require.NoError(t, err)
+
+	wrongIpnet, err := netsets.ParseIPNets("1.0.0.0/10")
+	require.NoError(t, err)
+
+	fw, err := gce.GetFirewall(MakeFirewallName(lbName))
+	require.NoError(t, err)
+
+	for desc, tc := range map[string]struct {
+		lbName       string
+		ipAddr       string
+		ports        []v1.ServicePort
+		ipnet        netsets.IPNet
+		fwIPProtocol string
+		getHook      func(context.Context, *meta.Key, *cloud.MockFirewalls) (bool, *ga.Firewall, error)
+		sourceRange  string
+		exists       bool
+		needsUpdate  bool
+		hasErr       bool
+	}{
+		"When response is a Non-400 HTTP error.": {
+			lbName:       lbName,
+			ipAddr:       ipAddr,
+			ports:        fakeApiService.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      mock.GetFirewallsUnauthorizedErrHook,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       false,
+			needsUpdate:  false,
+			hasErr:       true,
+		},
+		"When given a wrong description.": {
+			lbName:       lbName,
+			ipAddr:       "",
+			ports:        fakeApiService.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
+		"When IPProtocol doesn't match.": {
+			lbName:       lbName,
+			ipAddr:       ipAddr,
+			ports:        fakeApiService.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "usps",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
+		"When the ports don't match.": {
+			lbName:       lbName,
+			ipAddr:       ipAddr,
+			ports:        []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(666)}},
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
+		"When parseIPNets returns an error.": {
+			lbName:       lbName,
+			ipAddr:       ipAddr,
+			ports:        fakeApiService.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  "badSourceRange",
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
+		"When the source ranges are not equal.": {
+			lbName:       lbName,
+			ipAddr:       ipAddr,
+			ports:        fakeApiService.Spec.Ports,
+			ipnet:        wrongIpnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
+		"When basic flow without exceptions.": {
+			lbName:       lbName,
+			ipAddr:       ipAddr,
+			ports:        fakeApiService.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  false,
+			hasErr:       false,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			fw, err = gce.GetFirewall(MakeFirewallName(tc.lbName))
+			fw.Allowed[0].IPProtocol = tc.fwIPProtocol
+			fw, err = gce.GetFirewall(MakeFirewallName(tc.lbName))
+			require.Equal(t, fw.Allowed[0].IPProtocol, tc.fwIPProtocol)
+
+			trueSourceRange := fw.SourceRanges[0]
+			fw.SourceRanges[0] = tc.sourceRange
+			fw, err = gce.GetFirewall(MakeFirewallName(lbName))
+			require.Equal(t, fw.SourceRanges[0], tc.sourceRange)
+
+			c := gce.c.(*cloud.MockGCE)
+			c.MockFirewalls.GetHook = tc.getHook
+
+			exists, needsUpdate, err := gce.firewallNeedsUpdate(
+				tc.lbName,
+				svcName,
+				region,
+				tc.ipAddr,
+				tc.ports,
+				tc.ipnet)
+
+			assert.Equal(t, tc.exists, exists, "'exists' didn't return as expected "+desc)
+			assert.Equal(t, tc.needsUpdate, needsUpdate, "'needsUpdate' didn't return as expected "+desc)
+			if tc.hasErr {
+				assert.Error(t, err, "Should returns an error "+desc)
+			} else {
+				assert.NoError(t, err, "Should not returns an error "+desc)
+			}
+
+			c.MockFirewalls.GetHook = nil
+
+			fw.Allowed[0].IPProtocol = "tcp"
+			fw.SourceRanges[0] = trueSourceRange
+			fw, err = gce.GetFirewall(MakeFirewallName(tc.lbName))
+			require.Equal(t, fw.Allowed[0].IPProtocol, "tcp")
+			require.Equal(t, fw.SourceRanges[0], trueSourceRange)
+
+		})
+	}
+}
+
+func TestDeleteWrongNetworkTieredResourcesSucceedsWhenNotFound(t *testing.T) {
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	gce.AlphaFeatureGate.features[AlphaFeatureNetworkTiers] = true
+	assert.Nil(t, gce.deleteWrongNetworkTieredResources("Wrong_LB_Name", "", cloud.NetworkTier("")))
+}
+
+func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	status, err := gce.ensureExternalLoadBalancer(
+		vals.ClusterName,
+		vals.ClusterID,
+		fakeApiService,
+		nil,
+		nodes,
+	)
+	require.NotNil(t, status)
+	require.NoError(t, err)
+
+	hostNames := nodeNames(nodes)
+	hosts, err := gce.getInstancesByNames(hostNames)
+	clusterID := vals.ClusterID
+
+	ipAddr := status.Ingress[0].IP
+	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	region := vals.Region
+
+	hcToCreate := makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+	hcToDelete := makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+
+	// Apply a tag on the target pool. By verifying the change of the tag, target pool update can be ensured.
+	tag := "A Tag"
+	pool, err := gce.GetTargetPool(lbName, region)
+	pool.CreationTimestamp = tag
+	pool, err = gce.GetTargetPool(lbName, region)
+	require.Equal(t, tag, pool.CreationTimestamp)
+	err = gce.ensureTargetPoolAndHealthCheck(true, true, fakeApiService, lbName, clusterID, ipAddr, hosts, hcToCreate, hcToDelete)
+	assert.NoError(t, err)
+	pool, err = gce.GetTargetPool(lbName, region)
+	assert.NotEqual(t, pool.CreationTimestamp, tag)
+
+	pool, err = gce.GetTargetPool(lbName, region)
+	assert.Equal(t, 1, len(pool.Instances))
+	var manyNodeName [maxTargetPoolCreateInstances + 1]string
+	for i := 0; i < maxTargetPoolCreateInstances+1; i += 1 {
+		manyNodeName[i] = fmt.Sprintf("testnode_%d", i)
+	}
+	manyNodes, err := createAndInsertNodes(gce, manyNodeName[:], vals.ZoneName)
+	require.NoError(t, err)
+	manyHostNames := nodeNames(manyNodes)
+	manyHosts, err := gce.getInstancesByNames(manyHostNames)
+	err = gce.ensureTargetPoolAndHealthCheck(true, true, fakeApiService, lbName, clusterID, ipAddr, manyHosts, hcToCreate, hcToDelete)
+	assert.NoError(t, err)
+
+	pool, err = gce.GetTargetPool(lbName, region)
+	assert.Equal(t, maxTargetPoolCreateInstances+1, len(pool.Instances))
+
+	err = gce.ensureTargetPoolAndHealthCheck(true, false, fakeApiService, lbName, clusterID, ipAddr, hosts, hcToCreate, hcToDelete)
+	assert.NoError(t, err)
+	pool, err = gce.GetTargetPool(lbName, region)
+	assert.Equal(t, 1, len(pool.Instances))
+}
+
+func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, shouldMatch bool) bool {
+	select {
+	case received := <-recorder.Events:
+		if strings.HasPrefix(received, expected) != shouldMatch {
+			t.Errorf(received)
+			if shouldMatch {
+				t.Errorf("Should receive message \"%v\" but got \"%v\".", expected, received)
+			} else {
+				t.Errorf("Unexpected event \"%v\".", received)
+			}
+		}
+		return false
+	case <-time.After(2 * time.Second):
+		if shouldMatch {
+			t.Errorf("Should receive message \"%v\" but got timed out.", expected)
+		}
+		return true
+	}
+}
+
+func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+	vals := DefaultTestClusterValues()
+
+	c := gce.c.(*cloud.MockGCE)
+	c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
+	c.MockFirewalls.UpdateHook = mock.UpdateFirewallsUnauthorizedErrHook
+	gce.onXPN = true
+	require.True(t, gce.OnXPN())
+
+	recorder := record.NewFakeRecorder(1024)
+	gce.eventRecorder = recorder
+
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	hostNames := nodeNames(nodes)
+	hosts, err := gce.getInstancesByNames(hostNames)
+	require.NoError(t, err)
+	ipnet, err := netsets.ParseIPNets("10.0.0.0/20")
+	require.NoError(t, err)
+	gce.createFirewall(
+		fakeApiService,
+		cloudprovider.GetLoadBalancerName(fakeApiService),
+		gce.region,
+		"A sad little firewall",
+		ipnet,
+		fakeApiService.Spec.Ports,
+		hosts)
+	require.Nil(t, err)
+
+	msg := fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
+	checkEvent(t, recorder, msg, true)
+
+	gce.updateFirewall(
+		fakeApiService,
+		cloudprovider.GetLoadBalancerName(fakeApiService),
+		gce.region,
+		"A sad little firewall",
+		ipnet,
+		fakeApiService.Spec.Ports,
+		hosts)
+	require.Nil(t, err)
+
+	msg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
+	checkEvent(t, recorder, msg, true)
+}
+
+func TestEnsureExternalLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	require.NoError(t, err)
+
+	c := gce.c.(*cloud.MockGCE)
+	c.MockFirewalls.DeleteHook = mock.DeleteFirewallsUnauthorizedErrHook
+	gce.onXPN = true
+	require.True(t, gce.OnXPN())
+
+	recorder := record.NewFakeRecorder(1024)
+	gce.eventRecorder = recorder
+
+	err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
+	require.NoError(t, err)
+
+	msg := fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
+	checkEvent(t, recorder, msg, true)
 }
