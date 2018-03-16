@@ -100,6 +100,26 @@ func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, 
 	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, promptedCredentials{}}
 }
 
+// NewClientConfigFromBytes takes your kubeconfig and gives you back a ClientConfig
+func NewClientConfigFromBytes(configBytes []byte) (ClientConfig, error) {
+	config, err := Load(configBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DirectClientConfig{*config, "", &ConfigOverrides{}, nil, nil, promptedCredentials{}}, nil
+}
+
+// RESTConfigFromKubeConfig is a convenience method to give back a restconfig from your kubeconfig bytes.
+// For programmatic access, this is what you want 80% of the time
+func RESTConfigFromKubeConfig(configBytes []byte) (*restclient.Config, error) {
+	clientConfig, err := NewClientConfigFromBytes(configBytes)
+	if err != nil {
+		return nil, err
+	}
+	return clientConfig.ClientConfig()
+}
+
 func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
 }
