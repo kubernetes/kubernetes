@@ -25,3 +25,4 @@ approvers:
   - gmarek
   - vishh
   - liggitt
+  - soltysh # for sig-cli related stuff
