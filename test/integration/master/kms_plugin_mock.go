@@ -37,7 +37,7 @@ const (
 	unixProtocol  = "unix"
 )
 
-// base64Plugin gRPC sever for a mock KMS provider.
+// base64Plugin gRPC serve for a mock KMS provider.
 // Uses base64 to simulate encrypt and decrypt.
 type base64Plugin struct {
 	grpcServer *grpc.Server
