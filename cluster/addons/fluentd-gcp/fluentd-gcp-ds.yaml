@@ -35,9 +35,6 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: libsystemddir
-          mountPath: /host/lib
-          readOnly: true
         - name: config-volume
           mountPath: /etc/google-fluentd/config.d
         # Liveness probe is aimed to help in situarions where fluentd
@@ -109,9 +106,6 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      - name: libsystemddir
-        hostPath:
-          path: /usr/lib64
       - name: config-volume
         configMap:
           name: fluentd-gcp-config-v1.2.4

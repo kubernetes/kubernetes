@@ -109,9 +109,13 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    jm.enqueueController,
+		AddFunc: func(obj interface{}) {
+			jm.enqueueController(obj, true)
+		},
 		UpdateFunc: jm.updateJob,
-		DeleteFunc: jm.enqueueController,
+		DeleteFunc: func(obj interface{}) {
+			jm.enqueueController(obj, true)
+		},
 	})
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
@@ -209,7 +213,7 @@ func (jm *JobController) addPod(obj interface{}) {
 			return
 		}
 		jm.expectations.CreationObserved(jobKey)
-		jm.enqueueController(job)
+		jm.enqueueController(job, true)
 		return
 	}
 
@@ -218,7 +222,7 @@ func (jm *JobController) addPod(obj interface{}) {
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
 	for _, job := range jm.getPodJobs(pod) {
-		jm.enqueueController(job)
+		jm.enqueueController(job, true)
 	}
 }
 
@@ -242,7 +246,8 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+	// the only time we want the backoff to kick-in, is when the pod failed
+	immediate := curPod.Status.Phase != v1.PodFailed
 
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
@@ -250,7 +255,7 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
 		if job := jm.resolveControllerRef(oldPod.Namespace, oldControllerRef); job != nil {
-			jm.enqueueController(job)
+			jm.enqueueController(job, immediate)
 		}
 	}
 
@@ -260,15 +265,16 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 		if job == nil {
 			return
 		}
-		jm.enqueueController(job)
+		jm.enqueueController(job, immediate)
 		return
 	}
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
 		for _, job := range jm.getPodJobs(curPod) {
-			jm.enqueueController(job)
+			jm.enqueueController(job, immediate)
 		}
 	}
 }
@@ -309,7 +315,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 		return
 	}
 	jm.expectations.DeletionObserved(jobKey)
-	jm.enqueueController(job)
+	jm.enqueueController(job, true)
 }
 
 func (jm *JobController) updateJob(old, cur interface{}) {
@@ -321,7 +327,7 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	if err != nil {
 		return
 	}
-	jm.enqueueController(curJob)
+	jm.enqueueController(curJob, true)
 	// check if need to add a new rsync for ActiveDeadlineSeconds
 	if curJob.Status.StartTime != nil {
 		curADS := curJob.Spec.ActiveDeadlineSeconds
@@ -341,15 +347,19 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 	}
 }
 
-// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
-func (jm *JobController) enqueueController(job interface{}) {
-	key, err := controller.KeyFunc(job)
+// obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item,
+// immediate tells the controller to update the status right away, and should
+// happen ONLY when there was a successful pod run.
+func (jm *JobController) enqueueController(obj interface{}, immediate bool) {
+	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
-	// Retrieves the backoff duration for this Job
+	if immediate {
+		jm.queue.Forget(key)
+	}
 	backoff := getBackoff(jm.queue, key)
 
 	// TODO: Handle overlapping controllers better. Either disallow them at admission time or
