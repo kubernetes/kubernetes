@@ -707,9 +707,6 @@ function start_kubelet {
       if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
         auth_args="${auth_args} --authentication-token-webhook"
       fi
-      if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
-        auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
-      fi
 
       cni_conf_dir_args=""
       if [[ -n "${CNI_CONF_DIR}" ]]; then
@@ -753,6 +750,7 @@ function start_kubelet {
         --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
         --pod-manifest-path="${POD_MANIFEST_PATH}" \
         --fail-swap-on="${FAIL_SWAP_ON}" \
+        --client-ca-file="${CERT_DIR}/client-ca.crt" \
         ${auth_args} \
         ${dns_args} \
         ${cni_conf_dir_args} \

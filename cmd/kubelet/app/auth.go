@@ -46,6 +46,13 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient = client.AuthorizationV1beta1().SubjectAccessReviews()
 	}
 
+	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
+	// in such a case the AnonymousAuth is stomped to false and you get a message
+	if config.Authentication.Anonymous.Enabled &&
+		config.Authorization.Mode == kubeletconfig.KubeletAuthorizationModeAlwaysAllow {
+		config.Authentication.Anonymous.Enabled = false
+	}
+
 	authenticator, err := BuildAuthn(tokenClient, config.Authentication)
 	if err != nil {
 		return nil, err
