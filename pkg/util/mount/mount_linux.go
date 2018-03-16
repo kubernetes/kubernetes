@@ -948,7 +948,19 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	// so user can read/write it. This is the behavior of previous code.
 	// TODO: chmod all created directories, not just the last one.
 	// parentFD is the last created directory.
-	if err = syscall.Fchmod(parentFD, uint32(perm)&uint32(os.ModePerm)); err != nil {
+
+	// Translate perm (os.FileMode) to uint32 that fchmod() expects
+	kernelPerm := uint32(perm & os.ModePerm)
+	if perm&os.ModeSetgid > 0 {
+		kernelPerm |= syscall.S_ISGID
+	}
+	if perm&os.ModeSetuid > 0 {
+		kernelPerm |= syscall.S_ISUID
+	}
+	if perm&os.ModeSticky > 0 {
+		kernelPerm |= syscall.S_ISVTX
+	}
+	if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
 		return fmt.Errorf("chmod %q failed: %s", currentPath, err)
 	}
 	return nil
