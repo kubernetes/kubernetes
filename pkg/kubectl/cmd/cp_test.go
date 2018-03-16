@@ -422,3 +422,78 @@ func TestTarDestinationName(t *testing.T) {
 		}
 	}
 }
+
+func TestBadTar(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "dest")
+	if err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+	defer os.RemoveAll(dir)
+
+	// More or less cribbed from https://golang.org/pkg/archive/tar/#example__minimal
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	var files = []struct {
+		name string
+		body string
+	}{
+		{"/prefix/../../../tmp/foo", "Up to temp"},
+		{"/prefix/foo/bar/../../home/bburns/names.txt", "Down and back"},
+	}
+	for _, file := range files {
+		hdr := &tar.Header{
+			Name: file.name,
+			Mode: 0600,
+			Size: int64(len(file.body)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Errorf("unexpected error: %v ", err)
+			t.FailNow()
+		}
+		if _, err := tw.Write([]byte(file.body)); err != nil {
+			t.Errorf("unexpected error: %v ", err)
+			t.FailNow()
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+
+	if err := untarAll(&buf, dir, "/prefix"); err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+
+	for _, file := range files {
+		_, err := os.Stat(path.Join(dir, path.Clean(file.name[len("/prefix"):])))
+		if err != nil {
+			t.Errorf("Error finding file: %v", err)
+		}
+	}
+
+}
+
+func TestClean(t *testing.T) {
+	tests := []struct {
+		input   string
+		cleaned string
+	}{
+		{
+			"../../../tmp/foo",
+			"/tmp/foo",
+		},
+		{
+			"/../../../tmp/foo",
+			"/tmp/foo",
+		},
+	}
+
+	for _, test := range tests {
+		out := clean(test.input)
+		if out != test.cleaned {
+			t.Errorf("Expected: %s, saw %s", test.cleaned, out)
+		}
+	}
+}
