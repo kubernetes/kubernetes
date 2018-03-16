@@ -103,8 +103,12 @@ func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
 		return
 	}
 
+	if len(fstype) == 0 {
+		// Use 'NTFS' as the default
+		fstype = "NTFS"
+	}
 	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru", disk)
-	cmd += " | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -Confirm:$false"
+	cmd += fmt.Sprintf(" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", fstype)
 	output, err := exec.Run("powershell", "/c", cmd)
 	if err != nil {
 		glog.Errorf("azureDisk Mount: Get-Disk failed, error: %v, output: %q", err, string(output))
