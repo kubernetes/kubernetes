@@ -142,7 +142,7 @@ func cleanSockFile() error {
 	return nil
 }
 
-// Fake gRPC sever for remote KMS provider.
+// Fake gRPC serve for remote KMS provider.
 // Use base64 to simulate encrypt and decrypt.
 type base64Server struct{}
 
