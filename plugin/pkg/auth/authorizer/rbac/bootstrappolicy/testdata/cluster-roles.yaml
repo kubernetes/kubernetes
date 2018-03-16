@@ -770,6 +770,7 @@ items:
     resources:
     - endpoints
     - services
+    - configmaps
     verbs:
     - list
     - watch

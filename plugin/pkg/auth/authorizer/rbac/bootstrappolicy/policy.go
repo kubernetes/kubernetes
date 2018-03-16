@@ -440,7 +440,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role to use for the kube-dns pod
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-dns"},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("endpoints", "services").RuleOrDie(),
+				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("endpoints", "services", "configmaps").RuleOrDie(),
 			},
 		},
 		{
