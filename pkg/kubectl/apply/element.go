@@ -224,9 +224,9 @@ func (s *CombinedPrimitiveSlice) UpsertRemote(l interface{}) {
 	v.remoteSet = true
 }
 
-// ListItem represents a single value in a slice of maps or types
-type ListItem struct {
-	// KeyValue is the merge key value of the item
+// MapItem represents a single value in a slice of maps or types
+type MapItem struct {
+	// KeyValue is the merge key value of the map item
 	KeyValue MergeKeyValue
 
 	// RawElementData contains the field values
@@ -235,11 +235,11 @@ type ListItem struct {
 
 // CombinedMapSlice is a slice of maps or types with merge keys
 type CombinedMapSlice struct {
-	Items []*ListItem
+	Items []*MapItem
 }
 
-// Lookup returns the ListItem matching the merge key, or nil if not found.
-func (s *CombinedMapSlice) lookup(v MergeKeyValue) *ListItem {
+// Lookup returns the MapItem matching the merge key, or nil if not found.
+func (s *CombinedMapSlice) lookup(v MergeKeyValue) *MapItem {
 	for _, i := range s.Items {
 		if i.KeyValue.Equal(v) {
 			return i
@@ -248,8 +248,8 @@ func (s *CombinedMapSlice) lookup(v MergeKeyValue) *ListItem {
 	return nil
 }
 
-func (s *CombinedMapSlice) upsert(key MergeKeys, l interface{}) (*ListItem, error) {
-	// Get the identity of the item
+func (s *CombinedMapSlice) upsert(key MergeKeys, l interface{}) (*MapItem, error) {
+	// Get the identity of the map item
 	val, err := key.GetMergeKeyValue(l)
 	if err != nil {
 		return nil, err
@@ -260,8 +260,8 @@ func (s *CombinedMapSlice) upsert(key MergeKeys, l interface{}) (*ListItem, erro
 		return item, nil
 	}
 
-	// Otherwise create a new item and append to the list
-	item := &ListItem{
+	// Otherwise create a new map item and append to the list
+	item := &MapItem{
 		KeyValue: val,
 	}
 	s.Items = append(s.Items, item)
