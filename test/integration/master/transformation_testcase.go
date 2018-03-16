@@ -48,7 +48,7 @@ const (
 	encryptionConfigFileName    = "encryption.conf"
 	testNamespace               = "secret-encryption-test"
 	testSecret                  = "test-secret"
-	latencySummaryMetricsFamily = "value_apiserver_storage_transformation_latency_microseconds"
+	latencySummaryMetricsFamily = "apiserver_storage_transformation_latencies_microseconds"
 )
 
 type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
@@ -248,7 +248,6 @@ func (e *transformTest) printMetrics() error {
 	}
 
 	metricsOfInterest := []string{latencySummaryMetricsFamily}
-
 	for _, mf := range metrics {
 		if contains(metricsOfInterest, *mf.Name) {
 			for _, metric := range mf.GetMetric() {

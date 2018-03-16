@@ -23,16 +23,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	valueSubsystem = "value"
-)
-
 var (
-	TransformerOperationalLatencies = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: valueSubsystem,
-			Name:      "apiserver_storage_transformation_latency_microseconds",
-			Help:      "Latency in microseconds of value transformation operations.",
+	transformerLatencies = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "apiserver",
+			Subsystem: "storage",
+			Name:      "transformation_latencies_microseconds",
+			Help:      "Latencies in microseconds of value transformation operations.",
+			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
+			// external KMS is involved latencies may climb into milliseconds.
+			Buckets: prometheus.ExponentialBuckets(5, 2, 14),
 		},
 		[]string{"transformation_type"},
 	)
@@ -42,14 +42,16 @@ var registerMetrics sync.Once
 
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(TransformerOperationalLatencies)
+		prometheus.MustRegister(transformerLatencies)
 	})
 }
 
 func RecordTransformation(transformationType string, start time.Time) {
-	TransformerOperationalLatencies.WithLabelValues(transformationType).Observe(float64(sinceInMicroseconds(start)))
+	since := sinceInMicroseconds(start)
+	transformerLatencies.WithLabelValues(transformationType).Observe(float64(since))
 }
 
-func sinceInMicroseconds(start time.Time) time.Duration {
-	return time.Since(start) / time.Microsecond
+func sinceInMicroseconds(start time.Time) int64 {
+	elapsedNanoseconds := time.Since(start).Nanoseconds()
+	return elapsedNanoseconds / int64(time.Microsecond)
 }
