@@ -172,6 +172,14 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		// Get the current resource list from discovery.
 		newResources := GetDeletableResources(discoveryClient)
 
+		// This can occur if there is an internal error in GetDeletableResources.
+		// If the gc attempts to sync with 0 resources it will block forever.
+		// TODO: Implement a more complete solution for the garbage collector hanging.
+		if len(newResources) == 0 {
+			glog.V(5).Infof("no resources reported by discovery, skipping garbage collector sync")
+			return
+		}
+
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
 			glog.V(5).Infof("no resource updates from discovery, skipping garbage collector sync")
