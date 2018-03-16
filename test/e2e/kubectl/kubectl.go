@@ -776,7 +776,7 @@ metadata:
 			// Can't check exact strings due to terminal control commands (colors)
 			requiredItems := []string{"Kubernetes master", "is running at"}
 			if framework.ProviderIs("gce", "gke") {
-				requiredItems = append(requiredItems, "KubeDNS", "Heapster")
+				requiredItems = append(requiredItems, "Heapster")
 			}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
