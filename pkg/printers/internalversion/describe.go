@@ -3829,33 +3829,26 @@ func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 	}
 
 	// to print tolerations in the sorted order
-	keys := make([]string, 0, len(tolerations))
-	for _, toleration := range tolerations {
-		keys = append(keys, toleration.Key)
-	}
-	sort.Strings(keys)
+	sort.Slice(tolerations, func(i, j int) bool {
+		return tolerations[i].Key < tolerations[j].Key
+	})
 
-	for i, key := range keys {
-		for _, toleration := range tolerations {
-			if toleration.Key == key {
-				if i != 0 {
-					w.Write(LEVEL_0, "%s", initialIndent)
-					w.Write(LEVEL_0, "%s", innerIndent)
-				}
-				w.Write(LEVEL_0, "%s", toleration.Key)
-				if len(toleration.Value) != 0 {
-					w.Write(LEVEL_0, "=%s", toleration.Value)
-				}
-				if len(toleration.Effect) != 0 {
-					w.Write(LEVEL_0, ":%s", toleration.Effect)
-				}
-				if toleration.TolerationSeconds != nil {
-					w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
-				}
-				w.Write(LEVEL_0, "\n")
-				i++
-			}
+	for i, toleration := range tolerations {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
 		}
+		w.Write(LEVEL_0, "%s", toleration.Key)
+		if len(toleration.Value) != 0 {
+			w.Write(LEVEL_0, "=%s", toleration.Value)
+		}
+		if len(toleration.Effect) != 0 {
+			w.Write(LEVEL_0, ":%s", toleration.Effect)
+		}
+		if toleration.TolerationSeconds != nil {
+			w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
+		}
+		w.Write(LEVEL_0, "\n")
 	}
 }
 
