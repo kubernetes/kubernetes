@@ -911,11 +911,13 @@ func validateQuobyteVolumeSource(quobyte *core.QuobyteVolumeSource, fldPath *fie
 			}
 		}
 	}
-
+	quobyteVolFmt := regexp.MustCompile(`[^\w\s/-]`)
 	if len(quobyte.Volume) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("volume"), ""))
-	} else if strings.Contains(quobyte.Volume, "#") {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("volume"), quobyte.Volume, "Volume must not contain #"))
+	} else if strings.Contains(quobyte.Volume, "\\") {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("volume"), quobyte.Volume, "volume must not contain \\"))
+	} else if quobyteVolFmt.MatchString(quobyte.Volume) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("volume"), quobyte.Volume, "quobyte volume can only consists of alphanumeric and -,/,_,space characters"))
 	}
 	return allErrs
 }
