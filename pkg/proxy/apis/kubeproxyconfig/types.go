@@ -37,7 +37,7 @@ type ClientConnectionConfiguration struct {
 	// qps controls the number of queries per second allowed for this connection.
 	QPS float32
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
-	Burst int32
+	Burst int
 }
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
