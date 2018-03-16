@@ -708,6 +708,14 @@ func createPD(zone string) (string, error) {
 			return "", err
 		}
 
+		if zone == "" && TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZonesFromCloudProvider()
+			if err != nil {
+				return "", err
+			}
+			zone, _ = zones.PopAny()
+		}
+
 		tags := map[string]string{}
 		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, zone, 10 /* sizeGb */, tags)
 		if err != nil {
