@@ -3794,23 +3794,19 @@ func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 	}
 
 	// to print taints in the sorted order
-	keys := make([]string, 0, len(taints))
-	for _, taint := range taints {
-		keys = append(keys, string(taint.Effect)+","+taint.Key)
-	}
-	sort.Strings(keys)
-
-	for i, key := range keys {
-		for _, taint := range taints {
-			if string(taint.Effect)+","+taint.Key == key {
-				if i != 0 {
-					w.Write(LEVEL_0, "%s", initialIndent)
-					w.Write(LEVEL_0, "%s", innerIndent)
-				}
-				w.Write(LEVEL_0, "%s\n", taint.ToString())
-				i++
-			}
+	sort.Slice(taints, func(i, j int) bool {
+		cmpKey := func(taint api.Taint) string {
+			return string(taint.Effect) + "," + taint.Key
 		}
+		return cmpKey(taints[i]) < cmpKey(taints[j])
+	})
+
+	for i, taint := range taints {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
+		}
+		w.Write(LEVEL_0, "%s\n", taint.ToString())
 	}
 }
 
