@@ -118,7 +118,7 @@ func Run(c *config.CompletedConfig) error {
 	if cfgz, err := configz.New("componentconfig"); err == nil {
 		cfgz.Set(c.Generic.ComponentConfig)
 	} else {
-		glog.Errorf("unable to register configz: %c", err)
+		glog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Start the controller manager HTTP server
