@@ -360,6 +360,7 @@ func NewControllerInitializers() map[string]InitFunc {
 	controllers["persistentvolume-expander"] = startVolumeExpandController
 	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
 	controllers["pvc-protection"] = startPVCProtectionController
+	controllers["pv-protection"] = startPVProtectionController
 
 	return controllers
 }
