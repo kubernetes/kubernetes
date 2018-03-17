@@ -169,7 +169,7 @@ func (rc *reconciler) reconcile() {
 			// Volume is mounted, unmount it
 			glog.V(5).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 			err := rc.operationExecutor.UnmountVolume(
-				mountedVolume.MountedVolume, rc.actualStateOfWorld)
+				mountedVolume.MountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 			if err != nil &&
 				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
@@ -357,21 +357,39 @@ func (rc *reconciler) syncStates() {
 		return
 	}
 	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
+	volumeNeedReport := []v1.UniqueVolumeName{}
 	for _, volume := range podVolumes {
-		if rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			glog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
-			continue
-		}
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
 			glog.V(4).Infof("Volume exists in actual state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+			// There is nothing to reconstruct
 			continue
 		}
+		volumeInDSW := rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName)
+
 		reconstructedVolume, err := rc.reconstructVolume(volume)
 		if err != nil {
+			if volumeInDSW {
+				// Some pod needs the volume, don't clean it up and hope that
+				// reconcile() calls SetUp and reconstructs the volume in ASW.
+				glog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), skip cleaning up mounts", volume.volumeSpecName, volume.podName)
+				continue
+			}
+			// No pod needs the volume.
 			glog.Warningf("Could not construct volume information, cleanup the mounts. (pod.UID %s, volume.SpecName %s): %v", volume.podName, volume.volumeSpecName, err)
 			rc.cleanupMounts(volume)
 			continue
 		}
+		if volumeInDSW {
+			// Some pod needs the volume. And it exists on disk. Some previous
+			// kubelet must have created the directory, therefore it must have
+			// reported the volume as in use. Mark the volume as in use also in
+			// this new kubelet so reconcile() calls SetUp and re-mounts the
+			// volume if it's necessary.
+			volumeNeedReport = append(volumeNeedReport, reconstructedVolume.volumeName)
+			glog.V(4).Infof("Volume exists in desired state (volume.SpecName %s, pod.UID %s), marking as InUse", volume.volumeSpecName, volume.podName)
+			continue
+		}
+		// There is no pod that uses the volume.
 		if rc.operationExecutor.IsOperationPending(reconstructedVolume.volumeName, nestedpendingoperations.EmptyUniquePodName) {
 			glog.Warning("Volume is in pending operation, skip cleaning up mounts")
 		}
@@ -386,7 +404,9 @@ func (rc *reconciler) syncStates() {
 			glog.Errorf("Error occurred during reconstruct volume from disk: %v", err)
 		}
 	}
-
+	if len(volumeNeedReport) > 0 {
+		rc.desiredStateOfWorld.MarkVolumesReportedInUse(volumeNeedReport)
+	}
 }
 
 func (rc *reconciler) cleanupMounts(volume podVolume) {
@@ -401,7 +421,7 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 	}
 	// TODO: Currently cleanupMounts only includes UnmountVolume operation. In the next PR, we will add
 	// to unmount both volume and device in the same routine.
-	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld)
+	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 	if err != nil {
 		glog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("volumeHandler.UnmountVolumeHandler for UnmountVolume failed"), err).Error())
 		return
@@ -455,7 +475,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
 	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, volume.mountPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
 	if checkErr != nil {
-		return nil, err
+		return nil, checkErr
 	}
 	// If mount or symlink doesn't exist, volume reconstruction should be failed
 	if !isExist {

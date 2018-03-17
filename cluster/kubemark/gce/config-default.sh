@@ -62,7 +62,7 @@ TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 ETCD_COMPACTION_INTERVAL_SEC="${KUBEMARK_ETCD_COMPACTION_INTERVAL_SEC:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.1.10) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.1.12) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"

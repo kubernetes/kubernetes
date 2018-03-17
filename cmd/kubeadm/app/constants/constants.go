@@ -90,13 +90,22 @@ const (
 	// EtcdPeerCertCommonName defines etcd's peer certificate common name (CN)
 	EtcdPeerCertCommonName = "kube-etcd-peer"
 
-	// APIServerEtcdClientCertAndKeyBaseName defines etcd client certificate and key base name
+	// EtcdHealthcheckClientCertAndKeyBaseName defines etcd's healthcheck client certificate and key base name
+	EtcdHealthcheckClientCertAndKeyBaseName = "etcd/healthcheck-client"
+	// EtcdHealthcheckClientCertName defines etcd's healthcheck client certificate name
+	EtcdHealthcheckClientCertName = "etcd/healthcheck-client.crt"
+	// EtcdHealthcheckClientKeyName defines etcd's healthcheck client key name
+	EtcdHealthcheckClientKeyName = "etcd/healthcheck-client.key"
+	// EtcdHealthcheckClientCertCommonName defines etcd's healthcheck client certificate common name (CN)
+	EtcdHealthcheckClientCertCommonName = "kube-etcd-healthcheck-client"
+
+	// APIServerEtcdClientCertAndKeyBaseName defines apiserver's etcd client certificate and key base name
 	APIServerEtcdClientCertAndKeyBaseName = "apiserver-etcd-client"
-	// APIServerEtcdClientCertName defines etcd client certificate name
+	// APIServerEtcdClientCertName defines apiserver's etcd client certificate name
 	APIServerEtcdClientCertName = "apiserver-etcd-client.crt"
-	// APIServerEtcdClientKeyName defines etcd client key name
+	// APIServerEtcdClientKeyName defines apiserver's etcd client key name
 	APIServerEtcdClientKeyName = "apiserver-etcd-client.key"
-	// APIServerEtcdClientCertCommonName defines etcd client certificate common name (CN)
+	// APIServerEtcdClientCertCommonName defines apiserver's etcd client certificate common name (CN)
 	APIServerEtcdClientCertCommonName = "kube-apiserver-etcd-client"
 
 	// ServiceAccountKeyBaseName defines SA key base name
@@ -199,10 +208,10 @@ const (
 	KubeletBaseConfigurationFile = "kubelet"
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.1.11"
+	MinExternalEtcdVersion = "3.1.12"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.2.14"
+	DefaultEtcdVersion = "3.1.12"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -287,9 +296,9 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		9:  "3.1.11",
-		10: "3.2.14",
-		11: "3.2.14",
+		9:  "3.1.12",
+		10: "3.1.12",
+		11: "3.1.12",
 	}
 )
 

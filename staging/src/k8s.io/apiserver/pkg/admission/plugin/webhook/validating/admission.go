@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
@@ -128,9 +127,6 @@ func (a *ValidatingAdmissionWebhook) SetServiceResolver(sr config.ServiceResolve
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *ValidatingAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
-		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
-		}))
 		a.convertor.Scheme = scheme
 	}
 }
@@ -174,6 +170,10 @@ func (a *ValidatingAdmissionWebhook) loadConfiguration(attr admission.Attributes
 
 // Validate makes an admission decision based on the request attributes.
 func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
+	if rules.IsWebhookConfigurationResource(attr) {
+		return nil
+	}
+
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
@@ -266,7 +266,7 @@ func (a *ValidatingAdmissionWebhook) Validate(attr admission.Attributes) error {
 	return errs[0]
 }
 
-// TODO: factor into a common place along with the validating webhook version.
+// TODO: factor into a common place along with the mutating webhook version.
 func (a *ValidatingAdmissionWebhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	var matches bool
 	for _, r := range h.Rules {

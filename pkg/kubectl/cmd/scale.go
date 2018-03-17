@@ -31,7 +31,7 @@ import (
 
 var (
 	scaleLong = templates.LongDesc(i18n.T(`
-		Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
+		Set a new size for a Deployment, ReplicaSet, Replication Controller, or StatefulSet.
 
 		Scale also allows users to specify one or more preconditions for the scale action.
 
@@ -52,8 +52,8 @@ var (
 		# Scale multiple replication controllers.
 		kubectl scale --replicas=5 rc/foo rc/bar rc/baz
 
-		# Scale job named 'cron' to 3.
-		kubectl scale --replicas=3 job/cron`))
+		# Scale statefulset named 'web' to 3.
+		kubectl scale --replicas=3 statefulset/web`))
 )
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale

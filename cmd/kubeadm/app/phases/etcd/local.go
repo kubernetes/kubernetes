@@ -65,7 +65,10 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false),
 			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 		},
-		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTP),
+		LivenessProbe: staticpodutil.EtcdProbe(
+			cfg, kubeadmconstants.Etcd, 2379, cfg.CertificatesDir,
+			kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
+		),
 	}, etcdMounts)
 }
 

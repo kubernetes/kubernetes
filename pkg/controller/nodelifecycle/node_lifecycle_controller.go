@@ -22,6 +22,12 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -50,12 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
-
-	"fmt"
-	"sync"
-	"time"
-
-	"github.com/golang/glog"
 )
 
 func init() {
@@ -438,7 +438,21 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 			}
 		}
 	}
+	if node.Spec.Unschedulable {
+		// If unschedulable, append related taint.
+		taints = append(taints, v1.Taint{
+			Key:    algorithm.TaintNodeUnschedulable,
+			Effect: v1.TaintEffectNoSchedule,
+		})
+	}
+
+	// Get exist taints of node.
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
+		// Find unschedulable taint of node.
+		if t.Key == algorithm.TaintNodeUnschedulable {
+			return true
+		}
+		// Find node condition taints of node.
 		_, found := taintKeyToNodeConditionMap[t.Key]
 		return found
 	})

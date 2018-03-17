@@ -1126,16 +1126,16 @@ func (f *fakeVMSet) GetInstanceTypeByNodeName(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetIPByNodeName(name, vmSetName string) (string, error) {
+func (f *fakeVMSet) GetIPByNodeName(name, vmSetName string) (string, string, error) {
 	nodes, found := f.NodeToIP[vmSetName]
 	if !found {
-		return "", fmt.Errorf("not found")
+		return "", "", fmt.Errorf("not found")
 	}
 	ip, found := nodes[name]
 	if !found {
-		return "", fmt.Errorf("not found")
+		return "", "", fmt.Errorf("not found")
 	}
-	return ip, nil
+	return ip, "", nil
 }
 
 func (f *fakeVMSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Interface, error) {

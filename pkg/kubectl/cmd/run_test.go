@@ -168,35 +168,39 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-		ns := legacyscheme.Codecs
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.URL.Path == "/namespaces/test/replicationcontrollers" {
-					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
-				}
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
-				}, nil
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfigVal = &restclient.Config{}
-		cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
-		cmd.Flags().Set("image", "nginx")
-		cmd.Flags().Set("generator", "run/v1")
-		err := RunRun(tf, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
-		if test.expectError && err == nil {
-			t.Errorf("unexpected non-error (%s)", test.name)
-		}
-		if !test.expectError && err != nil {
-			t.Errorf("unexpected error: %v (%s)", err, test.name)
-		}
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
+
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path == "/namespaces/test/replicationcontrollers" {
+						return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+					}, nil
+				}),
+			}
+			tf.Namespace = "test"
+			tf.ClientConfigVal = &restclient.Config{}
+			cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
+			cmd.Flags().Set("image", "nginx")
+			cmd.Flags().Set("generator", "run/v1")
+			err := RunRun(tf, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
+			if test.expectError && err == nil {
+				t.Errorf("unexpected non-error (%s)", test.name)
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("unexpected error: %v (%s)", err, test.name)
+			}
+		})
 	}
 }
 
@@ -292,90 +296,98 @@ func TestGenerateService(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		sawPOST := false
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-		ns := legacyscheme.Codecs
+		t.Run(test.name, func(t *testing.T) {
+			sawPOST := false
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.ClientConfigVal = defaultClientConfig()
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
-					sawPOST = true
-					body := objBody(codec, &test.service)
-					data, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatalf("unexpected error: %v", err)
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
+
+			tf.ClientConfigVal = defaultClientConfig()
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
+						sawPOST = true
+						body := objBody(codec, &test.service)
+						data, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+						defer req.Body.Close()
+						svc := &api.Service{}
+						if err := runtime.DecodeInto(codec, data, svc); err != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+						// Copy things that are defaulted by the system
+						test.service.Annotations = svc.Annotations
+
+						if !reflect.DeepEqual(&test.service, svc) {
+							t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+					default:
+						// Ensures no GET is performed when deleting by name
+						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
+						return nil, fmt.Errorf("unexpected request")
 					}
-					defer req.Body.Close()
-					svc := &api.Service{}
-					if err := runtime.DecodeInto(codec, data, svc); err != nil {
-						t.Fatalf("unexpected error: %v", err)
-					}
-					// Copy things that are defaulted by the system
-					test.service.Annotations = svc.Annotations
-
-					if !reflect.DeepEqual(&test.service, svc) {
-						t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
-					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					// Ensures no GET is performed when deleting by name
-					t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
-					return nil, fmt.Errorf("unexpected request")
-				}
-			}),
-		}
-		cmd := &cobra.Command{}
-		cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
-		cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-		cmdutil.AddPrinterFlags(cmd)
-		cmdutil.AddInclude3rdPartyFlags(cmd)
-		addRunFlags(cmd)
-
-		if !test.expectPOST {
-			cmd.Flags().Set("dry-run", "true")
-		}
-
-		if len(test.port) > 0 {
-			cmd.Flags().Set("port", test.port)
-			test.params["port"] = test.port
-		}
-
-		buff := &bytes.Buffer{}
-		_, err := generateService(tf, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
-		if test.expectErr {
-			if err == nil {
-				t.Error("unexpected non-error")
+				}),
 			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectPOST != sawPOST {
-			t.Errorf("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
-		}
+			cmd := &cobra.Command{}
+			cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
+			cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+			cmdutil.AddPrinterFlags(cmd)
+			cmdutil.AddInclude3rdPartyFlags(cmd)
+			addRunFlags(cmd)
+
+			if !test.expectPOST {
+				cmd.Flags().Set("dry-run", "true")
+			}
+
+			if len(test.port) > 0 {
+				cmd.Flags().Set("port", test.port)
+				test.params["port"] = test.port
+			}
+
+			buff := &bytes.Buffer{}
+			_, err := generateService(tf, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
+			if test.expectErr {
+				if err == nil {
+					t.Error("unexpected non-error")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectPOST != sawPOST {
+				t.Errorf("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
+			}
+		})
 	}
 }
 
 func TestRunValidations(t *testing.T) {
 	tests := []struct {
+		name        string
 		args        []string
 		flags       map[string]string
 		expectedErr string
 	}{
 		{
+			name:        "test missing name error",
 			expectedErr: "NAME is required",
 		},
 		{
+			name:        "test missing --image error",
 			args:        []string{"test"},
 			expectedErr: "--image is required",
 		},
 		{
+			name: "test invalid image name error",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image": "#",
@@ -383,6 +395,7 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "Invalid image name",
 		},
 		{
+			name: "test stdin replicas value",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image":    "busybox",
@@ -392,6 +405,7 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "stdin requires that replicas is 1",
 		},
 		{
+			name: "test rm errors when used on non-attached containers",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image": "busybox",
@@ -400,6 +414,7 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "rm should only be used for attached containers",
 		},
 		{
+			name: "test error on attached containers options",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image":   "busybox",
@@ -409,6 +424,7 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "can't be used with attached containers options",
 		},
 		{
+			name: "test error on attached containers options, with value from stdin",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image":   "busybox",
@@ -418,6 +434,7 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "can't be used with attached containers options",
 		},
 		{
+			name: "test error on attached containers options, with value from stdin and tty",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image":   "busybox",
@@ -428,6 +445,7 @@ func TestRunValidations(t *testing.T) {
 			expectedErr: "can't be used with attached containers options",
 		},
 		{
+			name: "test error when tty=true and no stdin provided",
 			args: []string{"test"},
 			flags: map[string]string{
 				"image": "busybox",
@@ -437,28 +455,32 @@ func TestRunValidations(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		tf := cmdtesting.NewTestFactory()
-		_, _, codec := cmdtesting.NewExternalScheme()
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: scheme.Codecs,
-			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
-		}
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
-		inBuf := bytes.NewReader([]byte{})
-		outBuf := bytes.NewBuffer([]byte{})
-		errBuf := bytes.NewBuffer([]byte{})
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		cmd := NewCmdRun(tf, inBuf, outBuf, errBuf)
-		for flagName, flagValue := range test.flags {
-			cmd.Flags().Set(flagName, flagValue)
-		}
-		err := RunRun(tf, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
-		if err != nil && len(test.expectedErr) > 0 {
-			if !strings.Contains(err.Error(), test.expectedErr) {
-				t.Errorf("unexpected error: %v", err)
+			_, _, codec := cmdtesting.NewExternalScheme()
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: scheme.Codecs,
+				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
-		}
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
+			inBuf := bytes.NewReader([]byte{})
+			outBuf := bytes.NewBuffer([]byte{})
+			errBuf := bytes.NewBuffer([]byte{})
+
+			cmd := NewCmdRun(tf, inBuf, outBuf, errBuf)
+			for flagName, flagValue := range test.flags {
+				cmd.Flags().Set(flagName, flagValue)
+			}
+			err := RunRun(tf, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
+			if err != nil && len(test.expectedErr) > 0 {
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
 	}
 
 }

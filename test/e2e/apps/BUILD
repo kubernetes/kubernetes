@@ -29,7 +29,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
         "//pkg/controller/job:go_default_library",

@@ -116,7 +116,7 @@ func TestCreateRegionalDisk_Basic(t *testing.T) {
 	tags := make(map[string]string)
 	tags["test-tag"] = "test-value"
 
-	expectedDiskTypeURI := gceComputeAPIEndpointAlpha + "projects/" + fmt.Sprintf(
+	expectedDiskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(
 		diskTypeURITemplateRegional, gceProjectId, gceRegion, diskType)
 	expectedDescription := "{\"test-tag\":\"test-value\"}"
 
@@ -753,7 +753,7 @@ func (manager *FakeServiceManager) CreateDiskOnCloudProvider(
 		return manager.opBeta, nil
 	case targetAlpha:
 		manager.opAlpha = &computealpha.Operation{}
-		diskTypeURI := gceComputeAPIEndpointAlpha + "projects/" + fmt.Sprintf(diskTypeURITemplateSingleZone, manager.gceProjectID, zone, diskType)
+		diskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(diskTypeURITemplateSingleZone, manager.gceProjectID, zone, diskType)
 		diskToCreateAlpha := &computealpha.Disk{
 			Name:        name,
 			SizeGb:      sizeGb,
@@ -779,7 +779,7 @@ func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 	diskType string,
 	zones sets.String) (gceObject, error) {
 	manager.createDiskCalled = true
-	diskTypeURI := gceComputeAPIEndpointAlpha + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
+	diskTypeURI := gceComputeAPIEndpointBeta + "projects/" + fmt.Sprintf(diskTypeURITemplateRegional, manager.gceProjectID, manager.gceRegion, diskType)
 
 	switch t := manager.targetAPI; t {
 	case targetStable:

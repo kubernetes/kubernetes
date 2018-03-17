@@ -514,6 +514,23 @@ function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
 }
 
+function build-node-labels {
+  local master=$1
+  local node_labels=""
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
+    # Add kube-proxy daemonset label to node to avoid situation during cluster
+    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
+  fi
+  if [[ -n "${NODE_LABELS:-}" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
+  fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
+  fi
+  echo $node_labels
+}
+
 # $1: if 'true', we're rendering flags for a master, else a node
 function construct-kubelet-flags {
   local master=$1
@@ -585,18 +602,7 @@ function construct-kubelet-flags {
   if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
     flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
   fi
-  local node_labels=""
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
-    # Add kube-proxy daemonset label to node to avoid situation during cluster
-    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
-  fi
-  if [[ -n "${NODE_LABELS:-}" ]]; then
-    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
-  fi
-  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
-    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
-  fi
+  local node_labels=$(build-node-labels ${master})
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -716,6 +722,14 @@ ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-f
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
 ADVANCED_AUDIT_POLICY: $(yaml-quote ${ADVANCED_AUDIT_POLICY:-})
 ADVANCED_AUDIT_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_BACKEND:-log})
+ADVANCED_AUDIT_LOG_MODE: $(yaml-quote ${ADVANCED_AUDIT_LOG_MODE:-})
+ADVANCED_AUDIT_LOG_BUFFER_SIZE: $(yaml-quote ${ADVANCED_AUDIT_LOG_BUFFER_SIZE:-})
+ADVANCED_AUDIT_LOG_MAX_BATCH_SIZE: $(yaml-quote ${ADVANCED_AUDIT_LOG_MAX_BATCH_SIZE:-})
+ADVANCED_AUDIT_LOG_MAX_BATCH_WAIT: $(yaml-quote ${ADVANCED_AUDIT_LOG_MAX_BATCH_WAIT:-})
+ADVANCED_AUDIT_LOG_THROTTLE_QPS: $(yaml-quote ${ADVANCED_AUDIT_LOG_THROTTLE_QPS:-})
+ADVANCED_AUDIT_LOG_THROTTLE_BURST: $(yaml-quote ${ADVANCED_AUDIT_LOG_THROTTLE_BURST:-})
+ADVANCED_AUDIT_LOG_INITIAL_BACKOFF: $(yaml-quote ${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF:-})
+ADVANCED_AUDIT_WEBHOOK_MODE: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_MODE:-})
 ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-})
 ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_SIZE: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_SIZE:-})
 ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_WAIT: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_MAX_BATCH_WAIT:-})
@@ -737,6 +751,14 @@ ZONE: $(yaml-quote ${ZONE})
 VOLUME_PLUGIN_DIR: $(yaml-quote ${VOLUME_PLUGIN_DIR})
 KUBELET_ARGS: $(yaml-quote ${KUBELET_ARGS})
 EOF
+  if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
+     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "cos" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+    cat >>$file <<EOF
+REMOUNT_VOLUME_PLUGIN_DIR: $(yaml-quote ${REMOUNT_VOLUME_PLUGIN_DIR:-true})
+EOF
+  fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     cat >>$file <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
@@ -956,6 +978,17 @@ ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
 EOF
+      if [[ "${master}" == "false" ]]; then
+          # TODO(kubernetes/autoscaler#718): AUTOSCALER_ENV_VARS is a hotfix for cluster autoscaler,
+          # which reads the kube-env to determine the shape of a node and was broken by #60020.
+          # This should be removed as soon as a more reliable source of information is available!
+          local node_labels=$(build-node-labels false)
+          local node_taints="${NODE_TAINTS:-}"
+          local autoscaler_env_vars="node_labels=${node_labels};node_taints=${node_taints}"
+          cat >>$file <<EOF
+AUTOSCALER_ENV_VARS: $(yaml-quote ${autoscaler_env_vars})
+EOF
+      fi
   fi
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
     cat >>$file <<EOF
@@ -1392,7 +1425,7 @@ function get-template-name-from-version() {
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
-# validates the NODE_LOCAL_SSDS_EXT variable 
+# validates the NODE_LOCAL_SSDS_EXT variable
 function validate-node-local-ssds-ext(){
   ssdopts="${1}"
 
@@ -1468,7 +1501,7 @@ function create-node-template() {
       done
     done
   fi
-  
+
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
     # Some versions of seq will count down from 1 if "seq 0" is specified
@@ -1478,7 +1511,7 @@ function create-node-template() {
       done
     fi
   fi
-  
+
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
@@ -1623,7 +1656,7 @@ function create-network() {
       network_mode="custom"
     fi
     echo "Creating new ${network_mode} network: ${NETWORK}"
-    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode="${network_mode}"
+    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --subnet-mode="${network_mode}"
   else
     PREEXISTING_NETWORK=true
     PREEXISTING_NETWORK_MODE="$(check-network-mode)"
@@ -1658,8 +1691,8 @@ function create-network() {
 }
 
 function expand-default-subnetwork() {
-  gcloud compute networks switch-mode "${NETWORK}" \
-    --mode custom \
+  gcloud compute networks update "${NETWORK}" \
+    --switch-to-custom-subnet-mode \
     --project "${NETWORK_PROJECT}" \
     --quiet || true
   gcloud compute networks subnets expand-ip-range "${NETWORK}" \

@@ -68,6 +68,8 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	}
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)

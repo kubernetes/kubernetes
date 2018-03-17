@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -131,9 +130,6 @@ func (a *MutatingWebhook) SetServiceResolver(sr config.ServiceResolver) {
 // SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
 func (a *MutatingWebhook) SetScheme(scheme *runtime.Scheme) {
 	if scheme != nil {
-		a.clientManager.SetNegotiatedSerializer(serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
-		}))
 		a.convertor.Scheme = scheme
 		a.defaulter = scheme
 		a.jsonSerializer = json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
@@ -186,6 +182,10 @@ func (a *MutatingWebhook) loadConfiguration(attr admission.Attributes) *v1beta1.
 
 // Admit makes an admission decision based on the request attributes.
 func (a *MutatingWebhook) Admit(attr admission.Attributes) error {
+	if rules.IsWebhookConfigurationResource(attr) {
+		return nil
+	}
+
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}

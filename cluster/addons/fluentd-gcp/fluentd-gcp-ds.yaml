@@ -35,9 +35,6 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: libsystemddir
-          mountPath: /host/lib
-          readOnly: true
         - name: config-volume
           mountPath: /etc/google-fluentd/config.d
         # Liveness probe is aimed to help in situarions where fluentd
@@ -61,14 +58,14 @@ spec:
               then
                 exit 1;
               fi;
-              LAST_MODIFIED_DATE=`stat /var/log/fluentd-buffers | grep Modify | sed -r "s/Modify: (.*)/\1/"`;
-              LAST_MODIFIED_TIMESTAMP=`date -d "$LAST_MODIFIED_DATE" +%s`;
-              if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $STUCK_THRESHOLD_SECONDS` ];
+              touch -d "${STUCK_THRESHOLD_SECONDS} seconds ago" /tmp/marker-stuck;
+              if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-stuck -print -quit)" ]];
               then
                 rm -rf /var/log/fluentd-buffers;
                 exit 1;
               fi;
-              if [ `date +%s` -gt `expr $LAST_MODIFIED_TIMESTAMP + $LIVENESS_THRESHOLD_SECONDS` ];
+              touch -d "${LIVENESS_THRESHOLD_SECONDS} seconds ago" /tmp/marker-liveness;
+              if [[ -z "$(find /var/log/fluentd-buffers -type f -newer /tmp/marker-liveness -print -quit)" ]];
               then
                 exit 1;
               fi;
@@ -109,9 +106,6 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      - name: libsystemddir
-        hostPath:
-          path: /usr/lib64
       - name: config-volume
         configMap:
           name: fluentd-gcp-config-v1.2.4

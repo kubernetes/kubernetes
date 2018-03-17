@@ -70,6 +70,8 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 
+		framework.SkipIfMultizone(cs)
+
 		podClient = cs.CoreV1().Pods(ns)
 		nodeClient = cs.CoreV1().Nodes()
 		nodes = framework.GetReadySchedulableNodesOrDie(cs)

@@ -70,8 +70,8 @@ type backend struct {
 }
 
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
-func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion) (audit.Backend, error) {
-	w, err := loadWebhook(kubeConfigFile, groupVersion, DefaultInitialBackoff)
+func NewBackend(kubeConfigFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration) (audit.Backend, error) {
+	w, err := loadWebhook(kubeConfigFile, groupVersion, initialBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -100,4 +100,8 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 	return b.w.WithExponentialBackoff(func() rest.Result {
 		return b.w.RestClient.Post().Body(&list).Do()
 	}).Error()
+}
+
+func (b *backend) String() string {
+	return PluginName
 }

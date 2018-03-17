@@ -33,6 +33,8 @@ func TestCreateService(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-service"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	negSer := legacyscheme.Codecs
 
@@ -65,6 +67,8 @@ func TestCreateServiceNodePort(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-node-port-service"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	negSer := legacyscheme.Codecs
 
@@ -97,6 +101,8 @@ func TestCreateServiceExternalName(t *testing.T) {
 	service := &v1.Service{}
 	service.Name = "my-external-name-service"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	negSer := legacyscheme.Codecs
 

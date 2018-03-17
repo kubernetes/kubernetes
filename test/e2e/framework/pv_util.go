@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
@@ -678,6 +679,22 @@ func DeletePDWithRetry(diskName string) error {
 	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
 }
 
+func newAWSClient(zone string) *ec2.EC2 {
+	var cfg *aws.Config
+
+	if zone == "" {
+		zone = TestContext.CloudConfig.Zone
+	}
+	if zone == "" {
+		glog.Warning("No AWS zone configured!")
+		cfg = nil
+	} else {
+		region := zone[:len(zone)-1]
+		cfg = &aws.Config{Region: aws.String(region)}
+	}
+	return ec2.New(session.New(), cfg)
+}
+
 func createPD(zone string) (string, error) {
 	if zone == "" {
 		zone = TestContext.CloudConfig.Zone
@@ -691,6 +708,14 @@ func createPD(zone string) (string, error) {
 			return "", err
 		}
 
+		if zone == "" && TestContext.CloudConfig.MultiZone {
+			zones, err := gceCloud.GetAllZonesFromCloudProvider()
+			if err != nil {
+				return "", err
+			}
+			zone, _ = zones.PopAny()
+		}
+
 		tags := map[string]string{}
 		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, zone, 10 /* sizeGb */, tags)
 		if err != nil {
@@ -698,8 +723,7 @@ func createPD(zone string) (string, error) {
 		}
 		return pdName, nil
 	} else if TestContext.Provider == "aws" {
-		client := ec2.New(session.New())
-
+		client := newAWSClient(zone)
 		request := &ec2.CreateVolumeInput{}
 		request.AvailabilityZone = aws.String(zone)
 		request.Size = aws.Int64(10)
@@ -751,7 +775,7 @@ func deletePD(pdName string) error {
 		}
 		return err
 	} else if TestContext.Provider == "aws" {
-		client := ec2.New(session.New())
+		client := newAWSClient("")
 
 		tokens := strings.Split(pdName, "/")
 		awsVolumeID := tokens[len(tokens)-1]

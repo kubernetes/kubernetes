@@ -19,12 +19,12 @@ http_archive(
     urls = ["https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"],
 )
 
-ETCD_VERSION = "3.2.14"
+ETCD_VERSION = "3.1.12"
 
 new_http_archive(
     name = "com_coreos_etcd",
     build_file = "third_party/etcd.BUILD",
-    sha256 = "f77398f558ff19b65a0bf978b47868e03683f27090c56c054415666b1d78bf42",
+    sha256 = "4b22184bef1bba8b4908b14bae6af4a6d33ec2b91e4f7a240780e07fa43f2111",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
     urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
 )

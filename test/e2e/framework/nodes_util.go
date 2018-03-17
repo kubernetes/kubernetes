@@ -67,7 +67,7 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+target_version,
 		"STORAGE_BACKEND="+target_storage,
-		"TEST_ETCD_IMAGE=3.2.14")
+		"TEST_ETCD_IMAGE=3.1.12")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -107,7 +107,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.2.14")
+			"TEST_ETCD_IMAGE=3.1.12")
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
 		// implicit etcd upgrades to simulate the user entering "y".
@@ -119,17 +119,35 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	return err
 }
 
+func locationParamGKE() string {
+	if TestContext.CloudConfig.Zone != "" {
+		return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	}
+	return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+}
+
+func appendContainerCommandGroupIfNeeded(args []string) []string {
+	if TestContext.CloudConfig.Region != "" {
+		// TODO(wojtek-t): Get rid of it once Regional Clusters go to GA.
+		return append([]string{"beta"}, args...)
+	}
+	return args
+}
+
 func masterUpgradeGKE(v string) error {
 	Logf("Upgrading master to %q", v)
-	_, _, err := RunCmd("gcloud", "container",
+	args := []string{
+		"container",
 		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
+		locationParamGKE(),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		"--master",
 		fmt.Sprintf("--cluster-version=%s", v),
-		"--quiet")
+		"--quiet",
+	}
+	_, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {
 		return err
 	}
@@ -235,7 +253,7 @@ func nodeUpgradeGKE(v string, img string) error {
 		"container",
 		"clusters",
 		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
+		locationParamGKE(),
 		"upgrade",
 		TestContext.CloudConfig.Cluster,
 		fmt.Sprintf("--cluster-version=%s", v),
@@ -244,7 +262,7 @@ func nodeUpgradeGKE(v string, img string) error {
 	if len(img) > 0 {
 		args = append(args, fmt.Sprintf("--image-type=%s", img))
 	}
-	_, _, err := RunCmd("gcloud", args...)
+	_, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
 
 	if err != nil {
 		return err

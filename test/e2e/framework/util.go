@@ -348,6 +348,16 @@ func SkipUnlessMultizone(c clientset.Interface) {
 	}
 }
 
+func SkipIfMultizone(c clientset.Interface) {
+	zones, err := GetClusterZones(c)
+	if err != nil {
+		Skipf("Error listing cluster zones")
+	}
+	if zones.Len() > 1 {
+		Skipf("Requires more than one zone")
+	}
+}
+
 func SkipUnlessClusterMonitoringModeIs(supportedMonitoring ...string) {
 	if !ClusterMonitoringModeIs(supportedMonitoring...) {
 		Skipf("Only next monitoring modes are supported %v (not %s)", supportedMonitoring, TestContext.ClusterMonitoringMode)
@@ -1368,23 +1378,23 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	if pod.Status.Phase == v1.PodRunning {
 		return nil
 	}
-	return waitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, PodStartTimeout)
+	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, PodStartTimeout)
 }
 
 // Waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
+	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
 }
 
 // Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod. Returns an error if timeout occurs first, or pod goes in to failed state.
 func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
+	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
 }
 
-func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+func WaitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(Poll, timeout, podRunning(c, podName, namespace))
 }
 
@@ -3916,17 +3926,24 @@ func WaitForKubeletUp(host string) error {
 	return fmt.Errorf("waiting for kubelet timed out")
 }
 
-func RestartApiserver(c discovery.ServerVersionInterface) error {
+func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
 		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
 	}
 	if ProviderIs("gce", "aws") {
-		return sshRestartMaster()
+		initialRestartCount, err := getApiserverRestartCount(cs)
+		if err != nil {
+			return fmt.Errorf("failed to get apiserver's restart count: %v", err)
+		}
+		if err := sshRestartMaster(); err != nil {
+			return fmt.Errorf("failed to restart apiserver: %v", err)
+		}
+		return waitForApiserverRestarted(cs, initialRestartCount)
 	}
 	// GKE doesn't allow ssh access, so use a same-version master
 	// upgrade to teardown/recreate master.
-	v, err := c.ServerVersion()
+	v, err := cs.Discovery().ServerVersion()
 	if err != nil {
 		return err
 	}
@@ -3960,6 +3977,42 @@ func WaitForApiserverUp(c clientset.Interface) error {
 		}
 	}
 	return fmt.Errorf("waiting for apiserver timed out")
+}
+
+// waitForApiserverRestarted waits until apiserver's restart count increased.
+func waitForApiserverRestarted(c clientset.Interface, initialRestartCount int32) error {
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		restartCount, err := getApiserverRestartCount(c)
+		if err != nil {
+			Logf("Failed to get apiserver's restart count: %v", err)
+			continue
+		}
+		if restartCount > initialRestartCount {
+			Logf("Apiserver has restarted.")
+			return nil
+		}
+		Logf("Waiting for apiserver restart count to increase")
+	}
+	return fmt.Errorf("timed out waiting for apiserver to be restarted")
+}
+
+func getApiserverRestartCount(c clientset.Interface) (int32, error) {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "kube-apiserver"}))
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
+	if err != nil {
+		return -1, err
+	}
+	if len(pods.Items) != 1 {
+		return -1, fmt.Errorf("unexpected number of apiserver pod: %d", len(pods.Items))
+	}
+	for _, s := range pods.Items[0].Status.ContainerStatuses {
+		if s.Name != "kube-apiserver" {
+			continue
+		}
+		return s.RestartCount, nil
+	}
+	return -1, fmt.Errorf("failed to find kube-apiserver container in pod")
 }
 
 func RestartControllerManager() error {
@@ -4825,14 +4878,17 @@ func GetClusterID(c clientset.Interface) (string, error) {
 // CleanupGCEResources cleans up GCE Service Type=LoadBalancer resources with
 // the given name. The name is usually the UUID of the Service prefixed with an
 // alpha-numeric character ('a') to work around cloudprovider rules.
-func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (retErr error) {
+func CleanupGCEResources(c clientset.Interface, loadBalancerName, region, zone string) (retErr error) {
 	gceCloud, err := GetGCECloud()
 	if err != nil {
 		return err
 	}
-	region, err := gcecloud.GetGCERegion(zone)
-	if err != nil {
-		return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+	if region == "" {
+		// Attempt to parse region from zone if no region is given.
+		region, err = gcecloud.GetGCERegion(zone)
+		if err != nil {
+			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
+		}
 	}
 	if err := gceCloud.DeleteFirewall(gcecloud.MakeFirewallName(loadBalancerName)); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {

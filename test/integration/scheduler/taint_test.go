@@ -244,6 +244,9 @@ func TestTaintNodeByCondition(t *testing.T) {
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(old, cur interface{}) {
 			curNode := cur.(*v1.Node)
+			if curNode.Name != "node-1" {
+				return
+			}
 			for _, taint := range curNode.Spec.Taints {
 				if taint.Key == algorithm.TaintNodeNetworkUnavailable &&
 					taint.Effect == v1.TaintEffectNoSchedule {
@@ -292,6 +295,57 @@ func TestTaintNodeByCondition(t *testing.T) {
 	} else {
 		if err := waitForPodToScheduleWithTimeout(clientset, networkDaemonPod, time.Second*60); err != nil {
 			t.Errorf("Case 4: Failed to schedule network daemon pod in 60s.")
+		}
+	}
+
+	// Case 5: Taint node by unschedulable condition
+	unschedulableNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-2",
+		},
+		Spec: v1.NodeSpec{
+			Unschedulable: true,
+		},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4000m"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+				v1.ResourcePods:   resource.MustParse("110"),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4000m"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+				v1.ResourcePods:   resource.MustParse("110"),
+			},
+		},
+	}
+
+	nodeInformerCh2 := make(chan bool)
+	nodeInformer2 := informers.Core().V1().Nodes().Informer()
+	nodeInformer2.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(old, cur interface{}) {
+			curNode := cur.(*v1.Node)
+			if curNode.Name != "node-2" {
+				return
+			}
+
+			for _, taint := range curNode.Spec.Taints {
+				if taint.Key == algorithm.TaintNodeUnschedulable &&
+					taint.Effect == v1.TaintEffectNoSchedule {
+					nodeInformerCh2 <- true
+					break
+				}
+			}
+		},
+	})
+
+	if _, err := clientset.CoreV1().Nodes().Create(unschedulableNode); err != nil {
+		t.Errorf("Case 5: Failed to create node: %v", err)
+	} else {
+		select {
+		case <-time.After(60 * time.Second):
+			t.Errorf("Case 5: Failed to taint node after 60s.")
+		case <-nodeInformerCh2:
 		}
 	}
 }

@@ -31,6 +31,8 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 	for _, test := range tests {
 		out := &bytes.Buffer{}
 		f := cmdtesting.NewTestFactory()
+		defer f.Cleanup()
+
 		cmd := NewCmdClusterInfoDump(f, os.Stdout)
 		cmd.Flag("output-directory").Value.Set(test)
 		writer := setupOutputWriter(cmd, out, "/some/file/that/should/be/ignored")
@@ -51,6 +53,8 @@ func TestSetupOutputWriterFile(t *testing.T) {
 
 	out := &bytes.Buffer{}
 	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
 	cmd := NewCmdClusterInfoDump(f, os.Stdout)
 	cmd.Flag("output-directory").Value.Set(dir)
 	writer := setupOutputWriter(cmd, out, file)

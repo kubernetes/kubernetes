@@ -33,6 +33,8 @@ func TestCreateNamespace(t *testing.T) {
 	namespaceObject := &v1.Namespace{}
 	namespaceObject.Name = "my-namespace"
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 

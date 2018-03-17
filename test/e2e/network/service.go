@@ -61,7 +61,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -428,7 +428,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Restart apiserver
 		By("Restarting apiserver")
-		if err := framework.RestartApiserver(cs.Discovery()); err != nil {
+		if err := framework.RestartApiserver(cs); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		By("Waiting for apiserver to come up by polling /healthz")
@@ -1555,7 +1555,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Zone)
+			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}

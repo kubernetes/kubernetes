@@ -242,7 +242,7 @@ const (
 	// alpha: v1.10
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
-	NoDaemonSetScheduler utilfeature.Feature = "NoDaemonSetScheduler"
+	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
 
 	// owner: @mikedanese
 	// alpha: v1.10
@@ -267,6 +267,13 @@ const (
 	//
 	// Enables control over the primary group ID of containers' init processes.
 	RunAsGroup utilfeature.Feature = "RunAsGroup"
+
+	// owner: @saad-ali
+	// ga
+	//
+	// Allow mounting a subpath of a volume in a container
+	// Do not remove this feature gate even though it's GA
+	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
 )
 
 func init() {
@@ -308,11 +315,12 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.Beta},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
-	NoDaemonSetScheduler:                        {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: false, PreRelease: utilfeature.Alpha},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

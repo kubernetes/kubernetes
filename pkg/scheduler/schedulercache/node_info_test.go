@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -230,6 +231,7 @@ func TestNewNodeInfo(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "node_info_cache_test",
 					Name:      "test-1",
+					UID:       types.UID("test-1"),
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -256,6 +258,7 @@ func TestNewNodeInfo(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "node_info_cache_test",
 					Name:      "test-2",
+					UID:       types.UID("test-2"),
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -310,6 +313,7 @@ func TestNodeInfoClone(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-1",
+							UID:       types.UID("test-1"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
@@ -336,6 +340,7 @@ func TestNodeInfoClone(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-2",
+							UID:       types.UID("test-2"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
@@ -376,6 +381,7 @@ func TestNodeInfoClone(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-1",
+							UID:       types.UID("test-1"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
@@ -402,6 +408,7 @@ func TestNodeInfoClone(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-2",
+							UID:       types.UID("test-2"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
@@ -446,6 +453,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "node_info_cache_test",
 				Name:      "test-1",
+				UID:       types.UID("test-1"),
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -472,6 +480,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "node_info_cache_test",
 				Name:      "test-2",
+				UID:       types.UID("test-2"),
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -530,6 +539,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "node_info_cache_test",
 					Name:      "test-1",
+					UID:       types.UID("test-1"),
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -556,6 +566,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "node_info_cache_test",
 					Name:      "test-2",
+					UID:       types.UID("test-2"),
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -641,6 +652,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-1",
+							UID:       types.UID("test-1"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
@@ -667,6 +679,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-2",
+							UID:       types.UID("test-2"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
@@ -697,6 +710,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "node_info_cache_test",
 					Name:      "test-1",
+					UID:       types.UID("test-1"),
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -754,6 +768,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "node_info_cache_test",
 							Name:      "test-2",
+							UID:       types.UID("test-2"),
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{

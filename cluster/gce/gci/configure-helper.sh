@@ -1515,6 +1515,29 @@ function start-kube-apiserver {
       # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
       # never restarts. Please manually restart apiserver before this time.
       params+=" --audit-log-maxsize=2000000000"
+
+      # Batching parameters
+      if [[ -n "${ADVANCED_AUDIT_LOG_MODE:-}" ]]; then
+        params+=" --audit-log-mode=${ADVANCED_AUDIT_LOG_MODE}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_LOG_BUFFER_SIZE:-}" ]]; then
+        params+=" --audit-log-batch-buffer-size=${ADVANCED_AUDIT_LOG_BUFFER_SIZE}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_LOG_MAX_BATCH_SIZE:-}" ]]; then
+        params+=" --audit-log-batch-max-size=${ADVANCED_AUDIT_LOG_MAX_BATCH_SIZE}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_LOG_MAX_BATCH_WAIT:-}" ]]; then
+        params+=" --audit-log-batch-max-wait=${ADVANCED_AUDIT_LOG_MAX_BATCH_WAIT}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_LOG_THROTTLE_QPS:-}" ]]; then
+        params+=" --audit-log-batch-throttle-qps=${ADVANCED_AUDIT_LOG_THROTTLE_QPS}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_LOG_THROTTLE_BURST:-}" ]]; then
+        params+=" --audit-log-batch-throttle-burst=${ADVANCED_AUDIT_LOG_THROTTLE_BURST}"
+      fi
+      if [[ -n "${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF:-}" ]]; then
+        params+=" --audit-log-initial-backoff=${ADVANCED_AUDIT_LOG_INITIAL_BACKOFF}"
+      fi
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
       params+=" --audit-webhook-mode=batch"
@@ -1522,6 +1545,14 @@ function start-kube-apiserver {
       # Create the audit webhook config file, and mount it into the apiserver pod.
       local -r audit_webhook_config_file="/etc/audit_webhook.config"
       params+=" --audit-webhook-config-file=${audit_webhook_config_file}"
+      create-master-audit-webhook-config "${audit_webhook_config_file}"
+      audit_webhook_config_mount="{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"${audit_webhook_config_file}\", \"readOnly\": true},"
+      audit_webhook_config_volume="{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"${audit_webhook_config_file}\", \"type\": \"FileOrCreate\"}},"
+
+      # Batching parameters
+      if [[ -n "${ADVANCED_AUDIT_WEBHOOK_MODE:-}" ]]; then
+        params+=" --audit-webhook-mode=${ADVANCED_AUDIT_WEBHOOK_MODE}"
+      fi
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-}" ]]; then
         params+=" --audit-webhook-batch-buffer-size=${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE}"
       fi
@@ -1540,9 +1571,6 @@ function start-kube-apiserver {
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-}" ]]; then
         params+=" --audit-webhook-initial-backoff=${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF}"
       fi
-      create-master-audit-webhook-config "${audit_webhook_config_file}"
-      audit_webhook_config_mount="{\"name\": \"auditwebhookconfigmount\",\"mountPath\": \"${audit_webhook_config_file}\", \"readOnly\": true},"
-      audit_webhook_config_volume="{\"name\": \"auditwebhookconfigmount\",\"hostPath\": {\"path\": \"${audit_webhook_config_file}\", \"type\": \"FileOrCreate\"}},"
     fi
   fi
 
@@ -1997,6 +2025,12 @@ function update-event-exporter {
     sed -i -e "s@{{ *event_exporter_zone *}}@${ZONE:-}@g" "$1"
 }
 
+function update-dashboard-controller {
+  if [ -n "${CUSTOM_KUBE_DASHBOARD_BANNER:-}" ]; then
+    sed -i -e "s@\( \+\)# PLATFORM-SPECIFIC ARGS HERE@\1- --system-banner=${CUSTOM_KUBE_DASHBOARD_BANNER}\n\1- --system-banner-severity=WARNING@" "$1"
+  fi
+}
+
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
   local -r coredns_file="${dst_dir}/dns/coredns.yaml"
@@ -2156,6 +2190,8 @@ EOF
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
+    local -r dashboard_controller_yaml="${dst_dir}/dashboard/dashboard-controller.yaml"
+    update-dashboard-controller ${dashboard_controller_yaml}
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"

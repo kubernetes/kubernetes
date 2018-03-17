@@ -57,6 +57,9 @@ const (
 	podMutatingWebhookConfigName = "e2e-test-mutating-webhook-pod"
 	crdMutatingWebhookConfigName = "e2e-test-mutating-webhook-config-crd"
 	webhookFailClosedConfigName  = "e2e-test-webhook-fail-closed"
+	webhookForWebhooksConfigName = "e2e-test-webhook-for-webhooks-config"
+	removableValidatingHookName  = "e2e-test-should-be-removable-validating-webhook-config"
+	removableMutatingHookName    = "e2e-test-should-be-removable-mutating-webhook-config"
 
 	skipNamespaceLabelKey   = "skip-webhook-admission"
 	skipNamespaceLabelValue = "yes"
@@ -139,6 +142,12 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerMutatingWebhookForPod(f, context)
 		defer webhookCleanup()
 		testMutatingPodWebhook(f)
+	})
+
+	It("Should not be able to prevent deleting validating-webhook-configurations or mutating-webhook-configurations", func() {
+		webhookCleanup := registerWebhookForWebhookConfigurations(f, context)
+		defer webhookCleanup()
+		testWebhookForWebhookConfigurations(f)
 	})
 
 	It("Should mutate crd", func() {
@@ -375,7 +384,7 @@ func registerWebhook(f *framework.Framework, context *certContext) func() {
 	})
 	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
 
-	// The webhook configuration is honored in 1s.
+	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 
 	return func() {
@@ -437,7 +446,7 @@ func registerMutatingWebhookForConfigMap(f *framework.Framework, context *certCo
 	})
 	framework.ExpectNoError(err, "registering mutating webhook config %s with namespace %s", configName, namespace)
 
-	// The webhook configuration is honored in 1s.
+	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 	return func() { client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil) }
 }
@@ -493,7 +502,7 @@ func registerMutatingWebhookForPod(f *framework.Framework, context *certContext)
 	})
 	framework.ExpectNoError(err, "registering mutating webhook config %s with namespace %s", configName, namespace)
 
-	// The webhook configuration is honored in 1s.
+	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 
 	return func() { client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil) }
@@ -709,6 +718,152 @@ func testFailClosedWebhook(f *framework.Framework) {
 	}
 }
 
+func registerWebhookForWebhookConfigurations(f *framework.Framework, context *certContext) func() {
+	var err error
+	client := f.ClientSet
+	By("Registering a webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := webhookForWebhooksConfigName
+	failurePolicy := v1beta1.Fail
+
+	// This webhook will deny all requests to Delete admissionregistration objects
+	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "deny-webhook-configuration-deletions.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Delete},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{"admissionregistration.k8s.io"},
+						APIVersions: []string{"*"},
+						Resources: []string{
+							"validatingwebhookconfigurations",
+							"mutatingwebhookconfigurations",
+						},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/always-deny"),
+					},
+					CABundle: context.signingCert,
+				},
+				FailurePolicy: &failurePolicy,
+			},
+		},
+	})
+
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+	return func() {
+		err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(configName, nil)
+		framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", configName, namespace)
+	}
+}
+
+// This test assumes that the deletion-rejecting webhook defined in
+// registerWebhookForWebhookConfigurations is in place.
+func testWebhookForWebhookConfigurations(f *framework.Framework) {
+	var err error
+	client := f.ClientSet
+	By("Creating a validating-webhook-configuration object")
+
+	namespace := f.Namespace.Name
+	failurePolicy := v1beta1.Ignore
+
+	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: removableValidatingHookName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "should-be-removable-validating-webhook.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{"*"},
+						APIVersions: []string{"*"},
+						Resources:   []string{"*"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						// This path not recognized by the webhook service,
+						// so the call to this webhook will always fail,
+						// but because the failure policy is ignore, it will
+						// have no effect on admission requests.
+						Path: strPtr(""),
+					},
+					CABundle: nil,
+				},
+				FailurePolicy: &failurePolicy,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", removableValidatingHookName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+
+	By("Deleting the validating-webhook-configuration, which should be possible to remove")
+
+	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(removableValidatingHookName, nil)
+	framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", removableValidatingHookName, namespace)
+
+	By("Creating a mutating-webhook-configuration object")
+
+	_, err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: removableMutatingHookName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "should-be-removable-mutating-webhook.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{"*"},
+						APIVersions: []string{"*"},
+						Resources:   []string{"*"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						// This path not recognized by the webhook service,
+						// so the call to this webhook will always fail,
+						// but because the failure policy is ignore, it will
+						// have no effect on admission requests.
+						Path: strPtr(""),
+					},
+					CABundle: nil,
+				},
+				FailurePolicy: &failurePolicy,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", removableMutatingHookName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+
+	By("Deleting the mutating-webhook-configuration, which should be possible to remove")
+
+	err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(removableMutatingHookName, nil)
+	framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", removableMutatingHookName, namespace)
+}
+
 func createNamespace(f *framework.Framework, ns *v1.Namespace) error {
 	return wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		_, err := f.ClientSet.CoreV1().Namespaces().Create(ns)
@@ -849,7 +1004,7 @@ func registerWebhookForCRD(f *framework.Framework, context *certContext, testcrd
 	})
 	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", configName, namespace)
 
-	// The webhook configuration is honored in 1s.
+	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 	return func() {
 		client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(configName, nil)
@@ -909,7 +1064,7 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext,
 	})
 	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", configName, namespace)
 
-	// The webhook configuration is honored in 1s.
+	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 
 	return func() { client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil) }
