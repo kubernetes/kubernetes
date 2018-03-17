@@ -31,7 +31,7 @@ import (
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 )
 
-// NewKubeadmCommand return cobra.Command to run kubeadm command
+// NewKubeadmCommand returns cobra.Command to run kubeadm command
 func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",

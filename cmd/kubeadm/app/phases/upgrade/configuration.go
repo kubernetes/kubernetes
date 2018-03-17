@@ -52,7 +52,7 @@ func FetchConfiguration(client clientset.Interface, w io.Writer, cfgPath string)
 	return versionedcfg, nil
 }
 
-// FetchConfigurationFromFile fetch configuration from a file
+// FetchConfigurationFromFile fetches configuration from a file
 func FetchConfigurationFromFile(cfgPath string) (*kubeadmapiext.MasterConfiguration, error) {
 	// Load the configuration from a file or the cluster
 	configBytes, err := ioutil.ReadFile(cfgPath)

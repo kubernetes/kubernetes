@@ -88,7 +88,7 @@ var (
 	}
 )
 
-// NewCmdCompletion return command for executing "kubeadm completion" command
+// NewCmdCompletion returns command for executing "kubeadm completion" command
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	shells := []string{}
 	for s := range completionShells {

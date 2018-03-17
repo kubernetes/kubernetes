@@ -63,7 +63,7 @@ var (
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, kubeadmconstants.GetStaticPodDirectory()))
 )
 
-// NewCmdControlplane return main command for Controlplane phase
+// NewCmdControlplane returns main command for Controlplane phase
 func NewCmdControlplane() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "controlplane",
