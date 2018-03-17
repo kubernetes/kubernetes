@@ -77,19 +77,30 @@ var _ = SIGDescribe("Proxy", func() {
 			    Description: Ensure that proxy on node logs works with generic top
 				level prefix proxy and explicit kubelet port.
 		*/
-		if !skipPrefixProxyTests {
-			framework.ConformanceIt("should proxy logs on node with explicit kubelet port ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
-		}
+		framework.ConformanceIt("should proxy logs on node with explicit kubelet port ", func() {
+			if skipPrefixProxyTests {
+				framework.Skipf("/proxy prefix removed on newer server version")
+			}
+			nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/")
+		})
 
 		/*
 			    Testname: proxy-prefix-node-logs
 			    Description: Ensure that proxy on node logs works with generic top
 				level prefix proxy.
 		*/
-		if !skipPrefixProxyTests {
-			framework.ConformanceIt("should proxy logs on node ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
-			It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
-		}
+		framework.ConformanceIt("should proxy logs on node ", func() {
+			if skipPrefixProxyTests {
+				framework.Skipf("/proxy prefix removed on newer server version")
+			}
+			nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/")
+		})
+		It("should proxy to cadvisor", func() {
+			if skipPrefixProxyTests {
+				framework.Skipf("/proxy prefix removed on newer server version")
+			}
+			nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/")
+		})
 
 		/*
 			    Testname: proxy-subresource-node-logs-port
