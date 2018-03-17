@@ -135,6 +135,19 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 			},
 		})
 	}
+
+	// If using host network, the Pod should tolerate network unavailable taint.
+	if pod.Spec.SecurityContext != nil &&
+		pod.Spec.SecurityContext.HostNetwork {
+		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
+			{
+				Key:      algorithm.TaintNodeNetworkUnavailable,
+				Operator: api.TolerationOpExists,
+				Effect:   api.TaintEffectNoSchedule,
+			},
+		})
+	}
+
 	pod.Spec.Tolerations = finalTolerations
 
 	return p.Validate(a)
