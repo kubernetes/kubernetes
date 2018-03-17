@@ -26,7 +26,12 @@ import (
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
+	clientset "k8s.io/client-go/kubernetes"
+	retry "k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -170,6 +175,14 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				framework.ExpectNoError(framework.CheckNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(framework.CheckMasterVersion(f.ClientSet, target))
+
+				// when downgrading from >= 1.10 to < 1.10, storage protection finalizers must be removed before PV/PVC objects can be deleted
+				// https://github.com/kubernetes/kubernetes/issues/60764#issuecomment-373803755
+				// remove this once downgrade tests no longer need to cross this boundary
+				storageProtectionVersion := version.MustParseSemantic("v1.10.0-alpha.0")
+				if upgCtx.Versions[0].Version.AtLeast(storageProtectionVersion) && upgCtx.Versions[1].Version.LessThan(storageProtectionVersion) {
+					framework.ExpectNoError(removeStorageProtectionFinalizers(f.ClientSet))
+				}
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -448,4 +461,56 @@ func getUpgradeContext(c discovery.DiscoveryInterface, upgradeTarget string) (*u
 	})
 
 	return upgCtx, nil
+}
+
+//  remove 1.10 storage protection finalizer from PV and PVC objects
+func removeStorageProtectionFinalizers(c clientset.Interface) error {
+	pvs, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, pv := range pvs.Items {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			pv, err := c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			finalizers := sets.NewString(pv.Finalizers...)
+			if !finalizers.Has("kubernetes.io/pv-protection") {
+				return nil
+			}
+			finalizers.Delete("kubernetes.io/pv-protection")
+			pv.Finalizers = finalizers.List()
+			_, err = c.CoreV1().PersistentVolumes().Update(pv)
+			return err
+		})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	pvcs, err := c.CoreV1().PersistentVolumeClaims(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcs.Items {
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			pvc, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			finalizers := sets.NewString(pvc.Finalizers...)
+			if !finalizers.Has("kubernetes.io/pvc-protection") {
+				return nil
+			}
+			finalizers.Delete("kubernetes.io/pvc-protection")
+			pvc.Finalizers = finalizers.List()
+			_, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+			return err
+		})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
