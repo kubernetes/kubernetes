@@ -9,12 +9,10 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 
@@ -32,7 +30,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
 

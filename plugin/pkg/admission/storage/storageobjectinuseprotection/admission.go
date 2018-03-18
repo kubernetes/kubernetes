@@ -23,11 +23,9 @@ import (
 	"github.com/golang/glog"
 
 	admission "k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -95,10 +93,6 @@ var (
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
 func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
-	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		return nil
-	}
-
 	switch a.GetResource().GroupResource() {
 	case pvResource:
 		return c.admitPV(a)
