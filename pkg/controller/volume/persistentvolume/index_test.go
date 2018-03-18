@@ -1043,7 +1043,7 @@ func TestAlphaFilteringVolumeModes(t *testing.T) {
 	toggleFeature(false, "BlockVolume", t)
 }
 
-func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
+func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "pv1",
@@ -1072,39 +1072,23 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 
 	satisfyingTestCases := map[string]struct {
-		isExpectedMatch                    bool
-		vol                                *v1.PersistentVolume
-		pvc                                *v1.PersistentVolumeClaim
-		enableStorageObjectInUseProtection bool
+		isExpectedMatch bool
+		vol             *v1.PersistentVolume
+		pvc             *v1.PersistentVolumeClaim
 	}{
-		"feature enabled - pv deletionTimeStamp not set": {
+		"pv deletionTimeStamp not set": {
 			isExpectedMatch: true,
 			vol:             pv,
 			pvc:             pvc,
-			enableStorageObjectInUseProtection: true,
 		},
-		"feature enabled - pv deletionTimeStamp set": {
+		"pv deletionTimeStamp set": {
 			isExpectedMatch: false,
 			vol:             pvToDelete,
 			pvc:             pvc,
-			enableStorageObjectInUseProtection: true,
-		},
-		"feature disabled - pv deletionTimeStamp not set": {
-			isExpectedMatch: true,
-			vol:             pv,
-			pvc:             pvc,
-			enableStorageObjectInUseProtection: false,
-		},
-		"feature disabled - pv deletionTimeStamp set": {
-			isExpectedMatch: true,
-			vol:             pvToDelete,
-			pvc:             pvc,
-			enableStorageObjectInUseProtection: false,
 		},
 	}
 
 	for name, testCase := range satisfyingTestCases {
-		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
 		err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
 		// expected to match but got an error
 		if err != nil && testCase.isExpectedMatch {
@@ -1118,38 +1102,22 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 
 	filteringTestCases := map[string]struct {
-		isExpectedMatch                    bool
-		vol                                persistentVolumeOrderedIndex
-		pvc                                *v1.PersistentVolumeClaim
-		enableStorageObjectInUseProtection bool
+		isExpectedMatch bool
+		vol             persistentVolumeOrderedIndex
+		pvc             *v1.PersistentVolumeClaim
 	}{
-		"feature enabled - pv deletionTimeStamp not set": {
+		"pv deletionTimeStamp not set": {
 			isExpectedMatch: true,
 			vol:             createTestVolOrderedIndex(pv),
 			pvc:             pvc,
-			enableStorageObjectInUseProtection: true,
 		},
-		"feature enabled - pv deletionTimeStamp set": {
+		"pv deletionTimeStamp set": {
 			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(pvToDelete),
 			pvc:             pvc,
-			enableStorageObjectInUseProtection: true,
-		},
-		"feature disabled - pv deletionTimeStamp not set": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(pv),
-			pvc:             pvc,
-			enableStorageObjectInUseProtection: false,
-		},
-		"feature disabled - pv deletionTimeStamp set": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(pvToDelete),
-			pvc:             pvc,
-			enableStorageObjectInUseProtection: false,
 		},
 	}
 	for name, testCase := range filteringTestCases {
-		toggleFeature(testCase.enableStorageObjectInUseProtection, "StorageObjectInUseProtection", t)
 		pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
 		// expected to match but either got an error or no returned pvmatch
 		if pvmatch == nil && testCase.isExpectedMatch {
@@ -1166,9 +1134,6 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 			t.Errorf("Unexpected failure for testcase: %s - %+v", name, err)
 		}
 	}
-
-	// make sure feature gate is turned off
-	toggleFeature(false, "StorageObjectInUseProtection", t)
 }
 
 func TestFindingPreboundVolumes(t *testing.T) {

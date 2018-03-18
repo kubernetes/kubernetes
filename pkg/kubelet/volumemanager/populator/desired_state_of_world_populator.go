@@ -445,21 +445,19 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 			err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		// Pods that uses a PVC that is being deleted must not be started.
-		//
-		// In case an old kubelet is running without this check or some kubelets
-		// have this feature disabled, the worst that can happen is that such
-		// pod is scheduled. This was the default behavior in 1.8 and earlier
-		// and users should not be that surprised.
-		// It should happen only in very rare case when scheduler schedules
-		// a pod and user deletes a PVC that's used by it at the same time.
-		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			return "", "", fmt.Errorf(
-				"can't start pod because PVC %s/%s is being deleted",
-				namespace,
-				claimName)
-		}
+	// Pods that uses a PVC that is being deleted must not be started.
+	//
+	// In case an old kubelet is running without this check or some kubelets
+	// have this feature disabled, the worst that can happen is that such
+	// pod is scheduled. This was the default behavior in 1.8 and earlier
+	// and users should not be that surprised.
+	// It should happen only in very rare case when scheduler schedules
+	// a pod and user deletes a PVC that's used by it at the same time.
+	if pvc.ObjectMeta.DeletionTimestamp != nil {
+		return "", "", fmt.Errorf(
+			"can't start pod because PVC %s/%s is being deleted",
+			namespace,
+			claimName)
 	}
 
 	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {

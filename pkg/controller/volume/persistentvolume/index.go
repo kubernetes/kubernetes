@@ -169,10 +169,8 @@ func findMatchingVolume(
 		}
 
 		// check if PV's DeletionTimeStamp is set, if so, skip this volume.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-			if volume.ObjectMeta.DeletionTimestamp != nil {
-				continue
-			}
+		if volume.ObjectMeta.DeletionTimestamp != nil {
+			continue
 		}
 
 		nodeAffinityValid := true

@@ -240,10 +240,8 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	requestedSize := requestedQty.Value()
 
 	// check if PV's DeletionTimeStamp is set, if so, return error.
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		if volume.ObjectMeta.DeletionTimestamp != nil {
-			return fmt.Errorf("the volume is marked for deletion")
-		}
+	if volume.ObjectMeta.DeletionTimestamp != nil {
+		return fmt.Errorf("the volume is marked for deletion")
 	}
 
 	volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
