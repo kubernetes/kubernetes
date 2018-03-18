@@ -18,19 +18,45 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/xyproto/simpleredis"
 )
 
 var (
 	masterPool *simpleredis.ConnectionPool
 	slavePool  *simpleredis.ConnectionPool
+	counter    = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name:        "guestbook_requests_total",
+			Help:        "How many HTTP requests processed, partitioned by status code, method and HTTP path.",
+			ConstLabels: prometheus.Labels{"service": "guestbook"},
+		},
+		[]string{"code", "method", "path"},
+	)
+
+	latency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "guestbook_request_duration_milliseconds",
+			Help:    "How long it took to process the request, partitioned by status code, method and HTTP path.",
+			Buckets: prometheus.ExponentialBuckets(1, 2, 10),
+		},
+		[]string{"code", "method", "path"},
+	)
 )
+
+func init() {
+	prometheus.MustRegister(counter)
+	prometheus.MustRegister(latency)
+}
 
 func ListRangeHandler(rw http.ResponseWriter, req *http.Request) {
 	key := mux.Vars(req)["key"]
@@ -73,6 +99,17 @@ func HandleError(result interface{}, err error) (r interface{}) {
 	return result
 }
 
+type MetricsMiddleware struct{}
+
+func (m MetricsMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	start := time.Now()
+	next(rw, r)
+	res := rw.(negroni.ResponseWriter)
+	counter.WithLabelValues(fmt.Sprint(res.Status()), r.Method, r.URL.Path).Inc()
+	latency.WithLabelValues(fmt.Sprint(res.Status()), r.Method, r.URL.Path).Observe(
+		float64(time.Since(start).Seconds()) * float64(time.Millisecond))
+}
+
 func main() {
 	masterPool = simpleredis.NewConnectionPoolHost("redis-master:6379")
 	defer masterPool.Close()
@@ -84,8 +121,10 @@ func main() {
 	r.Path("/rpush/{key}/{value}").Methods("GET").HandlerFunc(ListPushHandler)
 	r.Path("/info").Methods("GET").HandlerFunc(InfoHandler)
 	r.Path("/env").Methods("GET").HandlerFunc(EnvHandler)
+	r.Path("/metrics").Methods("GET").HandlerFunc(promhttp.Handler().ServeHTTP)
 
 	n := negroni.Classic()
 	n.UseHandler(r)
+	n.Use(MetricsMiddleware{})
 	n.Run(":3000")
 }
