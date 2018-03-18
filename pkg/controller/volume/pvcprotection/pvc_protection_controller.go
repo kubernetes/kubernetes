@@ -49,13 +49,17 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
+
+	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
+	storageObjectInUseProtectionEnabled bool
 }
 
 // NewPVCProtectionController returns a new *{VCProtectionController.
-func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) *Controller {
+func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
 	e := &Controller{
 		client: cl,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolumeclaim_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -176,6 +180,10 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 }
 
 func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
+	// Skip adding Finalizer in case the StorageObjectInUseProtection feature is not enabled
+	if !c.storageObjectInUseProtectionEnabled {
+		return nil
+	}
 	claimClone := pvc.DeepCopy()
 	claimClone.ObjectMeta.Finalizers = append(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
