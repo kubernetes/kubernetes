@@ -2284,17 +2284,18 @@ function setup-kubelet-dir {
 
 # Config policy routing.
 #
-# Specifically, with GCP PTP CNI, for traffic not coming from the network
+# Specifically, with a PTP CNI plugin, for traffic not coming from the network
 # interface that the default route points to, it is always sent to such a
 # network interface.
 function config-policy-routing {
-  sudo su
+  echo "Configuring policy routing"
   local -r tables="/etc/iproute2/rt_tables"
   local reserved_tables="$(grep -v ^# ${tables} | awk '{print $1}')"
   local nic0="$(ip route get 8.8.8.8 | sed -n 's/.*dev \([^\ ]*\) .*/\1/p')"
   local gateway="$(ip route get 8.8.8.8 | sed -n 's/.*via \([^\ ]*\) .*/\1/p')"
   local -r pr_table_name="${POLICY_ROUTING_TABLE}"
   local pr_table
+  local host_ip="$(ip address show dev ${nic0} | grep -Po 'inet \K[\d.]+')"
   for table in {1..252}; do
     if [[ ! "${reserved_tables[@]}" =~ table ]]; then
       pr_table="${table}"
@@ -2303,11 +2304,12 @@ function config-policy-routing {
   done
 
   if [[ "${pr_table}" ]]; then
-    echo "${pr_table} ${pr_table_name}" >> "${tables}"
+    echo "${pr_table} ${pr_table_name}" | sudo tee -a "${tables}" > /dev/null
     ip route add default via "${gateway}" table "${pr_table_name}"
     ip rule add not iif "${nic0}" table "${pr_table_name}"
+    ip rule add from "${host_ip}" table main
+    ip rule add to "${host_ip}" table main
   fi
-  exit
 }
 
 function reset-motd {
