@@ -1172,7 +1172,7 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 	for i := 0; i < 3; i++ {
 		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			Failf("failed to get ingress %q: %v", name, err)
+			Failf("failed to get ingress %s/%s: %v", ns, name, err)
 		}
 		update(j.Ingress)
 		j.Ingress, err = j.runUpdate(j.Ingress)
@@ -1181,10 +1181,10 @@ func (j *IngressTestJig) Update(update func(ing *extensions.Ingress)) {
 			return
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
-			Failf("failed to update ingress %q: %v", name, err)
+			Failf("failed to update ingress %s/%s: %v", ns, name, err)
 		}
 	}
-	Failf("too many retries updating ingress %q", name)
+	Failf("too many retries updating ingress %s/%s", ns, name)
 }
 
 // AddHTTPS updates the ingress to use this secret for these hosts.
@@ -1304,13 +1304,14 @@ func (j *IngressTestJig) WaitForIngressAddress(c clientset.Interface, ns, ingNam
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getIngressAddress(c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
-			j.Logger.Errorf("Waiting for Ingress %v to acquire IP, error %v", ingName, err)
+			j.Logger.Errorf("Waiting for Ingress %s/%s to acquire IP, error: %v, ipOrNameList: %v", ns, ingName, err, ipOrNameList)
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
 			}
 			return false, err
 		}
 		address = ipOrNameList[0]
+		j.Logger.Infof("Found address %s for ingress %s/%s", address, ns, ingName)
 		return true, nil
 	})
 	return address, err
@@ -1349,7 +1350,9 @@ func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address st
 }
 
 func (j *IngressTestJig) WaitForIngress(waitForNodePort bool) {
-	j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, LoadBalancerPollTimeout)
+	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, LoadBalancerPollTimeout); err != nil {
+		Failf("error in waiting for ingress to get an address: %s", err)
+	}
 }
 
 // WaitForGivenIngressWithTimeout waits till the ingress acquires an IP,
@@ -1363,7 +1366,6 @@ func (j *IngressTestJig) WaitForGivenIngressWithTimeout(ing *extensions.Ingress,
 	if err != nil {
 		return fmt.Errorf("Ingress failed to acquire an IP address within %v", timeout)
 	}
-	j.Logger.Infof("Found address %v for ingress %v", address, ing.Name)
 
 	var knownHosts []string
 	var cert []byte
@@ -1385,7 +1387,6 @@ func (j *IngressTestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts
 	if err != nil {
 		return fmt.Errorf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
 	}
-	j.Logger.Infof("Found address %v for ingress %v", address, j.Ingress.Name)
 
 	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, LoadBalancerPollTimeout)
 }
