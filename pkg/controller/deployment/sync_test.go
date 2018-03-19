@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	extensions "k8s.io/api/extensions/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
@@ -41,7 +41,7 @@ func TestScale(t *testing.T) {
 	oldTimestamp := metav1.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
 	olderTimestamp := metav1.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
 
-	var updatedTemplate = func(replicas int) *extensions.Deployment {
+	var updatedTemplate = func(replicas int) *apps.Deployment {
 		d := newDeployment("foo", replicas, nil, nil, nil, map[string]string{"foo": "bar"})
 		d.Spec.Template.Labels["another"] = "label"
 		return d
@@ -49,14 +49,14 @@ func TestScale(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		deployment    *extensions.Deployment
-		oldDeployment *extensions.Deployment
+		deployment    *apps.Deployment
+		oldDeployment *apps.Deployment
 
-		newRS  *extensions.ReplicaSet
-		oldRSs []*extensions.ReplicaSet
+		newRS  *apps.ReplicaSet
+		oldRSs []*apps.ReplicaSet
 
-		expectedNew  *extensions.ReplicaSet
-		expectedOld  []*extensions.ReplicaSet
+		expectedNew  *apps.ReplicaSet
+		expectedOld  []*apps.ReplicaSet
 		wasntUpdated map[string]bool
 
 		desiredReplicasAnnotations map[string]int32
@@ -67,10 +67,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 10, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v1", 10, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{},
+			oldRSs: []*apps.ReplicaSet{},
 
 			expectedNew: rs("foo-v1", 12, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{},
+			expectedOld: []*apps.ReplicaSet{},
 		},
 		{
 			name:          "normal scaling event: 10 -> 5",
@@ -78,10 +78,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 10, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v1", 10, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{},
+			oldRSs: []*apps.ReplicaSet{},
 
 			expectedNew: rs("foo-v1", 5, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{},
+			expectedOld: []*apps.ReplicaSet{},
 		},
 		{
 			name:          "proportional scaling: 5 -> 10",
@@ -89,10 +89,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v2", 2, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 4, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 5 -> 3",
@@ -100,10 +100,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v2", 2, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 1, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 2, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 2, nil, oldTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 9 -> 4",
@@ -111,10 +111,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 9, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v2", 8, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 4, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 0, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 0, nil, oldTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 7 -> 10",
@@ -122,10 +122,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 7, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 3, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 4, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 4, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 13 -> 8",
@@ -133,10 +133,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 13, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 8, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 8, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 1, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 5, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 5, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 		},
 		// Scales up the new replica set.
 		{
@@ -145,10 +145,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 3, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 1, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 2, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 		},
 		// Scales down the older replica set.
 		{
@@ -157,10 +157,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 3, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 1, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 1, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 		},
 		// Scales up the latest replica set first.
 		{
@@ -169,10 +169,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 4, nil, nil, nil, nil),
 
 			newRS:  nil,
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 
 			expectedNew: nil,
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 		},
 		// Scales down to zero
 		{
@@ -181,10 +181,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 6, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 3, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 0, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 		},
 		// Scales up from zero
 		{
@@ -193,10 +193,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 6, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 0, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 
 			expectedNew:  rs("foo-v3", 6, nil, newTimestamp),
-			expectedOld:  []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedOld:  []*apps.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 			wasntUpdated: map[string]bool{"foo-v2": true, "foo-v1": true},
 		},
 		// Scenario: deployment.spec.replicas == 3 ( foo-v1.spec.replicas == foo-v2.spec.replicas == foo-v3.spec.replicas == 1 )
@@ -208,10 +208,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew:  rs("foo-v3", 2, nil, newTimestamp),
-			expectedOld:  []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			expectedOld:  []*apps.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 			wasntUpdated: map[string]bool{"foo-v3": true, "foo-v1": true},
 
 			desiredReplicasAnnotations: map[string]int32{"foo-v2": int32(3)},
@@ -222,10 +222,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 10, nil, intOrStrP(2), nil, nil),
 
 			newRS:  rs("foo-v2", 6, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 11, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 11, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 11, nil, oldTimestamp)},
 		},
 		{
 			name:          "change both surge and size",
@@ -233,10 +233,10 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 10, nil, intOrStrP(3), nil, nil),
 
 			newRS:  rs("foo-v2", 5, nil, newTimestamp),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 8, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 8, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 22, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 34, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 34, nil, oldTimestamp)},
 		},
 		{
 			name:          "change both size and template",
@@ -244,25 +244,25 @@ func TestScale(t *testing.T) {
 			oldDeployment: newDeployment("foo", 10, nil, nil, nil, map[string]string{"foo": "bar"}),
 
 			newRS:  nil,
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 7, nil, newTimestamp), rs("foo-v1", 3, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v2", 7, nil, newTimestamp), rs("foo-v1", 3, nil, oldTimestamp)},
 
 			expectedNew: nil,
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 10, nil, newTimestamp), rs("foo-v1", 4, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 10, nil, newTimestamp), rs("foo-v1", 4, nil, oldTimestamp)},
 		},
 		{
 			name:          "saturated but broken new replica set does not affect old pods",
 			deployment:    newDeployment("foo", 2, nil, intOrStrP(1), intOrStrP(1), nil),
 			oldDeployment: newDeployment("foo", 2, nil, intOrStrP(1), intOrStrP(1), nil),
 
-			newRS: func() *extensions.ReplicaSet {
+			newRS: func() *apps.ReplicaSet {
 				rs := rs("foo-v2", 2, nil, newTimestamp)
 				rs.Status.AvailableReplicas = 0
 				return rs
 			}(),
-			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 2, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 		},
 	}
 
@@ -313,7 +313,7 @@ func TestScale(t *testing.T) {
 			}
 			// Get all the UPDATE actions and update nameToSize with all the updated sizes.
 			for _, action := range fake.Actions() {
-				rs := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
+				rs := action.(testclient.UpdateAction).GetObject().(*apps.ReplicaSet)
 				if !test.wasntUpdated[rs.Name] {
 					nameToSize[rs.Name] = *(rs.Spec.Replicas)
 				}
@@ -345,12 +345,12 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	alreadyDeleted.DeletionTimestamp = &now
 
 	tests := []struct {
-		oldRSs               []*extensions.ReplicaSet
+		oldRSs               []*apps.ReplicaSet
 		revisionHistoryLimit int32
 		expectedDeletions    int
 	}{
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*apps.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
 				newRSWithStatus("foo-2", 0, 0, selector),
 				newRSWithStatus("foo-3", 0, 0, selector),
@@ -360,7 +360,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		},
 		{
 			// Only delete the replica set with Spec.Replicas = Status.Replicas = 0.
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*apps.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
 				newRSWithStatus("foo-2", 0, 1, selector),
 				newRSWithStatus("foo-3", 1, 0, selector),
@@ -371,7 +371,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		},
 
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*apps.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
 				newRSWithStatus("foo-2", 0, 0, selector),
 			},
@@ -379,7 +379,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			expectedDeletions:    2,
 		},
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*apps.ReplicaSet{
 				newRSWithStatus("foo-1", 1, 1, selector),
 				newRSWithStatus("foo-2", 1, 1, selector),
 			},
@@ -387,7 +387,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			expectedDeletions:    0,
 		},
 		{
-			oldRSs: []*extensions.ReplicaSet{
+			oldRSs: []*apps.ReplicaSet{
 				alreadyDeleted,
 			},
 			revisionHistoryLimit: 0,
@@ -401,7 +401,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(informers.Extensions().V1beta1().Deployments(), informers.Extensions().V1beta1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
@@ -411,7 +411,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
-			informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+			informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs)
 		}
 
 		stopCh := make(chan struct{})

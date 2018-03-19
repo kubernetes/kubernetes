@@ -11,7 +11,6 @@ go_library(
         "cloudproviders.go",
         "controllermanager.go",
         "core.go",
-        "extensions.go",
         "import_known_versions.go",
         "plugins.go",
         "policy.go",

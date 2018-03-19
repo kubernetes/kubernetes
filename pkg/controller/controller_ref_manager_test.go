@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,7 +52,7 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 		},
 	}
 	if owner != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, v1beta1.SchemeGroupVersion.WithKind("Fake"))}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, apps.SchemeGroupVersion.WithKind("Fake"))}
 	}
 	return pod
 }
