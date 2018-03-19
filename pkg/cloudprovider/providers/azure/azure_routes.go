@@ -99,7 +99,9 @@ func (az *Cloud) createRouteTable() error {
 	}
 
 	// Invalidate the cache right after updating
-	az.rtCache.Delete(az.RouteTableName)
+	if err := az.rtCache.Delete(az.RouteTableName); err != nil {
+		glog.Errorf("Error clearing cache: %v", err)
+	}
 	return nil
 }
 

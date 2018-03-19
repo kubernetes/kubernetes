@@ -1114,26 +1114,43 @@ func (fDC *fakeDisksClient) Get(resourceGroupName string, diskName string) (resu
 }
 
 type fakeVMSet struct {
-	NodeToIP map[string]map[string]string
-	Err      error
+	NodeToIP      map[string]map[string]string
+	NodeNames     map[string]string
+	InstanceIDs   map[string]string
+	InstanceTypes map[string]string
+	Err           error
 }
 
 func (f *fakeVMSet) GetInstanceIDByNodeName(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
+	if f.Err != nil {
+		return "", f.Err
+	}
+	id, found := f.InstanceIDs[name]
+	if !found {
+		return "", cloudprovider.InstanceNotFound
+	}
+	return id, nil
 }
 
 func (f *fakeVMSet) GetInstanceTypeByNodeName(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
+	if f.Err != nil {
+		return "", f.Err
+	}
+	t, found := f.InstanceTypes[name]
+	if !found {
+		return "", cloudprovider.InstanceNotFound
+	}
+	return t, nil
 }
 
 func (f *fakeVMSet) GetIPByNodeName(name, vmSetName string) (string, string, error) {
 	nodes, found := f.NodeToIP[vmSetName]
 	if !found {
-		return "", "", fmt.Errorf("not found")
+		return "", "", cloudprovider.InstanceNotFound
 	}
 	ip, found := nodes[name]
 	if !found {
-		return "", "", fmt.Errorf("not found")
+		return "", "", cloudprovider.InstanceNotFound
 	}
 	return ip, "", nil
 }
@@ -1143,7 +1160,14 @@ func (f *fakeVMSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Int
 }
 
 func (f *fakeVMSet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
-	return types.NodeName(""), fmt.Errorf("unimplemented")
+	if f.Err != nil {
+		return types.NodeName(""), f.Err
+	}
+	name, found := f.NodeNames[providerID]
+	if !found {
+		return "", cloudprovider.InstanceNotFound
+	}
+	return types.NodeName(name), nil
 }
 
 func (f *fakeVMSet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
