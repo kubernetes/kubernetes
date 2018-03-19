@@ -302,21 +302,13 @@ func (o setAuthInfoOptions) validate() error {
 			return fmt.Errorf("you must specify a --%s or --%s to embed", clientcmd.FlagCertFile, clientcmd.FlagKeyFile)
 		}
 		if certPath != "" {
-			certFileInfo, err := os.Stat(certPath)
-			if err != nil {
+			if _, err := os.Stat(certPath); err != nil {
 				return err
-			}
-			if certFileInfo.Size() <= 0 {
-				return fmt.Errorf("you must specify a non-empty client certificate file: %v", certPath)
 			}
 		}
 		if keyPath != "" {
-			keyFileInfo, err := os.Stat(keyPath)
-			if err != nil {
+			if _, err := os.Stat(keyPath); err != nil {
 				return err
-			}
-			if keyFileInfo.Size() <= 0 {
-				return fmt.Errorf("you must specify a non-empty client key file: %v", keyPath)
 			}
 		}
 	}

@@ -181,12 +181,8 @@ func (o setClusterOptions) validate() error {
 		if caPath == "" {
 			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
-		caFileInfo, err := os.Stat(caPath)
-		if err != nil {
+		if _, err := os.Stat(caPath); err != nil {
 			return err
-		}
-		if caFileInfo.Size() <= 0 {
-			return fmt.Errorf("you must specify a non-empty certificate authority file: %v", caPath)
 		}
 	}
 
