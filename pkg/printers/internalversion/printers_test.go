@@ -1127,6 +1127,113 @@ func contains(fields []string, field string) bool {
 	return false
 }
 
+func TestPrintIngress(t *testing.T) {
+	tests := []struct {
+		ing    extensions.Ingress
+		expect []metav1beta1.TableRow
+	}{
+		{
+			// test ingress with default port
+			extensions.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: extensions.IngressSpec{
+					Backend: &extensions.IngressBackend{
+						ServiceName: "svc",
+						ServicePort: intstr.FromInt(93),
+					},
+				},
+				Status: extensions.IngressStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{
+								IP: "2.3.4.5",
+							},
+						},
+					},
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "*", "2.3.4.5", "80", "10y"}}},
+		},
+		{
+			// Test ingress with custom http port
+			extensions.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.port": "8080",
+					},
+				},
+				Spec: extensions.IngressSpec{
+					Backend: &extensions.IngressBackend{
+						ServiceName: "svc",
+						ServicePort: intstr.FromInt(93),
+					},
+				},
+				Status: extensions.IngressStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{
+								IP: "2.3.4.5",
+							},
+						},
+					},
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "*", "2.3.4.5", "8080", "10y"}}},
+		},
+		{
+			// Test ingress with tls enabled and custom http port
+			extensions.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.port": "8080",
+					},
+				},
+				Spec: extensions.IngressSpec{
+					TLS: []extensions.IngressTLS{
+						{
+							SecretName: "secret",
+						},
+					},
+					Backend: &extensions.IngressBackend{
+						ServiceName: "svc",
+						ServicePort: intstr.FromInt(93),
+					},
+				},
+				Status: extensions.IngressStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{
+								IP: "2.3.4.5",
+							},
+						},
+					},
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "*", "2.3.4.5", "8080, 443", "10y"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printIngress(&test.ing, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+		}
+	}
+}
+
 func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 	ingress := extensions.Ingress{
 		ObjectMeta: metav1.ObjectMeta{

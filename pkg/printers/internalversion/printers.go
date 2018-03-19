@@ -68,6 +68,12 @@ const (
 
 	// nodeLabelRole specifies the role of a node
 	nodeLabelRole = "kubernetes.io/role"
+
+	// ingressPortAnnotation specifies the http port of ingress resources
+	ingressPortAnnotation = "kubernetes.io/ingress.port"
+
+	// ingressTLSPortAnnotation specifies the https port of ingress resources
+	ingressTLSPortAnnotation = "kubernetes.io/ingress.tlsport"
 )
 
 // AddHandlers adds print handlers for default Kubernetes types dealing with internal versions.
@@ -924,11 +930,21 @@ func formatHosts(rules []extensions.IngressRule) string {
 	return ret
 }
 
-func formatPorts(tls []extensions.IngressTLS) string {
-	if len(tls) != 0 {
-		return "80, 443"
+func formatPorts(ing *extensions.Ingress) string {
+	httpPort := "80"
+	if p, ok := ing.GetAnnotations()[ingressPortAnnotation]; ok {
+		httpPort = p
 	}
-	return "80"
+
+	httpsPort := "443"
+	if p, ok := ing.GetAnnotations()[ingressTLSPortAnnotation]; ok {
+		httpsPort = p
+	}
+
+	if len(ing.Spec.TLS) != 0 {
+		return httpPort + ", " + httpsPort
+	}
+	return httpPort
 }
 
 func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
@@ -937,7 +953,7 @@ func printIngress(obj *extensions.Ingress, options printers.PrintOptions) ([]met
 	}
 	hosts := formatHosts(obj.Spec.Rules)
 	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
-	ports := formatPorts(obj.Spec.TLS)
+	ports := formatPorts(obj)
 	createTime := translateTimestamp(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, hosts, address, ports, createTime)
 	return []metav1beta1.TableRow{row}, nil
