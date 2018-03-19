@@ -19,6 +19,7 @@ package scheduler
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -48,8 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"net/http/httptest"
 )
 
 type TestContext struct {
@@ -316,6 +315,12 @@ func createNode(cs clientset.Interface, name string, res *v1.ResourceList) (*v1.
 		},
 	}
 	return cs.CoreV1().Nodes().Create(n)
+}
+
+// updateNodeStatus updates the status of node.
+func updateNodeStatus(cs clientset.Interface, node *v1.Node) error {
+	_, err := cs.CoreV1().Nodes().UpdateStatus(node)
+	return err
 }
 
 // createNodes creates `numNodes` nodes. The created node names will be in the

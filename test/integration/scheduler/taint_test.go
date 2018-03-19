@@ -45,6 +45,12 @@ import (
 //   2. NodeController taints nodes by node condition
 //   3. Scheduler allows pod to tolerate node condition taints, e.g. network unavailable
 func TestTaintNodeByCondition(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled("TaintNodesByCondition")
+	defer func() {
+		if !enabled {
+			utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		}
+	}()
 	// Enable TaintNodeByCondition
 	utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
 

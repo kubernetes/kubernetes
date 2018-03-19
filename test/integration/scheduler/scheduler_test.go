@@ -134,6 +134,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"CheckNodeCondition", // mandatory predicate
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
+				"CheckNodePIDPressure",
 				"CheckVolumeBinding",
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
