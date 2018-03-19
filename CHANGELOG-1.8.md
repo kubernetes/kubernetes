@@ -1,73 +1,80 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.8.9](#v189)
-  - [Downloads for v1.8.9](#downloads-for-v189)
+- [v1.8.10](#v1810)
+  - [Downloads for v1.8.10](#downloads-for-v1810)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.8.8](#changelog-since-v188)
+  - [Changelog since v1.8.9](#changelog-since-v189)
     - [Other notable changes](#other-notable-changes)
-- [v1.8.8](#v188)
-  - [Downloads for v1.8.8](#downloads-for-v188)
+- [v1.8.9](#v189)
+  - [Downloads for v1.8.9](#downloads-for-v189)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.8.7](#changelog-since-v187)
+  - [Changelog since v1.8.8](#changelog-since-v188)
     - [Other notable changes](#other-notable-changes-1)
-- [v1.8.7](#v187)
-  - [Downloads for v1.8.7](#downloads-for-v187)
+- [v1.8.8](#v188)
+  - [Downloads for v1.8.8](#downloads-for-v188)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.8.6](#changelog-since-v186)
+  - [Changelog since v1.8.7](#changelog-since-v187)
     - [Other notable changes](#other-notable-changes-2)
-- [v1.8.6](#v186)
-  - [Downloads for v1.8.6](#downloads-for-v186)
+- [v1.8.7](#v187)
+  - [Downloads for v1.8.7](#downloads-for-v187)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
-  - [Changelog since v1.8.5](#changelog-since-v185)
+  - [Changelog since v1.8.6](#changelog-since-v186)
     - [Other notable changes](#other-notable-changes-3)
-- [v1.8.5](#v185)
-  - [Downloads for v1.8.5](#downloads-for-v185)
+- [v1.8.6](#v186)
+  - [Downloads for v1.8.6](#downloads-for-v186)
     - [Client Binaries](#client-binaries-4)
     - [Server Binaries](#server-binaries-4)
     - [Node Binaries](#node-binaries-4)
-  - [Changelog since v1.8.4](#changelog-since-v184)
+  - [Changelog since v1.8.5](#changelog-since-v185)
     - [Other notable changes](#other-notable-changes-4)
-- [v1.8.4](#v184)
-  - [Downloads for v1.8.4](#downloads-for-v184)
+- [v1.8.5](#v185)
+  - [Downloads for v1.8.5](#downloads-for-v185)
     - [Client Binaries](#client-binaries-5)
     - [Server Binaries](#server-binaries-5)
     - [Node Binaries](#node-binaries-5)
-  - [Changelog since v1.8.3](#changelog-since-v183)
+  - [Changelog since v1.8.4](#changelog-since-v184)
     - [Other notable changes](#other-notable-changes-5)
-- [v1.8.3](#v183)
-  - [Downloads for v1.8.3](#downloads-for-v183)
+- [v1.8.4](#v184)
+  - [Downloads for v1.8.4](#downloads-for-v184)
     - [Client Binaries](#client-binaries-6)
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
-  - [Changelog since v1.8.2](#changelog-since-v182)
+  - [Changelog since v1.8.3](#changelog-since-v183)
     - [Other notable changes](#other-notable-changes-6)
-- [v1.8.2](#v182)
-  - [Downloads for v1.8.2](#downloads-for-v182)
+- [v1.8.3](#v183)
+  - [Downloads for v1.8.3](#downloads-for-v183)
     - [Client Binaries](#client-binaries-7)
     - [Server Binaries](#server-binaries-7)
     - [Node Binaries](#node-binaries-7)
-  - [Changelog since v1.8.1](#changelog-since-v181)
+  - [Changelog since v1.8.2](#changelog-since-v182)
     - [Other notable changes](#other-notable-changes-7)
-- [v1.8.1](#v181)
-  - [Downloads for v1.8.1](#downloads-for-v181)
+- [v1.8.2](#v182)
+  - [Downloads for v1.8.2](#downloads-for-v182)
     - [Client Binaries](#client-binaries-8)
     - [Server Binaries](#server-binaries-8)
     - [Node Binaries](#node-binaries-8)
-  - [Changelog since v1.8.0](#changelog-since-v180)
-    - [Action Required](#action-required)
+  - [Changelog since v1.8.1](#changelog-since-v181)
     - [Other notable changes](#other-notable-changes-8)
-- [v1.8.0](#v180)
-  - [Downloads for v1.8.0](#downloads-for-v180)
+- [v1.8.1](#v181)
+  - [Downloads for v1.8.1](#downloads-for-v181)
     - [Client Binaries](#client-binaries-9)
     - [Server Binaries](#server-binaries-9)
     - [Node Binaries](#node-binaries-9)
+  - [Changelog since v1.8.0](#changelog-since-v180)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes-9)
+- [v1.8.0](#v180)
+  - [Downloads for v1.8.0](#downloads-for-v180)
+    - [Client Binaries](#client-binaries-10)
+    - [Server Binaries](#server-binaries-10)
+    - [Node Binaries](#node-binaries-10)
   - [Introduction to v1.8.0](#introduction-to-v180)
   - [Major Themes](#major-themes)
     - [SIG API Machinery](#sig-api-machinery)
@@ -128,47 +135,109 @@
   - [External Dependencies](#external-dependencies)
 - [v1.8.0-rc.1](#v180-rc1)
   - [Downloads for v1.8.0-rc.1](#downloads-for-v180-rc1)
-    - [Client Binaries](#client-binaries-10)
-    - [Server Binaries](#server-binaries-10)
-    - [Node Binaries](#node-binaries-10)
-  - [Changelog since v1.8.0-beta.1](#changelog-since-v180-beta1)
-    - [Action Required](#action-required-1)
-    - [Other notable changes](#other-notable-changes-9)
-- [v1.8.0-beta.1](#v180-beta1)
-  - [Downloads for v1.8.0-beta.1](#downloads-for-v180-beta1)
     - [Client Binaries](#client-binaries-11)
     - [Server Binaries](#server-binaries-11)
     - [Node Binaries](#node-binaries-11)
-  - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
-    - [Action Required](#action-required-2)
+  - [Changelog since v1.8.0-beta.1](#changelog-since-v180-beta1)
+    - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-10)
-- [v1.8.0-alpha.3](#v180-alpha3)
-  - [Downloads for v1.8.0-alpha.3](#downloads-for-v180-alpha3)
+- [v1.8.0-beta.1](#v180-beta1)
+  - [Downloads for v1.8.0-beta.1](#downloads-for-v180-beta1)
     - [Client Binaries](#client-binaries-12)
     - [Server Binaries](#server-binaries-12)
     - [Node Binaries](#node-binaries-12)
-  - [Changelog since v1.8.0-alpha.2](#changelog-since-v180-alpha2)
-    - [Action Required](#action-required-3)
+  - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
+    - [Action Required](#action-required-2)
     - [Other notable changes](#other-notable-changes-11)
-- [v1.8.0-alpha.2](#v180-alpha2)
-  - [Downloads for v1.8.0-alpha.2](#downloads-for-v180-alpha2)
+- [v1.8.0-alpha.3](#v180-alpha3)
+  - [Downloads for v1.8.0-alpha.3](#downloads-for-v180-alpha3)
     - [Client Binaries](#client-binaries-13)
     - [Server Binaries](#server-binaries-13)
     - [Node Binaries](#node-binaries-13)
-  - [Changelog since v1.7.0](#changelog-since-v170)
-    - [Action Required](#action-required-4)
+  - [Changelog since v1.8.0-alpha.2](#changelog-since-v180-alpha2)
+    - [Action Required](#action-required-3)
     - [Other notable changes](#other-notable-changes-12)
-- [v1.8.0-alpha.1](#v180-alpha1)
-  - [Downloads for v1.8.0-alpha.1](#downloads-for-v180-alpha1)
+- [v1.8.0-alpha.2](#v180-alpha2)
+  - [Downloads for v1.8.0-alpha.2](#downloads-for-v180-alpha2)
     - [Client Binaries](#client-binaries-14)
     - [Server Binaries](#server-binaries-14)
     - [Node Binaries](#node-binaries-14)
+  - [Changelog since v1.7.0](#changelog-since-v170)
+    - [Action Required](#action-required-4)
+    - [Other notable changes](#other-notable-changes-13)
+- [v1.8.0-alpha.1](#v180-alpha1)
+  - [Downloads for v1.8.0-alpha.1](#downloads-for-v180-alpha1)
+    - [Client Binaries](#client-binaries-15)
+    - [Server Binaries](#server-binaries-15)
+    - [Node Binaries](#node-binaries-15)
   - [Changelog since v1.7.0-alpha.4](#changelog-since-v170-alpha4)
     - [Action Required](#action-required-5)
-    - [Other notable changes](#other-notable-changes-13)
+    - [Other notable changes](#other-notable-changes-14)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.8.10
+
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.8/examples)
+
+## Downloads for v1.8.10
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes.tar.gz) | `021c0f968c7b3facd48e2cf250eec9acc250dae33627025a0762fe9db700d063`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-src.tar.gz) | `b2848ab41200fc5a8a780e860543e682dacd687d919e000038416de8641620d9`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-darwin-386.tar.gz) | `55dcca2eba20f864e2ba9945b8b5babf2eb5cc7e80852159c6c32de9cc76374d`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-darwin-amd64.tar.gz) | `334b9816260b8802030f4d50a7f86c1084235c628fe51e6ef09c8837b77bb0c0`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-linux-386.tar.gz) | `e267d233fe7015b20bad48758ed7ba0c7cc5d896d6c721931443df78132ab4cc`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-linux-amd64.tar.gz) | `8ebcc183c59482b259fcc26bdcf6869ada44555708ae55a80d311e66c730721a`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-linux-arm.tar.gz) | `17b39001b967475382374174b7d2a5f4b1a37225be04c5edb5e722ef8eb64ca0`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-linux-arm64.tar.gz) | `1ff6a2c706d103c8207bf1c3844d9d19dc17a50f8a1c70efeb8e6eb2d9c05e35`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-linux-ppc64le.tar.gz) | `3bdcdf580dda212e54d4532e054ab640dc683495039fee22bd3b6d925d888383`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-linux-s390x.tar.gz) | `c4fdf17c3ac91a1652aec431073d12ceaf9d11656d3ded700106bfdb722e7846`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-windows-386.tar.gz) | `b75b22bebd90ca27d68263143f50695b173745fceac3077fb81a0c52ca0637d5`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-client-windows-amd64.tar.gz) | `2e2e2dabef8bc6d096dd00143bcce9f6f76232dffef8cb9c62f809a337c883d6`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-server-linux-amd64.tar.gz) | `35037ce8764ae1620daf2dc870f23b53bc9091c2ff51a74cc82b1a1bfd05cff6`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-server-linux-arm.tar.gz) | `42e9c10f726773028b060db1363e5e92ab718af8e0ab79a0c298c3d3a15002e0`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-server-linux-arm64.tar.gz) | `d7443bef32a43f23627c52d65a4b5643efce97127fceed1d662562541eb74a61`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-server-linux-ppc64le.tar.gz) | `c149282b4b1e0fc33444b2166489a66bff7817feed08f030e493694901c759d8`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-server-linux-s390x.tar.gz) | `86a5090d7745b7c1f949023bd44d36cbbe7fc679bf27adac6406a19483f00832`
+
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-node-linux-amd64.tar.gz) | `c2b4a3107ad42199800864bc3eeba44b9c48ab0d5e9a2d7e6056beb8120b8335`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-node-linux-arm.tar.gz) | `77b4735367f4029a47601d352e6c1bc88838c95c5ddc67cd4a16932e3bf4cfcf`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-node-linux-arm64.tar.gz) | `791f100738aaa80014b01d5f16581142e3dc13cc92f80b4c62563cac782faa28`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-node-linux-ppc64le.tar.gz) | `c00ce5f56f5ac8d283a00807fd5374be19f819e5bae47045bc31ee668a96b071`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-node-linux-s390x.tar.gz) | `fd602c74605aa370ee37c52467da34eb8e73c621f82d71f3ce09a54591f93f5e`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.8.10/kubernetes-node-windows-amd64.tar.gz) | `bdaaf628a38f9cf2134af302b941beb51d0f0f94431131e1c92c532e98a03098`
+
+## Changelog since v1.8.9
+
+### Other notable changes
+
+* gce: fixes race condition in ServiceController, where nodes weren't updated in the node sync loop, by updating TargetPools in the ensureExternalLoadBalancer call. ([#58368](https://github.com/kubernetes/kubernetes/pull/58368), [@MrHohn](https://github.com/MrHohn))
+* fix azure file plugin failure issue on Windows after node restart ([#60625](https://github.com/kubernetes/kubernetes/pull/60625), [@andyzhangx](https://github.com/andyzhangx))
+* Get parent dir via canonical absolute path when trying to judge mount-point ([#58433](https://github.com/kubernetes/kubernetes/pull/58433), [@yue9944882](https://github.com/yue9944882))
+* Fix a regression that prevented using `subPath` volume mounts with secret, configMap, projected, and downwardAPI volumes ([#61080](https://github.com/kubernetes/kubernetes/pull/61080), [@liggitt](https://github.com/liggitt))
+* Set node external IP for azure node when disabling UseInstanceMetadata ([#60959](https://github.com/kubernetes/kubernetes/pull/60959), [@feiskyer](https://github.com/feiskyer))
+* [fluentd-gcp addon] Fixed bug with reporting metrics in event-exporter ([#60126](https://github.com/kubernetes/kubernetes/pull/60126), [@serathius](https://github.com/serathius))
+* Bug fix: Clusters with GCE feature 'DiskAlphaAPI' enabled were unable to dynamically provision GCE PD volumes. ([#59447](https://github.com/kubernetes/kubernetes/pull/59447), [@verult](https://github.com/verult))
+
 
 
 # v1.8.9
