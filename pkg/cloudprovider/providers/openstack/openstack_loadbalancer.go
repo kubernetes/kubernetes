@@ -367,7 +367,7 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		_, err := loadbalancers.Get(client, loadbalancerID).Extract()
 		if err != nil {
-			if err == ErrNotFound {
+			if isNotFound(err) {
 				return true, nil
 			}
 			return false, err
