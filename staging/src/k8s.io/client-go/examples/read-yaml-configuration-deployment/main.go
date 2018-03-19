@@ -26,9 +26,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/client-go/kubernetes"
@@ -90,24 +90,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Check "kind: deployment"
-	if jsonDeployment.GetObjectKind().GroupVersionKind().Kind != "Deployment" {
-		panic(fmt.Sprintf("\nError: Not \"Kind: Deployment\"\n%#v\n", jsonDeployment))
-	}
-
-	// Marshall JSON deployment
-	d, err := json.Marshal(&jsonDeployment)
-	if err != nil {
-		panic(err)
-	}
-
-	// Unmarshall JSON into deployment struct
-	var deployment appsv1beta1.Deployment
-	err = json.Unmarshal(d, &deployment)
-	if err != nil {
-		panic(err)
-	}
+	deployment := jsonDeployment.(*v1.Deployment)
 
 	// Read second resource - expecting service with size < 1024
 	yamlService := make([]byte, 1024)
@@ -125,10 +108,7 @@ func main() {
 		panic(err)
 	}
 
-	// Check "kind: service"
-	if jsonService.GetObjectKind().GroupVersionKind().Kind != "Service" {
-		panic(fmt.Sprintf("Error: Not \"Kind: Service\"\n%#v\n", jsonService))
-	}
+	service := jsonService.(*corev1.Service)
 
 	// Marshall JSON Service
 	s, err := json.Marshal(&jsonService)
@@ -137,7 +117,6 @@ func main() {
 	}
 
 	//Unmarshall JSON into service struct
-	var service corev1.Service
 	err = json.Unmarshal(s, &service)
 	if err != nil {
 		panic(err)
@@ -155,20 +134,21 @@ func main() {
 	}
 
 	// Create client for deployments
-	deploymentsClient := clientset.AppsV1beta1().Deployments(corev1.NamespaceDefault)
+	deploymentsClient := clientset.AppsV1().Deployments(corev1.NamespaceDefault)
 
 	// Create client for services
 	servicesClient := clientset.CoreV1().Services(corev1.NamespaceDefault)
 
-	// create deployment - try update on error
+	// create deployment - try update on IsAlreadyExists error
 	fmt.Printf("Create deployment %q\n", deployment.Name)
-	createdDeployment, err := deploymentsClient.Create(&deployment)
-	if err != nil {
+	createdDeployment, err := deploymentsClient.Create(deployment)
+
+	if errors.IsAlreadyExists(err) {
 		fmt.Printf("Info: %s\n\n", err)
 
 		// update deployment
 		fmt.Printf("Update deployment %q\n", deployment.Name)
-		updatedDeployment, err := deploymentsClient.Update(&deployment)
+		updatedDeployment, err := deploymentsClient.Update(deployment)
 		if err != nil {
 			panic(err)
 		}
@@ -177,38 +157,20 @@ func main() {
 		fmt.Printf("Deployment %q created\n\n", createdDeployment.Name)
 	}
 
-	// create service - try update on error
+	// create service - try update on IsAlreadyExists error
 	fmt.Printf("Create service %q\n", service.Name)
-	createdService, err := servicesClient.Create(&service)
-	if err != nil {
+	createdService, err := servicesClient.Create(service)
+	if errors.IsAlreadyExists(err) {
 		fmt.Printf("Info: %s\n\n", err)
 
 		// update service
 		fmt.Printf("Update service %q\n", service.Name)
-		updatedService, err := deploymentsClient.Update(&deployment)
+		updatedService, err := servicesClient.Update(service)
 		if err != nil {
 			panic(err)
 		}
 		fmt.Printf("Service %q updated\n", updatedService.Name)
 	} else {
 		fmt.Printf("Service %q created\n", createdService.Name)
-	}
-
-	// Get the port number by service's name
-	runningService, err := servicesClient.Get(service.Name, metav1.GetOptions{})
-	if err != nil {
-		panic(err)
-	}
-
-	// Get Pod "kube-addon-manager-minikube" of "kube-system" to retrieve 'minikube ip'
-	//
-	// Only valid for a minikube environment
-	//
-	pod, err := clientset.CoreV1().Pods("kube-system").Get("kube-addon-manager-minikube", metav1.GetOptions{})
-	if err != nil {
-		fmt.Printf("\nInfo: %s", err)
-		fmt.Printf("\nPlease help yourself and view: http://<ip-address>:%v\n\n", runningService.Spec.Ports[0].NodePort)
-	} else {
-		fmt.Printf("\nPlease view: http://%s:%v\n\n", pod.Status.HostIP, runningService.Spec.Ports[0].NodePort)
 	}
 }
