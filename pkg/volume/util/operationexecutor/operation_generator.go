@@ -889,7 +889,13 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
 		}
-
+		// Update actual state of world to reflect volume is globally mounted for non-attachable plugin
+		markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
+			volumeToMount.VolumeName, devicePath, globalMapPath)
+		if markDeviceMappedErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
+		}
 		// Take filedescriptor lock to keep a block device opened. Otherwise, there is a case
 		// that the block device is silently removed and attached another device with same name.
 		// Container runtime can't handler this problem. To avoid unexpected condition fd lock
