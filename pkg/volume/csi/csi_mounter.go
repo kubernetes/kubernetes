@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/golang/glog"
 	grpctx "golang.org/x/net/context"
@@ -43,13 +44,15 @@ var (
 		volHandle,
 		driverName,
 		nodeName,
-		attachmentID string
+		attachmentID,
+		readOnly string
 	}{
 		"specVolID",
 		"volumeHandle",
 		"driverName",
 		"nodeName",
 		"attachmentID",
+		"readOnly",
 	}
 )
 
@@ -160,6 +163,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	glog.V(4).Info(log("created target path successfully [%s]", dir))
 
+	readOnly, err := getReadOnlyFromSpec(c.spec)
 	// persist volume info data for teardown
 	volData := map[string]string{
 		volDataKey.specVolID:    c.spec.Name(),
@@ -167,6 +171,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		volDataKey.driverName:   csiSource.Driver,
 		volDataKey.nodeName:     nodeName,
 		volDataKey.attachmentID: attachID,
+		volDataKey.readOnly:     strconv.FormatBool(readOnly),
 	}
 
 	if err := saveVolumeData(c.plugin, c.podUID, c.spec.Name(), volData); err != nil {
