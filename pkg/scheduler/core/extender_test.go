@@ -113,10 +113,15 @@ type FakeExtender struct {
 	nodeCacheCapable bool
 	filteredNodes    []*v1.Node
 	unInterested     bool
+	ignorable        bool
 
 	// Cached node information for fake extender
 	cachedNodeNameToInfo map[string]*schedulercache.NodeInfo
 	cachedPDBs           []*policy.PodDisruptionBudget
+}
+
+func (f *FakeExtender) IsIgnorable() bool {
+	return f.ignorable
 }
 
 func (f *FakeExtender) SupportsPreemption() bool {
@@ -455,6 +460,28 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			expectsErr:   false,
 			expectedHost: "machine2", // machine2 has higher score
 			name:         "test 8",
+		},
+		{
+			// Scheduling is expected to not fail in
+			// Filter/Prioritize phases if the extender is not available and ignorable.
+			//
+			// If scheduler did not ignore the extender, the test will fail
+			// because of the errors from errorPredicateExtender.
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			extenders: []FakeExtender{
+				{
+					predicates: []fitPredicate{errorPredicateExtender},
+					ignorable:  true,
+				},
+				{
+					predicates: []fitPredicate{machine1PredicateExtender},
+				},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectsErr:   false,
+			expectedHost: "machine1",
+			name:         "test 9",
 		},
 	}
 

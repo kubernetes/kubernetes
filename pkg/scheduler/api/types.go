@@ -192,6 +192,9 @@ type ExtenderConfig struct {
 	//   will skip checking the resource in predicates.
 	// +optional
 	ManagedResources []ExtenderManagedResource
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool
 }
 
 // ExtenderPreemptionResult represents the result returned by preemption phase of extender.
