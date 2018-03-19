@@ -23,6 +23,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -198,4 +199,29 @@ func ReplaceDaemonSetPodHostnameNodeAffinity(affinity *v1.Affinity, nodename str
 	nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTerms
 
 	return affinity
+}
+
+// AppendNoScheduleTolerationIfNotExist appends unschedulable toleration to `.spec` if not exist; otherwise,
+// no changes to `.spec.tolerations`.
+func AppendNoScheduleTolerationIfNotExist(tolerations []v1.Toleration) []v1.Toleration {
+	unschedulableToleration := v1.Toleration{
+		Key:      algorithm.TaintNodeUnschedulable,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	}
+
+	unschedulableTaintExist := false
+
+	for _, t := range tolerations {
+		if apiequality.Semantic.DeepEqual(t, unschedulableToleration) {
+			unschedulableTaintExist = true
+			break
+		}
+	}
+
+	if !unschedulableTaintExist {
+		tolerations = append(tolerations, unschedulableToleration)
+	}
+
+	return tolerations
 }

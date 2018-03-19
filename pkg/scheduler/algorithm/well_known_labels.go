@@ -36,6 +36,11 @@ const (
 	// It is deprecated since 1.9
 	DeprecatedTaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 
+	// TaintNodeUnschedulable will be added when node becomes unschedulable
+	// and feature-gate for TaintNodesByCondition flag is enabled,
+	// and removed when node becomes scheduable.
+	TaintNodeUnschedulable = "node.kubernetes.io/unschedulable"
+
 	// TaintNodeOutOfDisk will be added when node becomes out of disk
 	// and feature-gate for TaintNodesByCondition flag is enabled,
 	// and removed when node has enough disk.
