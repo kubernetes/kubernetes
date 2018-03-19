@@ -470,6 +470,9 @@ type VolumeInfo struct {
 	// Whether the volume permission is set to read-only or not
 	// This value is passed from volume.spec
 	ReadOnly bool
+	// Inner volume spec name, which is the PV name if used, otherwise
+	// it is the same as the outer volume spec name.
+	InnerVolumeSpecName string
 }
 
 type VolumeMap map[string]VolumeInfo
