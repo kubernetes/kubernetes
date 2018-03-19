@@ -811,7 +811,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rm := &testRESTMapper{legacyscheme.Registry.RESTMapper()}
+	rm := &testRESTMapper{api.Registry.RESTMapper()}
 	metaOnlyClientPool := dynamic.NewClientPool(clientConfig, rm, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(clientConfig, rm, dynamic.LegacyAPIPathResolverFunc)
 	podResource := map[schema.GroupVersionResource]struct{}{
