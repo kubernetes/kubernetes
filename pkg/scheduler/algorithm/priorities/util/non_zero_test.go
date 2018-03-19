@@ -29,20 +29,33 @@ func TestGetNonzeroRequests(t *testing.T) {
 	tds := []struct {
 		name           string
 		requests       v1.ResourceList
+		capacity       v1.ResourceList
 		expectedCPU    int64
 		expectedMemory int64
 	}{
 		{
 			"cpu_and_memory_not_found",
 			v1.ResourceList{},
+			nil,
 			DefaultMilliCPURequest,
 			DefaultMemoryRequest,
+		},
+		{
+			"cpu_and_memory_not_found",
+			v1.ResourceList{},
+			v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("400Mi"),
+			},
+			int64(DefaultMilliCPURequestFraction * 200),
+			int64(DefaultMemoryRequestFraction * 400 * 1024 * 1024),
 		},
 		{
 			"only_cpu_exist",
 			v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("200m"),
 			},
+			nil,
 			200,
 			DefaultMemoryRequest,
 		},
@@ -51,6 +64,7 @@ func TestGetNonzeroRequests(t *testing.T) {
 			v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("400Mi"),
 			},
+			nil,
 			DefaultMilliCPURequest,
 			400 * 1024 * 1024,
 		},
@@ -60,13 +74,14 @@ func TestGetNonzeroRequests(t *testing.T) {
 				v1.ResourceCPU:    resource.MustParse("200m"),
 				v1.ResourceMemory: resource.MustParse("400Mi"),
 			},
+			nil,
 			200,
 			400 * 1024 * 1024,
 		},
 	}
 
 	for _, td := range tds {
-		realCPU, realMemory := GetNonzeroRequests(&td.requests)
+		realCPU, realMemory := GetNonzeroRequests(&td.requests, &td.capacity)
 		assert.EqualValuesf(t, td.expectedCPU, realCPU, "Failed to test: %s", td.name)
 		assert.EqualValuesf(t, td.expectedMemory, realMemory, "Failed to test: %s", td.name)
 	}

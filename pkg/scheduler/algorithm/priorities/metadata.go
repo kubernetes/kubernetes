@@ -61,7 +61,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		return nil
 	}
 	return &priorityMetadata{
-		nonZeroRequest:          getNonZeroRequests(pod),
+		nonZeroRequest:          getNonZeroRequests(pod, nil),
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
 		affinity:                pod.Spec.Affinity,
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),

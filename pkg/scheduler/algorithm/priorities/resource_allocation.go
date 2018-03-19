@@ -49,7 +49,7 @@ func (r *ResourceAllocationPriority) PriorityMap(
 		requested = *priorityMeta.nonZeroRequest
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		requested = *getNonZeroRequests(pod)
+		requested = *getNonZeroRequests(pod, &node.Status.Capacity)
 	}
 
 	requested.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
@@ -73,11 +73,11 @@ func (r *ResourceAllocationPriority) PriorityMap(
 	}, nil
 }
 
-func getNonZeroRequests(pod *v1.Pod) *schedulercache.Resource {
+func getNonZeroRequests(pod *v1.Pod, capacity *v1.ResourceList) *schedulercache.Resource {
 	result := &schedulercache.Resource{}
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
-		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests)
+		cpu, memory := priorityutil.GetNonzeroRequests(&container.Resources.Requests, capacity)
 		result.MilliCPU += cpu
 		result.Memory += memory
 	}
