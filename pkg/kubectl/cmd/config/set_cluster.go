@@ -181,29 +181,14 @@ func (o setClusterOptions) validate() error {
 		if caPath == "" {
 			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
-		fileSize, err := getFileSize(caPath)
+		caFileInfo, err := os.Stat(caPath)
 		if err != nil {
 			return err
 		}
-		if fileSize <= 0 {
+		if caFileInfo.Size() <= 0 {
 			return fmt.Errorf("you must specify a non-empty certificate authority file: %v", caPath)
 		}
 	}
 
 	return nil
-}
-
-// getFileSize attempt open file and get file size.
-// we want to support 'process substitution', so only get stat not read data.
-func getFileSize(filepath string) (int64, error) {
-	f, err := os.Open(filepath)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		return 0, err
-	}
-	return fi.Size(), nil
 }
