@@ -418,7 +418,7 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 }
 
 func (d *deploymentTester) waitRSStable(replicaset *v1beta1.ReplicaSet) error {
-	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
+	return testutil.WaitExtensionsRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) scaleDeployment(newReplicas int32) error {

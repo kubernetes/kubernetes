@@ -81,7 +81,22 @@ func UpdateExtensionsReplicaSetWithRetries(c clientset.Interface, namespace, nam
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *extensions.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
+func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
+	desiredGeneration := rs.Generation
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return newRS.Status.ObservedGeneration >= desiredGeneration && newRS.Status.Replicas == *rs.Spec.Replicas, nil
+	}); err != nil {
+		return fmt.Errorf("failed to verify .Status.Replicas is equal to .Spec.Replicas for replicaset %q: %v", rs.Name, err)
+	}
+	return nil
+}
+
+// TODO(#55714): Remove after Deployment tests use apps/v1 ReplicaSet.
+func WaitExtensionsRSStable(t *testing.T, clientSet clientset.Interface, rs *extensions.ReplicaSet, pollInterval, pollTimeout time.Duration) error {
 	desiredGeneration := rs.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		newRS, err := clientSet.ExtensionsV1beta1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
@@ -95,6 +110,7 @@ func WaitRSStable(t *testing.T, clientSet clientset.Interface, rs *extensions.Re
 	return nil
 }
 
+// TODO(#55714): Remove after Deployment tests use apps/v1 ReplicaSet.
 func UpdateExtensionsReplicaSetStatusWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateExtensionsReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*extensions.ReplicaSet, error) {
 	var rs *extensions.ReplicaSet
 	var updateErr error
