@@ -828,19 +828,28 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 // Wait up to 10 minutes for all matching pods to become Running and at least one
 // matching pod exists.
 func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
+	return WaitForEnoughPodsWithLabelRunning(c, ns, label, -1)
+}
+
+// Wait up to 10 minutes for at least 'replicas' many pods to be Running and at least
+// one matching pod exists. If 'replicas' is < 0, wait for all matching pods running.
+func WaitForEnoughPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector, replicas int) error {
 	running := false
 	PodStore := NewPodStore(c, ns, label, fields.Everything())
 	defer PodStore.Stop()
-waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
 		pods := PodStore.List()
 		if len(pods) == 0 {
-			continue waitLoop
+			continue
 		}
+		runningPodsCount := 0
 		for _, p := range pods {
-			if p.Status.Phase != v1.PodRunning {
-				continue waitLoop
+			if p.Status.Phase == v1.PodRunning {
+				runningPodsCount++
 			}
+		}
+		if (replicas < 0 && runningPodsCount < len(pods)) || (runningPodsCount < replicas) {
+			continue
 		}
 		running = true
 		break

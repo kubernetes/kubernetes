@@ -2811,7 +2811,11 @@ func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind s
 	if err != nil {
 		return err
 	}
-	err = testutils.WaitForPodsWithLabelRunning(c, ns, selector)
+	replicas, err := getReplicasFromRuntimeObject(rtObject)
+	if err != nil {
+		return err
+	}
+	err = testutils.WaitForEnoughPodsWithLabelRunning(c, ns, selector, int(replicas))
 	if err != nil {
 		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", name, err)
 	}
