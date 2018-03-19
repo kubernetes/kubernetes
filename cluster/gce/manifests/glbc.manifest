@@ -13,7 +13,7 @@ spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: k8s.gcr.io/ingress-gce-glbc-amd64:0.9.8-alpha.2
+  - image: k8s.gcr.io/ingress-gce-glbc-amd64:1.0.0
     livenessProbe:
       httpGet:
         path: /healthz
@@ -44,7 +44,7 @@ spec:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
     - sh
     - -c
-    - 'exec /glbc --verbose --apiserver-host=http://localhost:8080 --default-backend-service=kube-system/default-http-backend --sync-period=600s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
+    - 'exec /glbc --gce-ratelimit=ga.Operations.Get,qps,10,100 --gce-ratelimit=alpha.Operations.Get,qps,10,100 --gce-ratelimit=ga.BackendServices.Get,qps,1.8,1 --gce-ratelimit=ga.HealthChecks.Get,qps,1.8,1 --gce-ratelimit=alpha.HealthChecks.Get,qps,1.8,1 --verbose --apiserver-host=http://localhost:8080 --default-backend-service=kube-system/default-http-backend --sync-period=600s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
   volumes:
   - hostPath:
       path: /etc/gce.conf
