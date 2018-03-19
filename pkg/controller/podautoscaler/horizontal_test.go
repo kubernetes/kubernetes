@@ -938,6 +938,47 @@ func TestScaleUpPerPodCMExternal(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpOneMetricInvalid(t *testing.T) {
+	tc := testCase{
+		minReplicas:      2,
+		maxReplicas:      6,
+		initialReplicas:  3,
+		desiredReplicas:  4,
+		CPUTarget:        30,
+		verifyCPUCurrent: true,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: "CheddarCheese",
+			},
+		},
+		reportedLevels:      []uint64{300, 400, 500},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpBothMetricsEmpty(t *testing.T) { // Switch to missing
+	tc := testCase{
+		minReplicas:     2,
+		maxReplicas:     6,
+		initialReplicas: 3,
+		desiredReplicas: 3,
+		CPUTarget:       0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: "CheddarCheese",
+			},
+		},
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestScaleDown(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
@@ -1076,6 +1117,63 @@ func TestScaleDownIgnoresFailedPods(t *testing.T) {
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		reportedPodPhase:     []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
 	}
+	tc.runTest(t)
+}
+
+func TestNoScaleDownOneMetricInvalid(t *testing.T) {
+	tc := testCase{
+		minReplicas:     2,
+		maxReplicas:     6,
+		initialReplicas: 5,
+		desiredReplicas: 5,
+		CPUTarget:       50,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: "CheddarCheese",
+			},
+		},
+		reportedLevels:      []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
+		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		},
+	}
+
+	tc.runTest(t)
+}
+
+func TestNoScaleDownOneMetricEmpty(t *testing.T) {
+	tc := testCase{
+		minReplicas:     2,
+		maxReplicas:     6,
+		initialReplicas: 5,
+		desiredReplicas: 5,
+		CPUTarget:       50,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricSource{
+					MetricSelector:     &metav1.LabelSelector{},
+					MetricName:         "qps",
+					TargetAverageValue: resource.NewMilliQuantity(1000, resource.DecimalSI),
+				},
+			},
+		},
+		reportedLevels:      []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
+		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
+		},
+	}
+	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
+	})
+	tc.testEMClient = testEMClient
 	tc.runTest(t)
 }
 
@@ -1640,6 +1738,35 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 		tc.metricsTarget = specs
 		tc.runTest(t)
 	}
+}
+
+func TestScaleUpOneMetricEmpty(t *testing.T) {
+	tc := testCase{
+		minReplicas:      2,
+		maxReplicas:      6,
+		initialReplicas:  3,
+		desiredReplicas:  4,
+		CPUTarget:        30,
+		verifyCPUCurrent: true,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricSource{
+					MetricSelector:     &metav1.LabelSelector{},
+					MetricName:         "qps",
+					TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+				},
+			},
+		},
+		reportedLevels:      []uint64{300, 400, 500},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
+	})
+	tc.testEMClient = testEMClient
+	tc.runTest(t)
 }
 
 func TestConditionInvalidSourceType(t *testing.T) {
