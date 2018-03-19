@@ -54,6 +54,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -66,6 +67,7 @@ import (
 const (
 	metricsPath         = "/metrics"
 	cadvisorMetricsPath = "/metrics/cadvisor"
+	proberMetricsPath   = "/metrics/probes"
 	specPath            = "/spec/"
 	statsPath           = "/stats/"
 	logsPath            = "/logs/"
@@ -279,6 +281,13 @@ func (s *Server) InstallDefaultHandlers() {
 	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabels))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+	)
+
+	// prober metrics are exposed under a different endpoint
+	p := prometheus.NewRegistry()
+	p.MustRegister(prober.ProberResults)
+	s.restfulCont.Handle(proberMetricsPath,
+		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
 
 	ws = new(restful.WebService)

@@ -58,6 +58,18 @@ func (r Result) String() string {
 	}
 }
 
+// ToPrometheusType translates a Result to a form which is better understood by prometheus.
+func (r Result) ToPrometheusType() float64 {
+	switch r {
+	case Success:
+		return 0
+	case Failure:
+		return 1
+	default:
+		return -1
+	}
+}
+
 // Update is an enum of the types of updates sent over the Updates channel.
 type Update struct {
 	ContainerID kubecontainer.ContainerID
