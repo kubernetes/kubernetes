@@ -41,6 +41,7 @@ spec:
         - containerPort: 8443
           protocol: TCP
         args:
+          # PLATFORM-SPECIFIC ARGS HERE
           - --auto-generate-certificates
         volumeMounts:
         - name: kubernetes-dashboard-certs
