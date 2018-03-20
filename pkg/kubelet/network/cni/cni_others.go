@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 )
 
-func getLoNetwork(binDir, vendorDirPrefix string) *cniNetwork {
+func getLoNetwork(binDirs []string) *cniNetwork {
 	loConfig, err := libcni.ConfListFromBytes([]byte(`{
   "cniVersion": "0.2.0",
   "name": "cni-loopback",
@@ -39,13 +39,10 @@ func getLoNetwork(binDir, vendorDirPrefix string) *cniNetwork {
 		// catch this
 		panic(err)
 	}
-	cninet := &libcni.CNIConfig{
-		Path: []string{vendorCNIDir(vendorDirPrefix, "loopback"), binDir},
-	}
 	loNetwork := &cniNetwork{
 		name:          "lo",
 		NetworkConfig: loConfig,
-		CNIConfig:     cninet,
+		CNIConfig:     &libcni.CNIConfig{Path: binDirs},
 	}
 
 	return loNetwork

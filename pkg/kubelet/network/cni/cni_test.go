@@ -47,31 +47,28 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
-func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
-	pluginDir := path.Join(testNetworkConfigPath, plugName)
-	err := os.MkdirAll(pluginDir, 0777)
-	if err != nil {
-		t.Fatalf("Failed to create plugin config dir: %v", err)
+// Returns .in file path, .out file path, and .env file path
+func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, binName string, confName string) (string, string, string) {
+	for _, dir := range []string{testBinDir, testConfDir, testDataDir} {
+		err := os.MkdirAll(dir, 0777)
+		if err != nil {
+			t.Fatalf("Failed to create test plugin dir %s: %v", dir, err)
+		}
 	}
-	pluginConfig := path.Join(pluginDir, plugName+".conf")
-	f, err := os.Create(pluginConfig)
-	if err != nil {
-		t.Fatalf("Failed to install plugin")
-	}
-	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true}  }`, plugName, vendorName)
 
+	confFile := path.Join(testConfDir, confName+".conf")
+	f, err := os.Create(confFile)
+	if err != nil {
+		t.Fatalf("Failed to install plugin %s: %v", confFile, err)
+	}
+	networkConfig := fmt.Sprintf(`{ "name": "%s", "type": "%s", "capabilities": {"portMappings": true}  }`, confName, binName)
 	_, err = f.WriteString(networkConfig)
 	if err != nil {
 		t.Fatalf("Failed to write network config file (%v)", err)
 	}
 	f.Close()
 
-	vendorCNIDir := fmt.Sprintf(VendorCNIDirTemplate, testVendorCNIDirPrefix, vendorName)
-	err = os.MkdirAll(vendorCNIDir, 0777)
-	if err != nil {
-		t.Fatalf("Failed to create plugin dir: %v", err)
-	}
-	pluginExec := path.Join(vendorCNIDir, vendorName)
+	pluginExec := path.Join(testBinDir, binName)
 	f, err = os.Create(pluginExec)
 
 	const execScriptTempl = `#!/bin/bash
@@ -83,11 +80,14 @@ mkdir -p {{.OutputDir}} &> /dev/null
 echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}
 echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 `
+	inputFile := path.Join(testDataDir, binName+".in")
+	outputFile := path.Join(testDataDir, binName+".out")
+	envFile := path.Join(testDataDir, binName+".env")
 	execTemplateData := &map[string]interface{}{
-		"InputFile":  path.Join(pluginDir, plugName+".in"),
-		"OutputFile": path.Join(pluginDir, plugName+".out"),
-		"OutputEnv":  path.Join(pluginDir, plugName+".env"),
-		"OutputDir":  pluginDir,
+		"InputFile":  inputFile,
+		"OutputFile": outputFile,
+		"OutputEnv":  envFile,
+		"OutputDir":  testDataDir,
 	}
 
 	tObj := template.Must(template.New("test").Parse(execScriptTempl))
@@ -107,6 +107,8 @@ echo -n "{ \"ip4\": { \"ip\": \"10.1.0.23/24\" } }"
 	}
 
 	f.Close()
+
+	return inputFile, outputFile, envFile
 }
 
 func tearDownPlugin(tmpDir string) {
@@ -155,8 +157,8 @@ func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {
 
 func TestCNIPlugin(t *testing.T) {
 	// install some random plugin
-	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
-	vendorName := fmt.Sprintf("test_vendor%d", rand.Intn(1000))
+	netName := fmt.Sprintf("test%d", rand.Intn(1000))
+	binName := fmt.Sprintf("test_vendor%d", rand.Intn(1000))
 
 	podIP := "10.0.0.2"
 	podIPOutput := fmt.Sprintf("4: eth0    inet %s/24 scope global dynamic eth0\\       valid_lft forever preferred_lft forever", podIP)
@@ -183,10 +185,11 @@ func TestCNIPlugin(t *testing.T) {
 	// TODO mock for the test plugin too
 
 	tmpDir := utiltesting.MkTmpdirOrDie("cni-test")
-	testNetworkConfigPath := path.Join(tmpDir, "plugins", "net", "cni")
-	testVendorCNIDirPrefix := tmpDir
+	testConfDir := path.Join(tmpDir, "etc", "cni", "net.d")
+	testBinDir := path.Join(tmpDir, "opt", "cni", "bin")
+	testDataDir := path.Join(tmpDir, "output")
 	defer tearDownPlugin(tmpDir)
-	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
+	inputFile, outputFile, outputEnv := installPluginUnderTest(t, testBinDir, testConfDir, testDataDir, binName, netName)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "test_infra_container"}
 	pods := []*containertest.FakePod{{
@@ -198,7 +201,7 @@ func TestCNIPlugin(t *testing.T) {
 		NetnsPath: "/proc/12345/ns/net",
 	}}
 
-	plugins := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), "", testVendorCNIDirPrefix)
+	plugins := ProbeNetworkPlugins(testConfDir, []string{testBinDir})
 	if len(plugins) != 1 {
 		t.Fatalf("Expected only one network plugin, got %d", len(plugins))
 	}
@@ -238,9 +241,7 @@ func TestCNIPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
-	outputEnv := path.Join(testNetworkConfigPath, pluginName, pluginName+".env")
 	eo, eerr := ioutil.ReadFile(outputEnv)
-	outputFile := path.Join(testNetworkConfigPath, pluginName, pluginName+".out")
 	output, err := ioutil.ReadFile(outputFile)
 	if err != nil || eerr != nil {
 		t.Errorf("Failed to read output file %s: %v (env %s err %v)", outputFile, err, eo, eerr)
@@ -257,7 +258,6 @@ func TestCNIPlugin(t *testing.T) {
 			PortMappings []map[string]interface{} `json:"portMappings"`
 		} `json:"runtimeConfig"`
 	}{}
-	inputFile := path.Join(testNetworkConfigPath, pluginName, pluginName+".in")
 	inputBytes, inerr := ioutil.ReadFile(inputFile)
 	parseerr := json.Unmarshal(inputBytes, &inputConfig)
 	if inerr != nil || parseerr != nil {
@@ -285,7 +285,7 @@ func TestCNIPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
-	output, err = ioutil.ReadFile(path.Join(testNetworkConfigPath, pluginName, pluginName+".out"))
+	output, err = ioutil.ReadFile(outputFile)
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))
@@ -295,7 +295,7 @@ func TestCNIPlugin(t *testing.T) {
 }
 
 func TestLoNetNonNil(t *testing.T) {
-	if conf := getLoNetwork("", ""); conf == nil {
+	if conf := getLoNetwork(nil); conf == nil {
 		t.Error("Expected non-nil lo network")
 	}
 }

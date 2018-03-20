@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 )
 
-func getLoNetwork(binDir, vendorDirPrefix string) *cniNetwork {
+func getLoNetwork(binDirs []string) *cniNetwork {
 	return nil
 }
 

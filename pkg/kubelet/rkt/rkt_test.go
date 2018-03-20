@@ -1215,6 +1215,7 @@ func TestGenerateRunCommand(t *testing.T) {
 	hostName := "test-hostname"
 	boolTrue := true
 	boolFalse := false
+	pluginDirs := []string{"/tmp"}
 
 	tests := []struct {
 		networkPlugin network.NetworkPlugin
@@ -1231,7 +1232,7 @@ func TestGenerateRunCommand(t *testing.T) {
 	}{
 		// Case #0, returns error.
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
@@ -1250,7 +1251,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 		// Case #1, returns no dns, with private-net.
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
@@ -1269,7 +1270,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 		// Case #2, returns no dns, with host-net.
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
@@ -1290,7 +1291,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 		// Case #3, returns dns, dns searches, with private-net.
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
@@ -1311,7 +1312,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 		// Case #4, returns no dns, dns searches, with host-network.
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
@@ -1351,7 +1352,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 		// Case #6, if all containers are privileged, the result should have 'insecure-options=all-run'
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",
@@ -1373,7 +1374,7 @@ func TestGenerateRunCommand(t *testing.T) {
 		},
 		// Case #7, if not all containers are privileged, the result should not have 'insecure-options=all-run'
 		{
-			kubenet.NewPlugin("/tmp"),
+			kubenet.NewPlugin(pluginDirs),
 			&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod-name-foo",

@@ -114,12 +114,12 @@ func GetDynamicPluginProber(pluginDir string) volume.DynamicPluginProber {
 }
 
 // ProbeNetworkPlugins collects all compiled-in plugins
-func ProbeNetworkPlugins(cniConfDir, cniBinDir string) []network.NetworkPlugin {
+func ProbeNetworkPlugins(cniConfDir string, cniBinDirs []string) []network.NetworkPlugin {
 	allPlugins := []network.NetworkPlugin{}
 
 	// for each existing plugin, add to the list
-	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, cniBinDir)...)
-	allPlugins = append(allPlugins, kubenet.NewPlugin(cniBinDir))
+	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(cniConfDir, cniBinDirs)...)
+	allPlugins = append(allPlugins, kubenet.NewPlugin(cniBinDirs))
 
 	return allPlugins
 }

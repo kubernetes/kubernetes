@@ -110,10 +110,10 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
-	// PluginBinDir is the directory in which the binaries for the plugin with
-	// PluginName is kept. The admin is responsible for provisioning these
-	// binaries before-hand.
-	PluginBinDir string
+	// PluginBinDirs is an array of directories in which the binaries for
+	// the plugin with PluginName may be found. The admin is responsible for
+	// provisioning these binaries before-hand.
+	PluginBinDirs []string
 	// PluginConfDir is the directory in which the admin places a CNI conf.
 	// Depending on the plugin, this may be an optional field, eg: kubenet
 	// generates its own plugin conf.
@@ -229,8 +229,8 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 		}
 	}
 	// dockershim currently only supports CNI plugins.
-	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDir)
-	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
+	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDirs)
+	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDirs))
 	netHost := &dockerNetworkHost{
 		pluginSettings.LegacyRuntimeHost,
 		&namespaceGetter{ds},

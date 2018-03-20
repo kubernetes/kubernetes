@@ -79,6 +79,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -587,7 +588,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		NonMasqueradeCIDR: nonMasqueradeCIDR,
 		PluginName:        crOptions.NetworkPluginName,
 		PluginConfDir:     crOptions.CNIConfDir,
-		PluginBinDir:      crOptions.CNIBinDir,
+		PluginBinDirs:     cni.SplitDirs(crOptions.CNIBinDir),
 		MTU:               int(crOptions.NetworkPluginMTU),
 	}
 
