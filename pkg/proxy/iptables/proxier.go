@@ -214,7 +214,7 @@ type Proxier struct {
 	mu           sync.Mutex // protects the following fields
 	serviceMap   proxy.ServiceMap
 	endpointsMap proxy.EndpointsMap
-	portsMap     map[utilproxy.LocalPort]utilproxy.Closeable
+	portsHolder  *utilnet.PortHolder
 	// endpointsSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating iptables
 	// with some partial data after kube-proxy restart.
@@ -231,7 +231,7 @@ type Proxier struct {
 	clusterCIDR    string
 	hostname       string
 	nodeIP         net.IP
-	portMapper     utilproxy.PortOpener
+	portMapper     utilnet.PortOpener
 	recorder       record.EventRecorder
 	healthChecker  healthcheck.Server
 	healthzServer  healthcheck.HealthzUpdater
@@ -260,8 +260,8 @@ type Proxier struct {
 type listenPortOpener struct{}
 
 // OpenLocalPort holds the given local port open.
-func (l *listenPortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
-	return openLocalPort(lp)
+func (l *listenPortOpener) OpenLocalPort(IP string, port int, proto, desc string) (utilnet.Closeable, error) {
+	return utilnet.OpenLocalPort(IP, port, proto, desc)
 }
 
 // Proxier implements ProxyProvider
@@ -317,19 +317,19 @@ func NewProxier(ipt utiliptables.Interface,
 
 	isIPv6 := ipt.IsIpv6()
 	proxier := &Proxier{
-		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		serviceMap:               make(proxy.ServiceMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
-		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder),
-		iptables:                 ipt,
-		masqueradeAll:            masqueradeAll,
-		masqueradeMark:           masqueradeMark,
-		exec:                     exec,
-		clusterCIDR:              clusterCIDR,
-		hostname:                 hostname,
-		nodeIP:                   nodeIP,
-		portMapper:               &listenPortOpener{},
+		portsHolder:      utilnet.NewPortHolder(),
+		serviceMap:       make(proxy.ServiceMap),
+		serviceChanges:   proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
+		endpointsMap:     make(proxy.EndpointsMap),
+		endpointsChanges: proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder),
+		iptables:         ipt,
+		masqueradeAll:    masqueradeAll,
+		masqueradeMark:   masqueradeMark,
+		exec:             exec,
+		clusterCIDR:      clusterCIDR,
+		hostname:         hostname,
+		nodeIP:           nodeIP,
+		// portMapper:               &listenPortOpener{},
 		recorder:                 recorder,
 		healthChecker:            healthChecker,
 		healthzServer:            healthzServer,
@@ -730,9 +730,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Accumulate NAT chains to keep.
 	activeNATChains := map[utiliptables.Chain]bool{} // use a map as a set
 
-	// Accumulate the set of local ports that we will be holding open once this update is complete
-	replacementPortsMap := map[utilproxy.LocalPort]utilproxy.Closeable{}
-
 	// We are creating those slices ones here to avoid memory reallocations
 	// in every loop. Note that reuse the memory, instead of doing:
 	//   slice = <some new slice>
@@ -821,19 +818,15 @@ func (proxier *Proxier) syncProxyRules() {
 			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
 			} else if local {
-				lp := utilproxy.LocalPort{
-					Description: "externalIP for " + svcNameString,
-					IP:          externalIP,
-					Port:        svcInfo.Port,
-					Protocol:    protocol,
-				}
-				if proxier.portsMap[lp] != nil {
-					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
-					replacementPortsMap[lp] = proxier.portsMap[lp]
+				desc := "externalIP for " + svcNameString
+				lpStr := utilnet.ToLocalPortString(externalIP, svcInfo.Port, protocol, desc)
+				if proxier.portsHolder.Old[lpStr] != nil {
+					glog.V(4).Infof("Port %s was open before and is still needed", lpStr)
+					proxier.portsHolder.Current[lpStr] = proxier.portsHolder.Old[lpStr]
 				} else {
-					socket, err := proxier.portMapper.OpenLocalPort(&lp)
+					socket, err := proxier.portMapper.OpenLocalPort(externalIP, svcInfo.Port, protocol, desc)
 					if err != nil {
-						msg := fmt.Sprintf("can't open %s, skipping this externalIP: %v", lp.String(), err)
+						msg := fmt.Sprintf("can't open %s, skipping this externalIP: %v", lpStr, err)
 
 						proxier.recorder.Eventf(
 							&v1.ObjectReference{
@@ -845,7 +838,7 @@ func (proxier *Proxier) syncProxyRules() {
 						glog.Error(msg)
 						continue
 					}
-					replacementPortsMap[lp] = socket
+					proxier.portsHolder.Current[lpStr] = socket
 				}
 			}
 
@@ -960,32 +953,28 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.NodePort != 0 {
 			// Hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			lp := utilproxy.LocalPort{
-				Description: "nodePort for " + svcNameString,
-				IP:          "",
-				Port:        svcInfo.NodePort,
-				Protocol:    protocol,
-			}
-			if proxier.portsMap[lp] != nil {
-				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
-				replacementPortsMap[lp] = proxier.portsMap[lp]
+			desc := "nodePort for " + svcNameString
+			lpStr := utilnet.ToLocalPortString("", svcInfo.NodePort, protocol, desc)
+			if proxier.portsHolder.Old[lpStr] != nil {
+				glog.V(4).Infof("Port %s was open before and is still needed", lpStr)
+				proxier.portsHolder.Current[lpStr] = proxier.portsHolder.Old[lpStr]
 			} else {
-				socket, err := proxier.portMapper.OpenLocalPort(&lp)
+				socket, err := proxier.portMapper.OpenLocalPort("", svcInfo.NodePort, protocol, desc)
 				if err != nil {
-					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
+					glog.Errorf("can't open %s, skipping this nodePort: %v", lpStr, err)
 					continue
 				}
-				if lp.Protocol == "udp" {
+				if protocol == "udp" {
 					// TODO: We might have multiple services using the same port, and this will clear conntrack for all of them.
 					// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
 					// This only affects UDP connections, which are not common.
 					// See issue: https://github.com/kubernetes/kubernetes/issues/49881
-					err := conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
+					err := conntrack.ClearEntriesForPort(proxier.exec, svcInfo.NodePort, isIPv6, v1.ProtocolUDP)
 					if err != nil {
-						glog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.Port, err)
+						glog.Errorf("Failed to clear udp conntrack for port %d, error: %v", svcInfo.NodePort, err)
 					}
 				}
-				replacementPortsMap[lp] = socket
+				proxier.portsHolder.Current[lpStr] = socket
 			}
 
 			if hasEndpoints {
@@ -1285,17 +1274,13 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.Errorf("Failed to execute iptables-restore: %v", err)
 		// Revert new local ports.
 		glog.V(2).Infof("Closing local ports after iptables-restore failure")
-		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
+		utilnet.CloseUnneededPorts(proxier.portsHolder.Current, proxier.portsHolder.Old)
 		return
 	}
 
 	// Close old local ports and save new ones.
-	for k, v := range proxier.portsMap {
-		if replacementPortsMap[k] == nil {
-			v.Close()
-		}
-	}
-	proxier.portsMap = replacementPortsMap
+	utilnet.CloseUnneededPorts(proxier.portsHolder.Old, proxier.portsHolder.Current)
+	proxier.portsHolder.Old = proxier.portsHolder.Current
 
 	// Update healthz timestamp.
 	if proxier.healthzServer != nil {
@@ -1333,42 +1318,4 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 			buf.WriteByte('\n')
 		}
 	}
-}
-
-func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
-	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
-	// This ensures a) that it's safe to use that port and b) that (a) stays
-	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
-	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
-	// would never know.
-	// NOTE: We should not need to have a real listen()ing socket - bind()
-	// should be enough, but I can't figure out a way to e2e test without
-	// it.  Tools like 'ss' and 'netstat' do not show sockets that are
-	// bind()ed but not listen()ed, and at least the default debian netcat
-	// has no way to avoid about 10 seconds of retries.
-	var socket utilproxy.Closeable
-	switch lp.Protocol {
-	case "tcp":
-		listener, err := net.Listen("tcp", net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port)))
-		if err != nil {
-			return nil, err
-		}
-		socket = listener
-	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port)))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-		socket = conn
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", lp.Protocol)
-	}
-	glog.V(2).Infof("Opened local port %s", lp.String())
-	return socket, nil
 }

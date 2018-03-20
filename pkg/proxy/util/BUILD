@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "endpoints.go",
         "network.go",
-        "port.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/util",
@@ -26,7 +25,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "endpoints_test.go",
-        "port_test.go",
         "utils_test.go",
     ],
     embed = [":go_default_library"],

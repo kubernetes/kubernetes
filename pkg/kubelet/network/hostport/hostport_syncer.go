@@ -29,6 +29,7 @@ import (
 
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // HostportSyncer takes a list of PodPortMappings and implements hostport all at once
@@ -43,16 +44,16 @@ type HostportSyncer interface {
 }
 
 type hostportSyncer struct {
-	hostPortMap map[hostport]closeable
+	hostPortMap map[string]utilnet.Closeable
 	iptables    utiliptables.Interface
 	portOpener  hostportOpener
 }
 
 func NewHostportSyncer(iptables utiliptables.Interface) HostportSyncer {
 	return &hostportSyncer{
-		hostPortMap: make(map[hostport]closeable),
+		hostPortMap: make(map[string]utilnet.Closeable),
 		iptables:    iptables,
-		portOpener:  openLocalPort,
+		portOpener:  utilnet.OpenLocalPort,
 	}
 }
 
@@ -61,36 +62,28 @@ type targetPod struct {
 	podIP       string
 }
 
-func (hp *hostport) String() string {
-	return fmt.Sprintf("%s:%d", hp.protocol, hp.port)
-}
-
 // openHostports opens all hostport for pod and returns the map of hostport and socket
 func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error {
 	var retErr error
-	ports := make(map[hostport]closeable)
+	ports := make(map[string]utilnet.Closeable)
 	for _, port := range podHostportMapping.PortMappings {
 		if port.HostPort <= 0 {
 			// Assume hostport is not specified in this portmapping. So skip
 			continue
 		}
-		hp := hostport{
-			port:     port.HostPort,
-			protocol: strings.ToLower(string(port.Protocol)),
-		}
-		socket, err := h.portOpener(&hp)
+		socket, err := h.portOpener("", int(port.HostPort), strings.ToLower(string(port.Protocol)), "")
 		if err != nil {
 			retErr = fmt.Errorf("cannot open hostport %d for pod %s: %v", port.HostPort, getPodFullName(podHostportMapping), err)
 			break
 		}
-		ports[hp] = socket
+		ports[utilnet.ToLocalPortString("", int(port.HostPort), strings.ToLower(string(port.Protocol)), "")] = socket
 	}
 
 	// If encounter any error, close all hostports that just got opened.
 	if retErr != nil {
 		for hp, socket := range ports {
 			if err := socket.Close(); err != nil {
-				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podHostportMapping), err)
+				glog.Errorf("Cannot clean up hostport %s for pod %s: %v", hp, getPodFullName(podHostportMapping), err)
 			}
 		}
 		return retErr
@@ -284,20 +277,17 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 // cleanupHostportMap closes obsolete hostports
 func (h *hostportSyncer) cleanupHostportMap(containerPortMap map[*PortMapping]targetPod) {
 	// compute hostports that are supposed to be open
-	currentHostports := make(map[hostport]bool)
+	currentHostports := make(map[string]bool)
 	for containerPort := range containerPortMap {
-		hp := hostport{
-			port:     containerPort.HostPort,
-			protocol: strings.ToLower(string(containerPort.Protocol)),
-		}
-		currentHostports[hp] = true
+		hpStr := utilnet.ToLocalPortString("", int(containerPort.HostPort), strings.ToLower(string(containerPort.Protocol)), "")
+		currentHostports[hpStr] = true
 	}
 
 	// close and delete obsolete hostports
 	for hp, socket := range h.hostPortMap {
 		if _, ok := currentHostports[hp]; !ok {
 			socket.Close()
-			glog.V(3).Infof("Closed local port %s", hp.String())
+			glog.V(3).Infof("Closed local port %s", hp)
 			delete(h.hostPortMap, hp)
 		}
 	}
