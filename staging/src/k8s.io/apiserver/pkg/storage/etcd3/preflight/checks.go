@@ -26,12 +26,6 @@ import (
 
 const connectionTimeout = 1 * time.Second
 
-type connection interface {
-	serverReachable(address string) bool
-	parseServerList(serverList []string) error
-	CheckEtcdServers() (bool, error)
-}
-
 // EtcdConnection holds the Etcd server list
 type EtcdConnection struct {
 	ServerList []string
