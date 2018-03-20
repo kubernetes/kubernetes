@@ -1054,6 +1054,8 @@ func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
 
 // addPodEvictorForNewZone checks if new zone appeared, and if so add new evictor.
 func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
 	zone := utilnode.GetZoneKey(node)
 	if _, found := nc.zoneStates[zone]; !found {
 		nc.zoneStates[zone] = stateInitial
