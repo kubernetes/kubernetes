@@ -938,7 +938,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 
 				podTemplate := &template
 
-				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+				if false /*disabled for 1.10*/ && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 					podTemplate = template.DeepCopy()
 					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodHostnameNodeAffinity(
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
@@ -1390,7 +1390,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	var predicateFails []algorithm.PredicateFailureReason
 
 	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+	if false /*disabled for 1.10*/ && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err
