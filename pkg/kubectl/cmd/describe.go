@@ -71,7 +71,9 @@ var (
 
 func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
-	describerSettings := &printers.DescriberSettings{}
+	describerSettings := &printers.DescriberSettings{
+		ShowEvents: true,
+	}
 
 	// TODO: this should come from the factory, and may need to be loaded from the server, and so is probably
 	//   going to have to be removed
@@ -95,7 +97,7 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
+	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", describerSettings.ShowEvents, "If true, display events related to the described object.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
