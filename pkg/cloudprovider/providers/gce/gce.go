@@ -290,17 +290,11 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 		cloudConfig.NodeTags = configFile.Global.NodeTags
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
 
-		alphaFeatureGate, err := NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
-		if err != nil {
-			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
-		}
+		alphaFeatureGate := NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
 		cloudConfig.AlphaFeatureGate = alphaFeatureGate
 	} else {
 		// initialize AlphaFeatureGate when no AlphaFeatures are configured.
-		alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
-		if err != nil {
-			glog.Errorf("Encountered error for initializing alpha feature gate: %v", err)
-		}
+		alphaFeatureGate := NewAlphaFeatureGate([]string{})
 		cloudConfig.AlphaFeatureGate = alphaFeatureGate
 	}
 
