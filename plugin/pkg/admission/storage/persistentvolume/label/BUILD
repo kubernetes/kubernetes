@@ -12,7 +12,7 @@ go_library(
         "admission.go",
         "doc.go",
     ],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label",
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider:go_default_library",

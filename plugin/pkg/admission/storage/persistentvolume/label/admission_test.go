@@ -56,19 +56,19 @@ func (v *mockVolumes) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (map[st
 	return v.volumeLabels, v.volumeLabelsError
 }
 
-func (c *mockVolumes) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
+func (v *mockVolumes) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
+func (v *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
+func (v *mockVolumes) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) ResizeDisk(
+func (v *mockVolumes) ResizeDisk(
 	diskName aws.KubernetesVolumeID,
 	oldSize resource.Quantity,
 	newSize resource.Quantity) (resource.Quantity, error) {
@@ -85,7 +85,7 @@ func mockVolumeLabels(labels map[string]string) *mockVolumes {
 
 // TestAdmission
 func TestAdmission(t *testing.T) {
-	pvHandler := NewPersistentVolumeLabel()
+	pvHandler := newPersistentVolumeLabel()
 	handler := admission.NewChainHandler(pvHandler)
 	ignoredPV := api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},

@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// labels created persistent volumes with zone information
+// Package label created persistent volumes with zone information
 // as provided by the cloud provider
-package label // import "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
+package label // import "k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label"
