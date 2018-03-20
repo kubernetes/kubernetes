@@ -67,9 +67,9 @@ function kube::release::parse_and_validate_ci_version() {
 # Build final release artifacts
 function kube::release::clean_cruft() {
   # Clean out cruft
-  find ${RELEASE_STAGE} -name '*~' -exec rm {} \;
-  find ${RELEASE_STAGE} -name '#*#' -exec rm {} \;
-  find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
+  find "${RELEASE_STAGE}" -name '*~' -exec rm {} \;
+  find "${RELEASE_STAGE}" -name '#*#' -exec rm {} \;
+  find "${RELEASE_STAGE}" -name '.DS*' -exec rm {} \;
 }
 
 function kube::release::package_tarballs() {
@@ -154,7 +154,7 @@ function kube::release::package_node_tarballs() {
   local platform
   for platform in "${KUBE_NODE_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename ${platform})
+    local arch=$(basename "${platform}")
     kube::log::status "Building tarball: node $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/node/${platform_tag}/kubernetes"
@@ -198,7 +198,7 @@ function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename ${platform})
+    local arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
@@ -280,7 +280,7 @@ function kube::release::create_docker_images_for_server() {
     local binary_dir="$1"
     local arch="$2"
     local binary_name
-    local binaries=($(kube::build::get_docker_wrapped_binaries ${arch}))
+    local binaries=($(kube::build::get_docker_wrapped_binaries "${arch}"))
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
@@ -325,16 +325,16 @@ function kube::release::create_docker_images_for_server() {
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
-        rm -rf ${docker_build_path}
-        mkdir -p ${docker_build_path}
-        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+        rm -rf "${docker_build_path}"
+        mkdir -p "${docker_build_path}"
+        ln "${binary_dir}/${binary_name}" "${docker_build_path}/${binary_name}"
+        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > "${docker_file_path}"
 
-        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        "${DOCKER[@]}" tag "${docker_image_tag}" ${deprecated_image_tag} >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" ${deprecated_image_tag} > "${binary_dir}/${binary_name}.tar"
-        echo "${docker_tag}" > ${binary_dir}/${binary_name}.docker_tag
-        rm -rf ${docker_build_path}
+        "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        "${DOCKER[@]}" tag "${docker_image_tag}" "${deprecated_image_tag}" >/dev/null
+        "${DOCKER[@]}" save "${docker_image_tag}" "${deprecated_image_tag}" > "${binary_dir}/${binary_name}.tar"
+        echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
+        rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
         # If we are building an official/alpha/beta release we want to keep
@@ -350,8 +350,8 @@ function kube::release::create_docker_images_for_server() {
         else
           # not a release
           kube::log::status "Deleting docker image ${docker_image_tag}"
-          "${DOCKER[@]}" rmi ${docker_image_tag} &>/dev/null || true
-          "${DOCKER[@]}" rmi ${deprecated_image_tag} &>/dev/null || true
+          "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
+          "${DOCKER[@]}" rmi "${deprecated_image_tag}" &>/dev/null || true
         fi
       ) &
     done
@@ -434,7 +434,7 @@ function kube::release::package_test_tarball() {
   # Add the test image files
   mkdir -p "${release_stage}/test/images"
   cp -fR "${KUBE_ROOT}/test/images" "${release_stage}/test/"
-  tar c ${KUBE_TEST_PORTABLE[@]} | tar x -C ${release_stage}
+  tar c "${KUBE_TEST_PORTABLE[@]}" | tar x -C "${release_stage}"
 
   kube::release::clean_cruft
 
