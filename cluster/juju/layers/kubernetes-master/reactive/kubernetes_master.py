@@ -1135,7 +1135,7 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['etcd-certfile'] = etcd_cert
     api_opts['etcd-servers'] = etcd_connection_string
 
-    admission_control = [
+    admission_control_pre_1_9 = [
         'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
@@ -1144,19 +1144,35 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
         'DefaultTolerationSeconds'
     ]
 
+    admission_control = [
+        'NamespaceLifecycle',
+        'LimitRanger',
+        'ServiceAccount',
+        'PersistentVolumeLabel',
+        'DefaultStorageClass',
+        'DefaultTolerationSeconds',
+        'MutatingAdmissionWebhook',
+        'ValidatingAdmissionWebhook',
+        'ResourceQuota'
+    ]
+
     auth_mode = hookenv.config('authorization-mode')
     if 'Node' in auth_mode:
         admission_control.append('NodeRestriction')
 
     api_opts['authorization-mode'] = auth_mode
 
-    if get_version('kube-apiserver') < (1, 6):
+    kube_version = get_version('kube-apiserver')
+    if kube_version < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
-        admission_control.remove('DefaultTolerationSeconds')
-    if get_version('kube-apiserver') < (1, 7):
+        admission_control_pre_1_9.remove('DefaultTolerationSeconds')
+    if kube_version < (1, 7):
         hookenv.log('Removing Initializers from admission-control')
-        admission_control.remove('Initializers')
-    api_opts['admission-control'] = ','.join(admission_control)
+        admission_control_pre_1_9.remove('Initializers')
+    if kube_version < (1, 9):
+        api_opts['admission-control'] = ','.join(admission_control_pre_1_9)
+    else:
+        api_opts['admission-control'] = ','.join(admission_control)
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
     restart_apiserver()
