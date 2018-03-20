@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pvcprotection
+package storageprotection
 
 import (
 	"errors"
@@ -38,6 +38,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+
 type reaction struct {
 	verb      string
 	resource  string
@@ -49,6 +50,7 @@ const (
 	defaultPVCName  = "pvc1"
 	defaultPodName  = "pod1"
 	defaultNodeName = "node1"
+	defaultPVName   = "default-pv"
 )
 
 func pod() *v1.Pod {
@@ -109,14 +111,43 @@ func pvc() *v1.PersistentVolumeClaim {
 	}
 }
 
-func withProtectionFinalizer(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+func withPVCProtectionFinalizer(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
 	return pvc
 }
 
-func deleted(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+func pvcDeleted(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 	pvc.DeletionTimestamp = &metav1.Time{}
 	return pvc
+}
+
+func pv() *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultPVName,
+		},
+	}
+}
+
+func boundPV() *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultPVName,
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeBound,
+		},
+	}
+}
+
+func withPVProtectionFinalizer(pv *v1.PersistentVolume) *v1.PersistentVolume {
+	pv.Finalizers = append(pv.Finalizers, volumeutil.PVProtectionFinalizer)
+	return pv
+}
+
+func pvDeleted(pv *v1.PersistentVolume) *v1.PersistentVolume {
+	pv.DeletionTimestamp = &metav1.Time{}
+	return pv
 }
 
 func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionFunc {
@@ -131,7 +162,7 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 				t.Fatalf("Reactor got non-update action: %+v", action)
 			}
 			acc, _ := meta.Accessor(update.GetObject())
-			return true, nil, apierrors.NewForbidden(update.GetResource().GroupResource(), acc.GetName(), errors.New("Mock error"))
+			return true, nil, apierrors.NewForbidden(update.GetResource().GroupResource(), acc.GetName(), errors.New("mock error"))
 		}
 		// Update succeeds
 		return false, nil, nil
@@ -144,6 +175,11 @@ func TestPVCProtectionController(t *testing.T) {
 		Version:  "v1",
 		Resource: "persistentvolumeclaims",
 	}
+	pvVer := schema.GroupVersionResource{
+		Group:    v1.GroupName,
+		Version:  "v1",
+		Resource: "persistentvolumes",
+	}
 
 	tests := []struct {
 		name string
@@ -151,6 +187,9 @@ func TestPVCProtectionController(t *testing.T) {
 		initialObjects []runtime.Object
 		// Optional client reactors.
 		reactors []reaction
+		// PV event to simulate. This PV will be automatically added to
+		// initalObjects.
+		updatedPV *v1.PersistentVolume
 		// PVC event to simulate. This PVC will be automatically added to
 		// initalObjects.
 		updatedPVC *v1.PersistentVolumeClaim
@@ -165,18 +204,82 @@ func TestPVCProtectionController(t *testing.T) {
 		expectedActions []clienttesting.Action
 	}{
 		//
+		// PV events
+		//
+		{
+			name:      "PV without finalizer -> finalizer is added",
+			updatedPV: pv(),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewUpdateAction(pvVer, "", withPVProtectionFinalizer(pv())),
+			},
+		},
+		{
+			name:            "PVC with finalizer -> no action",
+			updatedPV:       withPVProtectionFinalizer(pv()),
+			expectedActions: []clienttesting.Action{},
+		},
+		{
+			name:      "saving PVC finalizer fails -> controller retries",
+			updatedPV: pv(),
+			reactors: []reaction{
+				{
+					verb:      "update",
+					resource:  "persistentvolumes",
+					reactorfn: generateUpdateErrorFunc(t, 2 /* update fails twice*/),
+				},
+			},
+			expectedActions: []clienttesting.Action{
+				// This fails
+				clienttesting.NewUpdateAction(pvVer, "", withPVProtectionFinalizer(pv())),
+				// This fails too
+				clienttesting.NewUpdateAction(pvVer, "", withPVProtectionFinalizer(pv())),
+				// This succeeds
+				clienttesting.NewUpdateAction(pvVer, "", withPVProtectionFinalizer(pv())),
+			},
+		},
+		{
+			name:      "deleted PV with finalizer -> finalizer is removed",
+			updatedPV: pvDeleted(withPVProtectionFinalizer(pv())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewUpdateAction(pvVer, "", pvDeleted(pv())),
+			},
+		},
+		{
+			name:      "finalizer removal fails -> controller retries",
+			updatedPV: pvDeleted(withPVProtectionFinalizer(pv())),
+			reactors: []reaction{
+				{
+					verb:      "update",
+					resource:  "persistentvolumes",
+					reactorfn: generateUpdateErrorFunc(t, 2 /* update fails twice*/),
+				},
+			},
+			expectedActions: []clienttesting.Action{
+				// Fails
+				clienttesting.NewUpdateAction(pvVer, "", pvDeleted(pv())),
+				// Fails too
+				clienttesting.NewUpdateAction(pvVer, "", pvDeleted(pv())),
+				// Succeeds
+				clienttesting.NewUpdateAction(pvVer, "", pvDeleted(pv())),
+			},
+		},
+		{
+			name:            "deleted PVC with finalizer + PV is bound -> finalizer is not removed",
+			updatedPV:       pvDeleted(withPVProtectionFinalizer(boundPV())),
+			expectedActions: []clienttesting.Action{},
+		},
 		// PVC events
 		//
 		{
 			name:       "PVC without finalizer -> finalizer is added",
 			updatedPVC: pvc(),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, withPVCProtectionFinalizer(pvc())),
 			},
 		},
 		{
 			name:            "PVC with finalizer -> no action",
-			updatedPVC:      withProtectionFinalizer(pvc()),
+			updatedPVC:      withPVCProtectionFinalizer(pvc()),
 			expectedActions: []clienttesting.Action{},
 		},
 		{
@@ -191,23 +294,23 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			expectedActions: []clienttesting.Action{
 				// This fails
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, withPVCProtectionFinalizer(pvc())),
 				// This fails too
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, withPVCProtectionFinalizer(pvc())),
 				// This succeeds
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, withPVCProtectionFinalizer(pvc())),
 			},
 		},
 		{
 			name:       "deleted PVC with finalizer -> finalizer is removed",
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			updatedPVC: pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 		{
 			name:       "finalizer removal fails -> controller retries",
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			updatedPVC: pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			reactors: []reaction{
 				{
 					verb:      "update",
@@ -217,11 +320,11 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			expectedActions: []clienttesting.Action{
 				// Fails
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 				// Fails too
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 				// Succeeds
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 		{
@@ -229,7 +332,7 @@ func TestPVCProtectionController(t *testing.T) {
 			initialObjects: []runtime.Object{
 				withPVC(defaultPVCName, pod()),
 			},
-			updatedPVC:      deleted(withProtectionFinalizer(pvc())),
+			updatedPVC:      pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{},
 		},
 		{
@@ -237,9 +340,9 @@ func TestPVCProtectionController(t *testing.T) {
 			initialObjects: []runtime.Object{
 				withEmptyDir(withPVC("unrelatedPVC", pod())),
 			},
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			updatedPVC: pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 		{
@@ -247,9 +350,9 @@ func TestPVCProtectionController(t *testing.T) {
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			updatedPVC: pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 		//
@@ -258,7 +361,7 @@ func TestPVCProtectionController(t *testing.T) {
 		{
 			name: "updated running Pod -> no action",
 			initialObjects: []runtime.Object{
-				deleted(withProtectionFinalizer(pvc())),
+				pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			},
 			updatedPod:      withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{},
@@ -266,31 +369,31 @@ func TestPVCProtectionController(t *testing.T) {
 		{
 			name: "updated finished Pod -> finalizer is removed",
 			initialObjects: []runtime.Object{
-				deleted(withProtectionFinalizer(pvc())),
+				pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			},
 			updatedPod: withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 		{
 			name: "updated unscheduled Pod -> finalizer is removed",
 			initialObjects: []runtime.Object{
-				deleted(withProtectionFinalizer(pvc())),
+				pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			},
 			updatedPod: unscheduled(withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 		{
 			name: "deleted running Pod -> finalizer is removed",
 			initialObjects: []runtime.Object{
-				deleted(withProtectionFinalizer(pvc())),
+				pvcDeleted(withPVCProtectionFinalizer(pvc())),
 			},
 			deletedPod: withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, pvcDeleted(pvc())),
 			},
 		},
 	}
@@ -298,6 +401,9 @@ func TestPVCProtectionController(t *testing.T) {
 	for _, test := range tests {
 		// Create client with initial data
 		objs := test.initialObjects
+		if test.updatedPV != nil {
+			objs = append(objs, test.updatedPV)
+		}
 		if test.updatedPVC != nil {
 			objs = append(objs, test.updatedPVC)
 		}
@@ -307,7 +413,9 @@ func TestPVCProtectionController(t *testing.T) {
 		client := fake.NewSimpleClientset(objs...)
 
 		// Create informers
+		// Create informers
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		pvInformer := informers.Core().V1().PersistentVolumes()
 		pvcInformer := informers.Core().V1().PersistentVolumeClaims()
 		podInformer := informers.Core().V1().Pods()
 
@@ -315,6 +423,8 @@ func TestPVCProtectionController(t *testing.T) {
 		// Get() and List() it.
 		for _, obj := range objs {
 			switch obj.(type) {
+			case *v1.PersistentVolume:
+				pvInformer.Informer().GetStore().Add(obj)
 			case *v1.PersistentVolumeClaim:
 				pvcInformer.Informer().GetStore().Add(obj)
 			case *v1.Pod:
@@ -330,9 +440,12 @@ func TestPVCProtectionController(t *testing.T) {
 		}
 
 		// Create the controller
-		ctrl := NewPVCProtectionController(pvcInformer, podInformer, client)
+		ctrl := NewStorageObjectInUseProtectionController(pvInformer, pvcInformer, podInformer, client)
 
 		// Start the test by simulating an event
+		if test.updatedPV != nil {
+			ctrl.pvAddedUpdated(test.updatedPV)
+		}
 		if test.updatedPVC != nil {
 			ctrl.pvcAddedUpdated(test.updatedPVC)
 		}
@@ -351,17 +464,22 @@ func TestPVCProtectionController(t *testing.T) {
 				t.Errorf("Test %q: timed out", test.name)
 				break
 			}
-			if ctrl.queue.Len() > 0 {
-				glog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
-				ctrl.processNextWorkItem()
+			if ctrl.pvcQueue.Len() > 0 {
+				glog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.pvcQueue.Len())
+				ctrl.runClaimWorker()
 			}
-			if ctrl.queue.Len() > 0 {
+			if ctrl.pvQueue.Len() > 0 {
+				glog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.pvQueue.Len())
+				ctrl.runVolumeWorker()
+			}
+
+			if ctrl.pvcQueue.Len() > 0 || ctrl.pvQueue.Len() > 0 {
 				// There is still some work in the queue, process it now
 				continue
 			}
 			currentActionCount := len(client.Actions())
 			if currentActionCount < len(test.expectedActions) {
-				// Do not log evey wait, only when the action count changes.
+				// Do not log every wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
 					glog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
@@ -374,23 +492,9 @@ func TestPVCProtectionController(t *testing.T) {
 			break
 		}
 		actions := client.Actions()
-		for i, action := range actions {
-			if len(test.expectedActions) < i+1 {
-				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), spew.Sdump(actions[i:]))
-				break
-			}
 
-			expectedAction := test.expectedActions[i]
-			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, spew.Sdump(expectedAction), spew.Sdump(action))
-			}
-		}
-
-		if len(test.expectedActions) > len(actions) {
-			t.Errorf("Test %q: %d additional expected actions", test.name, len(test.expectedActions)-len(actions))
-			for _, a := range test.expectedActions[len(actions):] {
-				t.Logf("    %+v", a)
-			}
+		if !reflect.DeepEqual(actions, test.expectedActions) {
+			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedActions), spew.Sdump(actions))
 		}
 
 	}

@@ -338,8 +338,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
 	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
-	controllers["pvc-protection"] = startPVCProtectionController
-	controllers["pv-protection"] = startPVProtectionController
+	controllers["storage-object-in-use-protection"] = startStorageObjectInUseProtectionController
 
 	return controllers
 }
