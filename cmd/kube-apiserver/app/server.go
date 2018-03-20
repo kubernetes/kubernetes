@@ -613,16 +613,8 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 	storageFactory.AddCohabitatingResources(extensions.Resource("podsecuritypolicies"), policy.Resource("podsecuritypolicies"))
 	for _, override := range s.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
-		if len(tokens) != 2 {
-			glog.Errorf("invalid value of etcd server overrides: %s", override)
-			continue
-		}
-
 		apiresource := strings.Split(tokens[0], "/")
-		if len(apiresource) != 2 {
-			glog.Errorf("invalid resource definition: %s", tokens[0])
-			continue
-		}
+
 		group := apiresource[0]
 		resource := apiresource[1]
 		groupResource := schema.GroupResource{Group: group, Resource: resource}
