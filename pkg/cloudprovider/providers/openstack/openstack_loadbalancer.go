@@ -552,7 +552,7 @@ func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
-		srv, err := getServerByName(compute, nodeName, true)
+		srv, err := getServerByName(compute, nodeName)
 		if err != nil {
 			return nodeSecurityGroupIDs.List(), err
 		}

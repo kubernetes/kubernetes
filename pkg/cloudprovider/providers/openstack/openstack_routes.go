@@ -297,7 +297,7 @@ func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 }
 
 func getPortIDByIP(compute *gophercloud.ServiceClient, targetNode types.NodeName, ipAddress string) (string, error) {
-	srv, err := getServerByName(compute, targetNode, true)
+	srv, err := getServerByName(compute, targetNode)
 	if err != nil {
 		return "", err
 	}
