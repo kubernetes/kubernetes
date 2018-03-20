@@ -142,13 +142,8 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 }
 
 func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
-	emptyDirVolume := &v1.Volume{
-		Name: volName,
-		VolumeSource: v1.VolumeSource{
-			EmptyDir: &v1.EmptyDirVolumeSource{},
-		},
-	}
-	return volume.NewSpecFromVolume(emptyDirVolume), nil
+	//  To reconstruct volume spec we need source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct emptyDir volume spec from volume mountpath")
 }
 
 // mountDetector abstracts how to find what kind of mount a path is backed by.

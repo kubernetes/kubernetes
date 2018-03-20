@@ -177,16 +177,8 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 }
 
 func (plugin *azureFilePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
-	azureVolume := &v1.Volume{
-		Name: volName,
-		VolumeSource: v1.VolumeSource{
-			AzureFile: &v1.AzureFileVolumeSource{
-				SecretName: volName,
-				ShareName:  volName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(azureVolume), nil
+	//  To reconstruct volume spec we need source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct azure_file volume spec from volume mountpath")
 }
 
 // azureFile volumes represent mount of an AzureFile share.

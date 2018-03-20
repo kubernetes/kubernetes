@@ -168,16 +168,8 @@ func (plugin *cephfsPlugin) newUnmounterInternal(volName string, podUID types.UI
 }
 
 func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	cephfsVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			CephFS: &v1.CephFSVolumeSource{
-				Monitors: []string{},
-				Path:     mountPath,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(cephfsVolume), nil
+	//  To reconstruct volume spec we need source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct cephfs volume spec from volume mountpath")
 }
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.

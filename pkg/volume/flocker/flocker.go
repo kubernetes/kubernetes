@@ -181,15 +181,8 @@ func (p *flockerPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 }
 
 func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	flockerVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			Flocker: &v1.FlockerVolumeSource{
-				DatasetName: volumeName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(flockerVolume), nil
+	//  To reconstruct volume spec we need flocker source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct flocker volume spec from volume mountpath")
 }
 
 func (b *flockerVolume) GetDatasetUUID() (datasetUUID string, err error) {
