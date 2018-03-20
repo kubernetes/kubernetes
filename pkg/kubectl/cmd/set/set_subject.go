@@ -96,12 +96,12 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 	usage := "the resource to update the subjects"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArrayVar(&options.Users, "user", []string{}, "Usernames to bind to the role")
-	cmd.Flags().StringArrayVar(&options.Groups, "group", []string{}, "Groups to bind to the role")
-	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", []string{}, "Service accounts to bind to the role")
+	cmd.Flags().StringArrayVar(&options.Users, "user", options.Users, "Usernames to bind to the role")
+	cmd.Flags().StringArrayVar(&options.Groups, "group", options.Groups, "Groups to bind to the role")
+	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", options.ServiceAccounts, "Service accounts to bind to the role")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }

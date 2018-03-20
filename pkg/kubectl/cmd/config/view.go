@@ -93,9 +93,9 @@ func NewCmdConfigView(f cmdutil.Factory, out, errOut io.Writer, ConfigAccess cli
 	options.Merge.Default(true)
 	mergeFlag := cmd.Flags().VarPF(&options.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
 	mergeFlag.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "Display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
-	cmd.Flags().BoolVar(&options.Minify, "minify", false, "Remove all information not used by current-context from the output")
+	cmd.Flags().BoolVar(&options.RawByteData, "raw", options.RawByteData, "Display raw byte data")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", options.Flatten, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Minify, "minify", options.Minify, "Remove all information not used by current-context from the output")
 	return cmd
 }
 
