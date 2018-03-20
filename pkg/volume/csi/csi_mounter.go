@@ -249,11 +249,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return nil
 	}
 
-	if err != nil {
-		glog.Error(log("mounter.TearDownAt failed to get CSI persistent source: %v", err))
-		return err
-	}
-
 	// load volume info from file
 	dataDir := path.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
