@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/consts/admission"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
@@ -64,7 +65,7 @@ type AdmissionRequest struct {
 	// +optional
 	Namespace string
 	// Operation is the operation being performed
-	Operation Operation
+	Operation admission.Operation
 	// UserInfo is information about the requesting user
 	UserInfo authentication.UserInfo
 	// Object is the object from the incoming request prior to default values being applied
@@ -91,24 +92,5 @@ type AdmissionResponse struct {
 	Patch []byte
 	// PatchType indicates the form the Patch will take. Currently we only support "JSONPatch".
 	// +optional
-	PatchType *PatchType
+	PatchType *admission.PatchType
 }
-
-// PatchType is the type of patch being used to represent the mutated object
-type PatchType string
-
-// PatchType constants.
-const (
-	PatchTypeJSONPatch PatchType = "JSONPatch"
-)
-
-// Operation is the type of resource operation being checked for admission control
-type Operation string
-
-// Operation constants
-const (
-	Create  Operation = "CREATE"
-	Update  Operation = "UPDATE"
-	Delete  Operation = "DELETE"
-	Connect Operation = "CONNECT"
-)

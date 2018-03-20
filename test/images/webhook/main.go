@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/consts/admission"
 	// TODO: try this library to see if it generates correct json patch
 	// https://github.com/mattbaird/jsonpatch
 )
@@ -139,7 +140,7 @@ func mutatePods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	reviewResponse.Allowed = true
 	if pod.Name == "webhook-to-be-mutated" {
 		reviewResponse.Patch = []byte(addInitContainerPatch)
-		pt := v1beta1.PatchTypeJSONPatch
+		pt := admission.PatchTypeJSONPatch
 		reviewResponse.PatchType = &pt
 	}
 	return &reviewResponse
@@ -198,7 +199,7 @@ func mutateConfigmaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 		reviewResponse.Patch = []byte(patch2)
 	}
 
-	pt := v1beta1.PatchTypeJSONPatch
+	pt := admission.PatchTypeJSONPatch
 	reviewResponse.PatchType = &pt
 
 	return &reviewResponse
@@ -227,7 +228,7 @@ func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	if cr.Data["mutation-stage-1"] == "yes" {
 		reviewResponse.Patch = []byte(patch2)
 	}
-	pt := v1beta1.PatchTypeJSONPatch
+	pt := admission.PatchTypeJSONPatch
 	reviewResponse.PatchType = &pt
 	return &reviewResponse
 }

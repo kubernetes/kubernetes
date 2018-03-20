@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/consts/admission"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -62,7 +63,7 @@ type AdmissionRequest struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,6,opt,name=namespace"`
 	// Operation is the operation being performed
-	Operation Operation `json:"operation" protobuf:"bytes,7,opt,name=operation"`
+	Operation admission.Operation `json:"operation" protobuf:"bytes,7,opt,name=operation"`
 	// UserInfo is information about the requesting user
 	UserInfo authenticationv1.UserInfo `json:"userInfo" protobuf:"bytes,8,opt,name=userInfo"`
 	// Object is the object from the incoming request prior to default values being applied
@@ -93,24 +94,5 @@ type AdmissionResponse struct {
 
 	// The type of Patch. Currently we only allow "JSONPatch".
 	// +optional
-	PatchType *PatchType `json:"patchType,omitempty" protobuf:"bytes,5,opt,name=patchType"`
+	PatchType *admission.PatchType `json:"patchType,omitempty" protobuf:"bytes,5,opt,name=patchType"`
 }
-
-// PatchType is the type of patch being used to represent the mutated object
-type PatchType string
-
-// PatchType constants.
-const (
-	PatchTypeJSONPatch PatchType = "JSONPatch"
-)
-
-// Operation is the type of resource operation being checked for admission control
-type Operation string
-
-// Operation constants
-const (
-	Create  Operation = "CREATE"
-	Update  Operation = "UPDATE"
-	Delete  Operation = "DELETE"
-	Connect Operation = "CONNECT"
-)
