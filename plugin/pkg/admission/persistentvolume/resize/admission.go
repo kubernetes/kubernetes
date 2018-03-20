@@ -120,7 +120,7 @@ func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error 
 	// volume plugin must support resize
 	pv, err := pvcr.pvLister.Get(pvc.Spec.VolumeName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error updating persistent volume claim because fetching associated persistent volume failed"))
+		return admission.NewForbidden(a, fmt.Errorf("Error updating persistent volume claim because fetching associated persistent volume failed: %v", err))
 	}
 
 	if !pvcr.checkVolumePlugin(pv) {
