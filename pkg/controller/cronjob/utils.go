@@ -171,9 +171,6 @@ func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time
 
 // getJobFromTemplate makes a Job from a CronJob
 func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
-	// TODO: consider adding the following labels:
-	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
-	// scheduled-job-name=$SJ_NAME -- for user convenience
 	labels := copyLabels(&sj.Spec.JobTemplate)
 	annotations := copyAnnotations(&sj.Spec.JobTemplate)
 	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
