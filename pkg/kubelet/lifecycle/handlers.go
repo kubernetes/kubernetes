@@ -21,9 +21,12 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -123,8 +126,13 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 			return "", err
 		}
 	}
-	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	resp, err := hr.httpGetter.Get(url)
+	u, err := url.Parse(handler.HTTPGet.Path)
+	if err != nil {
+		return "", err
+	}
+	u.Scheme = strings.ToLower(string(handler.HTTPGet.Scheme))
+	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	resp, err := hr.httpGetter.Get(u.String())
 	return getHttpRespBody(resp), err
 }
 

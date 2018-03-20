@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -485,7 +486,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			clusterDNS = append(clusterDNS, ip)
 		}
 	}
-	httpClient := &http.Client{}
+	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, DisableKeepAlives: true})
+	httpClient := &http.Client{Timeout: 30 * time.Second, Transport: transport}
+
 	parsedNodeIP := net.ParseIP(nodeIP)
 
 	klet := &Kubelet{
