@@ -580,3 +580,18 @@ else
 bazel-release:
 	bazel build //build/release-tars
 endif
+
+ifeq ($(PRINT_HELP),y)
+define DIND_RELEASE_HELP_INFO
+# Build dind test images with bazel
+#
+# Example:
+# make dind
+endef
+dind:
+	@echo "$$DIND_RELEASE_HELP_INFO"
+else
+dind:
+	bazel run //build/dind-test:dind-cluster-bundle
+endif
+
