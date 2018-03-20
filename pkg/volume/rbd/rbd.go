@@ -590,9 +590,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 		switch dstrings.ToLower(k) {
 		case "monitors":
 			arr := dstrings.Split(v, ",")
-			for _, m := range arr {
-				r.Mon = append(r.Mon, m)
-			}
+			r.Mon = append(r.Mon, arr...)
 		case "adminid":
 			r.adminId = v
 		case "adminsecretname":

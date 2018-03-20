@@ -404,9 +404,8 @@ func TestGenericScheduler(t *testing.T) {
 			cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 		}
 		pvcs := []*v1.PersistentVolumeClaim{}
-		for _, pvc := range test.pvcs {
-			pvcs = append(pvcs, pvc)
-		}
+		pvcs = append(pvcs, test.pvcs...)
+
 		pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
 		scheduler := NewGenericScheduler(

@@ -276,9 +276,8 @@ func TestGCAdmission(t *testing.T) {
 func TestBlockOwnerDeletionAdmission(t *testing.T) {
 	podWithOwnerRefs := func(refs ...metav1.OwnerReference) *api.Pod {
 		var refSlice []metav1.OwnerReference
-		for _, ref := range refs {
-			refSlice = append(refSlice, ref)
-		}
+		refSlice = append(refSlice, refs...)
+
 		return &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				OwnerReferences: refSlice,

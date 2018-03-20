@@ -247,9 +247,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		controller, cloud, _ := newController()
 
 		var services []*v1.Service
-		for _, service := range item.services {
-			services = append(services, service)
-		}
+		services = append(services, item.services...)
+
 		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
