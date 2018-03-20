@@ -188,6 +188,7 @@ func (w *podSecurityContextWrapper) SetFSGroup(v *int64) {
 type ContainerSecurityContextAccessor interface {
 	Capabilities() *api.Capabilities
 	Privileged() *bool
+	ProcMount() api.ProcMountType
 	SELinuxOptions() *api.SELinuxOptions
 	RunAsUser() *int64
 	RunAsNonRoot() *bool
@@ -256,6 +257,15 @@ func (w *containerSecurityContextWrapper) SetPrivileged(v *bool) {
 	}
 	w.ensureContainerSC()
 	w.containerSC.Privileged = v
+}
+func (w *containerSecurityContextWrapper) ProcMount() api.ProcMountType {
+	if w.containerSC == nil {
+		return api.DefaultProcMount
+	}
+	if w.containerSC.ProcMount == nil {
+		return api.DefaultProcMount
+	}
+	return *w.containerSC.ProcMount
 }
 func (w *containerSecurityContextWrapper) SELinuxOptions() *api.SELinuxOptions {
 	if w.containerSC == nil {
@@ -355,6 +365,9 @@ func (w *effectiveContainerSecurityContextWrapper) SetPrivileged(v *bool) {
 	if !reflect.DeepEqual(w.Privileged(), v) {
 		w.containerSC.SetPrivileged(v)
 	}
+}
+func (w *effectiveContainerSecurityContextWrapper) ProcMount() api.ProcMountType {
+	return w.containerSC.ProcMount()
 }
 func (w *effectiveContainerSecurityContextWrapper) SELinuxOptions() *api.SELinuxOptions {
 	if v := w.containerSC.SELinuxOptions(); v != nil {
