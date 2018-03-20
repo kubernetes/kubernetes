@@ -132,7 +132,17 @@ type nodeReclaimFuncs []nodeReclaimFunc
 // thresholdNotifierHandlerFunc is a function that takes action in response to a crossed threshold
 type thresholdNotifierHandlerFunc func(thresholdDescription string)
 
+// ThresholdStopCh is an interface for a channel which is closed to stop waiting goroutines.
+// Implementations of ThresholdStopCh must correctly handle concurrent calls to all functions.
+type ThresholdStopCh interface {
+	// Reset closes the channel if it can be closed, and returns true if it was closed.
+	// Reset also creates a new channel.
+	Reset() bool
+	// Ch returns the channel that is closed when Reset() is called
+	Ch() <-chan struct{}
+}
+
 // ThresholdNotifier notifies the user when an attribute crosses a threshold value
 type ThresholdNotifier interface {
-	Start(stopCh <-chan struct{})
+	Start(ThresholdStopCh)
 }
