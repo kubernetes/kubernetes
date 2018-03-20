@@ -26,12 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -49,13 +51,17 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 
 	queue workqueue.RateLimitingInterface
+
+	// allows overriding for testing
+	features utilfeature.FeatureGate
 }
 
 // NewPVCProtectionController returns a new *{VCProtectionController.
 func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) *Controller {
 	e := &Controller{
-		client: cl,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		client:   cl,
+		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		features: utilfeature.DefaultFeatureGate,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolumeclaim_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -176,6 +182,11 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 }
 
 func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
+	// Skip adding Finalizer in case the PVC Protection feature is not enabled
+	if !c.features.Enabled(features.PVCProtection) {
+		return nil
+	}
+
 	claimClone := pvc.DeepCopy()
 	volumeutil.AddProtectionFinalizer(claimClone)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(claimClone)
@@ -200,6 +211,11 @@ func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 }
 
 func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
+	// if PVC protection is disabled - we do not care about PVC in use by pod or not
+	if !c.features.Enabled(features.PVCProtection) {
+		return false, nil
+	}
+
 	pods, err := c.podLister.Pods(pvc.Namespace).List(labels.Everything())
 	if err != nil {
 		return false, err

@@ -31,12 +31,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
+
+var (
+	pvcProtectionEnabled  = utilfeature.NewFeatureGate()
+	pvcProtectionDisabled = utilfeature.NewFeatureGate()
+)
+
+func init() {
+	if err := pvcProtectionEnabled.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.PVCProtection: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := pvcProtectionDisabled.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.PVCProtection: {Default: false}}); err != nil {
+		panic(err)
+	}
+}
 
 type reaction struct {
 	verb      string
@@ -163,21 +179,30 @@ func TestPVCProtectionController(t *testing.T) {
 		// List of expected kubeclient actions that should happen during the
 		// test.
 		expectedActions []clienttesting.Action
+		features        utilfeature.FeatureGate
 	}{
 		//
 		// PVC events
 		//
 		{
-			name:       "PVC without finalizer -> finalizer is added",
+			name:       "PVC Protection Enabled, PVC without finalizer -> finalizer is added",
 			updatedPVC: pvc(),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
 			},
+			features: pvcProtectionEnabled,
+		},
+		{
+			name:            "PVC Protection Disabled, PVC without finalizer -> finalizer is NOT added",
+			updatedPVC:      pvc(),
+			expectedActions: []clienttesting.Action{},
+			features:        pvcProtectionDisabled,
 		},
 		{
 			name:            "PVC with finalizer -> no action",
 			updatedPVC:      withProtectionFinalizer(pvc()),
 			expectedActions: []clienttesting.Action{},
+			features:        pvcProtectionEnabled,
 		},
 		{
 			name:       "saving PVC finalizer fails -> controller retries",
@@ -197,13 +222,23 @@ func TestPVCProtectionController(t *testing.T) {
 				// This succeeds
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 		{
-			name:       "deleted PVC with finalizer -> finalizer is removed",
+			name:       "PVC Protection Enabled, deleted PVC with finalizer -> finalizer is removed",
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
+		},
+		{
+			name:       "PVC Protection Disabled, deleted PVC with finalizer -> finalizer is removed",
+			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+			},
+			features: pvcProtectionDisabled,
 		},
 		{
 			name:       "finalizer removal fails -> controller retries",
@@ -223,6 +258,7 @@ func TestPVCProtectionController(t *testing.T) {
 				// Succeeds
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 		{
 			name: "deleted PVC with finalizer + pods with the PVC exists -> finalizer is not removed",
@@ -231,6 +267,18 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			updatedPVC:      deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{},
+			features:        pvcProtectionEnabled,
+		},
+		{
+			name: "PVC protection disabled, deleted PVC with finalizer + pods with PVC exists -> finalizer is removed",
+			initialObjects: []runtime.Object{
+				withPVC(defaultPVCName, pod()),
+			},
+			updatedPVC: deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+			},
+			features: pvcProtectionDisabled,
 		},
 		{
 			name: "deleted PVC with finalizer + pods with unrelated PVC and EmptyDir exists -> finalizer is removed",
@@ -241,9 +289,10 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 		{
-			name: "deleted PVC with finalizer + pods with the PVC andis finished -> finalizer is removed",
+			name: "deleted PVC with finalizer + pods with the PVC and is finished -> finalizer is removed",
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
@@ -251,6 +300,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 		//
 		// Pod events
@@ -262,6 +312,7 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			updatedPod:      withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{},
+			features:        pvcProtectionEnabled,
 		},
 		{
 			name: "updated finished Pod -> finalizer is removed",
@@ -272,6 +323,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 		{
 			name: "updated unscheduled Pod -> finalizer is removed",
@@ -282,6 +334,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 		{
 			name: "deleted running Pod -> finalizer is removed",
@@ -292,6 +345,7 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
 			},
+			features: pvcProtectionEnabled,
 		},
 	}
 
@@ -331,6 +385,7 @@ func TestPVCProtectionController(t *testing.T) {
 
 		// Create the controller
 		ctrl := NewPVCProtectionController(pvcInformer, podInformer, client)
+		ctrl.features = test.features
 
 		// Start the test by simulating an event
 		if test.updatedPVC != nil {
