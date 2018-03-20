@@ -46,7 +46,7 @@ func IsNotFound(err error) bool {
 }
 
 func getFinder(dc *Datacenter) *find.Finder {
-	finder := find.NewFinder(dc.Client(), true)
+	finder := find.NewFinder(dc.Client(), false)
 	finder.SetDatacenter(dc.Datacenter)
 	return finder
 }
