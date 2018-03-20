@@ -78,20 +78,22 @@ def upgrade_charm():
     set_state('kubernetes-worker.restart-needed')
 
 
+def get_snap_resource_paths():
+    resources = ['kubectl', 'kubelet', 'kube-proxy']
+    return [hookenv.resource_get(resource) for resource in resources]
+
+
 def check_resources_for_upgrade_needed():
     hookenv.status_set('maintenance', 'Checking resources')
-    resources = ['kubectl', 'kubelet', 'kube-proxy']
-    paths = [hookenv.resource_get(resource) for resource in resources]
-    if any_file_changed(paths):
+    if any_file_changed(get_snap_resource_paths()):
         set_upgrade_needed()
 
 
 def set_upgrade_needed():
     set_state('kubernetes-worker.snaps.upgrade-needed')
     config = hookenv.config()
-    previous_channel = config.previous('channel')
     require_manual = config.get('require-manual-upgrade')
-    if previous_channel is None or not require_manual:
+    if not require_manual:
         set_state('kubernetes-worker.snaps.upgrade-specified')
 
 
@@ -127,21 +129,34 @@ def cleanup_pre_snap_services():
             os.remove(file)
 
 
+@when_not('kubernetes-worker.snap.resources-available')
+def check_snap_resources():
+    for path in get_snap_resource_paths():
+        if not path or not os.path.exists(path):
+            msg = 'Missing snap resources.'
+            hookenv.status_set('blocked', msg)
+            return
+    set_state('kubernetes-worker.snap.resources-available')
+    set_state('kubernetes-worker.snaps.upgrade-specified')
+
+
 @when('config.changed.channel')
 def channel_changed():
     set_upgrade_needed()
 
 
-@when('kubernetes-worker.snaps.upgrade-needed')
+@when('kubernetes-worker.snaps.upgrade-needed',
+      'kubernetes-worker.snap.resources-available')
 @when_not('kubernetes-worker.snaps.upgrade-specified')
 def upgrade_needed_status():
     msg = 'Needs manual upgrade, run the upgrade action'
     hookenv.status_set('blocked', msg)
 
 
-@when('kubernetes-worker.snaps.upgrade-specified')
+@when('kubernetes-worker.snap.resources-available',
+      'kubernetes-worker.snaps.upgrade-specified')
 def install_snaps():
-    check_resources_for_upgrade_needed()
+    any_file_changed(get_snap_resource_paths())
     channel = hookenv.config('channel')
     hookenv.status_set('maintenance', 'Installing kubectl snap')
     snap.install('kubectl', channel=channel, classic=True)
