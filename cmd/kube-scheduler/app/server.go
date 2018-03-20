@@ -127,6 +127,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.config.SchedulerName, "scheduler-name", o.config.SchedulerName, "Name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.SchedulerName\".")
 	fs.StringVar(&o.config.LeaderElection.LockObjectNamespace, "lock-object-namespace", o.config.LeaderElection.LockObjectNamespace, "Define the namespace of the lock object.")
 	fs.StringVar(&o.config.LeaderElection.LockObjectName, "lock-object-name", o.config.LeaderElection.LockObjectName, "Define the name of the lock object.")
+	fs.Int32Var(&o.config.CacheDebugResyncInterval, "cache-debug-resync-interval", o.config.CacheDebugResyncInterval, "The interval in seconds local cache is rebuilt and compared against existing cache (Only used for debug).")
 	fs.Int32Var(&o.config.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", o.config.HardPodAffinitySymmetricWeight,
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
@@ -372,6 +373,7 @@ type SchedulerServer struct {
 	PodInformer                    coreinformers.PodInformer
 	AlgorithmSource                componentconfig.SchedulerAlgorithmSource
 	HardPodAffinitySymmetricWeight int32
+	CacheDebugResyncInterval       int32
 	EventClient                    v1core.EventsGetter
 	Recorder                       record.EventRecorder
 	Broadcaster                    record.EventBroadcaster
@@ -439,6 +441,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 		PodInformer:                    factory.NewPodInformer(client, 0, config.SchedulerName),
 		AlgorithmSource:                config.AlgorithmSource,
 		HardPodAffinitySymmetricWeight: config.HardPodAffinitySymmetricWeight,
+		CacheDebugResyncInterval:       config.CacheDebugResyncInterval,
 		EventClient:                    eventClient,
 		Recorder:                       recorder,
 		Broadcaster:                    eventBroadcaster,
@@ -658,6 +661,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		s.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
+		s.CacheDebugResyncInterval,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 	)
 

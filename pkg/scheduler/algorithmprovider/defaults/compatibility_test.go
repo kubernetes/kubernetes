@@ -38,6 +38,8 @@ import (
 
 const enableEquivalenceCache = true
 
+const resyncInterval int32 = 0
+
 func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
@@ -578,6 +580,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			informerFactory.Storage().V1().StorageClasses(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
+			resyncInterval,
 			enableEquivalenceCache,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)

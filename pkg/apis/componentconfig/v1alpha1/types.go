@@ -106,6 +106,9 @@ type KubeSchedulerConfiguration struct {
 
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	FailureDomains string `json:"failureDomains"`
+
+	// CacheDebugResyncInterval is the interval between cache rebuild and compare. It's specified as integer as number of seconds.
+	CacheDebugResyncInterval int32 `json:"cacheDebugResyncInterval"`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

@@ -151,6 +151,7 @@ func NewConfigFactory(
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
+	resyncIntervalInSec int32,
 	enableEquivalenceClassCache bool,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
@@ -309,11 +310,23 @@ func NewConfigFactory(
 	signal.Notify(ch, compareSignal)
 
 	go func() {
+		var tick <-chan time.Time
+
+		duration := time.Duration(resyncIntervalInSec) * time.Second
+		if duration != 0 {
+			ticker := time.NewTicker(duration)
+			defer ticker.Stop()
+
+			tick = ticker.C
+		}
+
 		for {
 			select {
 			case <-c.StopEverything:
 				return
 			case <-ch:
+				comparer.Compare()
+			case <-tick:
 				comparer.Compare()
 			}
 		}
