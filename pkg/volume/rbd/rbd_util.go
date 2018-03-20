@@ -346,6 +346,8 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 		cmd, err = b.exec.Run("rbd", args...)
 		if err == nil {
 			glog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
+		} else {
+			glog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lock_id, b.Pool, b.Image, b.Id, mon, err)
 		}
 	}
 
