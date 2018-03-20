@@ -235,7 +235,7 @@ func (p *podWorkers) removeWorker(uid types.UID) {
 		delete(p.podUpdates, uid)
 		// If there is an undelivered work update for this pod we need to remove it
 		// since per-pod goroutine won't be able to put it to the already closed
-		// channel when it finish processing the current work update.
+		// channel when it finishes processing the current work update.
 		if _, cached := p.lastUndeliveredWorkUpdate[uid]; cached {
 			delete(p.lastUndeliveredWorkUpdate, uid)
 		}
