@@ -34,7 +34,7 @@ import (
 
 	"github.com/fatih/camelcase"
 
-	versionedextension "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -3084,7 +3084,7 @@ type DeploymentDescriber struct {
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	d, err := dd.external.ExtensionsV1beta1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	d, err := dd.external.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3105,7 +3105,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	return describeDeployment(d, selector, internalDeployment, events, dd)
 }
 
-func describeDeployment(d *versionedextension.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
+func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
@@ -3129,10 +3129,10 @@ func describeDeployment(d *versionedextension.Deployment, selector labels.Select
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
-		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.external.ExtensionsV1beta1())
+		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.external.AppsV1())
 		if err == nil {
 			w.Write(LEVEL_0, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
-			var newRSs []*versionedextension.ReplicaSet
+			var newRSs []*appsv1.ReplicaSet
 			if newRS != nil {
 				newRSs = append(newRSs, newRS)
 			}
@@ -3146,7 +3146,7 @@ func describeDeployment(d *versionedextension.Deployment, selector labels.Select
 	})
 }
 
-func printReplicaSetsByLabels(matchingRSs []*versionedextension.ReplicaSet) string {
+func printReplicaSetsByLabels(matchingRSs []*appsv1.ReplicaSet) string {
 	// Format the matching ReplicaSets into strings.
 	rsStrings := make([]string, 0, len(matchingRSs))
 	for _, rs := range matchingRSs {

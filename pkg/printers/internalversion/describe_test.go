@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1345,12 +1345,12 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 
 func TestDescribeDeployment(t *testing.T) {
 	fake := fake.NewSimpleClientset()
-	versionedFake := versionedfake.NewSimpleClientset(&v1beta1.Deployment{
+	versionedFake := versionedfake.NewSimpleClientset(&appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bar",
 			Namespace: "foo",
 		},
-		Spec: v1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: utilpointer.Int32Ptr(1),
 			Selector: &metav1.LabelSelector{},
 			Template: v1.PodTemplateSpec{
@@ -1977,12 +1977,12 @@ func TestDescribeEvents(t *testing.T) {
 		},
 		"DeploymentDescriber": &DeploymentDescriber{
 			fake.NewSimpleClientset(events),
-			versionedfake.NewSimpleClientset(&v1beta1.Deployment{
+			versionedfake.NewSimpleClientset(&appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
 				},
-				Spec: v1beta1.DeploymentSpec{
+				Spec: appsv1.DeploymentSpec{
 					Replicas: utilpointer.Int32Ptr(1),
 					Selector: &metav1.LabelSelector{},
 				},
