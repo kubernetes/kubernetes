@@ -40,7 +40,6 @@ spec:
         - "--proxy-client-key-file=/var/run/auth-proxy-client/tls.key"
         - "--tls-cert-file=/var/run/serving-cert/tls.crt"
         - "--tls-private-key-file=/var/run/serving-cert/tls.key"
-        - "--tls-ca-file=/var/run/serving-ca/ca.crt"
         - "--etcd-servers=https://etcd.kube-public.svc:4001"
         - "--etcd-certfile=/var/run/etcd-client-cert/tls.crt"
         - "--etcd-keyfile=/var/run/etcd-client-cert/tls.key"

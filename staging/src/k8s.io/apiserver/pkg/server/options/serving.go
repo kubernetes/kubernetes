@@ -156,11 +156,6 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The limit that the server gives to clients for "+
 		"the maximum number of streams in an HTTP/2 connection. "+
 		"Zero means to use golang's default.")
-
-	// TODO remove this flag in 1.11.  The flag had no effect before this will prevent scripts from immediately failing on upgrade.
-	fs.String("tls-ca-file", "", "This flag has no effect.")
-	fs.MarkDeprecated("tls-ca-file", "This flag has no effect.")
-
 }
 
 // ApplyTo fills up serving information in the server configuration.
