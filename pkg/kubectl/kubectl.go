@@ -161,7 +161,8 @@ func ResourceAliases(rs []string) []string {
 		var plural string
 		switch {
 		case r == "endpoints":
-			plural = r // exception. "endpoint" does not exist. Why?
+			// Endpoints type itself is plural, unlike every other resource.
+			plural = r
 		case strings.HasSuffix(r, "y"):
 			plural = r[0:len(r)-1] + "ies"
 		case strings.HasSuffix(r, "s"):
