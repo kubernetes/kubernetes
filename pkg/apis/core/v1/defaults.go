@@ -93,6 +93,7 @@ func SetDefaults_Container(obj *v1.Container) {
 		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
 }
+
 func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone

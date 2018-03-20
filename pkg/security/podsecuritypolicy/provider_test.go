@@ -485,6 +485,10 @@ func TestValidateContainerFailures(t *testing.T) {
 	var priv bool = true
 	failPrivPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
+	failProcMountPod := defaultPod()
+	failProcMountPod.Spec.Containers[0].SecurityContext.ProcMount = new(api.ProcMountType)
+	*failProcMountPod.Spec.Containers[0].SecurityContext.ProcMount = api.UnmaskedProcMount
+
 	failCapsPod := defaultPod()
 	failCapsPod.Spec.Containers[0].SecurityContext.Capabilities = &api.Capabilities{
 		Add: []api.Capability{"foo"},
@@ -539,6 +543,11 @@ func TestValidateContainerFailures(t *testing.T) {
 			pod:           failPrivPod,
 			psp:           defaultPSP(),
 			expectedError: "Privileged containers are not allowed",
+		},
+		"failProcMountPSP": {
+			pod:           failProcMountPod,
+			psp:           defaultPSP(),
+			expectedError: "ProcMountType is not allowed",
 		},
 		"failCapsPSP": {
 			pod:           failCapsPod,

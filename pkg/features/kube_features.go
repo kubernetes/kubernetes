@@ -363,6 +363,12 @@ const (
 	//
 	// Enable volume snapshot data source support.
 	VolumeSnapshotDataSource utilfeature.Feature = "VolumeSnapshotDataSource"
+
+	// owner: @jessfraz
+	// alpha: v1.12
+	//
+	// Enables control over ProcMountType for containers.
+	ProcMountType utilfeature.Feature = "ProcMountType"
 )
 
 func init() {
@@ -424,6 +430,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	NodeLease:                                   {Default: false, PreRelease: utilfeature.Alpha},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
+	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

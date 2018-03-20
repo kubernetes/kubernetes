@@ -4616,7 +4616,26 @@ type SecurityContext struct {
 	// the no_new_privs flag will be set on the container process.
 	// +optional
 	AllowPrivilegeEscalation *bool
+	// ProcMount denotes the type of proc mount to use for the containers.
+	// The default is DefaultProcMount which uses the container runtime defaults for
+	// readonly paths and masked paths.
+	// +optional
+	ProcMount *ProcMountType
 }
+
+type ProcMountType string
+
+const (
+	// DefaultProcMount uses the container runtime defaults for readonly and masked
+	// paths for /proc.  Most container runtimes mask certain paths in /proc to avoid
+	// accidental security exposure of special devices or information.
+	DefaultProcMount ProcMountType = "Default"
+
+	// UnmaskedProcMount bypasses the default masking behavior of the container
+	// runtime and ensures the newly created /proc the container stays in tact with
+	// no modifications.
+	UnmaskedProcMount ProcMountType = "Unmasked"
+)
 
 // SELinuxOptions are the labels to be applied to the container.
 type SELinuxOptions struct {

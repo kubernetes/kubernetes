@@ -289,6 +289,21 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 		allErrs = append(allErrs, field.Invalid(scPath.Child("privileged"), *privileged, "Privileged containers are not allowed"))
 	}
 
+	procMount := sc.ProcMount()
+	allowedProcMounts := s.psp.Spec.AllowedProcMountTypes
+	if len(allowedProcMounts) == 0 {
+		allowedProcMounts = []api.ProcMountType{api.DefaultProcMount}
+	}
+	foundProcMountType := false
+	for _, pm := range allowedProcMounts {
+		if pm == procMount {
+			foundProcMountType = true
+		}
+	}
+	if !foundProcMountType {
+		allErrs = append(allErrs, field.Invalid(scPath.Child("procMount"), procMount, "ProcMountType is not allowed"))
+	}
+
 	allErrs = append(allErrs, s.strategies.CapabilitiesStrategy.Validate(scPath.Child("capabilities"), pod, container, sc.Capabilities())...)
 
 	allErrs = append(allErrs, s.hasInvalidHostPort(container, containerPath)...)
