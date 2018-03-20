@@ -149,7 +149,6 @@ func TestConfigDirCleaner(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unable to create temporary directory: %s", err)
 		}
-		defer os.RemoveAll(tmpDir)
 
 		for _, createDir := range test.setupDirs {
 			err := os.Mkdir(filepath.Join(tmpDir, createDir), 0700)
@@ -164,7 +163,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unable to create test file: %s", err)
 			}
-			defer f.Close()
+			f.Close()
 		}
 
 		resetConfigDir(tmpDir, filepath.Join(tmpDir, "pki"))
@@ -183,6 +182,8 @@ func TestConfigDirCleaner(t *testing.T) {
 		for _, path := range test.verifyNotExists {
 			assertNotExists(t, filepath.Join(tmpDir, path))
 		}
+
+		os.RemoveAll(tmpDir)
 	}
 }
 
