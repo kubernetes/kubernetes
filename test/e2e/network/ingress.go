@@ -602,10 +602,20 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	})
 
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
+		var gceController *framework.GCEIngressController
+
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			jig.Class = framework.MulticlusterIngressClassValue
+			By("Initializing gce controller")
+			gceController = &framework.GCEIngressController{
+				Ns:     ns,
+				Client: jig.Client,
+				Cloud:  framework.TestContext.CloudConfig,
+			}
+			err := gceController.Init()
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// Platform specific cleanup
@@ -619,16 +629,26 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			By("Deleting ingress")
 			jig.TryDeleteIngress()
+
+			By("Cleaning up cloud resources")
+			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
 		})
 
 		It("should conform to Ingress spec", func() {
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			// Use the randomly generated namespace name as the ip address name.
+			ipName := ns
+			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
+			ipAddress := gceController.CreateStaticIP(ipName)
+			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
+			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
+				framework.IngressStaticIPKey: ipName,
+			})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
 				t.Execute()
 				By(t.ExitLog)
-				jig.WaitForIngress(true /*waitForNodePort*/)
+				jig.WaitForIngress(false /*waitForNodePort*/)
 			}
 		})
 	})

@@ -165,7 +165,7 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 	updateURLMapHost := "bar.baz.com"
 	updateURLMapPath := "/testurl"
 	// Platform agnostic list of tests that must be satisfied by all controllers
-	return []IngressConformanceTests{
+	tests := []IngressConformanceTests{
 		{
 			fmt.Sprintf("should create a basic HTTP ingress"),
 			func() { jig.CreateIngress(manifestPath, ns, annotations, annotations) },
@@ -175,27 +175,6 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 			fmt.Sprintf("should terminate TLS for host %v", tlsHost),
 			func() { jig.AddHTTPS(tlsSecretName, tlsHost) },
 			fmt.Sprintf("waiting for HTTPS updates to reflect in ingress"),
-		},
-		{
-			fmt.Sprintf("should update SSL certificate with modified hostname %v", updatedTLSHost),
-			func() {
-				jig.Update(func(ing *extensions.Ingress) {
-					newRules := []extensions.IngressRule{}
-					for _, rule := range ing.Spec.Rules {
-						if rule.Host != tlsHost {
-							newRules = append(newRules, rule)
-							continue
-						}
-						newRules = append(newRules, extensions.IngressRule{
-							Host:             updatedTLSHost,
-							IngressRuleValue: rule.IngressRuleValue,
-						})
-					}
-					ing.Spec.Rules = newRules
-				})
-				jig.AddHTTPS(tlsSecretName, updatedTLSHost)
-			},
-			fmt.Sprintf("Waiting for updated certificates to accept requests for host %v", updatedTLSHost),
 		},
 		{
 			fmt.Sprintf("should update url map for host %v to expose a single url: %v", updateURLMapHost, updateURLMapPath),
@@ -233,6 +212,31 @@ func CreateIngressComformanceTests(jig *IngressTestJig, ns string, annotations m
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
 	}
+	// Skip the Update TLS cert test for kubemci: https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/141.
+	if jig.Class != MulticlusterIngressClassValue {
+		tests = append(tests, IngressConformanceTests{
+			fmt.Sprintf("should update SSL certificate with modified hostname %v", updatedTLSHost),
+			func() {
+				jig.Update(func(ing *extensions.Ingress) {
+					newRules := []extensions.IngressRule{}
+					for _, rule := range ing.Spec.Rules {
+						if rule.Host != tlsHost {
+							newRules = append(newRules, rule)
+							continue
+						}
+						newRules = append(newRules, extensions.IngressRule{
+							Host:             updatedTLSHost,
+							IngressRuleValue: rule.IngressRuleValue,
+						})
+					}
+					ing.Spec.Rules = newRules
+				})
+				jig.AddHTTPS(tlsSecretName, updatedTLSHost)
+			},
+			fmt.Sprintf("Waiting for updated certificates to accept requests for host %v", updatedTLSHost),
+		})
+	}
+	return tests
 }
 
 // GenerateRSACerts generates a basic self signed certificate using a key length
@@ -1131,7 +1135,7 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
-	j.Logger.Infof(fmt.Sprintf("creating" + j.Ingress.Name + " ingress"))
+	j.Logger.Infof(fmt.Sprintf("creating " + j.Ingress.Name + " ingress"))
 	j.Ingress, err = j.runCreate(j.Ingress)
 	ExpectNoError(err)
 }
@@ -1334,7 +1338,9 @@ func (j *IngressTestJig) pollIngressWithCert(ing *extensions.Ingress, address st
 		}
 		for _, p := range rules.IngressRuleValue.HTTP.Paths {
 			if waitForNodePort {
-				if err := j.pollServiceNodePort(ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal)); err != nil {
+				nodePort := int(p.Backend.ServicePort.IntVal)
+				if err := j.pollServiceNodePort(ing.Namespace, p.Backend.ServiceName, nodePort); err != nil {
+					j.Logger.Infof("Error in waiting for nodeport %d on service %v/%v: %s", nodePort, ing.Namespace, p.Backend.ServiceName, err)
 					return err
 				}
 			}
