@@ -314,7 +314,7 @@ func TestValidateServiceCommonGeneratorV1(t *testing.T) {
 				}
 			}
 			if err == nil && len(test.expectErr) != 0 {
-				t.Errorf("validate:%s Expected sucess, Got err: %v", test.name, err)
+				t.Errorf("validate:%s Expected success, Got err: %v", test.name, err)
 			}
 		})
 	}
