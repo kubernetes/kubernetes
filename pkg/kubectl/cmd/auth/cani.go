@@ -27,21 +27,25 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1alpha1 "k8s.io/apimachinery/pkg/apis/meta/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	internalauthorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type CanIOptions struct {
-	AllNamespaces bool
-	Quiet         bool
-	Namespace     string
-	SelfSARClient internalauthorizationclient.SelfSubjectAccessReviewsGetter
+	AllNamespaces          bool
+	Quiet                  bool
+	Namespace              string
+	SelfSARClient          internalauthorizationclient.SelfSubjectAccessReviewsGetter
+	SelfSubjectRulesClient internalauthorizationclient.SelfSubjectRulesReviewsGetter
 
+	List           bool
 	Verb           string
 	Resource       schema.GroupVersionResource
 	NonResourceURL string
@@ -94,7 +98,7 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		Long:    canILong,
 		Example: canIExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, args))
+			cmdutil.CheckErr(o.Complete(cmd, f, args))
 			cmdutil.CheckErr(o.Validate())
 
 			allowed, err := o.RunAccessCheck()
@@ -111,12 +115,35 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If true, check the specified action in all namespaces.")
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "If true, suppress output and just return the exit code.")
 	cmd.Flags().StringVar(&o.Subresource, "subresource", "", "SubResource such as pod/log or deployment/scale")
+	cmd.Flags().BoolVar(&o.List, "list", false, "list all the actions I can perform in the namespace or cluster scope")
 	return cmd
 }
 
-func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
+func (o *CanIOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
 	if o.Quiet {
 		o.Out = ioutil.Discard
+	}
+
+	var err error
+	client, err := f.ClientSet()
+	if err != nil {
+		return err
+	}
+	o.SelfSARClient = client.Authorization()
+	o.SelfSubjectRulesClient = client.Authorization()
+
+	o.Namespace = ""
+	if !o.AllNamespaces {
+		o.Namespace, _, err = f.DefaultNamespace()
+		if err != nil {
+			return err
+		}
+	}
+	if o.List {
+		if len(args) > 0 {
+			return errors.New("you may not specify any arguments when listing permissions")
+		}
+		return nil
 	}
 
 	switch len(args) {
@@ -136,21 +163,6 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		return errors.New("you must specify two or three arguments: verb, resource, and optional resourceName")
 	}
 
-	var err error
-	client, err := f.ClientSet()
-	if err != nil {
-		return err
-	}
-	o.SelfSARClient = client.Authorization()
-
-	o.Namespace = ""
-	if !o.AllNamespaces {
-		o.Namespace, _, err = f.DefaultNamespace()
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -167,6 +179,10 @@ func (o *CanIOptions) Validate() error {
 }
 
 func (o *CanIOptions) RunAccessCheck() (bool, error) {
+	if o.List {
+		return o.runRulesCheck()
+	}
+
 	var sar *authorizationapi.SelfSubjectAccessReview
 	if o.NonResourceURL == "" {
 		sar = &authorizationapi.SelfSubjectAccessReview{
@@ -238,4 +254,52 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 	}
 
 	return gvr
+}
+
+func (o *CanIOptions) runRulesCheck() (bool, error) {
+	result, err := o.SelfSubjectRulesClient.SelfSubjectRulesReviews().Create(
+		&authorizationapi.SelfSubjectRulesReview{
+			Spec: authorizationapi.SelfSubjectRulesReviewSpec{
+				Namespace: o.Namespace,
+			},
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	table := &metav1alpha1.Table{}
+	table.ColumnDefinitions = []metav1alpha1.TableColumnDefinition{
+		{Name: "VERBS", Type: "string"},
+		{Name: "NON-RESOURCE URLS", Type: "string"},
+		{Name: "RESOURCE NAMES", Type: "string"},
+		{Name: "API GROUPS", Type: "string"},
+		{Name: "RESOURCES", Type: "string"},
+	}
+
+	for _, rule := range result.Status.ResourceRules {
+		table.Rows = append(table.Rows, metav1alpha1.TableRow{
+			Cells: []interface{}{
+				rule.Verbs, "", rule.ResourceNames, rule.APIGroups, rule.Resources,
+			},
+		})
+	}
+	for _, rule := range result.Status.NonResourceRules {
+		table.Rows = append(table.Rows, metav1alpha1.TableRow{
+			Cells: []interface{}{
+				rule.Verbs, rule.NonResourceURLs, "", "", "",
+			},
+		})
+	}
+
+	printers.PrintTable(table, o.Out, printers.PrintOptions{})
+
+	if len(result.Status.EvaluationError) > 0 {
+		return false, fmt.Errorf("error evaluating permissions; reported rules may be incomplete: %v", result.Status.EvaluationError)
+	}
+	if result.Status.Incomplete {
+		return false, fmt.Errorf("reported rules are incomplete")
+	}
+
+	return true, err
 }
