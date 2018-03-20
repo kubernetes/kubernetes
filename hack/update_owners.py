@@ -17,10 +17,10 @@
 import argparse
 import collections
 import csv
-import re
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 import time

@@ -20,8 +20,6 @@ import argparse
 import datetime
 import difflib
 import glob
-import json
-import mmap
 import os
 import re
 import sys
