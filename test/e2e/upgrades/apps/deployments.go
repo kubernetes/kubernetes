@@ -19,7 +19,7 @@ package upgrades
 import (
 	"fmt"
 
-	extensions "k8s.io/api/extensions/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -54,11 +54,11 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	nginxImage := imageutils.GetE2EImage(imageutils.NginxSlim)
 
 	ns := f.Namespace.Name
-	deploymentClient := c.ExtensionsV1beta1().Deployments(ns)
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
+	deploymentClient := c.AppsV1().Deployments(ns)
+	rsClient := c.AppsV1().ReplicaSets(ns)
 
 	By(fmt.Sprintf("Creating a deployment %q with 1 replica in namespace %q", deploymentName, ns))
-	d := framework.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, extensions.RollingUpdateDeploymentStrategyType)
+	d := framework.NewDeployment(deploymentName, int32(1), map[string]string{"test": "upgrade"}, "nginx", nginxImage, apps.RollingUpdateDeploymentStrategyType)
 	deployment, err := deploymentClient.Create(d)
 	framework.ExpectNoError(err)
 
@@ -81,7 +81,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 
 	// Trigger a new rollout so that we have some history.
 	By(fmt.Sprintf("Triggering a new rollout for deployment %q", deploymentName))
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *extensions.Deployment) {
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = "updated-name"
 	})
 	framework.ExpectNoError(err)
@@ -121,8 +121,8 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	c := f.ClientSet
 	ns := f.Namespace.Name
-	deploymentClient := c.ExtensionsV1beta1().Deployments(ns)
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
+	deploymentClient := c.AppsV1().Deployments(ns)
+	rsClient := c.AppsV1().ReplicaSets(ns)
 
 	deployment, err := deploymentClient.Get(deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -157,7 +157,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	// Verify the upgraded deployment is active by scaling up the deployment by 1
 	By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
-	_, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *extensions.Deployment) {
+	_, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *apps.Deployment) {
 		*deployment.Spec.Replicas = *deployment.Spec.Replicas + 1
 	})
 	framework.ExpectNoError(err)

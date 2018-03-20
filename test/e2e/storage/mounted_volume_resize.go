@@ -21,8 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,7 +113,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 
 		By("Creating a deployment with the provisioned volume")
 		deployment, err := framework.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
-		defer c.ExtensionsV1beta1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
+		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
@@ -152,7 +152,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:ExpandPersistentVolume
 	})
 })
 
-func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *extensions.Deployment) (v1.Pod, error) {
+func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *apps.Deployment) (v1.Pod, error) {
 	var runningPod v1.Pod
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		podList, err := framework.GetPodsForDeployment(client, deployment)
