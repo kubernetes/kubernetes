@@ -103,8 +103,7 @@ type localTestVolume struct {
 
 const (
 	// TODO: This may not be available/writable on all images.
-	hostBase      = "/tmp"
-	containerBase = "/myvol"
+	hostBase = "/tmp"
 	// Path to the first volume in the test containers
 	// created via createLocalPod or makeLocalPod
 	// leveraging pv_util.MakePod

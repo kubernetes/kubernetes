@@ -30,8 +30,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const resizeNodeReadyTimeout = 2 * time.Minute
-
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	rc, err := c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
