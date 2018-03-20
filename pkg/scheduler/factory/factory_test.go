@@ -541,11 +541,30 @@ type fakeExtender struct {
 	interestedPodName string
 }
 
-func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
+func (f *fakeExtender) ProcessPreemption(
+	pod *v1.Pod,
+	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+) (map[*v1.Node]*schedulerapi.Victims, error) {
+	return nil, nil
+}
+
+func (f *fakeExtender) SupportsPreemption() bool {
+	return false
+}
+
+func (f *fakeExtender) Filter(
+	pod *v1.Pod,
+	nodes []*v1.Node,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
 	return nil, nil, nil
 }
 
-func (f *fakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error) {
+func (f *fakeExtender) Prioritize(
+	pod *v1.Pod,
+	nodes []*v1.Node,
+) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error) {
 	return nil, 0, nil
 }
 

@@ -22,12 +22,14 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -111,22 +113,145 @@ type FakeExtender struct {
 	nodeCacheCapable bool
 	filteredNodes    []*v1.Node
 	unInterested     bool
+
+	// Cached node information for fake extender
+	cachedNodeNameToInfo map[string]*schedulercache.NodeInfo
+	cachedPDBs           []*policy.PodDisruptionBudget
+}
+
+func (f *FakeExtender) SupportsPreemption() bool {
+	// Assume preempt verb is always defined.
+	return true
+}
+
+func (f *FakeExtender) ProcessPreemption(
+	pod *v1.Pod,
+	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+) (map[*v1.Node]*schedulerapi.Victims, error) {
+	nodeToVictimsCopy := map[*v1.Node]*schedulerapi.Victims{}
+	// We don't want to change the original nodeToVictims
+	for k, v := range nodeToVictims {
+		// In real world implementation, extender's user should have his own way to get node object
+		// by name if needed (e.g. query kube-apiserver etc).
+		//
+		// For test purpose, we just use node from parameters directly.
+		nodeToVictimsCopy[k] = v
+	}
+
+	for node, victims := range nodeToVictimsCopy {
+		// Try to do preemption on extender side.
+		extenderVictimPods, extendernPDBViolations, fits := f.selectVictimsOnNodeByExtender(pod, node, nodeNameToInfo)
+		// If it's unfit after extender's preemption, this node is unresolvable by preemption overall,
+		// let's remove it from potential preemption nodes.
+		if !fits {
+			delete(nodeToVictimsCopy, node)
+		} else {
+			// Append new victims to original victims
+			nodeToVictimsCopy[node].Pods = append(victims.Pods, extenderVictimPods...)
+			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + extendernPDBViolations
+		}
+	}
+	return nodeToVictimsCopy, nil
+}
+
+// selectVictimsOnNodeByExtender checks the given nodes->pods map with predicates on extender's side.
+// Returns:
+// 1. More victim pods (if any) amended by preemption phase of extender.
+// 2. Number of violating victim (used to calculate PDB).
+// 3. Fits or not after preemption phase on extender's side.
+func (f *FakeExtender) selectVictimsOnNodeByExtender(
+	pod *v1.Pod,
+	node *v1.Node,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+) ([]*v1.Pod, int, bool) {
+	// TODO(harry): add more test in generic_scheduler_test.go to verify this logic.
+	// If a extender support preemption but have no cached node info, let's run filter to make sure
+	// default scheduler's decision still stand with given pod and node.
+	if !f.nodeCacheCapable {
+		if fits, _ := f.runPredicate(pod, node); !fits {
+			return nil, 0, false
+		}
+		return []*v1.Pod{}, 0, true
+	}
+
+	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
+	// and get cached node info by given node name.
+	nodeInfoCopy := f.cachedNodeNameToInfo[node.GetName()].Clone()
+
+	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
+
+	removePod := func(rp *v1.Pod) {
+		nodeInfoCopy.RemovePod(rp)
+	}
+	addPod := func(ap *v1.Pod) {
+		nodeInfoCopy.AddPod(ap)
+	}
+	// As the first step, remove all the lower priority pods from the node and
+	// check if the given pod can be scheduled.
+	podPriority := util.GetPodPriority(pod)
+	for _, p := range nodeInfoCopy.Pods() {
+		if util.GetPodPriority(p) < podPriority {
+			potentialVictims.Items = append(potentialVictims.Items, p)
+			removePod(p)
+		}
+	}
+	potentialVictims.Sort()
+
+	// If the new pod does not fit after removing all the lower priority pods,
+	// we are almost done and this node is not suitable for preemption.
+	if fits, _ := f.runPredicate(pod, nodeInfoCopy.Node()); !fits {
+		return nil, 0, false
+	}
+
+	var victims []*v1.Pod
+
+	// TODO(harry): handle PDBs in the future.
+	numViolatingVictim := 0
+
+	reprievePod := func(p *v1.Pod) bool {
+		addPod(p)
+		fits, _ := f.runPredicate(pod, nodeInfoCopy.Node())
+		if !fits {
+			removePod(p)
+			victims = append(victims, p)
+		}
+		return fits
+	}
+
+	// For now, assume all potential victims to be non-violating.
+	// Now we try to reprieve non-violating victims.
+	for _, p := range potentialVictims.Items {
+		reprievePod(p.(*v1.Pod))
+	}
+
+	return victims, numViolatingVictim, true
+}
+
+// runPredicate run predicates of extender one by one for given pod and node.
+// Returns: fits or not.
+func (f *FakeExtender) runPredicate(pod *v1.Pod, node *v1.Node) (bool, error) {
+	fits := true
+	var err error
+	for _, predicate := range f.predicates {
+		fits, err = predicate(pod, node)
+		if err != nil {
+			return false, err
+		}
+		if !fits {
+			break
+		}
+	}
+	return fits, nil
 }
 
 func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulercache.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
 	filtered := []*v1.Node{}
 	failedNodesMap := schedulerapi.FailedNodesMap{}
 	for _, node := range nodes {
-		fits := true
-		for _, predicate := range f.predicates {
-			fit, err := predicate(pod, node)
-			if err != nil {
-				return []*v1.Node{}, schedulerapi.FailedNodesMap{}, err
-			}
-			if !fit {
-				fits = false
-				break
-			}
+		fits, err := f.runPredicate(pod, node)
+		if err != nil {
+			return []*v1.Node{}, schedulerapi.FailedNodesMap{}, err
 		}
 		if fits {
 			filtered = append(filtered, node)
@@ -340,7 +465,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		}
 		cache := schedulercache.New(time.Duration(0), wait.NeverStop)
 		for _, name := range test.nodes {
-			cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
+			cache.AddNode(createNode(name))
 		}
 		queue := NewSchedulingQueue()
 		scheduler := NewGenericScheduler(
@@ -361,4 +486,8 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			}
 		}
 	}
+}
+
+func createNode(name string) *v1.Node {
+	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
 }

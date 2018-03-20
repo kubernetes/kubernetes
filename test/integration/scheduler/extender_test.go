@@ -130,7 +130,7 @@ func (e *Extender) filterUsingNodeCache(args *schedulerapi.ExtenderArgs) (*sched
 	for _, nodeName := range *args.NodeNames {
 		fits := true
 		for _, predicate := range e.predicates {
-			fit, err := predicate(&args.Pod,
+			fit, err := predicate(args.Pod,
 				&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}})
 			if err != nil {
 				return &schedulerapi.ExtenderFilterResult{
@@ -169,7 +169,7 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 		for _, node := range args.Nodes.Items {
 			fits := true
 			for _, predicate := range e.predicates {
-				fit, err := predicate(&args.Pod, &node)
+				fit, err := predicate(args.Pod, &node)
 				if err != nil {
 					return &schedulerapi.ExtenderFilterResult{
 						Nodes:       &v1.NodeList{},
@@ -217,7 +217,7 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.Ho
 			continue
 		}
 		priorityFunc := prioritizer.function
-		prioritizedList, err := priorityFunc(&args.Pod, nodes)
+		prioritizedList, err := priorityFunc(args.Pod, nodes)
 		if err != nil {
 			return &schedulerapi.HostPriorityList{}, err
 		}
