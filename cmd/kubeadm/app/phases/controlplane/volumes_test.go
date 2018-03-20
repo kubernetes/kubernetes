@@ -618,27 +618,40 @@ func TestAddExtraHostPathMounts(t *testing.T) {
 			Name:      "foo",
 			HostPath:  "/tmp/qux",
 			MountPath: "/tmp/qux",
+			Writable:  false,
+		},
+		{
+			Name:      "bar",
+			HostPath:  "/tmp/asd",
+			MountPath: "/tmp/asd",
+			Writable:  true,
 		},
 	}
-	mounts.AddExtraHostPathMounts("component", hostPathMounts, true, &hostPathDirectoryOrCreate)
-	if _, ok := mounts.volumes["component"]["foo"]; !ok {
-		t.Errorf("Expected to find volume %q", "foo")
-	}
-	vol, _ := mounts.volumes["component"]["foo"]
-	if vol.Name != "foo" {
-		t.Errorf("Expected volume name %q", "foo")
-	}
-	if vol.HostPath.Path != "/tmp/qux" {
-		t.Errorf("Expected host path %q", "/tmp/qux")
-	}
-	if _, ok := mounts.volumeMounts["component"]["foo"]; !ok {
-		t.Errorf("Expected to find volume mount %q", "foo")
-	}
-	volMount, _ := mounts.volumeMounts["component"]["foo"]
-	if volMount.Name != "foo" {
-		t.Errorf("Expected volume mount name %q", "foo")
-	}
-	if volMount.MountPath != "/tmp/qux" {
-		t.Errorf("Expected container path %q", "/tmp/qux")
+	mounts.AddExtraHostPathMounts("component", hostPathMounts, &hostPathDirectoryOrCreate)
+	for _, hostMount := range hostPathMounts {
+		volumeName := hostMount.Name
+		if _, ok := mounts.volumes["component"][volumeName]; !ok {
+			t.Errorf("Expected to find volume %q", volumeName)
+		}
+		vol := mounts.volumes["component"][volumeName]
+		if vol.Name != volumeName {
+			t.Errorf("Expected volume name %q", volumeName)
+		}
+		if vol.HostPath.Path != hostMount.HostPath {
+			t.Errorf("Expected host path %q", hostMount.HostPath)
+		}
+		if _, ok := mounts.volumeMounts["component"][volumeName]; !ok {
+			t.Errorf("Expected to find volume mount %q", volumeName)
+		}
+		volMount, _ := mounts.volumeMounts["component"][volumeName]
+		if volMount.Name != volumeName {
+			t.Errorf("Expected volume mount name %q", volumeName)
+		}
+		if volMount.MountPath != hostMount.MountPath {
+			t.Errorf("Expected container path %q", hostMount.MountPath)
+		}
+		if volMount.ReadOnly != !hostMount.Writable {
+			t.Errorf("Expected volume writable setting %t", hostMount.Writable)
+		}
 	}
 }

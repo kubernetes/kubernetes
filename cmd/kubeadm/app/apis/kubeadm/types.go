@@ -281,6 +281,8 @@ type HostPathMount struct {
 	HostPath string
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string
+	// Writable controls write access to the volume
+	Writable bool
 }
 
 // KubeProxy contains elements describing the proxy configuration.
