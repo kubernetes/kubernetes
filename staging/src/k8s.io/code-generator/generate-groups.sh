@@ -65,6 +65,11 @@ if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   ${GOPATH}/bin/deepcopy-gen --input-dirs $(codegen::join , "${FQ_APIS[@]}") -O zz_generated.deepcopy --bounding-dirs ${APIS_PKG} "$@"
 fi
 
+if [ "${GENS}" = "all" ] || grep -qw "defaulter" <<<"${GENS}"; then
+  echo "Generating defaulters"
+  ${GOPATH}/bin/defaulter-gen  --input-dirs $(codegen::join , "${FQ_APIS[@]}") -O zz_generated.defaults "$@"
+fi
+
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/clientset"
   ${GOPATH}/bin/client-gen --clientset-name versioned --input-base "" --input $(codegen::join , "${FQ_APIS[@]}") --output-package ${OUTPUT_PKG}/clientset "$@"
