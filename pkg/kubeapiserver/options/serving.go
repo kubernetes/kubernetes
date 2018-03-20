@@ -81,7 +81,7 @@ func NewInsecureServingOptions() *InsecureServingOptions {
 	}
 }
 
-func (s InsecureServingOptions) Validate(portArg string) []error {
+func (s InsecureServingOptions) Validate() []error {
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {

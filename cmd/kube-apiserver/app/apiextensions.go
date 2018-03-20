@@ -61,10 +61,5 @@ func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, exte
 }
 
 func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {
-	apiextensionsServer, err := apiextensionsConfig.Complete().New(delegateAPIServer)
-	if err != nil {
-		return nil, err
-	}
-
-	return apiextensionsServer, nil
+	return apiextensionsConfig.Complete().New(delegateAPIServer)
 }
