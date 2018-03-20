@@ -225,3 +225,43 @@ func AppendNoScheduleTolerationIfNotExist(tolerations []v1.Toleration) []v1.Tole
 
 	return tolerations
 }
+
+// GetTargetNodeName get the target node name of DaemonSet pods. If ScheduleDaemonSetPods enabled, it will also
+// retrieve node name of pending pods from NodeAffinity; otherwise, `.spec.NodeName` will be return.
+func GetTargetNodeName(pod *v1.Pod) (string, error) {
+	if len(pod.Spec.NodeName) != 0 {
+		return pod.Spec.NodeName, nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+		// If ScheduleDaemonSetPods is enabled, retrieve node name of unscheduled pods from NodeAffinity
+		if pod.Spec.Affinity == nil ||
+			pod.Spec.Affinity.NodeAffinity == nil ||
+			pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			return "", fmt.Errorf("no spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution for pod %s/%s",
+				pod.Namespace, pod.Name)
+		}
+
+		terms := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+		if len(terms) < 1 {
+			return "", fmt.Errorf("no nodeSelectorTerms in requiredDuringSchedulingIgnoredDuringExecution of pod %s/%s",
+				pod.Namespace, pod.Name)
+		}
+
+		for _, term := range terms {
+			for _, exp := range term.MatchExpressions {
+				if exp.Key == kubeletapis.LabelHostname &&
+					exp.Operator == v1.NodeSelectorOpIn {
+					if len(exp.Values) != 1 {
+						return "", fmt.Errorf("the matchExpressions value of 'kubernetes.io/hostname' is not unique for pod %s/%s",
+							pod.Namespace, pod.Name)
+					}
+
+					return exp.Values[0], nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no node name found for pod %s/%s", pod.Namespace, pod.Name)
+}

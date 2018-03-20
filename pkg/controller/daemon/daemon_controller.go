@@ -775,9 +775,14 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *apps.DaemonSet) (map[s
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
-		nodeName := pod.Spec.NodeName
+		nodeName, err := util.GetTargetNodeName(pod)
+		if err != nil {
+			return nil, err
+		}
+
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
+
 	return nodeToDaemonPods, nil
 }
 
