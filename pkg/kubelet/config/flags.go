@@ -67,16 +67,6 @@ type ContainerRuntimeOptions struct {
 	// CNIBinDir is the full path of the directory in which to search for
 	// CNI plugin binaries
 	CNIBinDir string
-
-	// rkt-specific options.
-
-	// rktPath is the path of rkt binary. Leave empty to use the first rkt in $PATH.
-	RktPath string
-	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
-	RktAPIEndpoint string
-	// rktStage1Image is the image to use as stage1. Local paths and
-	// http/https URLs are supported.
-	RktStage1Image string
 }
 
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
@@ -95,17 +85,9 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, "Use this for the docker endpoint to communicate with")
 	fs.DurationVar(&s.ImagePullProgressDeadline.Duration, "image-pull-progress-deadline", s.ImagePullProgressDeadline.Duration, "If no pulling progress is made before this deadline, the image pulling will be cancelled.")
 
-	// Network plugin settings. Shared by both docker and rkt.
+	// Network plugin settings for Docker.
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.CNIConfDir, "cni-conf-dir", s.CNIConfDir, "<Warning: Alpha feature> The full path of the directory in which to search for CNI config files. Default: /etc/cni/net.d")
 	fs.StringVar(&s.CNIBinDir, "cni-bin-dir", s.CNIBinDir, "<Warning: Alpha feature> A comma-separated list of full paths of directories in which to search for CNI plugin binaries. Default: /opt/cni/bin")
 	fs.Int32Var(&s.NetworkPluginMTU, "network-plugin-mtu", s.NetworkPluginMTU, "<Warning: Alpha feature> The MTU to be passed to the network plugin, to override the default. Set to 0 to use the default 1460 MTU.")
-
-	// Rkt-specific settings.
-	fs.StringVar(&s.RktPath, "rkt-path", s.RktPath, "Path of rkt binary. Leave empty to use the first rkt in $PATH.  Only used if --container-runtime='rkt'.")
-	fs.MarkDeprecated("rkt-path", "will be removed in a future version. Rktnetes has been deprecated in favor of rktlet (https://github.com/kubernetes-incubator/rktlet).")
-	fs.StringVar(&s.RktAPIEndpoint, "rkt-api-endpoint", s.RktAPIEndpoint, "The endpoint of the rkt API service to communicate with. Only used if --container-runtime='rkt'.")
-	fs.MarkDeprecated("rkt-api-endpoint", "will be removed in a future version. Rktnetes has been deprecated in favor of rktlet (https://github.com/kubernetes-incubator/rktlet).")
-	fs.StringVar(&s.RktStage1Image, "rkt-stage1-image", s.RktStage1Image, "image to use as stage1. Local paths and http/https URLs are supported. If empty, the 'stage1.aci' in the same directory as '--rkt-path' will be used.")
-	fs.MarkDeprecated("rkt-stage1-image", "will be removed in a future version. Rktnetes has been deprecated in favor of rktlet (https://github.com/kubernetes-incubator/rktlet).")
 }
