@@ -63,6 +63,7 @@ type OIDCAuthenticationOptions struct {
 	GroupsClaim    string
 	GroupsPrefix   string
 	SigningAlgs    []string
+	HostedDomain   string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -222,6 +223,9 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
 			"'alg' header value not in this list will be rejected. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
+
+		fs.StringVar(&s.OIDC.HostedDomain, "oidc-hosted-domain", "", ""+
+			"If provided, the hosted domain of the user.")
 	}
 
 	if s.PasswordFile != nil {
@@ -297,6 +301,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
 		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
+		ret.OIDCHostedDomain = s.OIDC.HostedDomain
 	}
 
 	if s.PasswordFile != nil {

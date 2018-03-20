@@ -98,6 +98,9 @@ type Options struct {
 	// https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 	SupportedSigningAlgs []string
 
+	// HostedDomain, if provided, is the hosted domain of the user.
+	HostedDomain string
+
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
 }
@@ -109,6 +112,7 @@ type Authenticator struct {
 	usernamePrefix string
 	groupsClaim    string
 	groupsPrefix   string
+	hostedDomain   string
 
 	// Contains an *oidc.IDTokenVerifier. Do not access directly use the
 	// idTokenVerifier method.
@@ -218,6 +222,7 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		usernamePrefix: opts.UsernamePrefix,
 		groupsClaim:    opts.GroupsClaim,
 		groupsPrefix:   opts.GroupsPrefix,
+		hostedDomain:   opts.HostedDomain,
 		cancel:         cancel,
 	}
 
@@ -319,6 +324,17 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 			info.Groups[i] = a.groupsPrefix + group
 		}
 	}
+
+	if a.hostedDomain != "" {
+		var hostedDomain string
+		if err := c.unmarshalClaim("hd", &hostedDomain); err != nil {
+			return nil, false, fmt.Errorf("oidc: parse 'hd': %v", err)
+		}
+		if hostedDomain != a.hostedDomain {
+			return nil, false, fmt.Errorf("oidc: required domain not fulfilled")
+		}
+	}
+
 	return info, true, nil
 }
 
