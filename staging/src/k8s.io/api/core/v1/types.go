@@ -5198,7 +5198,26 @@ type SecurityContext struct {
 	// 2) has CAP_SYS_ADMIN
 	// +optional
 	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,7,opt,name=allowPrivilegeEscalation"`
+	// ProcMount denotes the type of proc mount to use for the containers.
+	// The default is DefaultProcMount which uses the container runtime defaults for
+	// readonly paths and masked paths.
+	// +optional
+	ProcMount *ProcMountType `json:"procMount,omitEmpty" protobuf:"bytes,9,opt,name=procMount"`
 }
+
+type ProcMountType string
+
+const (
+	// DefaultProcMount uses the container runtime defaults for readonly and masked
+	// paths for /proc.  Most container runtimes mask certain paths in /proc to avoid
+	// accidental security exposure of special devices or information.
+	DefaultProcMount ProcMountType = "Default"
+
+	// UnmaskedProcMount bypasses the default masking behavior of the container
+	// runtime and ensures the newly created /proc the container stays in tact with
+	// no modifications.
+	UnmaskedProcMount ProcMountType = "Unmasked"
+)
 
 // SELinuxOptions are the labels to be applied to the container
 type SELinuxOptions struct {
