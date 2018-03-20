@@ -71,10 +71,7 @@ func fakeGCECloud() (*GCECloud, error) {
 	fakeManager := newFakeManager(projectID, region)
 	zonesWithNodes := createNodeZones([]string{zoneName})
 
-	alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
-	if err != nil {
-		return nil, err
-	}
+	alphaFeatureGate:= NewAlphaFeatureGate([]string{})
 
 	gce := &GCECloud{
 		region:             region,
