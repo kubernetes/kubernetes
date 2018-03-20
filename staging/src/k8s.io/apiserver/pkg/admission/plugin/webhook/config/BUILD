@@ -31,10 +31,12 @@ go_test(
     name = "go_default_test",
     srcs = [
         "authentication_test.go",
+        "client_test.go",
         "serviceresolver_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
+        "//vendor/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
