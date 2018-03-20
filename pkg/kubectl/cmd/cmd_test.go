@@ -122,31 +122,6 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
-type testPrinter struct {
-	Objects        []runtime.Object
-	Err            error
-	GenericPrinter bool
-}
-
-func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Objects = append(t.Objects, obj)
-	fmt.Fprintf(out, "%#v", obj)
-	return t.Err
-}
-
-// TODO: implement HandledResources()
-func (t *testPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (t *testPrinter) IsGeneric() bool {
-	return t.GenericPrinter
-}
-
 type testDescriber struct {
 	Name, Namespace string
 	Settings        printers.DescriberSettings

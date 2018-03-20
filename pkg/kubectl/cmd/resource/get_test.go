@@ -82,31 +82,6 @@ func defaultClientConfig() *restclient.Config {
 	}
 }
 
-type testPrinter struct {
-	Objects        []runtime.Object
-	Err            error
-	GenericPrinter bool
-}
-
-func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Objects = append(t.Objects, obj)
-	fmt.Fprintf(out, "%#v", obj)
-	return t.Err
-}
-
-// TODO: implement HandledResources()
-func (t *testPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (t *testPrinter) IsGeneric() bool {
-	return t.GenericPrinter
-}
-
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
@@ -246,7 +221,6 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 
 	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
 	actual := []runtime.Object{}
-	//actual := tf.Printer.(*testPrinter).Objects
 	if len(actual) != len(expected) {
 		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
