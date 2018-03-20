@@ -112,8 +112,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				"Time": recent(maxStatsAge),
 				// Pods are limited by Node Allocatable
 				"AvailableBytes":  bounded(1*framework.Kb, memoryLimit),
-				"UsageBytes":      bounded(10*framework.Kb, 20*framework.Mb),
-				"WorkingSetBytes": bounded(10*framework.Kb, 20*framework.Mb),
+				"UsageBytes":      bounded(10*framework.Kb, 50*framework.Mb),
+				"WorkingSetBytes": bounded(10*framework.Kb, 50*framework.Mb),
 				"RSSBytes":        bounded(1*framework.Kb, 20*framework.Mb),
 				"PageFaults":      bounded(0, 1000000),
 				"MajorPageFaults": bounded(0, 10),
