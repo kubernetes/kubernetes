@@ -286,7 +286,7 @@ func (c *CreateRoleOptions) RunCreateRole() error {
 
 	// Create role.
 	if !c.DryRun {
-		_, err = c.Client.Roles(c.Namespace).Create(role)
+		role, err = c.Client.Roles(c.Namespace).Create(role)
 		if err != nil {
 			return err
 		}
