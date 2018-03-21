@@ -246,16 +246,32 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		defer tc.Unlock()
 
 		obj := &v1.PodList{}
-		for i := 0; i < len(tc.reportedCPURequests); i++ {
+
+		specifiedCPURequests := tc.reportedCPURequests != nil
+
+		numPodsToCreate := int(tc.initialReplicas)
+		if specifiedCPURequests {
+			numPodsToCreate = len(tc.reportedCPURequests)
+		}
+
+		for i := 0; i < numPodsToCreate; i++ {
 			podReadiness := v1.ConditionTrue
 			if tc.reportedPodReadiness != nil {
 				podReadiness = tc.reportedPodReadiness[i]
 			}
+
 			podPhase := v1.PodRunning
 			if tc.reportedPodPhase != nil {
 				podPhase = tc.reportedPodPhase[i]
 			}
+
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+
+			reportedCPURequest := resource.MustParse("1.0")
+			if specifiedCPURequests {
+				reportedCPURequest = tc.reportedCPURequests[i]
+			}
+
 			pod := v1.Pod{
 				Status: v1.PodStatus{
 					Phase: podPhase,
@@ -273,12 +289,13 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 						"name": podNamePrefix,
 					},
 				},
+
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceCPU: tc.reportedCPURequests[i],
+									v1.ResourceCPU: reportedCPURequest,
 								},
 							},
 						},
@@ -1348,13 +1365,14 @@ func TestEmptyMetrics(t *testing.T) {
 
 func TestEmptyCPURequest(t *testing.T) {
 	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 1,
-		desiredReplicas: 1,
-		CPUTarget:       100,
-		reportedLevels:  []uint64{200},
-		useMetricsAPI:   true,
+		minReplicas:         1,
+		maxReplicas:         5,
+		initialReplicas:     1,
+		desiredReplicas:     1,
+		CPUTarget:           100,
+		reportedLevels:      []uint64{200},
+		reportedCPURequests: []resource.Quantity{},
+		useMetricsAPI:       true,
 		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},

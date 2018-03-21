@@ -323,10 +323,10 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		var outTimestamp time.Time
 		var err error
 		if tc.metric.singleObject != nil {
-			outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject)
+			outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, selector)
 		} else if tc.metric.selector != nil {
 			if tc.metric.targetUtilization > 0 {
-				outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.selector)
+				outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.selector, selector)
 			} else if tc.metric.perPodTargetUtilization > 0 {
 				outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUtilization, tc.metric.name, testNamespace, tc.metric.selector)
 			}
@@ -497,10 +497,46 @@ func TestReplicaCalcScaleUpCMObject(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpCMObjectIgnoresUnreadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 5, // If we did not ignore unready pods, we'd expect 15 replicas.
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{50000},
+			targetUtilization:   10000,
+			expectedUtilization: 50000,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "extensions/v1beta1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpCMExternal(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  1,
 		expectedReplicas: 2,
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{8600},
+			targetUtilization:   4400,
+			expectedUtilization: 8600,
+			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpCMExternalIgnoresUnreadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 2, // Would expect 6 if we didn't ignore unready pods
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{8600},
