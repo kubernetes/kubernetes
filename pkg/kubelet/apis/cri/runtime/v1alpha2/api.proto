@@ -133,10 +133,10 @@ message VersionResponse {
 message DNSConfig {
     // List of DNS servers of the cluster.
     repeated string servers = 1;
-    // List of DNS search domains of the cluster.
+    // List of DNS search domains of the cluster. Optional.
     repeated string searches = 2;
-    // List of DNS options. See https://linux.die.net/man/5/resolv.conf
-    // for all available options.
+    // List of DNS options. Optional.
+    // See https://linux.die.net/man/5/resolv.conf for all available options.
     repeated string options = 3;
 }
 
@@ -177,7 +177,7 @@ message Mount {
     bool readonly = 3;
     // If set, the mount needs SELinux relabeling.
     bool selinux_relabel = 4;
-    // Requested propagation mode.
+    // Requested propagation mode. Optional.
     MountPropagation propagation = 5;
 }
 
@@ -228,19 +228,19 @@ message Int64Value {
 // 2) It may not be applicable to a PodSandbox which does not contain any running
 //    process.
 message LinuxSandboxSecurityContext {
-    // Configurations for the sandbox's namespaces.
+    // Configurations for the sandbox's namespaces. Optional.
     // This will be used only if the PodSandbox uses namespace for isolation.
     NamespaceOption namespace_options = 1;
-    // Optional SELinux context to be applied.
+    // Optional SELinux context to be applied. Optional.
     SELinuxOption selinux_options = 2;
-    // UID to run sandbox processes as, when applicable.
+    // UID to run sandbox processes as, when applicable. Optional.
     Int64Value run_as_user = 3;
-    // GID to run sandbox processes as, when applicable.
+    // GID to run sandbox processes as, when applicable. Optional.
     Int64Value run_as_group = 8;
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
     // List of groups applied to the first process run in the sandbox, in
-    // addition to the sandbox's primary GID.
+    // addition to the sandbox's primary GID. Optional.
     repeated int64 supplemental_groups = 5;
     // Indicates whether the sandbox will be asked to run a privileged
     // container. If a privileged container is to be executed within it, this
@@ -248,7 +248,8 @@ message LinuxSandboxSecurityContext {
     // This allows a sandbox to take additional security precautions if no
     // privileged containers are expected to be run.
     bool privileged = 6;
-    // Seccomp profile for the sandbox, candidate values are:
+    // Seccomp profile for the sandbox. Optional.
+    // Candidate values are:
     // * docker/default: the default profile for the docker container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
@@ -264,9 +265,9 @@ message LinuxPodSandboxConfig {
     // The cgroupfs style syntax will be used, but the container runtime can
     // convert it to systemd semantics if needed.
     string cgroup_parent = 1;
-    // LinuxSandboxSecurityContext holds sandbox security attributes.
+    // LinuxSandboxSecurityContext holds sandbox security attributes. Optional.
     LinuxSandboxSecurityContext security_context = 2;
-    // Sysctls holds linux sysctls config for the sandbox.
+    // Sysctls holds linux sysctls config for the sandbox. Optional.
     map<string, string> sysctls = 3;
 }
 
@@ -334,7 +335,7 @@ message PodSandboxConfig {
     // and the CRI). Whenever possible, however, runtime authors SHOULD
     // consider proposing new typed fields for any new features instead.
     map<string, string> annotations = 7;
-    // Optional configurations specific to Linux hosts.
+    // Sandbox configurations specific to Linux hosts. Optional.
     LinuxPodSandboxConfig linux = 8;
 }
 
@@ -406,7 +407,8 @@ message PodSandboxStatus {
     PodSandboxNetworkStatus network = 5;
     // Linux-specific status to a pod sandbox.
     LinuxPodSandboxStatus linux = 6;
-    // Labels are key-value pairs that may be used to scope and select individual resources.
+    // Labels are key-value pairs that may be used to scope and select individual
+    // resources. Optional.
     map<string, string> labels = 7;
     // Unstructured key-value map holding arbitrary metadata.
     // Annotations MUST NOT be altered by the runtime; the value of this field
@@ -434,18 +436,18 @@ message PodSandboxStateValue {
 // PodSandboxFilter is used to filter a list of PodSandboxes.
 // All those fields are combined with 'AND'
 message PodSandboxFilter {
-    // ID of the sandbox.
+    // ID of the sandbox. Optional.
     string id = 1;
-    // State of the sandbox.
+    // State of the sandbox. Optional.
     PodSandboxStateValue state = 2;
-    // LabelSelector to select matches.
+    // LabelSelector to select matches. Optional.
     // Only api.MatchLabels is supported for now and the requirements
     // are ANDed. MatchExpressions is not supported yet.
     map<string, string> label_selector = 3;
 }
 
 message ListPodSandboxRequest {
-    // PodSandboxFilter to filter a list of PodSandboxes.
+    // PodSandboxFilter to filter a list of PodSandboxes. Optional.
     PodSandboxFilter filter = 1;
 }
 
@@ -517,15 +519,15 @@ message SELinuxOption {
 
 // Capability contains the container capabilities to add or drop
 message Capability {
-    // List of capabilities to add.
+    // List of capabilities to add. Optional.
     repeated string add_capabilities = 1;
-    // List of capabilities to drop.
+    // List of capabilities to drop. Optional.
     repeated string drop_capabilities = 2;
 }
 
 // LinuxContainerSecurityContext holds linux security configuration that will be applied to a container.
 message LinuxContainerSecurityContext {
-    // Capabilities to add or drop.
+    // Capabilities to add or drop. Optional.
     Capability capabilities = 1;
     // If set, run container in privileged mode.
     // Privileged mode is incompatible with the following options. If
@@ -545,34 +547,37 @@ message LinuxContainerSecurityContext {
     // 7. All devices from the host's /dev are available within the container.
     // 8. SELinux restrictions are not applied (e.g. label=disabled).
     bool privileged = 2;
-    // Configurations for the container's namespaces.
+    // Configurations for the container's namespaces. Optional.
     // Only used if the container uses namespace for isolation.
     NamespaceOption namespace_options = 3;
-    // SELinux context to be optionally applied.
+    // SELinux context to be optionally applied. Optional.
     SELinuxOption selinux_options = 4;
-    // UID to run the container process as. Only one of run_as_user and
-    // run_as_username can be specified at a time.
+    // UID to run the container process as. Optional.
+    // Only one of run_as_user and run_as_username can be specified at a time.
     Int64Value run_as_user = 5;
-    // GID to run the container process as. Only one of run_as_group and
-    // run_as_groupname can be specified at a time.
+    // GID to run the container process as. Optional.
+    // Only one of run_as_group and run_as_groupname can be specified at a time.
     Int64Value run_as_group = 12;
-    // User name to run the container process as. If specified, the user MUST
-    // exist in the container image (i.e. in the /etc/passwd inside the image),
-    // and be resolved there by the runtime; otherwise, the runtime MUST error.
+    // User name to run the container process as. Optional.
+    // If specified, the user MUST exist in the container image (i.e. in the
+    // /etc/passwd inside the image), and be resolved there by the runtime;
+    // otherwise, the runtime MUST error.
     string run_as_username = 6;
     // If set, the root filesystem of the container is read-only.
     bool readonly_rootfs = 7;
     // List of groups applied to the first process run in the container, in
-    // addition to the container's primary GID.
+    // addition to the container's primary GID. Optional.
     repeated int64 supplemental_groups = 8;
-    // AppArmor profile for the container, candidate values are:
+    // AppArmor profile for the container. Optional.
+    // Candidate values are:
     // * runtime/default: equivalent to not specifying a profile.
     // * unconfined: no profiles are loaded
     // * localhost/<profile_name>: profile loaded on the node
     //    (localhost) by name. The possible profile names are detailed at
     //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9;
-    // Seccomp profile for the container, candidate values are:
+    // Seccomp profile for the container. Optional.
+    // Candidate values are:
     // * docker/default: the default profile for the docker container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
@@ -589,7 +594,7 @@ message LinuxContainerSecurityContext {
 message LinuxContainerConfig {
     // Resources specification for the container.
     LinuxContainerResources resources = 1;
-    // LinuxContainerSecurityContext configuration for the container.
+    // LinuxContainerSecurityContext configuration for the container. Optional.
     LinuxContainerSecurityContext security_context = 2;
 }
 
@@ -648,17 +653,17 @@ message ContainerConfig {
     ContainerMetadata metadata = 1 ;
     // Image to use.
     ImageSpec image = 2;
-    // Command to execute (i.e., entrypoint for docker)
+    // Command to execute (i.e., entrypoint for docker). Optional.
     repeated string command = 3;
-    // Args for the Command (i.e., command for docker)
+    // Args for the Command (i.e., command for docker). Optional.
     repeated string args = 4;
-    // Current working directory of the command.
+    // Current working directory of the command. Optional.
     string working_dir = 5;
-    // List of environment variable to set in the container.
+    // List of environment variable to set in the container. Optional.
     repeated KeyValue envs = 6;
-    // Mounts for the container.
+    // Mounts for the container. Optional.
     repeated Mount mounts = 7;
-    // Devices for the container.
+    // Devices for the container. Optional.
     repeated Device devices = 8;
     // Key-value pairs that may be used to scope and select individual resources.
     // Label keys are of the form:
@@ -668,7 +673,7 @@ message ContainerConfig {
     //     name ::= DNS_LABEL
     map<string, string> labels = 9;
     // Unstructured key-value map that may be used by the kubelet to store and
-    // retrieve arbitrary metadata.
+    // retrieve arbitrary metadata. Optional.
     //
     // Annotations MUST NOT be altered by the runtime; the annotations stored
     // here MUST be returned in the ContainerStatus associated with the container
@@ -761,13 +766,13 @@ message ContainerStateValue {
 // ContainerFilter is used to filter containers.
 // All those fields are combined with 'AND'
 message ContainerFilter {
-    // ID of the container.
+    // ID of the container. Optional.
     string id = 1;
-    // State of the container.
+    // State of the container. Optional.
     ContainerStateValue state = 2;
-    // ID of the PodSandbox.
+    // ID of the PodSandbox. Optional.
     string pod_sandbox_id = 3;
-    // LabelSelector to select matches.
+    // LabelSelector to select matches. Optional.
     // Only api.MatchLabels is supported for now and the requirements
     // are ANDed. MatchExpressions is not supported yet.
     map<string, string> label_selector = 4;
@@ -957,7 +962,7 @@ message PortForwardResponse {
 }
 
 message ImageFilter {
-    // Spec of the image.
+    // Spec of the image. Optional.
     ImageSpec image = 1;
 }
 
@@ -976,12 +981,13 @@ message Image {
     repeated string repo_digests = 3;
     // Size of the image in bytes. Must be > 0.
     uint64 size = 4;
-    // UID that will run the command(s). This is used as a default if no user is
-    // specified when creating the container. UID and the following user name
-    // are mutually exclusive.
+    // UID that will run the command(s). Optional.
+    // This is used as a default if no user is specified when creating the
+    // container. UID and the following user name are mutually exclusive.
     Int64Value uid = 5;
-    // User name that will run the command(s). This is used if UID is not set
-    // and no user is specified when creating container.
+    // User name that will run the command(s). Optional.
+    // This is used if UID is not set and no user is specified when creating
+    // container.
     string username = 6;
 }
 
@@ -1014,16 +1020,16 @@ message AuthConfig {
     string auth = 3;
     string server_address = 4;
     // IdentityToken is used to authenticate the user and get
-    // an access token for the registry.
+    // an access token for the registry. Optional.
     string identity_token = 5;
-    // RegistryToken is a bearer token to be sent to a registry
+    // RegistryToken is a bearer token to be sent to a registry. Optional.
     string registry_token = 6;
 }
 
 message PullImageRequest {
     // Spec of the image.
     ImageSpec image = 1;
-    // Authentication configuration for pulling the image.
+    // Authentication configuration for pulling the image. Optional.
     AuthConfig auth = 2;
     // Config of the PodSandbox, which is used to pull image in PodSandbox context.
     PodSandboxConfig sandbox_config = 3;
@@ -1148,18 +1154,18 @@ message ContainerStatsResponse {
 }
 
 message ListContainerStatsRequest{
-    // Filter for the list request.
+    // Filter for the list request. Optional.
     ContainerStatsFilter filter = 1;
 }
 
 // ContainerStatsFilter is used to filter containers.
 // All those fields are combined with 'AND'
 message ContainerStatsFilter {
-    // ID of the container.
+    // ID of the container. Optional.
     string id = 1;
-    // ID of the PodSandbox.
+    // ID of the PodSandbox. Optional.
     string pod_sandbox_id = 2;
-    // LabelSelector to select matches.
+    // LabelSelector to select matches. Optional.
     // Only api.MatchLabels is supported for now and the requirements
     // are ANDed. MatchExpressions is not supported yet.
     map<string, string> label_selector = 3;
