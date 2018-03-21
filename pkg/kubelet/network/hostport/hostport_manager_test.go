@@ -28,6 +28,134 @@ import (
 	"k8s.io/utils/exec"
 )
 
+func TestOpenCloseHostports(t *testing.T) {
+	openPortCases := []struct {
+		podPortMapping *PodPortMapping
+		expectError    bool
+	}{
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n0",
+			},
+			false,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n1",
+				PortMappings: []*PortMapping{
+					{HostPort: 80, Protocol: v1.Protocol("TCP")},
+					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+					{HostPort: 443, Protocol: v1.Protocol("TCP")},
+				},
+			},
+			false,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n2",
+				PortMappings: []*PortMapping{
+					{HostPort: 80, Protocol: v1.Protocol("TCP")},
+				},
+			},
+			true,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n3",
+				PortMappings: []*PortMapping{
+					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+				},
+			},
+			true,
+		},
+		{
+			&PodPortMapping{
+				Namespace: "ns1",
+				Name:      "n3",
+				PortMappings: []*PortMapping{
+					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+				},
+			},
+			false,
+		},
+	}
+
+	iptables := NewFakeIPTables()
+	portOpener := NewFakeSocketManager()
+	manager := &hostportManager{
+		hostPortMap: make(map[hostport]closeable),
+		iptables:    iptables,
+		portOpener:  portOpener.openFakeSocket,
+		execer:      exec.New(),
+	}
+
+	for _, tc := range openPortCases {
+		mapping, err := manager.openHostports(tc.podPortMapping)
+		if tc.expectError {
+			assert.Error(t, err)
+			continue
+		}
+		assert.NoError(t, err)
+		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings))
+	}
+
+	// We have 4 ports: 80, 443, 8080, 8081 open now.
+	closePortCases := []struct {
+		portMappings []*PortMapping
+		expectError  bool
+	}{
+		{
+			portMappings: nil,
+		},
+		{
+
+			portMappings: []*PortMapping{
+				{HostPort: 80, Protocol: v1.Protocol("TCP")},
+				{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+				{HostPort: 443, Protocol: v1.Protocol("TCP")},
+			},
+		},
+		{
+
+			portMappings: []*PortMapping{
+				{HostPort: 80, Protocol: v1.Protocol("TCP")},
+			},
+		},
+		{
+			portMappings: []*PortMapping{
+				{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+				{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+			},
+		},
+		{
+			portMappings: []*PortMapping{
+				{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+			},
+		},
+		{
+			portMappings: []*PortMapping{
+				{HostPort: 7070, Protocol: v1.Protocol("TCP")},
+			},
+		},
+	}
+
+	for _, tc := range closePortCases {
+		err := manager.closeHostports(tc.portMappings)
+		if tc.expectError {
+			assert.Error(t, err)
+			continue
+		}
+		assert.NoError(t, err)
+	}
+	// Clear all elements in hostPortMap
+	assert.Zero(t, len(manager.hostPortMap))
+}
+
 func TestHostportManager(t *testing.T) {
 	iptables := NewFakeIPTables()
 	portOpener := NewFakeSocketManager()
