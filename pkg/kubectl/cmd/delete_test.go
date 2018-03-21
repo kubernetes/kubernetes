@@ -722,13 +722,13 @@ func TestResourceErrors(t *testing.T) {
 		"resources but no selectors": {
 			args: []string{"pods"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, field selector or --all flag specified")
 			},
 		},
 		"multiple resources but no selectors": {
 			args: []string{"pods,deployments"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, field selector or --all flag specified")
 			},
 		},
 	}
