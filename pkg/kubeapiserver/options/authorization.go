@@ -68,12 +68,6 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.WebhookCacheUnauthorizedTTL,
 		"authorization-webhook-cache-unauthorized-ttl", s.WebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
-
-	fs.String("authorization-rbac-super-user", "", ""+
-		"If specified, a username which avoids RBAC authorization checks and role binding "+
-		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
-	fs.MarkDeprecated("authorization-rbac-super-user", "Removed during alpha to beta.  The 'system:masters' group has privileged access.")
-
 }
 
 func (s *BuiltInAuthorizationOptions) Modes() []string {
