@@ -75,6 +75,13 @@ const (
 	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
 )
 
+var (
+	// supportedServiceTags holds a list of supported service tags on Azure.
+	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for more information.
+	supportedServiceTags = sets.NewString("VirtualNetwork", "VIRTUAL_NETWORK", "AzureLoadBalancer", "AZURE_LOADBALANCER",
+		"Internet", "INTERNET", "AzureTrafficManager", "Storage", "Sql")
+)
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -842,7 +849,10 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if err != nil {
 		return nil, err
 	}
-	serviceTags := getServiceTags(service)
+	serviceTags, err := getServiceTags(service)
+	if err != nil {
+		return nil, err
+	}
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
@@ -1328,10 +1338,22 @@ func useSharedSecurityRule(service *v1.Service) bool {
 	return false
 }
 
-func getServiceTags(service *v1.Service) []string {
+func getServiceTags(service *v1.Service) ([]string, error) {
 	if serviceTags, found := service.Annotations[ServiceAnnotationAllowedServiceTag]; found {
-		return strings.Split(strings.TrimSpace(serviceTags), ",")
+		tags := strings.Split(strings.TrimSpace(serviceTags), ",")
+		for _, tag := range tags {
+			// Storage and Sql service tags support setting regions with suffix ".Region"
+			if strings.HasPrefix(tag, "Storage.") || strings.HasPrefix(tag, "Sql.") {
+				continue
+			}
+
+			if !supportedServiceTags.Has(tag) {
+				return nil, fmt.Errorf("only %q are allowed in service tags", supportedServiceTags.List())
+			}
+		}
+
+		return tags, nil
 	}
 
-	return nil
+	return nil, nil
 }
