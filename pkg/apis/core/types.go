@@ -1934,6 +1934,9 @@ type Probe struct {
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +optional
 	FailureThreshold int32
+	// The list of a container(s) which is(are) restarted when Liveness probe detects a failure of the monitored resource.
+	// +optional
+	MonitoredContainers []string
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

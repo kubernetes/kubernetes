@@ -1349,7 +1349,11 @@ func TestSetDefaultProbe(t *testing.T) {
 
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	actualProbe := *output.Spec.Containers[0].LivenessProbe
-	if actualProbe != expectedProbe {
+	if actualProbe.InitialDelaySeconds != expectedProbe.InitialDelaySeconds ||
+		actualProbe.TimeoutSeconds != expectedProbe.TimeoutSeconds ||
+		actualProbe.PeriodSeconds != expectedProbe.PeriodSeconds ||
+		actualProbe.SuccessThreshold != expectedProbe.SuccessThreshold ||
+		actualProbe.FailureThreshold != expectedProbe.FailureThreshold {
 		t.Errorf("Expected probe: %+v\ngot: %+v\n", expectedProbe, actualProbe)
 	}
 }

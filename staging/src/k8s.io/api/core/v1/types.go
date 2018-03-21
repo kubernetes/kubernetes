@@ -2064,6 +2064,9 @@ type Probe struct {
 	// Defaults to 3. Minimum value is 1.
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+	// The list of a container(s) which is(are) restarted when Liveness probe detects a failure of the monitored resource.
+	// +optional
+	MonitoredContainers []string `json:"monitoredContainers,omitempty" protobuf:"bytes,7,opt,name=monitoredContainers"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

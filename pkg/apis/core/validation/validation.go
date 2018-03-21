@@ -2348,6 +2348,25 @@ func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+func validateProbeMonitoredContainers(monitoredContainers []string, containers []core.Container, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for _, mc := range monitoredContainers {
+		found := false
+		for _, c := range containers {
+			if c.Name == mc {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("monitoredContainers"), mc, "is not on the list of containers defined in the pod"))
+		}
+	}
+
+	return allErrs
+}
+
 func validateClientIPAffinityConfig(config *core.SessionAffinityConfig, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if config == nil {
@@ -2583,6 +2602,11 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		// Liveness-specific validation
 		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
+		}
+		if ctr.LivenessProbe != nil {
+			if len(ctr.LivenessProbe.MonitoredContainers) != 0 {
+				allErrs = append(allErrs, validateProbeMonitoredContainers(ctr.LivenessProbe.MonitoredContainers, containers, idxPath.Child("livenessProbe"))...)
+			}
 		}
 
 		switch ctr.TerminationMessagePolicy {
