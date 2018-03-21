@@ -47,10 +47,16 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 		printer = p
 
 	case "name":
-		printer = &NamePrinter{
-			Typer:    typer,
-			Decoders: decoders,
+		nameFlags := NewNamePrintFlags("", false)
+		namePrinter, matched, err := nameFlags.ToPrinter(format)
+		if !matched {
+			return nil, fmt.Errorf("unable to match a name printer to handle current print options")
 		}
+		if err != nil {
+			return nil, err
+		}
+
+		printer = namePrinter
 
 	case "template", "go-template":
 		if len(formatArgument) == 0 {
