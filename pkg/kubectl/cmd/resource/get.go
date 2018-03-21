@@ -122,7 +122,7 @@ var (
 
 const (
 	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
-	useServerPrintColumns          = "experimental-server-print"
+	useServerPrintColumns          = "server-print"
 )
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
@@ -201,6 +201,13 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 	options.Sort = len(isSorting) > 0
+
+	// TODO (soltysh): currently we don't support sorting and custom columns
+	// with server side print. So in these cases force the old behavior.
+	outputOption := cmd.Flags().Lookup("output").Value.String()
+	if options.Sort && outputOption == "custom-columns" {
+		options.ServerPrint = false
+	}
 
 	options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 
@@ -727,7 +734,7 @@ func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 }
 
 func addServerPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useServerPrintColumns, false, "If true, have the server return the appropriate table output. Supports extension APIs and CRD. Experimental.")
+	cmd.Flags().Bool(useServerPrintColumns, true, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {
