@@ -188,7 +188,11 @@ type LatencyMetric struct {
 }
 
 type PodStartupLatency struct {
-	Latency LatencyMetric `json:"latency"`
+	CreateToScheduleLatency LatencyMetric `json:"createToScheduleLatency"`
+	ScheduleToRunLatency    LatencyMetric `json:"scheduleToRunLatency"`
+	RunToWatchLatency       LatencyMetric `json:"runToWatchLatency"`
+	ScheduleToWatchLatency  LatencyMetric `json:"scheduleToWatchLatency"`
+	E2ELatency              LatencyMetric `json:"e2eLatency"`
 }
 
 func (l *PodStartupLatency) SummaryKind() string {
@@ -398,17 +402,17 @@ func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIRespons
 	return badMetrics, metrics, nil
 }
 
-// Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
+// Verifies whether 50, 90 and 99th percentiles of e2e PodStartupLatency are
 // within the threshold.
 func VerifyPodStartupLatency(latency *PodStartupLatency) error {
-	if latency.Latency.Perc50 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 50th percentile: %v", latency.Latency.Perc50)
+	if latency.E2ELatency.Perc50 > podStartupThreshold {
+		return fmt.Errorf("too high pod startup latency 50th percentile: %v", latency.E2ELatency.Perc50)
 	}
-	if latency.Latency.Perc90 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 90th percentile: %v", latency.Latency.Perc90)
+	if latency.E2ELatency.Perc90 > podStartupThreshold {
+		return fmt.Errorf("too high pod startup latency 90th percentile: %v", latency.E2ELatency.Perc90)
 	}
-	if latency.Latency.Perc99 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 99th percentile: %v", latency.Latency.Perc99)
+	if latency.E2ELatency.Perc99 > podStartupThreshold {
+		return fmt.Errorf("too high pod startup latency 99th percentile: %v", latency.E2ELatency.Perc99)
 	}
 	return nil
 }

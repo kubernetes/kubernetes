@@ -556,14 +556,14 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyD
 	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
 	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
 
-	podCreateLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLags)}
+	podStartupLatency := framework.ExtractLatencyMetrics(e2eLags)
 
 	// log latency perf data
-	logPerfData(getLatencyPerfData(podCreateLatency.Latency, testInfo), "latency")
+	logPerfData(getLatencyPerfData(podStartupLatency, testInfo), "latency")
 
 	if isVerify {
 		// check whether e2e pod startup time is acceptable.
-		framework.ExpectNoError(verifyPodStartupLatency(podStartupLimits, podCreateLatency.Latency))
+		framework.ExpectNoError(verifyPodStartupLatency(podStartupLimits, podStartupLatency))
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {

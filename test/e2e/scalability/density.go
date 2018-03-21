@@ -829,15 +829,23 @@ var _ = SIGDescribe("Density", func() {
 				sort.Sort(framework.LatencySlice(schedToWatchLag))
 				sort.Sort(framework.LatencySlice(e2eLag))
 
-				framework.PrintLatencies(scheduleLag, "worst schedule latencies")
-				framework.PrintLatencies(startupLag, "worst run-after-schedule latencies")
-				framework.PrintLatencies(watchLag, "worst watch latencies")
-				framework.PrintLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
-				framework.PrintLatencies(e2eLag, "worst e2e total latencies")
+				framework.PrintLatencies(scheduleLag, "worst create-to-schedule latencies")
+				framework.PrintLatencies(startupLag, "worst schedule-to-run latencies")
+				framework.PrintLatencies(watchLag, "worst run-to-watch latencies")
+				framework.PrintLatencies(schedToWatchLag, "worst schedule-to-watch latencies")
+				framework.PrintLatencies(e2eLag, "worst e2e latencies")
+
+				// Capture latency metrics related to pod-startup.
+				podStartupLatency := &framework.PodStartupLatency{
+					CreateToScheduleLatency: framework.ExtractLatencyMetrics(scheduleLag),
+					ScheduleToRunLatency:    framework.ExtractLatencyMetrics(startupLag),
+					RunToWatchLatency:       framework.ExtractLatencyMetrics(watchLag),
+					ScheduleToWatchLatency:  framework.ExtractLatencyMetrics(schedToWatchLag),
+					E2ELatency:              framework.ExtractLatencyMetrics(e2eLag),
+				}
+				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatency := &framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
-				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
