@@ -69,6 +69,10 @@ const (
 	// ServiceAnnotationLoadBalancerResourceGroup is the annotation used on the service
 	// to specify the resource group of load balancer objects that are not in the same resource group as the cluster.
 	ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+
+	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
+	// to specify a list of allowed service tags separated by comma
+	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
 )
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -838,14 +842,18 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if err != nil {
 		return nil, err
 	}
+	serviceTags := getServiceTags(service)
 	var sourceAddressPrefixes []string
-	if sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges) {
+	if (sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
 			sourceAddressPrefixes = []string{"Internet"}
 		}
 	} else {
 		for _, ip := range sourceRanges {
 			sourceAddressPrefixes = append(sourceAddressPrefixes, ip.String())
+		}
+		for _, serviceTag := range serviceTags {
+			sourceAddressPrefixes = append(sourceAddressPrefixes, serviceTag)
 		}
 	}
 	expectedSecurityRules := []network.SecurityRule{}
@@ -1318,4 +1326,12 @@ func useSharedSecurityRule(service *v1.Service) bool {
 	}
 
 	return false
+}
+
+func getServiceTags(service *v1.Service) []string {
+	if serviceTags, found := service.Annotations[ServiceAnnotationAllowedServiceTag]; found {
+		return strings.Split(strings.TrimSpace(serviceTags), ",")
+	}
+
+	return nil
 }
