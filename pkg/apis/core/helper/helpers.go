@@ -172,14 +172,11 @@ func IsNativeResource(name core.ResourceName) bool {
 		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
 
-var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
-
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted.
+// namespace and is not hugepages.
 func IsOvercommitAllowed(name core.ResourceName) bool {
 	return IsNativeResource(name) &&
-		!IsHugePageResourceName(name) &&
-		!overcommitBlacklist.Has(string(name))
+		!IsHugePageResourceName(name)
 }
 
 var standardLimitRangeTypes = sets.NewString(

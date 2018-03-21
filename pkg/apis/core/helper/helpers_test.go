@@ -388,10 +388,6 @@ func TestIsOvercommitAllowed(t *testing.T) {
 			allowed: true,
 		},
 		{
-			name:    core.ResourceNvidiaGPU,
-			allowed: false,
-		},
-		{
 			name:    HugePageResourceName(resource.MustParse("2Mi")),
 			allowed: false,
 		},

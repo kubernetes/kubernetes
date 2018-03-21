@@ -32,36 +32,15 @@ func TestValidateResourceRequirements(t *testing.T) {
 		requirements v1.ResourceRequirements
 	}{
 		{
-			Name: "GPU only setting Limits",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-			},
-		},
-		{
-			Name: "GPU setting Limits equals Requests",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-			},
-		},
-		{
-			Name: "Resources with GPU with Requests",
+			Name: "Resources with Requests equal to Limits",
 			requirements: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):       resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory):    resource.MustParse("10G"),
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("1"),
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 				},
 				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceCPU):       resource.MustParse("10"),
-					v1.ResourceName(v1.ResourceMemory):    resource.MustParse("10G"),
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("1"),
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 		},
@@ -111,36 +90,6 @@ func TestValidateResourceRequirements(t *testing.T) {
 		Name         string
 		requirements v1.ResourceRequirements
 	}{
-		{
-			Name: "GPU only setting Requests",
-			requirements: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-			},
-		},
-		{
-			Name: "GPU setting Limits less than Requests",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("11"),
-				},
-			},
-		},
-		{
-			Name: "GPU setting Limits larger than Requests",
-			requirements: v1.ResourceRequirements{
-				Limits: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("10"),
-				},
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceNvidiaGPU): resource.MustParse("9"),
-				},
-			},
-		},
 		{
 			Name: "Resources with Requests Larger Than Limits",
 			requirements: v1.ResourceRequirements{

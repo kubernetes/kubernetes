@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
@@ -85,14 +84,11 @@ func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, erro
 	return resource.ParseQuantity(pageSize)
 }
 
-var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
-
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted and is not hugepages.
+// namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
 	return IsNativeResource(name) &&
-		!IsHugePageResourceName(name) &&
-		!overcommitBlacklist.Has(string(name))
+		!IsHugePageResourceName(name)
 }
 
 // Extended and Hugepages resources

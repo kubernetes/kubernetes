@@ -90,26 +90,6 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
-// makeGPUDevices determines the devices for the given container.
-// Experimental.
-func (kl *Kubelet) makeGPUDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
-	if container.Resources.Limits.NvidiaGPU().IsZero() {
-		return nil, nil
-	}
-
-	nvidiaGPUPaths, err := kl.gpuManager.AllocateGPU(pod, container)
-	if err != nil {
-		return nil, err
-	}
-	var devices []kubecontainer.DeviceInfo
-	for _, path := range nvidiaGPUPaths {
-		// Devices have to be mapped one to one because of nvidia CUDA library requirements.
-		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
-	}
-
-	return devices, nil
-}
-
 func makeAbsolutePath(goos, path string) string {
 	if goos != "windows" {
 		return "/" + path
@@ -470,12 +450,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
-	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	devices, err := kl.makeGPUDevices(pod, container)
-	if err != nil {
-		return nil, nil, err
-	}
-	opts.Devices = append(opts.Devices, devices...)
 
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {

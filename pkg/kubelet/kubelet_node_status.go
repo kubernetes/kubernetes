@@ -540,14 +540,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		node.Status.Capacity = v1.ResourceList{}
 	}
 
-	// populate GPU capacity.
-	gpuCapacity := kl.gpuManager.Capacity()
-	if gpuCapacity != nil {
-		for k, v := range gpuCapacity {
-			node.Status.Capacity[k] = v
-		}
-	}
-
 	var devicePluginAllocatable v1.ResourceList
 	var devicePluginCapacity v1.ResourceList
 	var removedDevicePlugins []string

@@ -53,16 +53,6 @@ const (
 	// Note: This feature is not supported for `BestEffort` pods.
 	ExperimentalCriticalPodAnnotation utilfeature.Feature = "ExperimentalCriticalPodAnnotation"
 
-	// owner: @vishh
-	// alpha: v1.6
-	//
-	// This is deprecated and will be removed in v1.11. Use DevicePlugins instead.
-	//
-	// Enables support for GPUs as a schedulable resource.
-	// Only Nvidia GPUs are supported as of v1.6.
-	// Works only with Docker Container Runtime.
-	Accelerators utilfeature.Feature = "Accelerators"
-
 	// owner: @jiayingz
 	// beta: v1.10
 	//
@@ -296,7 +286,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
-	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
 	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
 	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
