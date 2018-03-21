@@ -384,7 +384,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		Name: "etcd-certs-1",
 		VolumeSource: v1.VolumeSource{
 			HostPath: &v1.HostPathVolumeSource{
-				Path: "/var/lib/certs/etcd",
+				Path: "/var/lib/etcd/certs",
 				Type: &hostPathDirectoryOrCreate,
 			},
 		},
@@ -446,7 +446,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	}
 	volMountMap2[kubeadmconstants.KubeAPIServer]["etcd-certs-1"] = v1.VolumeMount{
 		Name:      "etcd-certs-1",
-		MountPath: "/var/lib/certs/etcd",
+		MountPath: "/var/lib/etcd/certs",
 		ReadOnly:  true,
 	}
 	volMountMap2[kubeadmconstants.KubeControllerManager] = map[string]v1.VolumeMount{}
