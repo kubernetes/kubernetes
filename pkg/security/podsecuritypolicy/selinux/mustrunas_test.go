@@ -18,7 +18,7 @@ package selinux
 
 import (
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"reflect"
 	"strings"
 	"testing"
@@ -26,7 +26,7 @@ import (
 
 func TestMustRunAsOptions(t *testing.T) {
 	tests := map[string]struct {
-		opts *extensions.SELinuxStrategyOptions
+		opts *policy.SELinuxStrategyOptions
 		pass bool
 	}{
 		"nil opts": {
@@ -34,11 +34,11 @@ func TestMustRunAsOptions(t *testing.T) {
 			pass: false,
 		},
 		"invalid opts": {
-			opts: &extensions.SELinuxStrategyOptions{},
+			opts: &policy.SELinuxStrategyOptions{},
 			pass: false,
 		},
 		"valid opts": {
-			opts: &extensions.SELinuxStrategyOptions{SELinuxOptions: &api.SELinuxOptions{}},
+			opts: &policy.SELinuxStrategyOptions{SELinuxOptions: &api.SELinuxOptions{}},
 			pass: true,
 		},
 	}
@@ -54,7 +54,7 @@ func TestMustRunAsOptions(t *testing.T) {
 }
 
 func TestMustRunAsGenerate(t *testing.T) {
-	opts := &extensions.SELinuxStrategyOptions{
+	opts := &policy.SELinuxStrategyOptions{
 		SELinuxOptions: &api.SELinuxOptions{
 			User:  "user",
 			Role:  "role",
@@ -145,7 +145,7 @@ func TestMustRunAsValidate(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		opts := &extensions.SELinuxStrategyOptions{
+		opts := &policy.SELinuxStrategyOptions{
 			SELinuxOptions: tc.pspSeLinux,
 		}
 		mustRunAs, err := NewMustRunAs(opts)

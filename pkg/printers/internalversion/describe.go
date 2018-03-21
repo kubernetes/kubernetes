@@ -3475,7 +3475,7 @@ type PodSecurityPolicyDescriber struct {
 }
 
 func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	psp, err := d.Extensions().PodSecurityPolicies().Get(name, metav1.GetOptions{})
+	psp, err := d.Policy().PodSecurityPolicies().Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3483,7 +3483,7 @@ func (d *PodSecurityPolicyDescriber) Describe(namespace, name string, describerS
 	return describePodSecurityPolicy(psp)
 }
 
-func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error) {
+func describePodSecurityPolicy(psp *policy.PodSecurityPolicy) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", psp.Name)
@@ -3543,7 +3543,7 @@ func stringOrDefaultValue(s, defaultValue string) string {
 	return defaultValue
 }
 
-func fsTypeToString(volumes []extensions.FSType) string {
+func fsTypeToString(volumes []policy.FSType) string {
 	strVolumes := []string{}
 	for _, v := range volumes {
 		strVolumes = append(strVolumes, string(v))
@@ -3551,7 +3551,7 @@ func fsTypeToString(volumes []extensions.FSType) string {
 	return stringOrNone(strings.Join(strVolumes, ","))
 }
 
-func flexVolumesToString(flexVolumes []extensions.AllowedFlexVolume) string {
+func flexVolumesToString(flexVolumes []policy.AllowedFlexVolume) string {
 	volumes := []string{}
 	for _, flexVolume := range flexVolumes {
 		volumes = append(volumes, "driver="+flexVolume.Driver)
@@ -3559,7 +3559,7 @@ func flexVolumesToString(flexVolumes []extensions.AllowedFlexVolume) string {
 	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
 }
 
-func hostPortRangeToString(ranges []extensions.HostPortRange) string {
+func hostPortRangeToString(ranges []policy.HostPortRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}
@@ -3571,7 +3571,7 @@ func hostPortRangeToString(ranges []extensions.HostPortRange) string {
 	return stringOrNone(formattedString)
 }
 
-func userIDRangeToString(ranges []extensions.UserIDRange) string {
+func userIDRangeToString(ranges []policy.UserIDRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}
@@ -3583,7 +3583,7 @@ func userIDRangeToString(ranges []extensions.UserIDRange) string {
 	return stringOrNone(formattedString)
 }
 
-func groupIDRangeToString(ranges []extensions.GroupIDRange) string {
+func groupIDRangeToString(ranges []policy.GroupIDRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}

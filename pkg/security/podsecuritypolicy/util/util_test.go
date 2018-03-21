@@ -18,7 +18,7 @@ package util
 
 import (
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"reflect"
 	"testing"
 )
@@ -52,45 +52,45 @@ func TestVolumeSourceFSTypeDrift(t *testing.T) {
 
 func TestPSPAllowsFSType(t *testing.T) {
 	tests := map[string]struct {
-		psp    *extensions.PodSecurityPolicy
-		fsType extensions.FSType
+		psp    *policy.PodSecurityPolicy
+		fsType policy.FSType
 		allows bool
 	}{
 		"nil psp": {
 			psp:    nil,
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: false,
 		},
 		"empty volumes": {
-			psp:    &extensions.PodSecurityPolicy{},
-			fsType: extensions.HostPath,
+			psp:    &policy.PodSecurityPolicy{},
+			fsType: policy.HostPath,
 			allows: false,
 		},
 		"non-matching": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					Volumes: []extensions.FSType{extensions.AWSElasticBlockStore},
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					Volumes: []policy.FSType{policy.AWSElasticBlockStore},
 				},
 			},
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: false,
 		},
 		"match on FSTypeAll": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					Volumes: []extensions.FSType{extensions.All},
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					Volumes: []policy.FSType{policy.All},
 				},
 			},
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: true,
 		},
 		"match on direct match": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					Volumes: []extensions.FSType{extensions.HostPath},
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					Volumes: []policy.FSType{policy.HostPath},
 				},
 			},
-			fsType: extensions.HostPath,
+			fsType: policy.HostPath,
 			allows: true,
 		},
 	}
@@ -105,7 +105,7 @@ func TestPSPAllowsFSType(t *testing.T) {
 
 func TestAllowsHostVolumePath(t *testing.T) {
 	tests := map[string]struct {
-		psp    *extensions.PodSecurityPolicy
+		psp    *policy.PodSecurityPolicy
 		path   string
 		allows bool
 	}{
@@ -115,14 +115,14 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: false,
 		},
 		"empty allowed paths": {
-			psp:    &extensions.PodSecurityPolicy{},
+			psp:    &policy.PodSecurityPolicy{},
 			path:   "/test",
 			allows: true,
 		},
 		"non-matching": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo"},
 					},
 				},
@@ -131,9 +131,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: false,
 		},
 		"match on direct match": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo"},
 					},
 				},
@@ -142,9 +142,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"match with trailing slash on host path": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo"},
 					},
 				},
@@ -153,9 +153,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"match with trailing slash on allowed path": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo/"},
 					},
 				},
@@ -164,9 +164,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"match child directory": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo/"},
 					},
 				},
@@ -175,9 +175,9 @@ func TestAllowsHostVolumePath(t *testing.T) {
 			allows: true,
 		},
 		"non-matching parent directory": {
-			psp: &extensions.PodSecurityPolicy{
-				Spec: extensions.PodSecurityPolicySpec{
-					AllowedHostPaths: []extensions.AllowedHostPath{
+			psp: &policy.PodSecurityPolicy{
+				Spec: policy.PodSecurityPolicySpec{
+					AllowedHostPaths: []policy.AllowedHostPath{
 						{PathPrefix: "/foo/bar"},
 					},
 				},

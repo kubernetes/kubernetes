@@ -19,7 +19,6 @@ package policy
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // GroupName is the group name use in this package
@@ -49,8 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodDisruptionBudget{},
 		&PodDisruptionBudgetList{},
-		&extensions.PodSecurityPolicy{},
-		&extensions.PodSecurityPolicyList{},
+		&PodSecurityPolicy{},
+		&PodSecurityPolicyList{},
 		&Eviction{},
 	)
 	return nil
