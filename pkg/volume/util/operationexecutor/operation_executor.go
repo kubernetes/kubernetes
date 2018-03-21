@@ -163,7 +163,7 @@ func NewOperationExecutor(
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as mounted to the specified pod
-	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string) error
+	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string, volumeSpec *volume.Spec) error
 
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error

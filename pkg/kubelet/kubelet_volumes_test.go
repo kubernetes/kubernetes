@@ -261,7 +261,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
 
 	// Verify volumes detached and no longer reported as in use
-	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
+	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyDetachCallCount(
 		1 /* expectedDetachCallCount */, testKubelet.volumePlugin))
@@ -279,7 +279,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
-							Name:       "fake/vol1",
+							Name:       "fake/fake-device",
 							DevicePath: "fake/path",
 						},
 					}},
@@ -310,7 +310,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
-		v1.UniqueVolumeName("fake/vol1"),
+		v1.UniqueVolumeName("fake/fake-device"),
 		stopCh,
 		kubelet.volumeManager)
 
@@ -346,7 +346,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
-							Name:       "fake/vol1",
+							Name:       "fake/fake-device",
 							DevicePath: "fake/path",
 						},
 					}},
@@ -378,7 +378,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
-		v1.UniqueVolumeName("fake/vol1"),
+		v1.UniqueVolumeName("fake/fake-device"),
 		stopCh,
 		kubelet.volumeManager)
 
@@ -419,7 +419,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
 
 	// Verify volumes detached and no longer reported as in use
-	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
+	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin))
 }

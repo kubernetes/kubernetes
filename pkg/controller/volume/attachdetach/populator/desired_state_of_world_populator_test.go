@@ -68,7 +68,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].GCEPersistentDisk.PDName
 
 	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
