@@ -33,10 +33,10 @@ type mustRunAs struct {
 // NewMustRunAs provides a strategy that requires the container to run as a specific UID in a range.
 func NewMustRunAs(options *extensions.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
 	if options == nil {
-		return nil, fmt.Errorf("MustRunAsRange requires run as user options")
+		return nil, fmt.Errorf("MustRunAs requires run as user options")
 	}
 	if len(options.Ranges) == 0 {
-		return nil, fmt.Errorf("MustRunAsRange requires at least one range")
+		return nil, fmt.Errorf("MustRunAs requires at least one range")
 	}
 	return &mustRunAs{
 		opts: options,

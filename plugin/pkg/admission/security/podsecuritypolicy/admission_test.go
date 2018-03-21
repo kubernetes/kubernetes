@@ -1954,7 +1954,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 					},
 				}
 			},
-			expectedErr: "MustRunAsRange requires at least one range",
+			expectedErr: "MustRunAs requires at least one range",
 		},
 	}
 
