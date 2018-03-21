@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "customcolumn.go",
+        "customcolumn_flags.go",
         "humanreadable.go",
         "interface.go",
         "json.go",
@@ -23,6 +24,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [
+        "//pkg/kubectl/scheme:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -42,6 +44,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
+        "customcolumn_flags_test.go",
         "customcolumn_test.go",
         "json_yaml_flags_test.go",
     ],
