@@ -215,7 +215,7 @@ func TestPluginNewMounter(t *testing.T) {
 		t.Error("mounter pod not set")
 	}
 	if csiMounter.podUID == types.UID("") {
-		t.Error("mounter podUID mot set")
+		t.Error("mounter podUID not set")
 	}
 }
 
@@ -226,18 +226,17 @@ func TestPluginNewUnmounter(t *testing.T) {
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	unmounter, err := plug.NewUnmounter(pv.ObjectMeta.Name, testPodUID)
-	csiUnmounter := unmounter.(*csiMountMgr)
 
 	if err != nil {
 		t.Fatalf("Failed to make a new Unmounter: %v", err)
 	}
-
-	if csiUnmounter == nil {
+	if unmounter == nil {
 		t.Fatal("failed to create CSI Unmounter")
 	}
+	csiUnmounter := unmounter.(*csiMountMgr)
 
 	if csiUnmounter.podUID != testPodUID {
-		t.Error("podUID not set")
+		t.Error("unmounter podUID not set")
 	}
 
 }
