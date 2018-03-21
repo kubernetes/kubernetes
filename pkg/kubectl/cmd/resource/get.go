@@ -679,7 +679,7 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 	singleItemImplied := false
 	infos, err := r.IntoSingleItemImplied(&singleItemImplied).Infos()
 	if err != nil {
-		if singleItemImplied {
+		if singleItemImplied || len(infos) == 0 {
 			return err
 		}
 		errs = append(errs, err)
