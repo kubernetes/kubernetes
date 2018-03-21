@@ -2864,17 +2864,9 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 		}
 		w.Write(LEVEL_0, "Min replicas:\t%s\n", minReplicas)
 		w.Write(LEVEL_0, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
+		w.Write(LEVEL_0, "%s pods:\t", hpa.Spec.ScaleTargetRef.Kind)
+		w.Write(LEVEL_0, "%d current / %d desired\n", hpa.Status.CurrentReplicas, hpa.Status.DesiredReplicas)
 
-		// TODO: switch to scale subresource once the required code is submitted.
-		if strings.ToLower(hpa.Spec.ScaleTargetRef.Kind) == "replicationcontroller" {
-			w.Write(LEVEL_0, "ReplicationController pods:\t")
-			rc, err := d.client.Core().ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
-			if err == nil {
-				w.Write(LEVEL_0, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
-			} else {
-				w.Write(LEVEL_0, "failed to check Replication Controller\n")
-			}
-		}
 		if len(hpa.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n")
 			w.Write(LEVEL_1, "Type\tStatus\tReason\tMessage\n")
