@@ -64,50 +64,6 @@ func NewFromFile(path string) (policyList, error) {
 	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
 
-	decoder := abac.Codecs.UniversalDecoder()
-
-	i := 0
-	unversionedLines := 0
-	for scanner.Scan() {
-		i++
-		p := &abac.Policy{}
-		b := scanner.Bytes()
-
-		// skip comment lines and blank lines
-		trimmed := strings.TrimSpace(string(b))
-		if len(trimmed) == 0 || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		decodedObj, _, err := decoder.Decode(b, nil, nil)
-		if err != nil {
-			if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
-				return nil, policyLoadError{path, i, b, err}
-			}
-			unversionedLines++
-			// Migrate unversioned policy object
-			oldPolicy := &v0.Policy{}
-			if err := runtime.DecodeInto(decoder, b, oldPolicy); err != nil {
-				return nil, policyLoadError{path, i, b, err}
-			}
-			if err := abac.Scheme.Convert(oldPolicy, p, nil); err != nil {
-				return nil, policyLoadError{path, i, b, err}
-			}
-			pl = append(pl, p)
-			continue
-		}
-
-		decodedPolicy, ok := decodedObj.(*abac.Policy)
-		if !ok {
-			return nil, policyLoadError{path, i, b, fmt.Errorf("unrecognized object: %#v", decodedObj)}
-		}
-		pl = append(pl, decodedPolicy)
-	}
-
-	if unversionedLines > 0 {
-		glog.Warningf("Policy file %s contained unversioned rules. See docs/admin/authorization.md#abac-mode for ABAC file format details.", path)
-	}
-
 	if err := scanner.Err(); err != nil {
 		return nil, policyLoadError{path, -1, nil, err}
 	}
