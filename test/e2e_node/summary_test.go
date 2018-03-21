@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"fmt"
 	"io/ioutil"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -118,9 +119,33 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				"PageFaults":      bounded(0, 1000000),
 				"MajorPageFaults": bounded(0, 10),
 			})
+			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
+			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
+				// Some Linux distributions still ship a docker.service that is missing
+				// a `Delegate=yes` setting (or equivalent CPUAccounting= and MemoryAccounting=)
+				// that allows us to monitor the container runtime resource usage through
+				// the "cpu" and "memory" cgroups.
+				//
+				// Make an exception here for those distros, only for Docker, so that they
+				// can pass the full node e2e tests even in that case.
+				//
+				// For newer container runtimes (using CRI) and even distros that still
+				// ship Docker, we should encourage them to always set `Delegate=yes` in
+				// order to make monitoring of the runtime possible.
+				stdout, err := exec.Command("systemctl", "show", "-p", "Delegate", "docker.service").CombinedOutput()
+				if err == nil && strings.TrimSpace(string(stdout)) == "Delegate=no" {
+					// Only make these optional if we can successfully confirm that
+					// Delegate is set to "no" (in other words, unset.) If we fail
+					// to check that, default to requiring it, which might cause
+					// false positives, but that should be the safer approach.
+					By("Making runtime container expectations optional, since systemd was not configured to Delegate=yes the cgroups")
+					runtimeContExpectations.Fields["Memory"] = Or(BeNil(), runtimeContExpectations.Fields["Memory"])
+					runtimeContExpectations.Fields["CPU"] = Or(BeNil(), runtimeContExpectations.Fields["CPU"])
+				}
+			}
 			systemContainers := gstruct.Elements{
 				"kubelet": sysContExpectations(),
-				"runtime": sysContExpectations(),
+				"runtime": runtimeContExpectations,
 				"pods":    podsContExpectations,
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
