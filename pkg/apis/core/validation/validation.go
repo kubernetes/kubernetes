@@ -3316,8 +3316,10 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			}
 		}
 
-		if securityContext.Sysctls != nil {
-			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+		if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+			if securityContext.Sysctls != nil {
+				allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
+			}
 		}
 	}
 
