@@ -28,12 +28,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
 	alpha "google.golang.org/api/compute/v0.alpha"
 	beta "google.golang.org/api/compute/v0.beta"
 	ga "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 )
 
@@ -225,4 +227,184 @@ func InsertBetaAddressHook(ctx context.Context, key *meta.Key, obj *beta.Address
 func InsertAlphaAddressHook(ctx context.Context, key *meta.Key, obj *alpha.Address, m *cloud.MockAlphaAddresses) (bool, error) {
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionBeta, "addresses")
 	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionAlpha, projectID)
+}
+
+// InstanceGroupAttributes maps from InstanceGroup key to a map of Instances
+type InstanceGroupAttributes struct {
+	InstanceMap map[meta.Key]map[string]*ga.InstanceWithNamedPorts
+	Lock        *sync.Mutex
+}
+
+// AddInstances adds a list of Instances passed by InstanceReference
+func (igAttrs *InstanceGroupAttributes) AddInstances(key *meta.Key, instanceRefs []*ga.InstanceReference) error {
+	igAttrs.Lock.Lock()
+	defer igAttrs.Lock.Unlock()
+
+	instancesWithNamedPorts, ok := igAttrs.InstanceMap[*key]
+	if !ok {
+		instancesWithNamedPorts = make(map[string]*ga.InstanceWithNamedPorts)
+	}
+
+	for _, instance := range instanceRefs {
+		iWithPort := &ga.InstanceWithNamedPorts{
+			Instance: instance.Instance,
+		}
+
+		instancesWithNamedPorts[instance.Instance] = iWithPort
+	}
+
+	igAttrs.InstanceMap[*key] = instancesWithNamedPorts
+	return nil
+}
+
+// RemoveInstances removes a list of Instances passed by InstanceReference
+func (igAttrs *InstanceGroupAttributes) RemoveInstances(key *meta.Key, instanceRefs []*ga.InstanceReference) error {
+	igAttrs.Lock.Lock()
+	defer igAttrs.Lock.Unlock()
+
+	instancesWithNamedPorts, ok := igAttrs.InstanceMap[*key]
+	if !ok {
+		instancesWithNamedPorts = make(map[string]*ga.InstanceWithNamedPorts)
+	}
+
+	for _, instanceToRemove := range instanceRefs {
+		if _, ok := instancesWithNamedPorts[instanceToRemove.Instance]; ok {
+			delete(instancesWithNamedPorts, instanceToRemove.Instance)
+		} else {
+			return &googleapi.Error{
+				Code:    http.StatusBadRequest,
+				Message: fmt.Sprintf("%s is not a member of %s", instanceToRemove.Instance, key.String()),
+			}
+		}
+	}
+
+	igAttrs.InstanceMap[*key] = instancesWithNamedPorts
+	return nil
+}
+
+// List gets a list of InstanceWithNamedPorts
+func (igAttrs *InstanceGroupAttributes) List(key *meta.Key) []*ga.InstanceWithNamedPorts {
+	igAttrs.Lock.Lock()
+	defer igAttrs.Lock.Unlock()
+
+	instancesWithNamedPorts, ok := igAttrs.InstanceMap[*key]
+	if !ok {
+		instancesWithNamedPorts = make(map[string]*ga.InstanceWithNamedPorts)
+	}
+
+	var instanceList []*ga.InstanceWithNamedPorts
+	for _, val := range instancesWithNamedPorts {
+		instanceList = append(instanceList, val)
+	}
+
+	return instanceList
+}
+
+// AddInstancesHook mocks adding instances from an InstanceGroup
+func AddInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsAddInstancesRequest, m *cloud.MockInstanceGroups) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in InstanceGroups", key.String()),
+		}
+	}
+
+	var attrs InstanceGroupAttributes
+	attrs = m.X.(InstanceGroupAttributes)
+	attrs.AddInstances(key, req.Instances)
+	m.X = attrs
+	return nil
+}
+
+// ListInstancesHook mocks listing instances from an InstanceGroup
+func ListInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsListInstancesRequest, filter *filter.F, m *cloud.MockInstanceGroups) ([]*ga.InstanceWithNamedPorts, error) {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return nil, &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in InstanceGroups", key.String()),
+		}
+	}
+
+	var attrs InstanceGroupAttributes
+	attrs = m.X.(InstanceGroupAttributes)
+	instances := attrs.List(key)
+
+	return instances, nil
+}
+
+// RemoveInstancesHook mocks removing instances from an InstanceGroup
+func RemoveInstancesHook(ctx context.Context, key *meta.Key, req *ga.InstanceGroupsRemoveInstancesRequest, m *cloud.MockInstanceGroups) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in InstanceGroups", key.String()),
+		}
+	}
+
+	var attrs InstanceGroupAttributes
+	attrs = m.X.(InstanceGroupAttributes)
+	attrs.RemoveInstances(key, req.Instances)
+	m.X = attrs
+	return nil
+}
+
+// UpdateFirewallHook defines the hook for updating a Firewall. It replaces the
+// object with the same key in the mock with the updated object.
+func UpdateFirewallHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in Firewalls", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "firewalls")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "firewalls", key)
+
+	m.Objects[*key] = &cloud.MockFirewallsObj{Obj: obj}
+	return nil
+}
+
+// UpdateHealthCheckHook defines the hook for updating a HealthCheck. It
+// replaces the object with the same key in the mock with the updated object.
+func UpdateHealthCheckHook(ctx context.Context, key *meta.Key, obj *ga.HealthCheck, m *cloud.MockHealthChecks) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in HealthChecks", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "healthChecks")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "healthChecks", key)
+
+	m.Objects[*key] = &cloud.MockHealthChecksObj{Obj: obj}
+	return nil
+}
+
+// UpdateRegionBackendServiceHook defines the hook for updating a Region
+// BackendsService. It replaces the object with the same key in the mock with
+// the updated object.
+func UpdateRegionBackendServiceHook(ctx context.Context, key *meta.Key, obj *ga.BackendService, m *cloud.MockRegionBackendServices) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in RegionBackendServices", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "backendServices", key)
+
+	m.Objects[*key] = &cloud.MockRegionBackendServicesObj{Obj: obj}
+	return nil
 }
