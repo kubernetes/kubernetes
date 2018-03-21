@@ -13,6 +13,7 @@ go_library(
         "remote_image.go",
         "remote_runtime.go",
         "utils.go",
+        "validate.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     deps = [

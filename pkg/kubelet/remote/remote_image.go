@@ -60,6 +60,12 @@ func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runt
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
+	if filter.GetImage() != nil {
+		if err := validateImageSpec(filter.GetImage()); err != nil {
+			return nil, err
+		}
+	}
+
 	resp, err := r.imageClient.ListImages(ctx, &runtimeapi.ListImagesRequest{
 		Filter: filter,
 	})
@@ -76,6 +82,10 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
+	if err := validateImageSpec(image); err != nil {
+		return nil, err
+	}
+
 	resp, err := r.imageClient.ImageStatus(ctx, &runtimeapi.ImageStatusRequest{
 		Image: image,
 	})
@@ -84,12 +94,8 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 		return nil, err
 	}
 
-	if resp.Image != nil {
-		if resp.Image.Id == "" || resp.Image.Size_ == 0 {
-			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
-			glog.Errorf("ImageStatus failed: %s", errorMessage)
-			return nil, errors.New(errorMessage)
-		}
+	if err = validateImageStatus(resp); err != nil {
+		glog.Errorf("validateImageStatus %#v failed: %v", resp, err)
 	}
 
 	return resp.Image, nil
@@ -99,6 +105,10 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
+
+	if err := validateImageSpec(image); err != nil {
+		return "", err
+	}
 
 	resp, err := r.imageClient.PullImage(ctx, &runtimeapi.PullImageRequest{
 		Image: image,
@@ -122,6 +132,10 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
+
+	if err := validateImageSpec(image); err != nil {
+		return err
+	}
 
 	_, err := r.imageClient.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
 		Image: image,
