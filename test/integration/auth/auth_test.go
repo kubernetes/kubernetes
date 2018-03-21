@@ -51,7 +51,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -555,7 +554,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 

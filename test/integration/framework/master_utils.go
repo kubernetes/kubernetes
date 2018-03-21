@@ -59,7 +59,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -281,7 +280,6 @@ func NewMasterConfig() *master.Config {
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
 
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
