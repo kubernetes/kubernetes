@@ -45,12 +45,13 @@ type CreateJobOptions struct {
 	Name string
 	From string
 
-	Namespace string
-	Client    clientbatchv1.BatchV1Interface
-	Out       io.Writer
-	DryRun    bool
-	Builder   *resource.Builder
-	Cmd       *cobra.Command
+	Namespace    string
+	OutputFormat string
+	Client       clientbatchv1.BatchV1Interface
+	Out          io.Writer
+	DryRun       bool
+	Builder      *resource.Builder
+	Cmd          *cobra.Command
 }
 
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
@@ -71,6 +72,7 @@ func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().String("from", "", "The name of the resource to create a Job from (only cronjob is supported).")
 
 	return cmd
@@ -94,7 +96,9 @@ func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 	c.Client = clientset.BatchV1()
 	c.Builder = f.NewBuilder()
+	c.DryRun = cmdutil.GetDryRunFlag(cmd)
 	c.Cmd = cmd
+	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
 	return nil
 }
@@ -128,7 +132,7 @@ func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 	for k, v := range cronJob.Spec.JobTemplate.Annotations {
 		annotations[k] = v
 	}
-	jobToCreate := &batchv1.Job{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.Name,
 			Namespace:   c.Namespace,
@@ -138,9 +142,18 @@ func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
 
-	job, err := c.Client.Jobs(c.Namespace).Create(jobToCreate)
-	if err != nil {
-		return fmt.Errorf("failed to create job: %v", err)
+	if !c.DryRun {
+		var err error
+		job, err = c.Client.Jobs(c.Namespace).Create(job)
+		if err != nil {
+			return fmt.Errorf("failed to create job: %v", err)
+		}
 	}
+
+	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
+		cmdutil.PrintSuccess(useShortOutput, c.Out, job, c.DryRun, "created")
+		return nil
+	}
+
 	return cmdutil.PrintObject(c.Cmd, job, c.Out)
 }
