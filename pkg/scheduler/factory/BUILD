@@ -9,9 +9,45 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cache_comparer.go",
         "factory.go",
         "plugins.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "signal.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "signal_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "k8s.io/kubernetes/pkg/scheduler/factory",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
@@ -59,6 +95,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cache_comparer_test.go",
         "factory_test.go",
         "plugins_test.go",
     ],
@@ -75,8 +112,10 @@ go_test(
         "//pkg/scheduler/testing:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

@@ -326,6 +326,46 @@ func TestAddPodWillConfirm(t *testing.T) {
 	}
 }
 
+func TestSnapshot(t *testing.T) {
+	nodeName := "node"
+	now := time.Now()
+	ttl := 10 * time.Second
+
+	testPods := []*v1.Pod{
+		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+	}
+	tests := []struct {
+		podsToAssume []*v1.Pod
+		podsToAdd    []*v1.Pod
+	}{{ // two pod were assumed at same time. But first one is called Add() and gets confirmed.
+		podsToAssume: []*v1.Pod{testPods[0], testPods[1]},
+		podsToAdd:    []*v1.Pod{testPods[0]},
+	}}
+
+	for _, tt := range tests {
+		cache := newSchedulerCache(ttl, time.Second, nil)
+		for _, podToAssume := range tt.podsToAssume {
+			if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
+				t.Fatalf("assumePod failed: %v", err)
+			}
+		}
+		for _, podToAdd := range tt.podsToAdd {
+			if err := cache.AddPod(podToAdd); err != nil {
+				t.Fatalf("AddPod failed: %v", err)
+			}
+		}
+
+		snapshot := cache.Snapshot()
+		if !reflect.DeepEqual(snapshot.Nodes, cache.nodes) {
+			t.Fatalf("expect \n%+v; got \n%+v", cache.nodes, snapshot.Nodes)
+		}
+		if !reflect.DeepEqual(snapshot.AssumedPods, cache.assumedPods) {
+			t.Fatalf("expect \n%+v; got \n%+v", cache.assumedPods, snapshot.AssumedPods)
+		}
+	}
+}
+
 // TestAddPodWillReplaceAssumed tests that a pod being Add()ed will replace any assumed pod.
 func TestAddPodWillReplaceAssumed(t *testing.T) {
 	now := time.Now()
