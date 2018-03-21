@@ -1196,9 +1196,6 @@ type Kubelet struct {
 	// StatsProvider provides the node and the container stats.
 	*stats.StatsProvider
 
-	// containerized should be set to true if the kubelet is running in a container
-	containerized bool
-
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	keepTerminatedPodVolumes bool // DEPRECATED
@@ -1415,13 +1412,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
 	kl.syncLoop(updates, kl)
-}
-
-// GetKubeClient returns the Kubernetes client.
-// TODO: This is currently only required by network plugins. Replace
-// with more specific methods.
-func (kl *Kubelet) GetKubeClient() clientset.Interface {
-	return kl.kubeClient
 }
 
 // syncPod is the transaction script for the sync of a single pod.
