@@ -2295,7 +2295,7 @@ function config-policy-routing {
   local gateway="$(ip route get 8.8.8.8 | sed -n 's/.*via \([^\ ]*\) .*/\1/p')"
   local -r pr_table_name="${POLICY_ROUTING_TABLE}"
   local pr_table
-  local host_ip="$(ip address show dev ${nic0} | grep -Po 'inet \K[\d.]+')"
+  local host_ip="$(ip addr show eth0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)""
   for table in {1..252}; do
     if [[ ! "${reserved_tables[@]}" =~ table ]]; then
       pr_table="${table}"
