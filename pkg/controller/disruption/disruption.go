@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -176,7 +176,7 @@ func (dc *DisruptionController) finders() []podControllerFinder {
 
 var (
 	controllerKindRS  = v1beta1.SchemeGroupVersion.WithKind("ReplicaSet")
-	controllerKindSS  = apps.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKindSS  = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKindRC  = v1.SchemeGroupVersion.WithKind("ReplicationController")
 	controllerKindDep = v1beta1.SchemeGroupVersion.WithKind("Deployment")
 )

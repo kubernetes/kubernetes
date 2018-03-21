@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -201,7 +201,7 @@ func updatePodOwnerToRs(t *testing.T, pod *v1.Pod, rs *extensions.ReplicaSet) {
 }
 
 //	pod, podName := newPod(t, name)
-func updatePodOwnerToSs(t *testing.T, pod *v1.Pod, ss *apps.StatefulSet) {
+func updatePodOwnerToSs(t *testing.T, pod *v1.Pod, ss *appsv1beta1.StatefulSet) {
 	var controllerReference metav1.OwnerReference
 	var trueVar = true
 	controllerReference = metav1.OwnerReference{UID: ss.UID, APIVersion: controllerKindSS.GroupVersion().String(), Kind: controllerKindSS.Kind, Name: ss.Name, Controller: &trueVar}
@@ -307,8 +307,8 @@ func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 	return rs, rsName
 }
 
-func newStatefulSet(t *testing.T, size int32) (*apps.StatefulSet, string) {
-	ss := &apps.StatefulSet{
+func newStatefulSet(t *testing.T, size int32) (*appsv1beta1.StatefulSet, string) {
+	ss := &appsv1beta1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:             uuid.NewUUID(),
@@ -317,7 +317,7 @@ func newStatefulSet(t *testing.T, size int32) (*apps.StatefulSet, string) {
 			ResourceVersion: "18",
 			Labels:          fooBar(),
 		},
-		Spec: apps.StatefulSetSpec{
+		Spec: appsv1beta1.StatefulSetSpec{
 			Replicas: &size,
 			Selector: newSelFooBar(),
 		},

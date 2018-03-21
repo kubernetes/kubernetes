@@ -19,7 +19,7 @@ package appsv1beta1
 import (
 	"fmt"
 
-	v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +39,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 
 	return nil
 }
-func Convert_scheme_ScaleStatus_To_v1beta1_ScaleStatus(in *scheme.ScaleStatus, out *v1beta1.ScaleStatus, s conversion.Scope) error {
+func Convert_scheme_ScaleStatus_To_v1beta1_ScaleStatus(in *scheme.ScaleStatus, out *appsv1beta1.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.Selector = nil
 	out.TargetSelector = ""
@@ -58,7 +58,7 @@ func Convert_scheme_ScaleStatus_To_v1beta1_ScaleStatus(in *scheme.ScaleStatus, o
 	return nil
 }
 
-func Convert_v1beta1_ScaleStatus_To_scheme_ScaleStatus(in *v1beta1.ScaleStatus, out *scheme.ScaleStatus, s conversion.Scope) error {
+func Convert_v1beta1_ScaleStatus_To_scheme_ScaleStatus(in *appsv1beta1.ScaleStatus, out *scheme.ScaleStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 
 	// Normally when 2 fields map to the same internal value we favor the old field, since

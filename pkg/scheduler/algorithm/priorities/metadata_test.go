@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -157,7 +157,7 @@ func TestPriorityMetadata(t *testing.T) {
 		schedulertesting.FakeServiceLister([]*v1.Service{}),
 		schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 		schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
-		schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+		schedulertesting.FakeStatefulSetLister([]*appsv1beta1.StatefulSet{}))
 	for _, test := range tests {
 		ptData := mataDataProducer(test.pod, nil)
 		if !reflect.DeepEqual(test.expected, ptData) {

@@ -17,12 +17,12 @@ limitations under the License.
 package appsv1beta1
 
 import (
-	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GroupName is the group name use in this package
-const GroupName = appsapiv1beta1.GroupName
+const GroupName = appsv1beta1.GroupName
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
@@ -33,7 +33,7 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	localSchemeBuilder = &appsapiv1beta1.SchemeBuilder
+	localSchemeBuilder = &appsv1beta1.SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 

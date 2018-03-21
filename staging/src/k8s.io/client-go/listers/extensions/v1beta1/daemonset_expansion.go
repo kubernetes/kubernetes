@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ import (
 // DaemonSetLister.
 type DaemonSetListerExpansion interface {
 	GetPodDaemonSets(pod *v1.Pod) ([]*v1beta1.DaemonSet, error)
-	GetHistoryDaemonSets(history *apps.ControllerRevision) ([]*v1beta1.DaemonSet, error)
+	GetHistoryDaemonSets(history *appsv1beta1.ControllerRevision) ([]*v1beta1.DaemonSet, error)
 }
 
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
@@ -83,7 +83,7 @@ func (s *daemonSetLister) GetPodDaemonSets(pod *v1.Pod) ([]*v1beta1.DaemonSet, e
 // match a ControllerRevision. Only the one specified in the ControllerRevision's ControllerRef
 // will actually manage it.
 // Returns an error only if no matching DaemonSets are found.
-func (s *daemonSetLister) GetHistoryDaemonSets(history *apps.ControllerRevision) ([]*v1beta1.DaemonSet, error) {
+func (s *daemonSetLister) GetHistoryDaemonSets(history *appsv1beta1.ControllerRevision) ([]*v1beta1.DaemonSet, error) {
 	if len(history.Labels) == 0 {
 		return nil, fmt.Errorf("no DaemonSet found for ControllerRevision %s because it has no labels", history.Name)
 	}

@@ -17,7 +17,7 @@ limitations under the License.
 package algorithm
 
 import (
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -145,16 +145,16 @@ func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions
 // StatefulSetLister interface represents anything that can produce a list of StatefulSet; the list is consumed by a scheduler.
 type StatefulSetLister interface {
 	// Gets the StatefulSet for the given pod.
-	GetPodStatefulSets(*v1.Pod) ([]*apps.StatefulSet, error)
+	GetPodStatefulSets(*v1.Pod) ([]*appsv1beta1.StatefulSet, error)
 }
 
 var _ StatefulSetLister = &EmptyStatefulSetLister{}
 
-// EmptyStatefulSetLister implements StatefulSetLister on []apps.StatefulSet returning empty data.
+// EmptyStatefulSetLister implements StatefulSetLister on []appsv1beta1.StatefulSet returning empty data.
 type EmptyStatefulSetLister struct{}
 
 // GetPodStatefulSets of EmptyStatefulSetLister returns nil.
-func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
+func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1beta1.StatefulSet, err error) {
 	return nil, nil
 }
 
