@@ -421,7 +421,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_allowedhostpath">v1beta1.AllowedHostPath</h3>
 <div class="paragraph">
-<p>defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.</p>
+<p>AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -443,7 +443,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">pathPrefix</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">is the path prefix that the host volume must match. It does not support <code>*</code>. Trailing slashes are trimmed when validating the path prefix with a host path.<br>
+<td class="tableblock halign-left valign-top"><p class="tableblock">pathPrefix is the path prefix that the host volume must match. It does not support <code>*</code>. Trailing slashes are trimmed when validating the path prefix with a host path.<br>
 <br>
 Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> and <code>/foo/bar</code> <code>/foo</code> would not allow <code>/food</code> or <code>/etc/foo</code></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -1508,7 +1508,7 @@ Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> an
 <div class="sect2">
 <h3 id="_v1beta1_podsecuritypolicylist">v1beta1.PodSecurityPolicyList</h3>
 <div class="paragraph">
-<p>Pod Security Policy List is a list of PodSecurityPolicy objects.</p>
+<p>PodSecurityPolicyList is a list of PodSecurityPolicy objects.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1551,7 +1551,7 @@ Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> an
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Items is a list of schema objects.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items is a list of schema objects.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_podsecuritypolicy">v1beta1.PodSecurityPolicy</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1626,14 +1626,14 @@ Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> an
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rule</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rule is the strategy that will dictate what FSGroup is used in the SecurityContext.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ranges</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ranges are the allowed ranges of fs groups.  If you would like to force a single fs group then supply a single range with the same start and end. Required for MustRunAs.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_idrange">v1beta1.IDRange</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2989,7 +2989,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_selinuxstrategyoptions">v1beta1.SELinuxStrategyOptions</h3>
 <div class="paragraph">
-<p>SELinux  Strategy Options defines the strategy type and any options used to create the strategy.</p>
+<p>SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3011,7 +3011,7 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rule</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">type is the strategy that will dictate the allowable labels that may be set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rule is the strategy that will dictate the allowable labels that may be set.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3030,7 +3030,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_runasuserstrategyoptions">v1beta1.RunAsUserStrategyOptions</h3>
 <div class="paragraph">
-<p>Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.</p>
+<p>RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3052,14 +3052,14 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rule</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rule is the strategy that will dictate the allowable RunAsUser values that may be set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rule is the strategy that will dictate the allowable RunAsUser values that may be set.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ranges</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ranges are the allowed ranges of uids that may be used.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ranges are the allowed ranges of uids that may be used. If you would like to force a single uid then supply a single range with the same start and end. Required for MustRunAs.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_idrange">v1beta1.IDRange</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3384,14 +3384,14 @@ When an object is created, the system will populate this list with the current s
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rule</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ranges</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ranges are the allowed ranges of supplemental groups.  If you would like to force a single supplemental group then supply a single range with the same start and end. Required for MustRunAs.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_idrange">v1beta1.IDRange</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4318,7 +4318,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_podsecuritypolicy">v1beta1.PodSecurityPolicy</h3>
 <div class="paragraph">
-<p>Pod Security Policy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.</p>
+<p>PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6774,7 +6774,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">driver</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Driver is the name of the Flexvolume driver.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">driver is the name of the Flexvolume driver.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -7518,7 +7518,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1beta1_hostportrange">v1beta1.HostPortRange</h3>
 <div class="paragraph">
-<p>Host Port Range defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.</p>
+<p>HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7897,7 +7897,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1beta1_podsecuritypolicyspec">v1beta1.PodSecurityPolicySpec</h3>
 <div class="paragraph">
-<p>Pod Security Policy Spec defines the policy enforced.</p>
+<p>PodSecurityPolicySpec defines the policy enforced.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7926,28 +7926,28 @@ Both these may change in the future. Incoming requests are matched against the h
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">defaultAddCapabilities</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the AllowedCapabilities list.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capability in both defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly allowed, and need not be included in the allowedCapabilities list.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_capability">v1.Capability</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">requiredDropCapabilities</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RequiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">requiredDropCapabilities are the capabilities that will be dropped from the container.  These are required to be dropped and cannot be added.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_capability">v1.Capability</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">allowedCapabilities</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">AllowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author&#8217;s discretion. You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">allowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author&#8217;s discretion. You must not list a capability in both allowedCapabilities and requiredDropCapabilities.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_capability">v1.Capability</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">volumes</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">volumes is a white list of allowed volume plugins.  Empty indicates that all plugins may be used.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volumes is a white list of allowed volume plugins. Empty indicates that no volumes may be used. To allow all volumes you may use <em>*</em>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_fstype">v1beta1.FSType</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -7996,49 +7996,49 @@ Both these may change in the future. Incoming requests are matched against the h
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">supplementalGroups</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_supplementalgroupsstrategyoptions">v1beta1.SupplementalGroupsStrategyOptions</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fsGroup</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_fsgroupstrategyoptions">v1beta1.FSGroupStrategyOptions</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnlyRootFilesystem</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">readOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">defaultAllowPrivilegeEscalation</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">allowPrivilegeEscalation</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">allowedHostPaths</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">is a white list of allowed host paths. Empty indicates that all host paths may be used.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">allowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_allowedhostpath">v1beta1.AllowedHostPath</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">allowedFlexVolumes</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the "Volumes" field.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the "volumes" field.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_allowedflexvolume">v1beta1.AllowedFlexVolume</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -8311,7 +8311,7 @@ Both these may change in the future. Incoming requests are matched against the h
 <div class="sect2">
 <h3 id="_v1beta1_idrange">v1beta1.IDRange</h3>
 <div class="paragraph">
-<p>ID Range provides a min/max of an allowed range of IDs.</p>
+<p>IDRange provides a min/max of an allowed range of IDs.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -8333,14 +8333,14 @@ Both these may change in the future. Incoming requests are matched against the h
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">min</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Min is the start of the range, inclusive.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">min is the start of the range, inclusive.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">max</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Max is the end of the range, inclusive.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">max is the end of the range, inclusive.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">integer (int64)</p></td>
 <td class="tableblock halign-left valign-top"></td>
