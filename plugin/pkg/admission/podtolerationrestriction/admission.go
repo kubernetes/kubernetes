@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -286,7 +286,7 @@ func extractNSTolerations(ns *api.Namespace, key string) ([]api.Toleration, erro
 
 	ts := make([]api.Toleration, len(v1Tolerations))
 	for i := range v1Tolerations {
-		if err := k8s_api_v1.Convert_v1_Toleration_To_core_Toleration(&v1Tolerations[i], &ts[i], nil); err != nil {
+		if err := corev1.Convert_v1_Toleration_To_core_Toleration(&v1Tolerations[i], &ts[i], nil); err != nil {
 			return nil, err
 		}
 	}

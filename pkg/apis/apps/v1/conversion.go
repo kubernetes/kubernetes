@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -77,7 +77,7 @@ func Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *appsv1.Deploymen
 		out.Replicas = *in.Replicas
 	}
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -96,7 +96,7 @@ func Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(in *appsv1.Deploymen
 func Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(in *extensions.DeploymentSpec, out *appsv1.DeploymentSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -250,7 +250,7 @@ func Convert_extensions_DaemonSet_To_v1_DaemonSet(in *extensions.DaemonSet, out 
 
 func Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *appsv1.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -298,7 +298,7 @@ func Convert_v1_DaemonSet_To_extensions_DaemonSet(in *appsv1.DaemonSet, out *ext
 
 func Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *appsv1.DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -330,7 +330,7 @@ func Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *extensions.Repli
 	*out.Replicas = int32(in.Replicas)
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -342,7 +342,7 @@ func Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1.ReplicaSe
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	return nil
@@ -361,7 +361,7 @@ func Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1.StatefulSetSp
 	} else {
 		out.Selector = nil
 	}
-	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if in.VolumeClaimTemplates != nil {
@@ -401,7 +401,7 @@ func Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSetSpec
 	} else {
 		out.Selector = nil
 	}
-	if err := k8s_api_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if in.VolumeClaimTemplates != nil {

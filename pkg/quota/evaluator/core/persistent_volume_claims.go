@@ -31,7 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	k8sfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
@@ -196,7 +196,7 @@ func toInternalPersistentVolumeClaimOrError(obj runtime.Object) (*api.Persistent
 	pvc := &api.PersistentVolumeClaim{}
 	switch t := obj.(type) {
 	case *v1.PersistentVolumeClaim:
-		if err := k8s_api_v1.Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(t, pvc, nil); err != nil {
+		if err := corev1.Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(t, pvc, nil); err != nil {
 			return nil, err
 		}
 	case *api.PersistentVolumeClaim:

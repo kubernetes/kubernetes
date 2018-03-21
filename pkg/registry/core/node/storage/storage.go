@@ -29,7 +29,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -112,7 +112,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		}
 		// TODO: Remove the conversion. Consider only return the NodeAddresses
 		externalNode := &v1.Node{}
-		err = k8s_api_v1.Convert_core_Node_To_v1_Node(node, externalNode, nil)
+		err = corev1.Convert_core_Node_To_v1_Node(node, externalNode, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert to v1.Node: %v", err)
 		}
