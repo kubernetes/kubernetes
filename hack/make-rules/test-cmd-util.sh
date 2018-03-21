@@ -4736,8 +4736,8 @@ runTests() {
     local ns_name
     ns_name="namespace-$(date +%s)-${RANDOM}"
     kube::log::status "Creating namespace ${ns_name}"
-    kubectl create namespace "$ns_name"
-    kubectl config set-context "${CONTEXT}" --namespace="$ns_name"
+    kubectl create namespace "${ns_name}"
+    kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
   }
 
   kube_flags=(
