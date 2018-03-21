@@ -14,7 +14,6 @@ go_library(
         "proxysocket.go",
         "roundrobin.go",
         "types.go",
-        "udp_server.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/winuserspace",
     deps = [
