@@ -32,6 +32,8 @@ import (
 )
 
 const (
+	// rootFsMount is the path where the host "/" is mounted into the kubelet container
+	rootFsMount = "/rootfs"
 	// hostProcMountsPath is the default mount path for rootfs
 	hostProcMountsPath = "/rootfs/proc/1/mounts"
 	// hostProcMountinfoPath is the default mount info path for rootfs
@@ -317,4 +319,8 @@ func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath 
 
 func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)
+}
+
+func (mounter *NsenterMounter) GetAbsoluteHostPath(pathname string) (string, error) {
+	return doGetAbsoluteHostPath(filepath.Join(rootFsMount, pathname))
 }

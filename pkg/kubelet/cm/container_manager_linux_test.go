@@ -107,6 +107,10 @@ func (mi *fakeMountInterface) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
 }
 
+func (mi *fakeMountInterface) GetAbsoluteHostPath(_ string) (string, error) {
+	return "", nil
+}
+
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{

@@ -108,6 +108,9 @@ type Interface interface {
 	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
 	// when the pod finishes.
 	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
+	// GetAbsoluteHostPath resolves any symlinks in the given path.
+	// Will operate in the host mount namespace if kubelet is running in a container
+	GetAbsoluteHostPath(pathname string) (string, error)
 }
 
 type Subpath struct {

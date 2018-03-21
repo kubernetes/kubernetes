@@ -207,16 +207,17 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %v", mount.SubPath, err)
 			}
 
-			fileinfo, err := os.Lstat(hostPath)
+			volumePath, err := mounter.GetAbsoluteHostPath(hostPath)
+			if err != nil {
+				return nil, cleanupAction, err
+			}
+
+			fileinfo, err := os.Lstat(volumePath)
 			if err != nil {
 				return nil, cleanupAction, err
 			}
 			perm := fileinfo.Mode()
 
-			volumePath, err := filepath.EvalSymlinks(hostPath)
-			if err != nil {
-				return nil, cleanupAction, err
-			}
 			hostPath = filepath.Join(volumePath, mount.SubPath)
 
 			if subPathExists, err := utilfile.FileOrSymlinkExists(hostPath); err != nil {

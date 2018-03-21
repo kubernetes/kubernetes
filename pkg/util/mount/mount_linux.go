@@ -1155,3 +1155,11 @@ func doSafeOpen(pathname string, base string) (int, error) {
 
 	return finalFD, nil
 }
+
+func (mounter *Mounter) GetAbsoluteHostPath(pathname string) (string, error) {
+	return doGetAbsoluteHostPath(pathname)
+}
+
+func doGetAbsoluteHostPath(pathname string) (string, error) {
+	return filepath.EvalSymlinks(pathname)
+}

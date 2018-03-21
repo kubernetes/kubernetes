@@ -578,3 +578,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 
 	return pathname, []string{}, nil
 }
+
+func (mounter *Mounter) GetAbsoluteHostPath(pathname string) (string, error) {
+	return filepath.EvalSymlinks(pathname)
+}
