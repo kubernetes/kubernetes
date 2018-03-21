@@ -30,10 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// TODO: delete this global variable when we enable the validation of common
-// fields by default.
-var RepairMalformedUpdates bool = true
-
 const FieldImmutableErrorMsg string = `field is immutable`
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
@@ -254,39 +250,6 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if !RepairMalformedUpdates && newMeta.GetUID() != oldMeta.GetUID() {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), newMeta.GetUID(), "field is immutable"))
-	}
-	// in the event it is left empty, set it, to allow clients more flexibility
-	// TODO: remove the following code that repairs the update request when we retire the clients that modify the immutable fields.
-	// Please do not copy this pattern elsewhere; validation functions should not be modifying the objects they are passed!
-	if RepairMalformedUpdates {
-		if len(newMeta.GetUID()) == 0 {
-			newMeta.SetUID(oldMeta.GetUID())
-		}
-		// ignore changes to timestamp
-		if oldCreationTime := oldMeta.GetCreationTimestamp(); oldCreationTime.IsZero() {
-			oldMeta.SetCreationTimestamp(newMeta.GetCreationTimestamp())
-		} else {
-			newMeta.SetCreationTimestamp(oldMeta.GetCreationTimestamp())
-		}
-		// an object can never remove a deletion timestamp or clear/change grace period seconds
-		if !oldMeta.GetDeletionTimestamp().IsZero() {
-			newMeta.SetDeletionTimestamp(oldMeta.GetDeletionTimestamp())
-		}
-		if oldMeta.GetDeletionGracePeriodSeconds() != nil && newMeta.GetDeletionGracePeriodSeconds() == nil {
-			newMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
-		}
-	}
-
-	// TODO: needs to check if newMeta==nil && oldMeta !=nil after the repair logic is removed.
-	if newMeta.GetDeletionGracePeriodSeconds() != nil && (oldMeta.GetDeletionGracePeriodSeconds() == nil || *newMeta.GetDeletionGracePeriodSeconds() != *oldMeta.GetDeletionGracePeriodSeconds()) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), newMeta.GetDeletionGracePeriodSeconds(), "field is immutable; may only be changed via deletion"))
-	}
-	if newMeta.GetDeletionTimestamp() != nil && (oldMeta.GetDeletionTimestamp() == nil || !newMeta.GetDeletionTimestamp().Equal(oldMeta.GetDeletionTimestamp())) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.GetDeletionTimestamp(), "field is immutable; may only be changed via deletion"))
-	}
-
 	// Finalizers cannot be added if the object is already being deleted.
 	if oldMeta.GetDeletionTimestamp() != nil {
 		allErrs = append(allErrs, ValidateNoNewFinalizers(newMeta.GetFinalizers(), oldMeta.GetFinalizers(), fldPath.Child("finalizers"))...)
@@ -308,6 +271,8 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionTimestamp(), oldMeta.GetDeletionTimestamp(), fldPath.Child("deletionTimestamp"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionGracePeriodSeconds(), oldMeta.GetDeletionGracePeriodSeconds(), fldPath.Child("deletionGracePeriodSeconds"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetClusterName(), oldMeta.GetClusterName(), fldPath.Child("clusterName"))...)
 
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
