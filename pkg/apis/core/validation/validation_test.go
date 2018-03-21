@@ -7513,7 +7513,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"",
+			"metadata.deletionTimestamp",
 			"deletion timestamp removed",
 		},
 		{

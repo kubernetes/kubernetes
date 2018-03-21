@@ -112,6 +112,22 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 
 	// ClusterName is ignored and should not be saved
 	objectMeta.SetClusterName("")
+	// Use the existing UID if none is provided
+	if len(objectMeta.GetUID()) == 0 {
+		objectMeta.SetUID(oldMeta.GetUID())
+	}
+	// ignore changes to timestamp
+	if oldCreationTime := oldMeta.GetCreationTimestamp(); !oldCreationTime.IsZero() {
+		objectMeta.SetCreationTimestamp(oldMeta.GetCreationTimestamp())
+	}
+	// an update can never remove/change a deletion timestamp
+	if !oldMeta.GetDeletionTimestamp().IsZero() {
+		objectMeta.SetDeletionTimestamp(oldMeta.GetDeletionTimestamp())
+	}
+	// an update can never remove/change grace period seconds
+	if oldMeta.GetDeletionGracePeriodSeconds() != nil && objectMeta.GetDeletionGracePeriodSeconds() == nil {
+		objectMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
+	}
 
 	// Ensure some common fields, like UID, are validated for all resources.
 	errs, err := validateCommonFields(obj, old, strategy)

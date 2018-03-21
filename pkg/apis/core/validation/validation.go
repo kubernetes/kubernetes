@@ -55,10 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
-// TODO: delete this global variable when we enable the validation of common
-// fields by default.
-var RepairMalformedUpdates bool = apimachineryvalidation.RepairMalformedUpdates
-
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
