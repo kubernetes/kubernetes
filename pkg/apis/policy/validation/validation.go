@@ -30,9 +30,12 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	extensionsvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
@@ -345,6 +348,15 @@ func validatePodSecurityPolicySysctlListsDoNotOverlap(allowedSysctlsFldPath, for
 // validatePodSecurityPolicySysctls validates the sysctls fields of PodSecurityPolicy.
 func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if len(sysctls) == 0 {
+		return allErrs
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+		return append(allErrs, field.Forbidden(fldPath, "Sysctls are disabled by Sysctls feature-gate"))
+	}
+
 	coversAll := false
 	for i, s := range sysctls {
 		if len(s) == 0 {
