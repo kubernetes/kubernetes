@@ -73,6 +73,10 @@ const (
 	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
 	// to specify a list of allowed service tags separated by comma
 	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
+
+	// ServiceAnnotationLoadBalancerSku is the annotation to denote the Azure LoadBalancer Sku to provision. Default is "Basic", the
+	// other option is "Standard"
+	ServiceAnnotationLoadBalancerSku = "service.beta.kubernetes.io/azure-load-balancer-sku"
 )
 
 var (
@@ -106,6 +110,9 @@ func getPublicIPDomainNameLabel(service *v1.Service) string {
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	// TODO
+	// Don't allow swiching Skus as Azure does not support this.
+
 	// When a client updates the internal load balancer annotation,
 	// the service may be switched from an internal LB to a public one, or vise versa.
 	// Here we'll firstly ensure service do not lie in the opposite LB.
@@ -236,9 +243,11 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 			Name:                         &defaultLBName,
 			Location:                     &az.Location,
 			LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
+			Sku: getLoadBalancerSku(service),
 		}
 	}
 
+	glog.V(10).Infof("azure: returning defaultlb as %s", defaultLB.Sku.Name)
 	return defaultLB, nil, false, nil
 }
 
@@ -255,7 +264,7 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 		glog.Errorf("az.selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - az.GetVMSetNames failed, err=(%v)", clusterName, serviceName, isInternal, err)
 		return nil, false, err
 	}
-	glog.Infof("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - vmSetNames %v", clusterName, serviceName, isInternal, *vmSetNames)
+	glog.V(10).Infof("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - vmSetNames %v", clusterName, serviceName, isInternal, *vmSetNames)
 
 	mapExistingLBs := map[string]network.LoadBalancer{}
 	for _, lb := range *existingLBs {
@@ -272,6 +281,7 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 				Name:                         &currLBName,
 				Location:                     &az.Location,
 				LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
+				Sku: getLoadBalancerSku(service),
 			}
 
 			return selectedLB, false, nil
@@ -427,7 +437,8 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 	pip.Tags = &map[string]*string{"service": &serviceName}
-	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
+	pip.Sku = getPublicIPSku(service)
+	glog.V(3).Infof("ensure(%s): pip(%s) - creating of type %s", serviceName, *pip.Name, pip.Sku.Name)
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIPWithRetry(pipResourceGroup, pip)
 	if err != nil {
@@ -779,7 +790,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			}
 			glog.V(10).Infof("az.DeleteLBWithRetry(%q): end", lbName)
 		} else {
-			glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName)
+			glog.V(3).Infof("ensure(%s): lb(%s) - updating", serviceName, lbName, lb.Sku.Name)
 			err := az.CreateOrUpdateLBWithRetry(*lb)
 			if err != nil {
 				glog.V(2).Infof("ensure(%s) abort backoff: lb(%s) - updating", serviceName, lbName)
@@ -1285,6 +1296,30 @@ func (az *Cloud) getPublicIPAddressResourceGroup(service *v1.Service) string {
 	}
 
 	return az.ResourceGroup
+}
+
+func getPublicIPSku(service *v1.Service) *network.PublicIPAddressSku {
+	if name, found := service.Annotations[ServiceAnnotationLoadBalancerSku]; found {
+		glog.V(0).Infof("Azure: Public IP Annotation: %s", name)
+
+		if name == "Standard" {
+			glog.V(5).Info("Azure: Creating Standard Sku LoadBalancer")
+			return &network.PublicIPAddressSku{Name: network.PublicIPAddressSkuNameStandard}
+		}
+	}
+
+	return &network.PublicIPAddressSku{Name: network.PublicIPAddressSkuNameBasic}
+}
+
+func getLoadBalancerSku(service *v1.Service) *network.LoadBalancerSku {
+	if name, found := service.Annotations[ServiceAnnotationLoadBalancerSku]; found {
+		glog.V(5).Infof("Azure: LoadBalancer Annotation: %s", name)
+		if name == "Standard" {
+			return &network.LoadBalancerSku{Name: network.LoadBalancerSkuNameStandard}
+		}
+	}
+
+	return &network.LoadBalancerSku{Name: network.LoadBalancerSkuNameBasic}
 }
 
 // Check if service requires an internal load balancer.
