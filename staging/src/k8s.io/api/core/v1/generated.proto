@@ -2876,6 +2876,15 @@ message PodSecurityContext {
   // +optional
   optional bool runAsNonRoot = 3;
 
+  // Indicates that the container must run as a non-root group.
+  // If true, the Kubelet will validate the image at runtime to ensure that it
+  // does not run as GID 0 (root) and fail to start the container if it does.
+  // If unset or false, no such validation will be performed.
+  // May also be set in SecurityContext.  If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // +optional
+  optional bool runAsNonRootGroup = 7;
+
   // A list of groups applied to the first process run in each container, in addition
   // to the container's primary GID.  If unspecified, no groups will be added to
   // any container.
@@ -4007,6 +4016,15 @@ message SecurityContext {
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
   // +optional
   optional bool runAsNonRoot = 5;
+
+  // Indicates that the container must run as a non-root group.
+  // If true, the Kubelet will validate the image at runtime to ensure that it
+  // does not run as GID 0 (root) and fail to start the container if it does.
+  // If unset or false, no such validation will be performed.
+  // May also be set in SecurityContext.  If set in both SecurityContext and
+  // PodSecurityContext, the value specified in SecurityContext takes precedence.
+  // +optional
+  optional bool runAsNonRootGroup = 9;
 
   // Whether this container has a read-only root filesystem.
   // Default is false.

@@ -2909,6 +2909,14 @@ type PodSecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty" protobuf:"varint,3,opt,name=runAsNonRoot"`
+	// Indicates that the container must run as a non-root group.
+	// If true, the Kubelet will validate the image at runtime to ensure that it
+	// does not run as GID 0 (root) and fail to start the container if it does.
+	// If unset or false, no such validation will be performed.
+	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	RunAsNonRootGroup *bool `json:"runAsNonRootGroup,omitempty" protobuf:"varint,7,opt,name=runAsNonRootGroup"`
 	// A list of groups applied to the first process run in each container, in addition
 	// to the container's primary GID.  If unspecified, no groups will be added to
 	// any container.
@@ -5153,6 +5161,14 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty" protobuf:"varint,5,opt,name=runAsNonRoot"`
+	// Indicates that the container must run as a non-root group.
+	// If true, the Kubelet will validate the image at runtime to ensure that it
+	// does not run as GID 0 (root) and fail to start the container if it does.
+	// If unset or false, no such validation will be performed.
+	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence.
+	// +optional
+	RunAsNonRootGroup *bool `json:"runAsNonRootGroup,omitempty" protobuf:"varint,9,opt,name=runAsNonRootGroup"`
 	// Whether this container has a read-only root filesystem.
 	// Default is false.
 	// +optional

@@ -377,6 +377,7 @@ func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext
 	out.RunAsUser = in.RunAsUser
 	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
+	out.RunAsNonRootGroup = in.RunAsNonRootGroup
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
 	return nil
@@ -395,6 +396,7 @@ func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecuri
 	out.RunAsUser = in.RunAsUser
 	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
+	out.RunAsNonRootGroup = in.RunAsNonRootGroup
 	out.FSGroup = in.FSGroup
 	if in.Sysctls != nil {
 		out.Sysctls = make([]v1.Sysctl, len(in.Sysctls))
@@ -420,6 +422,8 @@ func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurity
 	out.RunAsUser = in.RunAsUser
 	out.RunAsGroup = in.RunAsGroup
 	out.RunAsNonRoot = in.RunAsNonRoot
+	out.RunAsNonRootGroup = in.RunAsNonRootGroup
+
 	out.FSGroup = in.FSGroup
 	if in.Sysctls != nil {
 		out.Sysctls = make([]core.Sysctl, len(in.Sysctls))

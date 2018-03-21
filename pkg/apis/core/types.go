@@ -2647,8 +2647,16 @@ type PodSecurityContext struct {
 	// for that container.
 	// +optional
 	RunAsNonRoot *bool
+	// Indicates that the container must run as a non-root group.
+	// If true, the Kubelet will validate the image at runtime to ensure that it
+	// does not run as GID 0 (root) and fail to start the container if it does.
+	// If unset or false, no such validation will be performed.
+	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence
+	// for that container.
+	// +optional
+	RunAsNonRootGroup *bool
 	// A list of groups applied to the first process run in each container, in addition
-	// to the container's primary GID.  If unspecified, no groups will be added to
 	// any container.
 	// +optional
 	SupplementalGroups []int64
@@ -4575,6 +4583,15 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsNonRoot *bool
+	// Indicates that the container must run as a non-root group.
+	// If true, the Kubelet will validate the image at runtime to ensure that it
+	// does not run as GID 0 (root) and fail to start the container if it does.
+	// If unset or false, no such validation will be performed.
+	// May also be set in SecurityContext.  If set in both SecurityContext and
+	// PodSecurityContext, the value specified in SecurityContext takes precedence
+	// for that container.
+	// +optional
+	RunAsNonRootGroup *bool
 	// The read-only root filesystem allows you to restrict the locations that an application can write
 	// files to, ensuring the persistent data can only be written to mounts.
 	// +optional
