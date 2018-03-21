@@ -231,6 +231,7 @@ func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta2
 			return err
 		}
 	}
+	out.VolumeClaimTemplateMismatches = in.VolumeClaimTemplateMismatches
 	return nil
 }
 
@@ -254,6 +255,7 @@ func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.Statef
 			return err
 		}
 	}
+	out.VolumeClaimTemplateMismatches = in.VolumeClaimTemplateMismatches
 	return nil
 }
 

@@ -25,6 +25,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
@@ -55,8 +56,9 @@ func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
 	statusUpdater StatefulSetStatusUpdaterInterface,
 	controllerHistory history.Interface,
-	recorder record.EventRecorder) StatefulSetControlInterface {
-	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder}
+	recorder record.EventRecorder,
+	client clientset.Interface) StatefulSetControlInterface {
+	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder, client}
 }
 
 type defaultStatefulSetControl struct {
@@ -64,6 +66,7 @@ type defaultStatefulSetControl struct {
 	statusUpdater     StatefulSetStatusUpdaterInterface
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
+	client            clientset.Interface
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -312,6 +315,34 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			condemned = append(condemned, pods[i])
 		}
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
+
+		for _, requested := range set.Spec.VolumeClaimTemplates {
+			pvcName := getPersistentVolumeClaimName(set, &requested, getOrdinal(pods[i]))
+			actual, err := ssc.client.CoreV1().PersistentVolumeClaims(set.Namespace).Get(pvcName, metav1.GetOptions{})
+			if err != nil {
+				glog.Warningf("Couldn't find a volume matching template %s on pod %s: %v",
+					requested.Name,
+					pods[i].Name,
+					err,
+				)
+				status.VolumeClaimTemplateMismatches++
+				continue
+			}
+
+			// TODO: Compare more properties? Storage class, labels, ...
+			requestedStorage := requested.Spec.Resources.Requests[v1.ResourceStorage]
+			actualStorage := actual.Status.Capacity[v1.ResourceStorage]
+			if (&actualStorage).Value() != (&requestedStorage).Value() {
+				glog.Warningf("Volume claim template %s on stateful pod %s doesn't match actual volume claim %s: Requested size %v, actual size %v",
+					requested.Name,
+					pods[i].Name,
+					actual.Name,
+					(&requestedStorage).Value(),
+					(&actualStorage).Value(),
+				)
+				status.VolumeClaimTemplateMismatches++
+			}
+		}
 	}
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
@@ -522,6 +553,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 
 	}
+
 	return &status, nil
 }
 

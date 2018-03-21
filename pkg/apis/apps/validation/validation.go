@@ -174,6 +174,7 @@ func ValidateStatefulSetStatus(status *apps.StatefulSetStatus, fieldPath *field.
 	if status.CollisionCount != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fieldPath.Child("collisionCount"))...)
 	}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.VolumeClaimTemplateMismatches), fieldPath.Child("volumeClaimTemplateMismatches"))...)
 
 	msg := "cannot be greater than status.replicas"
 	if status.ReadyReplicas > status.Replicas {

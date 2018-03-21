@@ -198,6 +198,9 @@ type StatefulSetStatus struct {
 
 	// Represents the latest available observations of a statefulset's current state.
 	Conditions []StatefulSetCondition
+
+	// volumeClaimTemplateMismatches is the number of persistent volume claims in use which do not match their template
+	VolumeClaimTemplateMismatches int32
 }
 
 type StatefulSetConditionType string

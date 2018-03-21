@@ -469,6 +469,10 @@ message StatefulSetStatus {
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated StatefulSetCondition conditions = 10;
+
+  // volumeClaimTemplateMismatches is the number of persistent volume claims in use which do not match their template
+  // +optional
+  optional int32 volumeClaimTemplateMismatches = 11;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet

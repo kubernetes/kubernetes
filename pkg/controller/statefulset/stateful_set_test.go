@@ -587,7 +587,7 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
 	recorder := record.NewFakeRecorder(10)
-	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh, recorder)
+	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh, recorder, client)
 
 	return ssc, fpc
 }

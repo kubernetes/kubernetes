@@ -212,6 +212,10 @@ type StatefulSetStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []StatefulSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,10,rep,name=conditions"`
+
+	// volumeClaimTemplateMismatches is the number of persistent volume claims in use which do not match their template
+	// +optional
+	VolumeClaimTemplateMismatches int32 `json:"volumeClaimTemplateMismatches,omitempty" protobuf:"varint,11,opt,name=volumeClaimTemplateMismatches"`
 }
 
 type StatefulSetConditionType string
