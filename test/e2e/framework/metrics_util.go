@@ -43,7 +43,6 @@ const (
 	// NodeStartupThreshold is a rough estimate of the time allocated for a pod to start on a node.
 	NodeStartupThreshold = 4 * time.Second
 
-	podStartupThreshold time.Duration = 5 * time.Second
 	// We are setting 1s threshold for apicalls even in small clusters to avoid flakes.
 	// The problem is that if long GC is happening in small clusters (where we have e.g.
 	// 1-core master machines) and tests are pretty short, it may consume significant
@@ -402,17 +401,17 @@ func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIRespons
 	return badMetrics, metrics, nil
 }
 
-// Verifies whether 50, 90 and 99th percentiles of e2e PodStartupLatency are
-// within the threshold.
-func VerifyPodStartupLatency(latency *PodStartupLatency) error {
-	if latency.E2ELatency.Perc50 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 50th percentile: %v", latency.E2ELatency.Perc50)
+// Verifies whether 50, 90 and 99th percentiles of a latency metric are
+// within the expected threshold.
+func VerifyLatencyWithinThreshold(threshold, actual LatencyMetric, metricName string) error {
+	if actual.Perc50 > threshold.Perc50 {
+		return fmt.Errorf("too high %v latency 50th percentile: %v", metricName, actual.Perc50)
 	}
-	if latency.E2ELatency.Perc90 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 90th percentile: %v", latency.E2ELatency.Perc90)
+	if actual.Perc90 > threshold.Perc90 {
+		return fmt.Errorf("too high %v latency 90th percentile: %v", metricName, actual.Perc90)
 	}
-	if latency.E2ELatency.Perc99 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 99th percentile: %v", latency.E2ELatency.Perc99)
+	if actual.Perc99 > threshold.Perc99 {
+		return fmt.Errorf("too high %v latency 99th percentile: %v", metricName, actual.Perc99)
 	}
 	return nil
 }

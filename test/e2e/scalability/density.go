@@ -50,6 +50,7 @@ import (
 )
 
 const (
+	PodStartupLatencyThreshold = 5 * time.Second
 	MinSaturationThreshold     = 2 * time.Minute
 	MinPodsPerSecondThroughput = 8
 	DensityPollInterval        = 10 * time.Second
@@ -846,7 +847,12 @@ var _ = SIGDescribe("Density", func() {
 				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 
 				// Test whether e2e pod startup time is acceptable.
-				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
+				podStartupLatencyThreshold := framework.LatencyMetric{
+					Perc50: PodStartupLatencyThreshold,
+					Perc90: PodStartupLatencyThreshold,
+					Perc99: PodStartupLatencyThreshold,
+				}
+				framework.ExpectNoError(framework.VerifyLatencyWithinThreshold(podStartupLatencyThreshold, podStartupLatency.E2ELatency, "pod startup"))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 				latencyMeasurementPhase.End()
