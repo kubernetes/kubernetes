@@ -17,24 +17,16 @@ limitations under the License.
 package daemonset
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/wait"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	appstyped "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -47,214 +39,23 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonS
 	config := restclient.Config{Host: server.URL}
 	clientSet, err := clientset.NewForConfig(&config)
 	if err != nil {
-		t.Fatalf("Error in creating clientset: %v", err)
+		t.Fatalf("error in creating clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
+	dsInformers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
 	metrics.UnregisterMetricAndUntrackRateLimiterUsage("daemon_controller")
 	dc, err := daemon.NewDaemonSetsController(
-		informers.Apps().V1().DaemonSets(),
-		informers.Apps().V1().ControllerRevisions(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().Nodes(),
+		dsInformers.Apps().V1().DaemonSets(),
+		dsInformers.Apps().V1().ControllerRevisions(),
+		dsInformers.Core().V1().Pods(),
+		dsInformers.Core().V1().Nodes(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-controller")),
 	)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
 
-	return server, closeFn, dc, informers, clientSet
-}
-
-func testLabels() map[string]string {
-	return map[string]string{"name": "test"}
-}
-
-func newDaemonSet(name, namespace string) *apps.DaemonSet {
-	two := int32(2)
-	return &apps.DaemonSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "DaemonSet",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Spec: apps.DaemonSetSpec{
-			RevisionHistoryLimit: &two,
-			Selector:             &metav1.LabelSelector{MatchLabels: testLabels()},
-			UpdateStrategy: apps.DaemonSetUpdateStrategy{
-				Type: apps.OnDeleteDaemonSetStrategyType,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: testLabels(),
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{Name: "foo", Image: "bar"}},
-				},
-			},
-		},
-	}
-}
-
-func newRollbackStrategy() *apps.DaemonSetUpdateStrategy {
-	one := intstr.FromInt(1)
-	return &apps.DaemonSetUpdateStrategy{
-		Type:          apps.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
-	}
-}
-
-func newOnDeleteStrategy() *apps.DaemonSetUpdateStrategy {
-	return &apps.DaemonSetUpdateStrategy{
-		Type: apps.OnDeleteDaemonSetStrategyType,
-	}
-}
-
-func updateStrategies() []*apps.DaemonSetUpdateStrategy {
-	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
-}
-
-func allocatableResources(memory, cpu string) v1.ResourceList {
-	return v1.ResourceList{
-		v1.ResourceMemory: resource.MustParse(memory),
-		v1.ResourceCPU:    resource.MustParse(cpu),
-		v1.ResourcePods:   resource.MustParse("100"),
-	}
-}
-
-func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
-	return v1.PodSpec{
-		NodeName: nodeName,
-		Containers: []v1.Container{
-			{
-				Name:  "foo",
-				Image: "bar",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse(memory),
-						v1.ResourceCPU:    resource.MustParse(cpu),
-					},
-				},
-			},
-		},
-	}
-}
-
-func newNode(name string, label map[string]string) *v1.Node {
-	return &v1.Node{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Node",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Labels:    label,
-			Namespace: metav1.NamespaceDefault,
-		},
-		Status: v1.NodeStatus{
-			Conditions:  []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
-			Allocatable: v1.ResourceList{v1.ResourcePods: resource.MustParse("100")},
-		},
-	}
-}
-
-func addNodes(nodeClient corev1typed.NodeInterface, startIndex, numNodes int, label map[string]string, t *testing.T) {
-	for i := startIndex; i < startIndex+numNodes; i++ {
-		_, err := nodeClient.Create(newNode(fmt.Sprintf("node-%d", i), label))
-		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
-		}
-	}
-}
-
-func validateDaemonSetPodsAndMarkReady(
-	podClient corev1typed.PodInterface,
-	podInformer cache.SharedIndexInformer,
-	numberPods int,
-	t *testing.T) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
-		objects := podInformer.GetIndexer().List()
-		if len(objects) != numberPods {
-			return false, nil
-		}
-
-		for _, object := range objects {
-			pod := object.(*v1.Pod)
-
-			ownerReferences := pod.ObjectMeta.OwnerReferences
-			if len(ownerReferences) != 1 {
-				return false, fmt.Errorf("Pod %s has %d OwnerReferences, expected only 1", pod.Name, len(ownerReferences))
-			}
-			controllerRef := ownerReferences[0]
-			if got, want := controllerRef.Kind, "DaemonSet"; got != want {
-				t.Errorf("controllerRef.Kind = %q, want %q", got, want)
-			}
-			if controllerRef.Controller == nil || *controllerRef.Controller != true {
-				t.Errorf("controllerRef.Controller is not set to true")
-			}
-
-			if !podutil.IsPodReady(pod) {
-				podCopy := pod.DeepCopy()
-				podCopy.Status = v1.PodStatus{
-					Phase:      v1.PodRunning,
-					Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
-				}
-				_, err := podClient.UpdateStatus(podCopy)
-				if err != nil {
-					return false, err
-				}
-			}
-		}
-
-		return true, nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func validateDaemonSetStatus(
-	dsClient appstyped.DaemonSetInterface,
-	dsName string,
-	dsNamespace string,
-	expectedNumberReady int32,
-	t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		ds, err := dsClient.Get(dsName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return ds.Status.NumberReady == expectedNumberReady, nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		eventList, err := eventClient.List(metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		if len(eventList.Items) == 0 {
-			return false, nil
-		}
-		if len(eventList.Items) > 1 {
-			t.Errorf("Expected 1 event got %d", len(eventList.Items))
-		}
-		event := eventList.Items[0]
-		if event.Type != v1.EventTypeWarning {
-			t.Errorf("Event type expected %s got %s", v1.EventTypeWarning, event.Type)
-		}
-		if event.Reason != daemon.FailedPlacementReason {
-			t.Errorf("Event reason expected %s got %s", daemon.FailedPlacementReason, event.Reason)
-		}
-		return true, nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+	return server, closeFn, dc, dsInformers, clientSet
 }
 
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
@@ -276,11 +77,11 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		_, err := dsClient.Create(ds)
 		if err != nil {
-			t.Fatalf("Failed to create DaemonSet: %v", err)
+			t.Fatalf("failed to create DaemonSet: %v", err)
 		}
 		_, err = nodeClient.Create(newNode("single-node", nil))
 		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
+			t.Fatalf("failed to create node: %v", err)
 		}
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
@@ -309,7 +110,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		_, err := dsClient.Create(ds)
 		if err != nil {
-			t.Fatalf("Failed to create DaemonSet: %v", err)
+			t.Fatalf("failed to create DaemonSet: %v", err)
 		}
 		addNodes(nodeClient, 0, 5, nil, t)
 
@@ -339,7 +140,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		_, err := dsClient.Create(ds)
 		if err != nil {
-			t.Fatalf("Failed to create DaemonSet: %v", err)
+			t.Fatalf("failed to create DaemonSet: %v", err)
 		}
 		node := newNode("single-node", nil)
 		node.Status.Conditions = []v1.NodeCondition{
@@ -347,7 +148,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		}
 		_, err = nodeClient.Create(node)
 		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
+			t.Fatalf("failed to create node: %v", err)
 		}
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
@@ -376,17 +177,78 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		ds.Spec.UpdateStrategy = *strategy
 		_, err := dsClient.Create(ds)
 		if err != nil {
-			t.Fatalf("Failed to create DaemonSet: %v", err)
+			t.Fatalf("failed to create DaemonSet: %v", err)
 		}
 		node := newNode("node-with-limited-memory", nil)
 		node.Status.Allocatable = allocatableResources("100M", "200m")
 		_, err = nodeClient.Create(node)
 		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
+			t.Fatalf("failed to create node: %v", err)
 		}
 
 		validateFailedPlacementEvent(eventClient, t)
 
 		close(stopCh)
 	}
+}
+
+// A RollingUpdate DaemonSet should adopt existing pods when it is created
+func TestRollingUpdateDaemonSetExistingPodAdoption(t *testing.T) {
+	server, closeFn, dc, informers, clientset := setup(t)
+	defer closeFn()
+
+	tearDownFn := setupGC(t, server)
+	defer tearDownFn()
+
+	ns := framework.CreateTestingNamespace("rolling-update-daemonset-existing-pod-adoption-test", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+	podClient := clientset.CoreV1().Pods(ns.Name)
+	nodeClient := clientset.CoreV1().Nodes()
+	podInformer := informers.Core().V1().Pods().Informer()
+	controllerRevisionClient := clientset.AppsV1().ControllerRevisions(ns.Name)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go dc.Run(5, stopCh)
+
+	// Step 1: create a RollingUpdate DaemonSet
+	dsName := "daemonset"
+	ds := newDaemonSet(dsName, ns.Name)
+	ds.Spec.UpdateStrategy = *newRollbackStrategy()
+	ds, err := dsClient.Create(ds)
+	if err != nil {
+		t.Fatalf("failed to create daemonset %q: %v", dsName, err)
+	}
+
+	nodeName := "single-node"
+	node := newNode(nodeName, nil)
+	_, err = nodeClient.Create(node)
+	if err != nil {
+		t.Fatalf("failed to create node %q: %v", nodeName, err)
+	}
+
+	// Validate everything works correctly (include marking daemon pod as ready)
+	validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
+	validateDaemonSetStatus(dsClient, ds.Name, ds.Namespace, 1, t)
+
+	// Step 2: delete daemonset and orphan its pods
+	deleteDaemonSetAndOrphanPods(dsClient, podClient, controllerRevisionClient, podInformer, ds, t)
+
+	// Step 3: create 2rd daemonset to adopt the pods (no restart) as long as template matches
+	dsName2 := "daemonset-adopt-template-matches"
+	ds2 := newDaemonSet(dsName2, ns.Name)
+	ds2.Spec.UpdateStrategy = *newRollbackStrategy()
+	ds2, err = dsClient.Create(ds2)
+	if err != nil {
+		t.Fatalf("failed to create daemonset %q: %v", dsName2, err)
+	}
+	if !apiequality.Semantic.DeepEqual(ds2.Spec.Template, ds.Spec.Template) {
+		t.Fatalf(".spec.template of new daemonset %q and old daemonset %q are not the same", dsName2, dsName)
+	}
+
+	// Wait for pods and history to be adopted by 2nd daemonset
+	waitDaemonSetAdoption(podClient, controllerRevisionClient, podInformer, ds2, ds.Name, t)
+	validateDaemonSetStatus(dsClient, ds2.Name, ds2.Namespace, 1, t)
 }
