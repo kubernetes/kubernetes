@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	"github.com/golang/glog"
@@ -37,8 +38,7 @@ const maxCacheEntries = 100
 // 2. function to get equivalence pod
 type EquivalenceCache struct {
 	sync.RWMutex
-	getEquivalencePod algorithm.GetEquivalencePodFunc
-	algorithmCache    map[string]AlgorithmCache
+	algorithmCache map[string]AlgorithmCache
 }
 
 // The AlgorithmCache stores PredicateMap with predicate name as key
@@ -62,11 +62,11 @@ func newAlgorithmCache() AlgorithmCache {
 	}
 }
 
-// NewEquivalenceCache creates a EquivalenceCache object.
-func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
+// NewEquivalenceCache returns EquivalenceCache to speed up predicates by caching
+// result from previous scheduling.
+func NewEquivalenceCache() *EquivalenceCache {
 	return &EquivalenceCache{
-		getEquivalencePod: getEquivalencePodFunc,
-		algorithmCache:    make(map[string]AlgorithmCache),
+		algorithmCache: make(map[string]AlgorithmCache),
 	}
 }
 
@@ -191,21 +191,21 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 	// it will also fits to equivalence class of existing pods
 
 	// GeneralPredicates: will always be affected by adding a new pod
-	invalidPredicates := sets.NewString("GeneralPredicates")
+	invalidPredicates := sets.NewString(predicates.GeneralPred)
 
 	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decision.
 	for _, vol := range pod.Spec.Volumes {
 		if vol.PersistentVolumeClaim != nil {
-			invalidPredicates.Insert("MaxEBSVolumeCount", "MaxGCEPDVolumeCount", "MaxAzureDiskVolumeCount")
+			invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred, predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred)
 		} else {
 			if vol.AWSElasticBlockStore != nil {
-				invalidPredicates.Insert("MaxEBSVolumeCount")
+				invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred)
 			}
 			if vol.GCEPersistentDisk != nil {
-				invalidPredicates.Insert("MaxGCEPDVolumeCount")
+				invalidPredicates.Insert(predicates.MaxGCEPDVolumeCountPred)
 			}
 			if vol.AzureDisk != nil {
-				invalidPredicates.Insert("MaxAzureDiskVolumeCount")
+				invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
 			}
 		}
 	}
@@ -219,9 +219,11 @@ type equivalenceClassInfo struct {
 	hash uint64
 }
 
-// getEquivalenceClassInfo returns the equivalence class of given pod.
+// getEquivalenceClassInfo returns a hash of the given pod.
+// The hashing function returns the same value for any two pods that are
+// equivalent from the perspective of scheduling.
 func (ec *EquivalenceCache) getEquivalenceClassInfo(pod *v1.Pod) *equivalenceClassInfo {
-	equivalencePod := ec.getEquivalencePod(pod)
+	equivalencePod := getEquivalenceHash(pod)
 	if equivalencePod != nil {
 		hash := fnv.New32a()
 		hashutil.DeepHashObject(hash, equivalencePod)
@@ -230,4 +232,61 @@ func (ec *EquivalenceCache) getEquivalenceClassInfo(pod *v1.Pod) *equivalenceCla
 		}
 	}
 	return nil
+}
+
+// equivalencePod is the set of pod attributes which must match for two pods to
+// be considered equivalent for scheduling purposes. For correctness, this must
+// include any Pod field which is used by a FitPredicate.
+//
+// NOTE: For equivalence hash to be formally correct, lists and maps in the
+// equivalencePod should be normalized. (e.g. by sorting them) However, the
+// vast majority of equivalent pod classes are expected to be created from a
+// single pod template, so they will all have the same ordering.
+type equivalencePod struct {
+	Namespace      *string
+	Labels         map[string]string
+	Affinity       *v1.Affinity
+	Containers     []v1.Container // See note about ordering
+	InitContainers []v1.Container // See note about ordering
+	NodeName       *string
+	NodeSelector   map[string]string
+	Tolerations    []v1.Toleration
+	Volumes        []v1.Volume // See note about ordering
+}
+
+// getEquivalenceHash returns the equivalencePod for a Pod.
+func getEquivalenceHash(pod *v1.Pod) *equivalencePod {
+	ep := &equivalencePod{
+		Namespace:      &pod.Namespace,
+		Labels:         pod.Labels,
+		Affinity:       pod.Spec.Affinity,
+		Containers:     pod.Spec.Containers,
+		InitContainers: pod.Spec.InitContainers,
+		NodeName:       &pod.Spec.NodeName,
+		NodeSelector:   pod.Spec.NodeSelector,
+		Tolerations:    pod.Spec.Tolerations,
+		Volumes:        pod.Spec.Volumes,
+	}
+	// DeepHashObject considers nil and empty slices to be different. Normalize them.
+	if len(ep.Containers) == 0 {
+		ep.Containers = nil
+	}
+	if len(ep.InitContainers) == 0 {
+		ep.InitContainers = nil
+	}
+	if len(ep.Tolerations) == 0 {
+		ep.Tolerations = nil
+	}
+	if len(ep.Volumes) == 0 {
+		ep.Volumes = nil
+	}
+	// Normalize empty maps also.
+	if len(ep.Labels) == 0 {
+		ep.Labels = nil
+	}
+	if len(ep.NodeSelector) == 0 {
+		ep.NodeSelector = nil
+	}
+	// TODO(misterikkit): Also normalize nested maps and slices.
+	return ep
 }
