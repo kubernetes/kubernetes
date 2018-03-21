@@ -385,7 +385,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
+		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, url, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
