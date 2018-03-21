@@ -668,6 +668,7 @@ func (c *configFactory) deletePodFromSchedulingQueue(obj interface{}) {
 	if c.volumeBinder != nil {
 		// Volume binder only wants to keep unassigned pods
 		c.volumeBinder.DeletePodBindings(pod)
+		c.volumeBinder.DeletePodPVCMatching(pod)
 	}
 }
 
@@ -1148,6 +1149,10 @@ func (c *configFactory) getNextPod() *v1.Pod {
 		return pod
 	}
 	glog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
+	if c.volumeBinder != nil {
+		// Clear pod pvc matching cache at the begining.
+		c.volumeBinder.DeletePodPVCMatching(pod)
+	}
 	return nil
 }
 
@@ -1316,6 +1321,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 						if c.volumeBinder != nil {
 							// Volume binder only wants to keep unassigned pods
 							c.volumeBinder.DeletePodBindings(pod)
+							c.volumeBinder.DeletePodPVCMatching(pod)
 						}
 					}
 					break
@@ -1326,6 +1332,7 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					if c.volumeBinder != nil {
 						// Volume binder only wants to keep unassigned pods
 						c.volumeBinder.DeletePodBindings(origPod)
+						c.volumeBinder.DeletePodPVCMatching(pod)
 					}
 					return
 				}

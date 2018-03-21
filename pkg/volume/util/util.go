@@ -263,6 +263,21 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	return class, nil
 }
 
+// HasNodeAdffinity returns true if PV has node affinity, false otherwise.
+func HasNodeAffinity(pv *v1.PersistentVolume) bool {
+	affinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
+	if err != nil {
+		return false
+	}
+	if affinity != nil {
+		return true
+	}
+	if pv.Spec.NodeAffinity != nil {
+		return true
+	}
+	return false
+}
+
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {

@@ -72,3 +72,11 @@ func (b *VolumeBinder) DeletePodBindings(pod *v1.Pod) {
 		cache.DeleteBindings(pod)
 	}
 }
+
+// DeletePodPVCMatching will delete the cached pvc matchings for the given pod.
+func (b *VolumeBinder) DeletePodPVCMatching(pod *v1.Pod) {
+	cache := b.Binder.GetMatchingCache()
+	if cache != nil && pod != nil {
+		cache.DeleteMatchings(pod)
+	}
+}
