@@ -602,8 +602,17 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 }
 
 func isNotFound(err error) bool {
-	e, ok := err.(*gophercloud.ErrUnexpectedResponseCode)
-	return ok && e.Actual == http.StatusNotFound
+	if _, ok := err.(gophercloud.ErrDefault404); ok {
+		return true
+	}
+
+	if errCode, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
+		if errCode.Actual == http.StatusNotFound {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Zones indicates that we support zones
