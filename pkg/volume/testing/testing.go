@@ -250,7 +250,17 @@ func (plugin *FakeVolumePlugin) GetPluginName() string {
 }
 
 func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
-	return spec.Name(), nil
+	var volumeName string
+	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
+		volumeName = spec.Volume.GCEPersistentDisk.PDName
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
+		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	}
+	if volumeName == "" {
+		volumeName = spec.Name()
+	}
+	return volumeName, nil
 }
 
 func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
