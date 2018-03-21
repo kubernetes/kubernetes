@@ -599,9 +599,6 @@ function construct-kubelet-flags {
     flags+=" --manifest-url=${MANIFEST_URL}"
     flags+=" --manifest-url-header=${MANIFEST_URL_HEADER}"
   fi
-  if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
-    flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
-  fi
   local node_labels=$(build-node-labels ${master})
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
