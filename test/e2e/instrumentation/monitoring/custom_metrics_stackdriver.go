@@ -216,10 +216,10 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 	req1, _ := labels.NewRequirement("resource.type", selection.Equals, []string{"k8s_pod"})
 	// It's important to filter out only metrics from the right namespace, since multiple e2e tests
 	// may run in the same project concurrently. "dummy" is added to test
-	req2, _ := labels.NewRequirement("resource.label.namespace_name", selection.In, []string{string(f.Namespace.Name), "dummy"})
-	req3, _ := labels.NewRequirement("resource.label.pod_name", selection.Exists, []string{})
-	req4, _ := labels.NewRequirement("resource.label.location", selection.NotEquals, []string{"dummy"})
-	req5, _ := labels.NewRequirement("resource.label.cluster_name", selection.NotIn, []string{"foo", "bar"})
+	req2, _ := labels.NewRequirement("resource.labels.namespace_name", selection.In, []string{string(f.Namespace.Name), "dummy"})
+	req3, _ := labels.NewRequirement("resource.labels.pod_name", selection.Exists, []string{})
+	req4, _ := labels.NewRequirement("resource.labels.location", selection.NotEquals, []string{"dummy"})
+	req5, _ := labels.NewRequirement("resource.labels.cluster_name", selection.NotIn, []string{"foo", "bar"})
 	values, err := externalMetricsClient.
 		NamespacedMetrics("dummy").
 		List("custom.googleapis.com|"+CustomMetricName, labels.NewSelector().Add(*req1, *req2, *req3, *req4, *req5))
@@ -232,7 +232,7 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 	if values.Items[0].MetricName != "custom.googleapis.com|"+CustomMetricName ||
 		values.Items[0].Value.Value() != CustomMetricValue ||
 		// Check one label just to make sure labels are included
-		values.Items[0].MetricLabels["resource.label.namespace_name"] != string(f.Namespace.Name) {
+		values.Items[0].MetricLabels["resource.labels.namespace_name"] != string(f.Namespace.Name) {
 		framework.Failf("Unexpected result for metric %s: %v", CustomMetricName, values.Items[0])
 	}
 }

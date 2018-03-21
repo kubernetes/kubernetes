@@ -58,6 +58,7 @@ var (
 	AdapterForOldResourceModel = "adapter_old_resource_model.yaml"
 	AdapterForNewResourceModel = "adapter_new_resource_model.yaml"
 	AdapterDefault             = AdapterForOldResourceModel
+	ClusterAdminBinding        = "e2e-test-cluster-admin-binding"
 )
 
 // CustomMetricContainerSpec allows to specify a config for StackdriverExporterDeployment
@@ -240,12 +241,32 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 // CreateAdapter creates Custom Metrics - Stackdriver adapter
 // adapterDeploymentFile should be a filename for adapter deployment located in StagingDeploymentLocation
 func CreateAdapter(adapterDeploymentFile string) error {
+	// A workaround to make the work on GKE. GKE doesn't normally allow to create cluster roles,
+	// which the adapter deployment does. The solution is to create cluster role binding for
+	// cluster-admin role and currently used service account.
+	err := createClusterAdminBinding()
+	if err != nil {
+		return err
+	}
 	adapterURL := StagingDeploymentsLocation + adapterDeploymentFile
-	err := exec.Command("wget", adapterURL).Run()
+	err = exec.Command("wget", adapterURL).Run()
 	if err != nil {
 		return err
 	}
 	stat, err := framework.RunKubectl("create", "-f", adapterURL)
+	framework.Logf(stat)
+	return err
+}
+
+func createClusterAdminBinding() error {
+	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
+	if err != nil {
+		framework.Logf(stderr)
+		return err
+	}
+	serviceAccount := strings.TrimSpace(stdout)
+	framework.Logf("current service account: %q", serviceAccount)
+	stat, err := framework.RunKubectl("create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
 	framework.Logf(stat)
 	return err
 }
@@ -293,5 +314,14 @@ func CleanupAdapter(adapterDeploymentFile string) {
 	err = exec.Command("rm", adapterDeploymentFile).Run()
 	if err != nil {
 		framework.Logf("Failed to delete adapter deployment file: %s", err)
+	}
+	cleanupClusterAdminBinding()
+}
+
+func cleanupClusterAdminBinding() {
+	stat, err := framework.RunKubectl("delete", "clusterrolebinding", ClusterAdminBinding)
+	framework.Logf(stat)
+	if err != nil {
+		framework.Logf("Failed to delete cluster admin binding: %s", err)
 	}
 }
