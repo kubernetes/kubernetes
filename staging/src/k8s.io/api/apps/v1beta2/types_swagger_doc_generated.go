@@ -367,16 +367,17 @@ func (StatefulSetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_StatefulSetStatus = map[string]string{
-	"":                   "StatefulSetStatus represents the current state of a StatefulSet.",
-	"observedGeneration": "observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the StatefulSet's generation, which is updated on mutation by the API Server.",
-	"replicas":           "replicas is the number of Pods created by the StatefulSet controller.",
-	"readyReplicas":      "readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.",
-	"currentReplicas":    "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
-	"updatedReplicas":    "updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by updateRevision.",
-	"currentRevision":    "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
-	"updateRevision":     "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)",
-	"collisionCount":     "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
-	"conditions":         "Represents the latest available observations of a statefulset's current state.",
+	"":                              "StatefulSetStatus represents the current state of a StatefulSet.",
+	"observedGeneration":            "observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the StatefulSet's generation, which is updated on mutation by the API Server.",
+	"replicas":                      "replicas is the number of Pods created by the StatefulSet controller.",
+	"readyReplicas":                 "readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.",
+	"currentReplicas":               "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
+	"updatedReplicas":               "updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by updateRevision.",
+	"currentRevision":               "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
+	"updateRevision":                "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)",
+	"collisionCount":                "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+	"conditions":                    "Represents the latest available observations of a statefulset's current state.",
+	"volumeClaimTemplateMismatches": "volumeClaimTemplateMismatches is the number of persistent volume claims in use which do not match their template",
 }
 
 func (StatefulSetStatus) SwaggerDoc() map[string]string {
