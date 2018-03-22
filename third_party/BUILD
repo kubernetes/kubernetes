@@ -22,7 +22,6 @@ filegroup(
         "//third_party/forked/golang/reflect:all-srcs",
         "//third_party/forked/golang/template:all-srcs",
         "//third_party/forked/gonum/graph:all-srcs",
-        "//third_party/htpasswd:all-srcs",
     ],
     tags = ["automanaged"],
 )
