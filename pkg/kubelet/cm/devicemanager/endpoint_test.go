@@ -169,6 +169,40 @@ func TestAllocate(t *testing.T) {
 	require.Equal(t, resp, respOut)
 }
 
+func TestPreStartContainer(t *testing.T) {
+	socket := path.Join("/tmp", esocketName)
+	devs := []*pluginapi.Device{
+		{ID: "PreStartDeviceId-1", Health: pluginapi.Healthy},
+		{ID: "PreStartDeviceId-2", Health: pluginapi.Healthy},
+	}
+	callbackCount := 0
+	callbackChan := make(chan int)
+	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {
+		callbackCount++
+		callbackChan <- callbackCount
+	})
+	defer ecleanup(t, p, e)
+
+	resp := new(pluginapi.PreStartContainerResponse)
+
+	p.SetPreStartContainerFunc(func(r *pluginapi.PreStartContainerRequest, devs map[string]pluginapi.Device) (*pluginapi.PreStartContainerResponse, error) {
+		return resp, nil
+	})
+
+	go e.run()
+	// Wait for the callback to be issued.
+	select {
+	case <-callbackChan:
+		break
+	case <-time.After(time.Second):
+		t.FailNow()
+	}
+
+	respOut, err := e.preStartContainer([]string{"PreStartDeviceId-1", "PreStartDeviceId-2"})
+	require.NoError(t, err)
+	require.Equal(t, resp, respOut)
+}
+
 func TestGetDevices(t *testing.T) {
 	e := endpointImpl{
 		devices: map[string]pluginapi.Device{

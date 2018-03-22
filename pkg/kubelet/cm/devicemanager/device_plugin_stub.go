@@ -41,6 +41,9 @@ type Stub struct {
 
 	// allocFunc is used for handling allocation request
 	allocFunc stubAllocFunc
+
+	// preStartContainerFunc is used for handing preStartContainer request
+	preStartContainerFunc stubPreStartContainerFunc
 }
 
 // stubAllocFunc is the function called when receive an allocation request from Kubelet
@@ -48,6 +51,15 @@ type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.
 
 func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
+
+	return &response, nil
+}
+
+// stubPreStartContainerFunc is the function called when receive an preStartContainer request from Kubelet
+type stubPreStartContainerFunc func(r *pluginapi.PreStartContainerRequest, devs map[string]pluginapi.Device) (*pluginapi.PreStartContainerResponse, error)
+
+func defaultPreStartContainerFunc(r *pluginapi.PreStartContainerRequest, devs map[string]pluginapi.Device) (*pluginapi.PreStartContainerResponse, error) {
+	var response pluginapi.PreStartContainerResponse
 
 	return &response, nil
 }
@@ -62,12 +74,18 @@ func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
 		update: make(chan []*pluginapi.Device),
 
 		allocFunc: defaultAllocFunc,
+		preStartContainerFunc: defaultPreStartContainerFunc,
 	}
 }
 
 // SetAllocFunc sets allocFunc of the device plugin
 func (m *Stub) SetAllocFunc(f stubAllocFunc) {
 	m.allocFunc = f
+}
+
+// SetPreStartContainerFunc sets preStartContainerFunc of the device plugin
+func (m *Stub) SetPreStartContainerFunc(f stubPreStartContainerFunc) {
+	m.preStartContainerFunc = f
 }
 
 // Start starts the gRPC server of the device plugin
