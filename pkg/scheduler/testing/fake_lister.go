@@ -19,7 +19,7 @@ package testing
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -154,11 +154,11 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.
 
 var _ algorithm.StatefulSetLister = &FakeStatefulSetLister{}
 
-// FakeStatefulSetLister implements ControllerLister on []apps.StatefulSet for testing purposes.
-type FakeStatefulSetLister []*apps.StatefulSet
+// FakeStatefulSetLister implements ControllerLister on []appsv1beta1.StatefulSet for testing purposes.
+type FakeStatefulSetLister []*appsv1beta1.StatefulSet
 
 // GetPodStatefulSets gets the StatefulSets that have the selector that match the labels on the given pod.
-func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
+func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1beta1.StatefulSet, err error) {
 	var selector labels.Selector
 
 	for _, ss := range f {

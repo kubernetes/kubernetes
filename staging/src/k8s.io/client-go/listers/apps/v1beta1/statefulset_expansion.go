@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -28,7 +28,7 @@ import (
 // StatefulSetListerExpansion allows custom methods to be added to
 // StatefulSetLister.
 type StatefulSetListerExpansion interface {
-	GetPodStatefulSets(pod *v1.Pod) ([]*apps.StatefulSet, error)
+	GetPodStatefulSets(pod *v1.Pod) ([]*appsv1beta1.StatefulSet, error)
 }
 
 // StatefulSetNamespaceListerExpansion allows custom methods to be added to
@@ -38,9 +38,9 @@ type StatefulSetNamespaceListerExpansion interface{}
 // GetPodStatefulSets returns a list of StatefulSets that potentially match a pod.
 // Only the one specified in the Pod's ControllerRef will actually manage it.
 // Returns an error only if no matching StatefulSets are found.
-func (s *statefulSetLister) GetPodStatefulSets(pod *v1.Pod) ([]*apps.StatefulSet, error) {
+func (s *statefulSetLister) GetPodStatefulSets(pod *v1.Pod) ([]*appsv1beta1.StatefulSet, error) {
 	var selector labels.Selector
-	var ps *apps.StatefulSet
+	var ps *appsv1beta1.StatefulSet
 
 	if len(pod.Labels) == 0 {
 		return nil, fmt.Errorf("no StatefulSets found for pod %v because it has no labels", pod.Name)
@@ -51,7 +51,7 @@ func (s *statefulSetLister) GetPodStatefulSets(pod *v1.Pod) ([]*apps.StatefulSet
 		return nil, err
 	}
 
-	var psList []*apps.StatefulSet
+	var psList []*appsv1beta1.StatefulSet
 	for i := range list {
 		ps = list[i]
 		if ps.Namespace != pod.Namespace {

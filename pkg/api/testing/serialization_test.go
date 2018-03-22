@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -71,11 +71,11 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := corev1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
-	return k8s_api_v1.Convert_v1_ReplicationController_To_core_ReplicationController(intermediate2, out, s)
+	return corev1.Convert_v1_ReplicationController_To_core_ReplicationController(intermediate2, out, s)
 }
 
 func TestSetControllerConversion(t *testing.T) {

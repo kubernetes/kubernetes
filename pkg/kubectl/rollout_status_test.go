@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	api "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -238,8 +238,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 	tests := []struct {
 		name       string
 		generation int64
-		strategy   apps.StatefulSetUpdateStrategy
-		status     apps.StatefulSetStatus
+		strategy   appsv1beta1.StatefulSetUpdateStrategy
+		status     appsv1beta1.StatefulSetStatus
 		msg        string
 		done       bool
 		err        bool
@@ -247,8 +247,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "on delete returns an error",
 			generation: 1,
-			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType},
-			status: apps.StatefulSetStatus{
+			strategy:   appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.OnDeleteStatefulSetStrategyType},
+			status: appsv1beta1.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
 					generation := int64(1)
 					return &generation
@@ -266,8 +266,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "unobserved update is not complete",
 			generation: 2,
-			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-			status: apps.StatefulSetStatus{
+			strategy:   appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.RollingUpdateStatefulSetStrategyType},
+			status: appsv1beta1.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
 					generation := int64(1)
 					return &generation
@@ -285,8 +285,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "if all pods are not ready the update is not complete",
 			generation: 1,
-			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-			status: apps.StatefulSetStatus{
+			strategy:   appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.RollingUpdateStatefulSetStrategyType},
+			status: appsv1beta1.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
 					generation := int64(2)
 					return &generation
@@ -304,12 +304,12 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "partition update completes when all replicas above the partition are updated",
 			generation: 1,
-			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+			strategy: appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
 					partition := int32(2)
-					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
+					return &appsv1beta1.RollingUpdateStatefulSetStrategy{Partition: &partition}
 				}()},
-			status: apps.StatefulSetStatus{
+			status: appsv1beta1.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
 					generation := int64(2)
 					return &generation
@@ -327,12 +327,12 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "partition update is in progress if all pods above the partition have not been updated",
 			generation: 1,
-			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+			strategy: appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
 					partition := int32(2)
-					return &apps.RollingUpdateStatefulSetStrategy{Partition: &partition}
+					return &appsv1beta1.RollingUpdateStatefulSetStrategy{Partition: &partition}
 				}()},
-			status: apps.StatefulSetStatus{
+			status: appsv1beta1.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
 					generation := int64(2)
 					return &generation
@@ -350,8 +350,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 		{
 			name:       "update completes when all replicas are current",
 			generation: 1,
-			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-			status: apps.StatefulSetStatus{
+			strategy:   appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.RollingUpdateStatefulSetStrategyType},
+			status: appsv1beta1.StatefulSetStatus{
 				ObservedGeneration: func() *int64 {
 					generation := int64(2)
 					return &generation
@@ -415,15 +415,15 @@ func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 	}
 }
 
-func newStatefulSet(replicas int32) *apps.StatefulSet {
-	return &apps.StatefulSet{
+func newStatefulSet(replicas int32) *appsv1beta1.StatefulSet {
+	return &appsv1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
 			Labels:    map[string]string{"a": "b"},
 		},
-		Spec: apps.StatefulSetSpec{
-			PodManagementPolicy: apps.OrderedReadyPodManagement,
+		Spec: appsv1beta1.StatefulSetSpec{
+			PodManagementPolicy: appsv1beta1.OrderedReadyPodManagement,
 			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -442,8 +442,8 @@ func newStatefulSet(replicas int32) *apps.StatefulSet {
 				},
 			},
 			Replicas:       &replicas,
-			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			UpdateStrategy: appsv1beta1.StatefulSetUpdateStrategy{Type: appsv1beta1.RollingUpdateStatefulSetStrategyType},
 		},
-		Status: apps.StatefulSetStatus{},
+		Status: appsv1beta1.StatefulSetStatus{},
 	}
 }

@@ -27,7 +27,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
@@ -252,7 +252,7 @@ func NewMasterConfig() *master.Config {
 		"",
 		ns)
 	storageFactory.SetSerializer(
-		schema.GroupResource{Group: apps.GroupName, Resource: serverstorage.AllResources},
+		schema.GroupResource{Group: appsv1beta1.GroupName, Resource: serverstorage.AllResources},
 		"",
 		ns)
 	storageFactory.SetSerializer(

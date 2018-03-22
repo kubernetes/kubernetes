@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -627,7 +627,7 @@ func TestZeroRequest(t *testing.T) {
 			schedulertesting.FakeServiceLister([]*v1.Service{}),
 			schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 			schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
-			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+			schedulertesting.FakeStatefulSetLister([]*appsv1beta1.StatefulSet{}))
 		pc := algorithm.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
 		priorityConfigs = append(priorityConfigs, pc)
 
@@ -637,7 +637,7 @@ func TestZeroRequest(t *testing.T) {
 			schedulertesting.FakeServiceLister([]*v1.Service{}),
 			schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
 			schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
-			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+			schedulertesting.FakeStatefulSetLister([]*appsv1beta1.StatefulSet{}))
 		mataData := mataDataProducer(test.pod, nodeNameToInfo)
 
 		list, err := PrioritizeNodes(

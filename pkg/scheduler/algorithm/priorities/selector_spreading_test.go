@@ -21,7 +21,7 @@ import (
 	"sort"
 	"testing"
 
-	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,7 +62,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		rcs          []*v1.ReplicationController
 		rss          []*extensions.ReplicaSet
 		services     []*v1.Service
-		sss          []*apps.StatefulSet
+		sss          []*appsv1beta1.StatefulSet
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -214,7 +214,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			sss:          []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			sss:          []*appsv1beta1.StatefulSet{{Spec: appsv1beta1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "service with partial pod label matches with service and replica set",
 		},
@@ -255,7 +255,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
-			sss:          []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			sss:          []*appsv1beta1.StatefulSet{{Spec: appsv1beta1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "disjoined service and replica set should be treated equally",
 		},
@@ -293,7 +293,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			sss:   []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
+			sss:   []*appsv1beta1.StatefulSet{{Spec: appsv1beta1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use StatefulSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
 			test:         "StatefulSet with partial pod label matches",
@@ -331,7 +331,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				{Spec: zone2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1, OwnerReferences: controllerRef("StatefulSet", "name", "abc123")}},
 			},
 			nodes: []string{"machine1", "machine2"},
-			sss:   []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
+			sss:   []*appsv1beta1.StatefulSet{{Spec: appsv1beta1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use StatefulSet, instead of ReplicationController. The result should be exactly as above.
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 5}},
 			test:         "Another stateful set with partial pod label matches",
@@ -411,7 +411,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		rcs          []*v1.ReplicationController
 		rss          []*extensions.ReplicaSet
 		services     []*v1.Service
-		sss          []*apps.StatefulSet
+		sss          []*appsv1beta1.StatefulSet
 		expectedList schedulerapi.HostPriorityList
 		test         string
 	}{
@@ -759,7 +759,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 	}
 	// these local variables just make sure controllerLister\replicaSetLister\statefulSetLister not nil
 	// when construct mataDataProducer
-	sss := []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}}
+	sss := []*appsv1beta1.StatefulSet{{Spec: appsv1beta1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}}
 	rcs := []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}}
 	rss := []*extensions.ReplicaSet{{Spec: extensions.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}}
 
