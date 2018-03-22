@@ -7,7 +7,6 @@ includes:
   - 'layer:metrics'
   - 'layer:nagios'
   - 'layer:tls-client'
-  - 'layer:nvidia-cuda'
   - 'layer:cdk-service-kicker'
   - 'interface:http'
   - 'interface:kubernetes-cni'

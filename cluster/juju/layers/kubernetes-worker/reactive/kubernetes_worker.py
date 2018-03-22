@@ -70,6 +70,7 @@ def upgrade_charm():
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
     remove_state('kubernetes-worker.gpu.enabled')
+    disable_gpu()
 
     remove_state('kubernetes-worker.cni-plugins.installed')
     remove_state('kubernetes-worker.config.created')
@@ -629,12 +630,10 @@ def configure_kubelet(dns, ingress_ip):
     kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'
 
     if is_state('kubernetes-worker.gpu.enabled'):
-        if get_version('kubelet') < (1, 6):
-            hookenv.log('Adding --experimental-nvidia-gpus=1 to kubelet')
-            kubelet_opts['experimental-nvidia-gpus'] = '1'
-        else:
-            hookenv.log('Adding --feature-gates=Accelerators=true to kubelet')
-            kubelet_opts['feature-gates'] = 'Accelerators=true'
+        hookenv.log('Adding '
+                    '--feature-gates=Accelerators=true,DevicePlugins=true '
+                    'to kubelet')
+        kubelet_opts['feature-gates'] = 'Accelerators=true,DevicePlugins=true'
 
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
@@ -870,14 +869,17 @@ def set_privileged():
 
     """
     privileged = hookenv.config('allow-privileged').lower()
-    if privileged == 'auto':
-        gpu_enabled = is_state('kubernetes-worker.gpu.enabled')
-        privileged = 'true' if gpu_enabled else 'false'
+    gpu_needs_privileged = (is_state('kubernetes-worker.gpu.enabled') and
+                            get_version('kubelet') < (1, 9))
 
-    if privileged == 'true':
-        set_state('kubernetes-worker.privileged')
-    else:
-        remove_state('kubernetes-worker.privileged')
+    if privileged == 'auto':
+        privileged = 'true' if gpu_needs_privileged else 'false'
+
+    if privileged == 'false' and gpu_needs_privileged:
+        disable_gpu()
+        remove_state('kubernetes-worker.gpu.enabled')
+        # No need to restart kubernetes (set the restart-needed state)
+        # because set-privileged is already in the restart path
 
 
 @when('config.changed.allow-privileged')
@@ -890,18 +892,17 @@ def on_config_allow_privileged_change():
     remove_state('config.changed.allow-privileged')
 
 
-@when('cuda.installed')
+@when('nvidia-docker.installed')
 @when('kubernetes-worker.config.created')
 @when_not('kubernetes-worker.gpu.enabled')
 def enable_gpu():
     """Enable GPU usage on this node.
 
     """
-    config = hookenv.config()
-    if config['allow-privileged'] == "false":
+    if get_version('kubelet') < (1, 9):
         hookenv.status_set(
             'active',
-            'GPUs available. Set allow-privileged="auto" to enable.'
+            'Upgrade to snap channel >= 1.9/stable to enable GPU suppport.'
         )
         return
 
@@ -916,7 +917,6 @@ def enable_gpu():
         hookenv.log(cpe)
         return
 
-    # Apply node labels
     set_label('gpu', 'true')
     set_label('cuda', 'true')
 
@@ -925,14 +925,18 @@ def enable_gpu():
 
 
 @when('kubernetes-worker.gpu.enabled')
-@when_not('kubernetes-worker.privileged')
+@when_not('nvidia-docker.installed')
 @when_not('kubernetes-worker.restart-needed')
+def nvidia_departed():
+    """Cuda departed, probably due to the docker layer switching to a
+     non nvidia-docker."""
+    disable_gpu()
+    remove_state('kubernetes-worker.gpu.enabled')
+    set_state('kubernetes-worker.restart-needed')
+
+
 def disable_gpu():
     """Disable GPU usage on this node.
-
-    This handler fires when we're running in gpu mode, and then the operator
-    sets allow-privileged="false". Since we can no longer run privileged
-    containers, we need to disable gpu mode.
 
     """
     hookenv.log('Disabling gpu mode')
@@ -940,9 +944,6 @@ def disable_gpu():
     # Remove node labels
     remove_label('gpu')
     remove_label('cuda')
-
-    remove_state('kubernetes-worker.gpu.enabled')
-    set_state('kubernetes-worker.restart-needed')
 
 
 @when('kubernetes-worker.gpu.enabled')
