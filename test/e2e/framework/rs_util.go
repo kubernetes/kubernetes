@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,7 @@ import (
 
 type updateRsFunc func(d *extensions.ReplicaSet)
 
-func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*extensions.ReplicaSet, error) {
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
 	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, Logf, Poll, pollShortTimeout)
 }
 
@@ -126,8 +127,8 @@ func RunReplicaSet(config testutils.ReplicaSetConfig) error {
 	return testutils.RunReplicaSet(config)
 }
 
-func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]string, imageName, image string) *extensions.ReplicaSet {
-	return &extensions.ReplicaSet{
+func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]string, imageName, image string) *apps.ReplicaSet {
+	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
 			APIVersion: "extensions/v1beta1",
@@ -136,7 +137,7 @@ func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: apps.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,
 			},
