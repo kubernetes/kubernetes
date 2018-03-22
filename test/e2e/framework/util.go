@@ -2157,7 +2157,6 @@ func (b kubectlBuilder) WithStdinReader(reader io.Reader) *kubectlBuilder {
 
 func (b kubectlBuilder) ExecOrDie() string {
 	str, err := b.Exec()
-	Logf("stdout: %q", str)
 	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
 	// Note that we're still dying after retrying so that we can get visibility to triage it further.
 	if isTimeout(err) {
@@ -2216,6 +2215,7 @@ func (b kubectlBuilder) Exec() (string, error) {
 		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
 	}
 	Logf("stderr: %q", stderr.String())
+	Logf("stdout: %q", stdout.String())
 	return stdout.String(), nil
 }
 
