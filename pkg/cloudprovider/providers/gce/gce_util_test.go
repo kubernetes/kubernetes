@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	compute "google.golang.org/api/compute/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestLastIPInRange(t *testing.T) {
@@ -110,5 +111,43 @@ func TestFirewallToGcloudArgs(t *testing.T) {
 	var e = `--description "Last Line of Defense" --allow tcp:123,tcp:123-456,tcp:321,udp:123,udp:123-456,udp:321 --source-ranges 1.1.1.1/20,2.2.2.2/20,3.3.3.3/20 --target-tags band-nodes,jock-nodes --project my-project`
 	if got != e {
 		t.Errorf("%q does not equal %q", got, e)
+	}
+}
+
+func TestMapNodeNameToInstanceName(t *testing.T) {
+	cloudConfigInstanceName := "vm-instancename"
+	mappedInstanceName := "vm-mapped-instancename"
+	nodeName := "test-node-name"
+
+	testcases := []struct {
+		gce                  *GCECloud
+		expectedInstanceName string
+		errorMessage         string
+	}{
+		{
+			gce:                  &GCECloud{},
+			expectedInstanceName: nodeName,
+			errorMessage:         "Expected instance name (%s) to be same as node name (%s)when there is no other information",
+		},
+		{
+			gce:                  &GCECloud{instanceName: cloudConfigInstanceName},
+			expectedInstanceName: cloudConfigInstanceName,
+			errorMessage:         "Expected instance name (%s) to be the same as provided in cloud config (%s)",
+		},
+		{
+			gce: &GCECloud{
+				instanceName:    cloudConfigInstanceName,
+				instanceNameMap: map[string]string{nodeName: mappedInstanceName},
+			},
+			expectedInstanceName: mappedInstanceName,
+			errorMessage:         "Expected instance name (%s) to be read from the map (%s)",
+		},
+	}
+
+	for _, tc := range testcases {
+		instanceName := tc.gce.mapNodeNameToInstanceName(types.NodeName(nodeName))
+		if instanceName != tc.expectedInstanceName {
+			t.Errorf(tc.errorMessage, instanceName, tc.expectedInstanceName)
+		}
 	}
 }
