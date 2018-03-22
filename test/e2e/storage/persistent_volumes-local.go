@@ -403,6 +403,24 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			By("Deleting provisioner daemonset")
 			deleteProvisionerDaemonset(config)
 		})
+		It("should discover dynamicly created local persistent volume mountpoint in discovery directory", func() {
+			By("Starting a provisioner daemonset")
+			createProvisionerDaemonset(config)
+
+			By("Creating a volume in discovery directory")
+			dynamicVolumePath := path.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
+			setupLocalVolumeProvisionerMountPoint(config, dynamicVolumePath, config.node0)
+
+			By("Waiting for the PersistentVolume to be created")
+			_, err := waitForLocalPersistentVolume(config.client, dynamicVolumePath)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Deleting provisioner daemonset")
+			deleteProvisionerDaemonset(config)
+
+			By("Deleting volume in discovery directory")
+			cleanupLocalVolumeProvisionerMountPoint(config, dynamicVolumePath, config.node0)
+		})
 	})
 
 	Context("StatefulSet with pod anti-affinity", func() {
