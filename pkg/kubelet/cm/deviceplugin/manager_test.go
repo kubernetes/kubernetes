@@ -163,7 +163,8 @@ func TestUpdateCapacity(t *testing.T) {
 	// Adds three devices for resource1, two healthy and one unhealthy.
 	// Expects capacity for resource1 to be 2.
 	resourceName1 := "domain1.com/resource1"
-	testManager.endpoints[resourceName1] = &endpointImpl{devices: make(map[string]pluginapi.Device)}
+	e1 := &endpointImpl{devices: make(map[string]pluginapi.Device)}
+	testManager.endpoints[resourceName1] = e1
 	callback(resourceName1, devs, []pluginapi.Device{}, []pluginapi.Device{})
 	capacity, removedResources := testManager.GetCapacity()
 	resource1Capacity, ok := capacity[v1.ResourceName(resourceName1)]
@@ -199,7 +200,8 @@ func TestUpdateCapacity(t *testing.T) {
 
 	// Tests adding another resource.
 	resourceName2 := "resource2"
-	testManager.endpoints[resourceName2] = &endpointImpl{devices: make(map[string]pluginapi.Device)}
+	e2 := &endpointImpl{devices: make(map[string]pluginapi.Device)}
+	testManager.endpoints[resourceName2] = e2
 	callback(resourceName2, devs, []pluginapi.Device{}, []pluginapi.Device{})
 	capacity, removedResources = testManager.GetCapacity()
 	as.Equal(2, len(capacity))
@@ -208,9 +210,9 @@ func TestUpdateCapacity(t *testing.T) {
 	as.Equal(int64(2), resource2Capacity.Value())
 	as.Equal(0, len(removedResources))
 
-	// Removes resourceName1 endpoint. Verifies testManager.GetCapacity() reports that resourceName1
+	// Expires resourceName1 endpoint. Verifies testManager.GetCapacity() reports that resourceName1
 	// is removed from capacity and it no longer exists in allDevices after the call.
-	delete(testManager.endpoints, resourceName1)
+	e1.setStopTime(time.Now().Add(-1*endpointStopGracePeriod - time.Duration(10)*time.Second))
 	capacity, removed := testManager.GetCapacity()
 	as.Equal([]string{resourceName1}, removed)
 	_, ok = capacity[v1.ResourceName(resourceName1)]
@@ -220,6 +222,44 @@ func TestUpdateCapacity(t *testing.T) {
 	as.Equal(int64(2), val.Value())
 	_, ok = testManager.allDevices[resourceName1]
 	as.False(ok)
+	_, ok = testManager.endpoints[resourceName1]
+	as.False(ok)
+	as.Equal(1, len(testManager.endpoints))
+
+	// Stops resourceName2 endpoint. Verifies its stopTime is set, allocate
+	// call returns errors.
+	e2.stop()
+	as.False(e2.stopTime.IsZero())
+	_, err = e2.allocate([]string{"Device1"})
+	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
+	// Marks resourceName2 unhealthy and verifies its capacity is
+	// correctly updated.
+	testManager.markResourceUnhealthy(resourceName2)
+	capacity, removed = testManager.GetCapacity()
+	val, ok = capacity[v1.ResourceName(resourceName2)]
+	as.True(ok)
+	as.Equal(int64(0), val.Value())
+	as.Empty(removed)
+	// Writes and re-reads checkpoints. Verifies we create a stopped endpoint
+	// for resourceName2, its capacity is set to zero, and we still consider
+	// it as a DevicePlugin resource. This makes sure any pod that was scheduled
+	// during the time of propagating capacity change to the scheduler will be
+	// properly rejected instead of being incorrectly started.
+	err = testManager.writeCheckpoint()
+	as.Nil(err)
+	testManager.allDevices = make(map[string]sets.String)
+	err = testManager.readCheckpoint()
+	as.Nil(err)
+	as.Equal(1, len(testManager.endpoints))
+	_, ok = testManager.endpoints[resourceName2]
+	as.True(ok)
+	capacity, removed = testManager.GetCapacity()
+	val, ok = capacity[v1.ResourceName(resourceName2)]
+	as.True(ok)
+	as.Equal(int64(0), val.Value())
+	as.Empty(removed)
+	_, registeredResource := testManager.allDevices[resourceName2]
+	as.True(registeredResource)
 }
 
 type stringPairType struct {
@@ -268,6 +308,7 @@ func TestCheckpoint(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	testManager := &ManagerImpl{
 		socketdir:        tmpDir,
+		endpoints:        make(map[string]endpoint),
 		allDevices:       make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
@@ -347,8 +388,10 @@ type MockEndpoint struct {
 	allocateFunc func(devs []string) (*pluginapi.AllocateResponse, error)
 }
 
-func (m *MockEndpoint) stop() {}
-func (m *MockEndpoint) run()  {}
+func (m *MockEndpoint) stop()                        {}
+func (m *MockEndpoint) run()                         {}
+func (m *MockEndpoint) isStopped() bool              { return false }
+func (m *MockEndpoint) stopGracePeriodExpired() bool { return false }
 
 func (m *MockEndpoint) getDevices() []pluginapi.Device {
 	return []pluginapi.Device{}

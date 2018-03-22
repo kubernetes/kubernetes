@@ -103,6 +103,10 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 			By("Restarting Kubelet and creating another pod")
 			restartKubelet(f)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			Eventually(func() bool {
+				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 10*time.Second, framework.Poll).Should(BeTrue())
 			p2 := f.PodClient().CreateSync(makeCudaPauseImage())
 
 			By("Checking that pods got a different GPU")

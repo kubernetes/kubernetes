@@ -17,6 +17,8 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -84,6 +86,8 @@ const (
 	errInvalidResourceName = "the ResourceName %q is invalid"
 	// errEmptyResourceName is the error raised when the resource name field is empty
 	errEmptyResourceName = "invalid Empty ResourceName"
+	// errEndpointStopped indicates that the endpoint has been stopped
+	errEndpointStopped = "endpoint %v has been stopped"
 
 	// errBadSocket is the error raised when the registry socket path is not absolute
 	errBadSocket = "bad socketPath, must be an absolute path:"
@@ -94,3 +98,9 @@ const (
 	// errListAndWatch is the error raised when ListAndWatch ended unsuccessfully
 	errListAndWatch = "listAndWatch ended unexpectedly for device plugin %s with error %v"
 )
+
+// endpointStopGracePeriod indicates the grace period after an endpoint is stopped
+// because its device plugin fails. DeviceManager keeps the stopped endpoint in its
+// cache during this grace period to cover the time gap for the capacity change to
+// take effect.
+const endpointStopGracePeriod = time.Duration(5) * time.Minute

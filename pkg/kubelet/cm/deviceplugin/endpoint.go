@@ -38,6 +38,8 @@ type endpoint interface {
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
 	getDevices() []pluginapi.Device
 	callback(resourceName string, added, updated, deleted []pluginapi.Device)
+	isStopped() bool
+	stopGracePeriodExpired() bool
 }
 
 type endpointImpl struct {
@@ -46,6 +48,7 @@ type endpointImpl struct {
 
 	socketPath   string
 	resourceName string
+	stopTime     time.Time
 
 	devices map[string]pluginapi.Device
 	mutex   sync.Mutex
@@ -54,6 +57,7 @@ type endpointImpl struct {
 }
 
 // newEndpoint creates a new endpoint for the given resourceName.
+// This is to be used during normal device plugin registration.
 func newEndpointImpl(socketPath, resourceName string, devices map[string]pluginapi.Device, callback monitorCallback) (*endpointImpl, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
@@ -71,6 +75,16 @@ func newEndpointImpl(socketPath, resourceName string, devices map[string]plugina
 		devices: devices,
 		cb:      callback,
 	}, nil
+}
+
+// newStoppedEndpointImpl creates a new endpoint for the given resourceName with stopTime set.
+// This is to be used during Kubelet restart, before the actual device plugin re-registers.
+func newStoppedEndpointImpl(resourceName string, devices map[string]pluginapi.Device) *endpointImpl {
+	return &endpointImpl{
+		resourceName: resourceName,
+		devices:      devices,
+		stopTime:     time.Now(),
+	}
 }
 
 func (e *endpointImpl) callback(resourceName string, added, updated, deleted []pluginapi.Device) {
@@ -171,15 +185,42 @@ func (e *endpointImpl) run() {
 	}
 }
 
+func (e *endpointImpl) isStopped() bool {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	return !e.stopTime.IsZero()
+}
+
+func (e *endpointImpl) stopGracePeriodExpired() bool {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	return !e.stopTime.IsZero() && time.Since(e.stopTime) > endpointStopGracePeriod
+}
+
+// used for testing only
+func (e *endpointImpl) setStopTime(t time.Time) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	e.stopTime = t
+}
+
 // allocate issues Allocate gRPC call to the device plugin.
 func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+	if e.isStopped() {
+		return nil, fmt.Errorf(errEndpointStopped, e)
+	}
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
 		DevicesIDs: devs,
 	})
 }
 
 func (e *endpointImpl) stop() {
-	e.clientConn.Close()
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	if e.clientConn != nil {
+		e.clientConn.Close()
+	}
+	e.stopTime = time.Now()
 }
 
 // dial establishes the gRPC communication with the registered device plugin.
