@@ -28,6 +28,8 @@ import (
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	computev1 "google.golang.org/api/compute/v1"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -664,5 +666,88 @@ func TestLastComponent(t *testing.T) {
 		if result != output {
 			t.Errorf("Actual result %q does not match expected result %q for input: %q", result, output, input)
 		}
+	}
+}
+
+func TestAddNodeToInstanceMap(t *testing.T) {
+	gce := GCECloud{instanceNameMap: map[string]string{}}
+
+	cases := []struct {
+		providerID           string
+		expectedInstanceName string
+		errorExpected        bool
+	}{
+		{providerID: "gce://project/zone/a", expectedInstanceName: "a", errorExpected: false},
+		{providerID: "gce://project/zone/b", expectedInstanceName: "b", errorExpected: false},
+		{providerID: "Invalid Provider ID", expectedInstanceName: "", errorExpected: true},
+	}
+
+	for _, tc := range cases {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "nodename"},
+			Spec:       v1.NodeSpec{ProviderID: tc.providerID},
+		}
+
+		err := gce.addNodeToInstanceMap(node)
+
+		if tc.errorExpected {
+			if err == nil {
+				t.Errorf("Expected error did not occur for input: %q", tc.providerID)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Unexpected error occurred %q for input: %q", err.Error(), tc.providerID)
+			}
+
+			instanceNameFromMap := gce.instanceNameMap[node.Name]
+			if instanceNameFromMap != tc.expectedInstanceName {
+				t.Errorf("Actual result %q does not match expected result %q for input %q", instanceNameFromMap, tc.expectedInstanceName, tc.providerID)
+			}
+		}
+	}
+}
+
+func TestAddNilNodeToInstanceMap(t *testing.T) {
+	gce := GCECloud{instanceNameMap: map[string]string{"node1": "instancename1"}}
+
+	err := gce.addNodeToInstanceMap(nil)
+
+	if err != nil {
+		t.Errorf("Unexpected error occurred on adding nil node to instance map")
+	}
+
+	if len(gce.instanceNameMap) != 1 {
+		t.Errorf("Expected instanceNameMap to be unchanged on adding nil node")
+	}
+}
+
+func TestDeleteNodeFromInstanceMap(t *testing.T) {
+	gce := GCECloud{instanceNameMap: map[string]string{"node1": "instancename1", "node2": "instancename2"}}
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+	}
+	gce.deleteNodeFromInstanceMap(node1)
+	_, ok := gce.instanceNameMap[node1.Name]
+	if ok {
+		t.Errorf("Expected node %q to be deleted from instanceNameMap", node1.Name)
+	}
+
+	instanceName2, ok := gce.instanceNameMap["node2"]
+	if !ok {
+		t.Errorf("Expected node %q to be present in instanceNameMap", "node2")
+	}
+
+	if instanceName2 != "instancename2" {
+		t.Errorf("Expected %q to equal %q", instanceName2, "instanceName2")
+	}
+}
+
+func TestDeleteNilNodeFromInstanceMap(t *testing.T) {
+	gce := GCECloud{instanceNameMap: map[string]string{"node1": "instancename1"}}
+
+	gce.deleteNodeFromInstanceMap(nil)
+
+	if len(gce.instanceNameMap) != 1 {
+		t.Errorf("Expected instanceNameMap to be unchanged on deleting nil node")
 	}
 }
