@@ -144,6 +144,11 @@ type GCECloud struct {
 	// lock to prevent shared resources from being prematurely deleted while the operation is
 	// in progress.
 	sharedResourceLock sync.Mutex
+	// instanceName is used for setting the GCE instance name of the node
+	// when the node name is not the same as the instance name
+	instanceName        string
+	instanceNameMap     map[string]string // Map of node names to instance names
+	instanceNameMapLock sync.Mutex        // Lock for access to instanceNameMap
 	// AlphaFeatureGate gates gce alpha features in GCECloud instance.
 	// Related wrapper functions that interacts with gce alpha api should examine whether
 	// the corresponding api is enabled.
@@ -179,6 +184,8 @@ type ConfigGlobal struct {
 	// located in (i.e. where the controller will be running). If this is
 	// blank, then the local zone will be discovered via the metadata server.
 	LocalZone string `gcfg:"local-zone"`
+	// InstanceName specifies the GCE instance name of the node
+	InstanceName string `gcfg:"instance-name"`
 	// Default to none.
 	// For example: MyFeatureFlag
 	AlphaFeatures []string `gcfg:"alpha-features"`
@@ -206,6 +213,7 @@ type CloudConfig struct {
 	NodeInstancePrefix string
 	TokenSource        oauth2.TokenSource
 	UseMetadataServer  bool
+	InstanceName       string
 	AlphaFeatureGate   *AlphaFeatureGate
 }
 
@@ -364,6 +372,10 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 		cloudConfig.SecondaryRangeName = configFile.Global.SecondaryRangeName
 	}
 
+	if configFile != nil {
+		cloudConfig.InstanceName = configFile.Global.InstanceName
+	}
+
 	return cloudConfig, err
 }
 
@@ -519,6 +531,8 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		operationPollRateLimiter: operationPollRateLimiter,
 		AlphaFeatureGate:         config.AlphaFeatureGate,
 		nodeZones:                map[string]sets.String{},
+		instanceName:             config.InstanceName,
+		instanceNameMap:          map[string]string{},
 	}
 
 	gce.manager = &gceServiceManager{gce}
@@ -669,6 +683,9 @@ func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactor
 		AddFunc: func(obj interface{}) {
 			node := obj.(*v1.Node)
 			gce.updateNodeZones(nil, node)
+			if err := gce.addNodeToInstanceMap(node); err != nil {
+				glog.Errorf("Received invalid object: %v. Encountered error: %s", node, err.Error())
+			}
 		},
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
@@ -678,6 +695,10 @@ func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactor
 				return
 			}
 			gce.updateNodeZones(prevNode, newNode)
+			gce.deleteNodeFromInstanceMap(prevNode)
+			if err := gce.addNodeToInstanceMap(newNode); err != nil {
+				glog.Errorf("Received invalid object: %v. Encountered error: %s", newNode, err.Error())
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			node, isNode := obj.(*v1.Node)
@@ -696,6 +717,7 @@ func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactor
 				}
 			}
 			gce.updateNodeZones(node, nil)
+			gce.deleteNodeFromInstanceMap(node)
 		},
 	})
 	gce.nodeInformerSynced = nodeInformer.HasSynced
@@ -721,6 +743,30 @@ func (gce *GCECloud) updateNodeZones(prevNode, newNode *v1.Node) {
 			}
 			gce.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
 		}
+	}
+}
+
+func (gce *GCECloud) addNodeToInstanceMap(newNode *v1.Node) error {
+	gce.instanceNameMapLock.Lock()
+	defer gce.instanceNameMapLock.Unlock()
+
+	if newNode != nil {
+		instanceName, err := getInstanceName(newNode.Spec.ProviderID)
+		if err != nil {
+			return err
+		}
+		gce.instanceNameMap[newNode.Name] = instanceName
+	}
+
+	return nil
+}
+
+func (gce *GCECloud) deleteNodeFromInstanceMap(prevNode *v1.Node) {
+	gce.instanceNameMapLock.Lock()
+	defer gce.instanceNameMapLock.Unlock()
+
+	if prevNode != nil {
+		delete(gce.instanceNameMap, prevNode.Name)
 	}
 }
 

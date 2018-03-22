@@ -157,7 +157,7 @@ func (gce *GCECloud) InstanceTypeByProviderID(ctx context.Context, providerID st
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
 func (gce *GCECloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
 		if gce.isCurrentInstance(instanceName) {
@@ -192,7 +192,7 @@ func (gce *GCECloud) InstanceExistsByProviderID(ctx context.Context, providerID 
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
 		if gce.isCurrentInstance(instanceName) {
@@ -211,7 +211,7 @@ func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (s
 
 // InstanceType returns the type of the specified node with the specified NodeName.
 func (gce *GCECloud) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
 		if gce.isCurrentInstance(instanceName) {
@@ -350,7 +350,7 @@ func (gce *GCECloud) CurrentNodeName(ctx context.Context, hostname string) (type
 // "<ip>/<netmask>".
 func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error) {
 	var instance *gceInstance
-	instance, err = gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	instance, err = gce.getInstanceByName(gce.mapNodeNameToInstanceName(nodeName))
 	if err != nil {
 		return
 	}
@@ -373,7 +373,7 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 // secondary range.
 func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) error {
 
-	v1instance, err := gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	v1instance, err := gce.getInstanceByName(gce.mapNodeNameToInstanceName(nodeName))
 	if err != nil {
 		return err
 	}

@@ -523,7 +523,7 @@ func (gce *GCECloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool, regional bool) error {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		return fmt.Errorf("error getting instance %q", instanceName)
@@ -566,7 +566,7 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 }
 
 func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) error {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	inst, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
@@ -591,7 +591,7 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 }
 
 func (gce *GCECloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
@@ -621,7 +621,7 @@ func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeNam
 	for _, diskName := range diskNames {
 		attached[diskName] = false
 	}
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {

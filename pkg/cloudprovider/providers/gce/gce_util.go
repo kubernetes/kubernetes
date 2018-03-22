@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -133,9 +135,24 @@ func lastComponent(s string) string {
 }
 
 // mapNodeNameToInstanceName maps a k8s NodeName to a GCE Instance Name
-// This is a simple string cast.
-func mapNodeNameToInstanceName(nodeName types.NodeName) string {
-	return string(nodeName)
+func (gce *GCECloud) mapNodeNameToInstanceName(nodeName types.NodeName) string {
+	instanceName, ok := gce.instanceNameMap[string(nodeName)]
+	if !ok {
+		if gce.instanceName == "" {
+			instanceName = string(nodeName)
+		} else {
+			instanceName = gce.instanceName
+		}
+	}
+	return instanceName
+}
+
+func getInstanceName(providerID string) (string, error) {
+	u, err := url.Parse(providerID)
+	if err != nil {
+		return "", err
+	}
+	return path.Base(u.Path), nil
 }
 
 // mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
