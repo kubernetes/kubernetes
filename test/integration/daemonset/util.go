@@ -295,9 +295,6 @@ func listDaemonSetHistories(controllerRevisionClient appstyped.ControllerRevisio
 	if err != nil {
 		t.Fatalf("failed to list daemonset histories: %v", err)
 	}
-	if len(historyList.Items) == 0 {
-		t.Fatalf("failed to locate any daemonset history")
-	}
 	return historyList
 }
 
