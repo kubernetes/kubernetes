@@ -186,15 +186,11 @@ func (o *ConvertOptions) RunConvert() error {
 	}
 
 	if meta.IsListType(objects) {
-		_, items, err := cmdutil.FilterResourceList(objects, nil, nil)
+		obj, err := objectListToVersionedObject([]runtime.Object{objects}, o.specifiedOutputVersion)
 		if err != nil {
 			return err
 		}
-		filteredObj, err := objectListToVersionedObject(items, o.specifiedOutputVersion)
-		if err != nil {
-			return err
-		}
-		return o.printer.PrintObj(filteredObj, o.out)
+		return o.printer.PrintObj(obj, o.out)
 	}
 
 	return o.printer.PrintObj(objects, o.out)

@@ -441,47 +441,15 @@ func Example_printPodShowTerminated() {
 	}
 	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
-	// filter pods
-	filterFuncs := tf.DefaultResourceFilterFunc()
-	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
-	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
-	if errs != nil {
-		fmt.Printf("Unexpected filter error: %v\n", errs)
-	}
 	printer, err := cmdutil.PrinterForOptions(cmdutil.ExtractCmdPrintOptions(cmd, false))
 	if err != nil {
-		fmt.Printf("Unexpected printer get error: %v\n", errs)
+		fmt.Printf("Unexpected printer get error: %v\n", err)
 	}
-	for _, pod := range filteredPodList {
+	for _, pod := range []runtime.Object{podList} {
 		err := printer.PrintObj(pod, os.Stdout)
 		if err != nil {
 			fmt.Printf("Unexpected error: %v", err)
 		}
-	}
-	// Output:
-	// NAME      READY     STATUS    RESTARTS   AGE
-	// test1     1/2       Pending   6          10y
-	// test2     1/2       Running   6         10y
-	// test3     1/2       Succeeded   6         10y
-	// test4     1/2       Failed    6         10y
-	// test5     1/2       Unknown   6         10y
-}
-
-func Example_printPodShowAll() {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-
-	ns := legacyscheme.Codecs
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client:               nil,
-	}
-	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
-	podList := newAllPhasePodList()
-	err := cmdutil.PrintObject(cmd, podList, os.Stdout)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
 	// NAME      READY     STATUS      RESTARTS   AGE

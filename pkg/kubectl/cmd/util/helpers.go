@@ -43,10 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/printers"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -687,56 +685,6 @@ func MustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *k
 	}
 
 	return false
-}
-
-// FilterResourceList receives a list of runtime objects.
-// If any objects are filtered, that number is returned along with a modified list.
-func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterOpts *printers.PrintOptions) (int, []runtime.Object, error) {
-	items, err := meta.ExtractList(obj)
-	if err != nil {
-		return 0, []runtime.Object{obj}, utilerrors.NewAggregate([]error{err})
-	}
-	if errs := runtime.DecodeList(items, legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme); len(errs) > 0 {
-		return 0, []runtime.Object{obj}, utilerrors.NewAggregate(errs)
-	}
-
-	filterCount := 0
-	list := make([]runtime.Object, 0, len(items))
-	for _, obj := range items {
-		if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
-			if err != nil {
-				glog.V(2).Infof("Unable to filter resource: %v", err)
-				continue
-			}
-			list = append(list, obj)
-		} else if isFiltered {
-			filterCount++
-		}
-	}
-	return filterCount, list, nil
-}
-
-// PrintFilterCount displays informational messages based on the number of resources found, hidden, or
-// config flags shown.
-func PrintFilterCount(out io.Writer, found, hidden, errors int, options *printers.PrintOptions, ignoreNotFound bool) {
-	switch {
-	case errors > 0 || ignoreNotFound:
-		// print nothing
-	case found <= hidden:
-		if found == 0 {
-			fmt.Fprintln(out, "No resources found.")
-		} else {
-			fmt.Fprintln(out, "No resources found, use --show-all to see completed objects.")
-		}
-	case hidden > 0 && !options.ShowAll && !options.NoHeaders:
-		if glog.V(2) {
-			if hidden > 1 {
-				fmt.Fprintf(out, "info: %d objects not shown, use --show-all to see completed objects.\n", hidden)
-			} else {
-				fmt.Fprintf(out, "info: 1 object not shown, use --show-all to see completed objects.\n")
-			}
-		}
-	}
 }
 
 // IsSiblingCommandExists receives a pointer to a cobra command and a target string.
