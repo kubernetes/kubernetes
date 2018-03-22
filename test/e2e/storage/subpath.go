@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -60,7 +61,7 @@ var initVolSources = map[string]func() volSource{
 	"hostPath":         initHostpath,
 	"hostPathSymlink":  initHostpathSymlink,
 	"emptyDir":         initEmptydir,
-	"gcePD":            initGCEPD,
+	"gcePDPVC":         initGCEPD,
 	"gcePDPartitioned": initGCEPDPartition,
 	"nfs":              initNFS,
 	"nfsPVC":           initNFSPVC,
@@ -307,6 +308,17 @@ var _ = utils.SIGDescribe("Subpath", func() {
 
 				testPodContainerRestart(f, pod, filePathInVolume, filePathInSubpath)
 			})
+
+			It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow]", func() {
+				testSubpathReconstruction(f, pod, false)
+			})
+
+			It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow]", func() {
+				if curVolType == "hostPath" || curVolType == "hostPathSymlink" {
+					framework.Skipf("%s volume type does not support reconstruction, skipping", curVolType)
+				}
+				testSubpathReconstruction(f, pod, true)
+			})
 		})
 	}
 
@@ -547,6 +559,85 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod, fileInVolume, 
 	framework.Logf("Pod exec output: %v", out)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(strings.TrimSpace(out)).To(BeEquivalentTo("test-after"))
+}
+
+func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete bool) {
+	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
+
+	// Change to busybox
+	pod.Spec.Containers[0].Image = "busybox"
+	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+	pod.Spec.Containers[1].Image = "busybox"
+	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+
+	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, time.Minute)
+	Expect(err).ToNot(HaveOccurred())
+
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+	Expect(err).ToNot(HaveOccurred())
+
+	nodeIP, err := framework.GetHostExternalAddress(f.ClientSet, pod)
+	Expect(err).NotTo(HaveOccurred())
+	nodeIP = nodeIP + ":22"
+
+	By("Expecting the volume mount to be found.")
+	result, err := framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", pod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+	Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+
+	By("Expecting the subpath volume mount to be found.")
+	result, err = framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep volume-subpaths | grep %s", pod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+	Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+
+	By("Stopping the kubelet.")
+	utils.KubeletCommand(utils.KStop, f.ClientSet, pod)
+	defer func() {
+		if err != nil {
+			utils.KubeletCommand(utils.KStart, f.ClientSet, pod)
+		}
+	}()
+
+	By(fmt.Sprintf("Deleting Pod %q", pod.Name))
+	if forceDelete {
+		err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+	} else {
+		err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Starting the kubelet and waiting for pod to delete.")
+	utils.KubeletCommand(utils.KStart, f.ClientSet, pod)
+	err = f.WaitForPodTerminated(pod.Name, "")
+	if !apierrs.IsNotFound(err) && err != nil {
+		Expect(err).NotTo(HaveOccurred(), "Expected pod to terminate.")
+	}
+
+	if forceDelete {
+		// With forceDelete, since pods are immediately deleted from API server, there is no way to be sure when volumes are torn down
+		// so wait some time to finish
+		time.Sleep(30 * time.Second)
+	}
+
+	By("Expecting the volume mount not to be found.")
+	result, err = framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", pod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+	Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
+	framework.Logf("Volume unmounted on node %s", pod.Spec.NodeName)
+
+	By("Expecting the subpath volume mount not to be found.")
+	result, err = framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep volume-subpaths | grep %s", pod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+	Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
+	framework.Logf("Subpath volume unmounted on node %s", pod.Spec.NodeName)
 }
 
 func podContainerExec(pod *v1.Pod, containerIndex int, bashExec string) (string, error) {
