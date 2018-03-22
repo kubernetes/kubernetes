@@ -124,7 +124,7 @@ func pbDecrypt(info decryptable, password []byte) (decrypted []byte, err error) 
 	return
 }
 
-// decryptable abstracts a object that contains ciphertext.
+// decryptable abstracts an object that contains ciphertext.
 type decryptable interface {
 	Algorithm() pkix.AlgorithmIdentifier
 	Data() []byte
