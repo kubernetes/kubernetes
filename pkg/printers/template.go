@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +34,10 @@ type TemplatePrinter struct {
 
 func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 	t, err := template.New("output").
-		Funcs(template.FuncMap{"exists": exists}).
+		Funcs(template.FuncMap{
+			"exists":       exists,
+			"base64decode": base64decode,
+		}).
 		Parse(string(tmpl))
 	if err != nil {
 		return nil, err
@@ -111,4 +115,12 @@ func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
 		return panicErr
 	}
 	return retErr
+}
+
+func base64decode(v string) (string, error) {
+	data, err := base64.StdEncoding.DecodeString(v)
+	if err != nil {
+		return "", fmt.Errorf("base64 decode failed: %v", err)
+	}
+	return string(data), nil
 }
