@@ -36,6 +36,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 type testConfig struct {
@@ -361,13 +363,21 @@ func TestPVAffinityConflict(t *testing.T) {
 	}
 }
 
-func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
-	// Enable feature gates
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true,PersistentLocalVolumes=true")
+func setupClusterWithOptions(
+	t *testing.T,
+	nsName string,
+	numberOfNodes int,
+	policy *schedulerapi.Policy,
+	featureStr string,
+) *testConfig {
+	if len(featureStr) != 0 {
+		// Enable feature gates
+		utilfeature.DefaultFeatureGate.Set(featureStr)
+	}
 
 	controllerCh := make(chan struct{})
 
-	context := initTestScheduler(t, initTestMaster(t, nsName, nil), controllerCh, false, nil)
+	context := initTestScheduler(t, initTestMaster(t, nsName, nil), controllerCh, false, policy)
 
 	clientset := context.clientSet
 	ns := context.ns.Name
@@ -398,8 +408,10 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 	for i := 0; i < numberOfNodes; i++ {
 		testNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   fmt.Sprintf("node-%d", i+1),
-				Labels: map[string]string{nodeAffinityLabelKey: fmt.Sprintf("node-%d", i+1)},
+				Name: fmt.Sprintf("node-%d", i+1),
+				Labels: map[string]string{
+					nodeAffinityLabelKey:        fmt.Sprintf("node-%d", i+1),
+					kubeletapis.LabelZoneRegion: testRegion},
 			},
 			Spec: v1.NodeSpec{Unschedulable: false},
 			Status: v1.NodeStatus{
@@ -432,16 +444,33 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		}
 	}
 
-	return &testConfig{
+	config := &testConfig{
 		client: clientset,
 		ns:     ns,
 		stop:   controllerCh,
 		teardown: func() {
 			deleteTestObjects(clientset, ns, nil)
 			cleanupTest(t, context)
-			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,LocalPersistentVolumes=false")
 		},
 	}
+
+	if len(featureStr) != 0 {
+		config.teardown = func() {
+			clientset.CoreV1().Pods(ns).DeleteCollection(nil, metav1.ListOptions{})
+			clientset.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(nil, metav1.ListOptions{})
+			clientset.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
+			clientset.StorageV1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
+			cleanupTest(t, context)
+			utilfeature.DefaultFeatureGate.Set(featureStr)
+		}
+	}
+
+	return config
+}
+
+func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
+	return setupClusterWithOptions(
+		t, nsName, numberOfNodes, nil, "VolumeScheduling=true,PersistentLocalVolumes=true")
 }
 
 func deleteTestObjects(client clientset.Interface, ns string, option *metav1.DeleteOptions) {
