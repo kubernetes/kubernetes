@@ -48,14 +48,14 @@ func TestMutatePodSpec(t *testing.T) {
 					{
 						Name: "kube-apiserver",
 						Command: []string{
-							"--advertise-address=$(HOST_IP)",
+							"--advertise-address=$(POD_IP)",
 						},
 						Env: []v1.EnvVar{
 							{
-								Name: "HOST_IP",
+								Name: "POD_IP",
 								ValueFrom: &v1.EnvVarSource{
 									FieldRef: &v1.ObjectFieldSelector{
-										FieldPath: "status.hostIP",
+										FieldPath: "status.podIP",
 									},
 								},
 							},
@@ -68,6 +68,7 @@ func TestMutatePodSpec(t *testing.T) {
 				},
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
+					kubeadmconstants.CloudProviderUninitializedToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -81,6 +82,7 @@ func TestMutatePodSpec(t *testing.T) {
 				},
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
+					kubeadmconstants.CloudProviderUninitializedToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -94,6 +96,7 @@ func TestMutatePodSpec(t *testing.T) {
 				},
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
+					kubeadmconstants.CloudProviderUninitializedToleration,
 				},
 				DNSPolicy: v1.DNSClusterFirstWithHostNet,
 			},
@@ -156,6 +159,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 			expected: v1.PodSpec{
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
+					kubeadmconstants.CloudProviderUninitializedToleration,
 				},
 			},
 		},
@@ -169,6 +173,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 				Tolerations: []v1.Toleration{
 					{Key: "foo", Value: "bar"},
 					kubeadmconstants.MasterToleration,
+					kubeadmconstants.CloudProviderUninitializedToleration,
 				},
 			},
 		},
@@ -213,7 +218,7 @@ func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 	}
 }
 
-func TestSetHostIPOnPodSpec(t *testing.T) {
+func TestSetPodIPOnPodSpec(t *testing.T) {
 	var tests = []struct {
 		podSpec  *v1.PodSpec
 		expected v1.PodSpec
@@ -235,17 +240,17 @@ func TestSetHostIPOnPodSpec(t *testing.T) {
 					{
 						Name: "kube-apiserver",
 						Command: []string{
-							"--advertise-address=$(HOST_IP)",
+							"--advertise-address=$(POD_IP)",
 						},
 						Env: []v1.EnvVar{
-							{
-								Name: "HOST_IP",
-								ValueFrom: &v1.EnvVarSource{
-									FieldRef: &v1.ObjectFieldSelector{
-										FieldPath: "status.hostIP",
-									},
+						{
+							Name: "POD_IP",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "status.podIP",
 								},
 							},
+						},
 						},
 					},
 				},
@@ -254,10 +259,10 @@ func TestSetHostIPOnPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setHostIPOnPodSpec(rt.podSpec)
+		setPodIPOnPodSpec(rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
-			t.Errorf("failed setHostIPOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+			t.Errorf("failed setPodIPOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
 		}
 	}
 }
