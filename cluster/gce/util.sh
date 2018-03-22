@@ -732,6 +732,7 @@ ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_THR
 ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-})
 GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 GCE_GLBC_IMAGE: $(yaml-quote ${GCE_GLBC_IMAGE:-})
+ENABLE_NODE_JOURNAL: $(yaml-quote ${ENABLE_NODE_JOURNAL:-false})
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
@@ -1400,7 +1401,7 @@ function get-template-name-from-version() {
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
-# validates the NODE_LOCAL_SSDS_EXT variable 
+# validates the NODE_LOCAL_SSDS_EXT variable
 function validate-node-local-ssds-ext(){
   ssdopts="${1}"
 
@@ -1476,7 +1477,7 @@ function create-node-template() {
       done
     done
   fi
-  
+
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
     # Some versions of seq will count down from 1 if "seq 0" is specified
@@ -1486,7 +1487,7 @@ function create-node-template() {
       done
     fi
   fi
-  
+
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \

@@ -2008,6 +2008,15 @@ function update-container-runtime {
   sed -i -e "s@{{ *container_runtime *}}@${CONTAINER_RUNTIME_NAME:-docker}@g" "${configmap_yaml}"
 }
 
+# Remove configuration in yaml file if node journal is not enabled.
+function update-node-journal {
+  local -r configmap_yaml="$1"
+  if [[ "${ENABLE_NODE_JOURNAL:-}" != "true" ]]; then
+    # Removes all lines between two patterns (throws away node-journal)
+    sed -i -e "/# BEGIN_NODE_JOURNAL/,/# END_NODE_JOURNAL/d" "${configmap_yaml}"
+  fi
+}
+
 # Updates parameters in yaml file for prometheus-to-sd configuration, or
 # removes component if it is disabled.
 function update-prometheus-to-sd-parameters {
@@ -2187,6 +2196,7 @@ EOF
     update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
     start-fluentd-resource-update ${fluentd_gcp_yaml}
     update-container-runtime ${fluentd_gcp_configmap_yaml}
+    update-node-journal ${fluentd_gcp_configmap_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
