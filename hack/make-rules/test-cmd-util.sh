@@ -78,6 +78,7 @@ customresourcedefinitions="customresourcedefinitions"
 daemonsets="daemonsets"
 controllerrevisions="controllerrevisions"
 job="jobs"
+podsecuritypolicies="podsecuritypolicies"
 
 
 # include shell2junit library
@@ -4047,6 +4048,24 @@ run_job_tests() {
   set +o errexit
 }
 
+run_pod_security_policy_tests() {
+  set -o nounset
+  set -o errexit
+
+  kube::log::status "Testing pod security policy"
+
+  ### Create a pod security policy
+  # Command
+  kubectl create podsecuritypolicy test-pod-security-policy
+  # Post-condition: pod security policy and has expected values
+  kube::test::get_object_assert 'podsecuritypolicy/test-pod-security-policy' "{{$id_field}}" 'test-pod-security-policy'
+  # Clean-up
+  kubectl delete podsecuritypolicy test-pod-security-policy --namespace=test-pod-security-policies
+
+  set +o nounset
+  set +o errexit
+}
+
 run_pod_templates_tests() {
   set -o nounset
   set -o errexit
@@ -5027,6 +5046,14 @@ runTests() {
 
   if kube::test::if_supports_resource "${job}" ; then
     record_command run_job_tests
+  fi
+
+  ####################
+  # PodSecurityPolicy#
+  ####################
+
+  if kube::test::if_supports_resource "${namespaces}" && kube::test::if_supports_resource "${podsecuritypolicies}" ; then
+    record_command run_pod_security_policy_tests
   fi
 
   #################
