@@ -155,6 +155,9 @@ type ActualStateOfWorld interface {
 	// mounted for the specified pod as requiring file system resize (if the plugin for the
 	// volume indicates it requires file system resize).
 	MarkFSResizeRequired(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName)
+
+	// Returns true if the given volume is attached and being set up
+	IsVolumeBeingSetUp(volumeName v1.UniqueVolumeName) bool
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -258,6 +261,9 @@ type attachedVolume struct {
 	// deviceMountPath contains the path on the node where the device should
 	// be mounted after it is attached.
 	deviceMountPath string
+
+	// Whether the volume is currently being set up (mount in progress)
+	inSetUp bool
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager
@@ -343,6 +349,44 @@ func (asw *actualStateOfWorld) RemoveVolumeFromReportAsAttached(volumeName v1.Un
 	return nil
 }
 
+// Marks the specified volume as being set up
+func (asw *actualStateOfWorld) MarkVolumeAsBeingSetUp(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if volumeExists {
+		volumeObj.inSetUp = true
+		asw.attachedVolumes[volumeName] = volumeObj
+	} else {
+		glog.Errorf("Failed to mark volume %v as being set up: volume not attached", volumeName)
+	}
+}
+
+func (asw *actualStateOfWorld) IsVolumeBeingSetUp(volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if volumeExists {
+		return volumeObj.inSetUp
+	}
+	glog.Errorf("Failed to mark volume %v set up as finished: volume not attached", volumeName)
+
+	return false
+}
+
+// Unmarks the specified volume as being set up
+func (asw *actualStateOfWorld) MarkVolumeAsSetUpFinished(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if volumeExists {
+		volumeObj.inSetUp = false
+		asw.attachedVolumes[volumeName] = volumeObj
+	}
+}
+
 func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 	podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error {
 	return asw.DeletePodFromVolume(podName, volumeName)
@@ -403,6 +447,7 @@ func (asw *actualStateOfWorld) addVolume(
 			pluginIsAttachable: pluginIsAttachable,
 			globallyMounted:    false,
 			devicePath:         devicePath,
+			inSetUp:            false,
 		}
 	} else {
 		// If volume object already exists, update the fields such as device path

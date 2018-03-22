@@ -178,6 +178,12 @@ type ActualStateOfWorldMounterUpdater interface {
 
 	// Marks the specified volume's file system resize request is finished.
 	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
+
+	// Marks the specified volume as being set up
+	MarkVolumeAsBeingSetUp(volumeName v1.UniqueVolumeName)
+
+	// Unmarks the specified volume as being set up
+	MarkVolumeAsSetUpFinished(volumeName v1.UniqueVolumeName)
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the

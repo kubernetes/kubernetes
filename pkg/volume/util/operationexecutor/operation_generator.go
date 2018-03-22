@@ -544,8 +544,10 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 		}
 
+		actualStateOfWorld.MarkVolumeAsBeingSetUp(volumeToMount.VolumeName)
 		// Execute mount
 		mountErr := volumeMounter.SetUp(fsGroup)
+		actualStateOfWorld.MarkVolumeAsSetUpFinished(volumeToMount.VolumeName)
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)

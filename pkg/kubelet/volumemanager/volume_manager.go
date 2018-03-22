@@ -369,6 +369,8 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			return nil
 		}
 
+		vm.addUnmountedVolumesStatus(unmountedVolumes)
+
 		return fmt.Errorf(
 			"timeout expired waiting for volumes to attach or mount for pod %q/%q. list of unmounted volumes=%v. list of unattached volumes=%v",
 			pod.Namespace,
@@ -379,6 +381,27 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 
 	glog.V(3).Infof("All volumes are attached and mounted for pod %q", format.Pod(pod))
 	return nil
+}
+
+// Figure out the volume's unique name to find out whether it's still being set-up
+func (vm *volumeManager) isVolumeBeingSetUp(outerVolumeSpecName string, volumesToMount []cache.VolumeToMount) bool {
+	for _, volumeToMount := range volumesToMount {
+		if volumeToMount.OuterVolumeSpecName == outerVolumeSpecName {
+			return vm.actualStateOfWorld.IsVolumeBeingSetUp(volumeToMount.VolumeName)
+		}
+	}
+	return false
+}
+
+// If the unmounted volume is known to be waiting for the SetUp() to finish, add a note so the user
+// knows the reason for the mount time-out
+func (vm *volumeManager) addUnmountedVolumesStatus(unmountedVolumes []string) {
+	volumesToMount := vm.desiredStateOfWorld.GetVolumesToMount()
+	for i, volume := range unmountedVolumes {
+		if vm.isVolumeBeingSetUp(volume, volumesToMount) {
+			unmountedVolumes[i] = fmt.Sprintf("%s (volume is still being set up)", volume)
+		}
+	}
 }
 
 // getUnattachedVolumes returns a list of the volumes that are expected to be attached but
