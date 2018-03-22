@@ -95,13 +95,6 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]schema.GroupVersion
 func (s *StorageSerializationOptions) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-
-	deprecatedStorageVersion := ""
-	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
-		"DEPRECATED: the version to store the legacy v1 resources with. Defaults to server preferred.")
-	fs.MarkDeprecated("storage-version", "--storage-version is deprecated and will be removed when the v1 API "+
-		"is retired. Setting this has no effect. See --storage-versions instead.")
-
 	fs.StringVar(&s.StorageVersions, "storage-versions", s.StorageVersions, ""+
 		"The per-group version to store resources in. "+
 		"Specified in the format \"group1/version1,group2/version2,...\". "+
