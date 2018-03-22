@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -114,20 +115,23 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 
 	resource := a.GetResource().GroupResource()
 	pod := a.GetObject().(*api.Pod)
-	namespaceNodeSelector, err := p.getNamespaceNodeSelectorMap(a.GetNamespace())
+
+	var namespaceNodeSelector labels.Set
+	namespaceNodeSelector, err = p.verifyConflictWithNamespaceNodeSelectors(resource, pod.Name, pod.Namespace, pod.Spec.NodeSelector)
 	if err != nil {
 		return err
-	}
-
-	if labels.Conflicts(namespaceNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-		return errors.NewForbidden(resource, pod.Name, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
 	}
 
 	// Merge pod node selector = namespace node selector + current pod node selector
 	// second selector wins
 	podNodeSelectorLabels := labels.Merge(namespaceNodeSelector, pod.Spec.NodeSelector)
 	pod.Spec.NodeSelector = map[string]string(podNodeSelectorLabels)
-	return p.Validate(a)
+
+	if err := p.verifyConflictWithNamespaceWhitelist(resource, pod.Name, pod.Namespace, pod.Spec.NodeSelector); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Validate ensures that the pod node selector is allowed
@@ -142,23 +146,38 @@ func (p *podNodeSelector) Validate(a admission.Attributes) error {
 	resource := a.GetResource().GroupResource()
 	pod := a.GetObject().(*api.Pod)
 
-	namespaceNodeSelector, err := p.getNamespaceNodeSelectorMap(a.GetNamespace())
-	if err != nil {
+	if _, err := p.verifyConflictWithNamespaceNodeSelectors(resource, pod.Name, pod.Namespace, pod.Spec.NodeSelector); err != nil {
 		return err
 	}
-	if labels.Conflicts(namespaceNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
-		return errors.NewForbidden(resource, pod.Name, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
+
+	if err := p.verifyConflictWithNamespaceWhitelist(resource, pod.Name, pod.Namespace, pod.Spec.NodeSelector); err != nil {
+		return err
 	}
 
+	return nil
+}
+
+func (p *podNodeSelector) verifyConflictWithNamespaceNodeSelectors(resource schema.GroupResource, podName, podNamespace string, podNodeSelectors map[string]string) (labels.Set, error) {
+	// verify there is no conflict with namespace/cluster node selectors
+	namespaceNodeSelector, err := p.getNamespaceNodeSelectorMap(podNamespace)
+	if err != nil {
+		return nil, err
+	}
+	if labels.Conflicts(namespaceNodeSelector, labels.Set(podNodeSelectors)) {
+		return nil, errors.NewForbidden(resource, podName, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
+	}
+	return namespaceNodeSelector, nil
+}
+
+func (p *podNodeSelector) verifyConflictWithNamespaceWhitelist(resource schema.GroupResource, podName, podNamespace string, podNodeSelectors map[string]string) error {
 	// whitelist verification
-	whitelist, err := labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors[a.GetNamespace()])
+	whitelist, err := labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors[podNamespace])
 	if err != nil {
 		return err
 	}
-	if !labels.AreLabelsInWhiteList(pod.Spec.NodeSelector, whitelist) {
-		return errors.NewForbidden(resource, pod.Name, fmt.Errorf("pod node label selector labels conflict with its namespace whitelist"))
+	if !labels.AreLabelsInWhiteList(podNodeSelectors, whitelist) {
+		return errors.NewForbidden(resource, podName, fmt.Errorf("pod node label selector labels conflict with its namespace whitelist"))
 	}
-
 	return nil
 }
 
