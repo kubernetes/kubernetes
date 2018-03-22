@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
-	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -145,14 +143,6 @@ func (gce *GCECloud) mapNodeNameToInstanceName(nodeName types.NodeName) string {
 		}
 	}
 	return instanceName
-}
-
-func getInstanceName(providerID string) (string, error) {
-	u, err := url.Parse(providerID)
-	if err != nil {
-		return "", err
-	}
-	return path.Base(u.Path), nil
 }
 
 // mapInstanceToNodeName maps a GCE Instance to a k8s NodeName

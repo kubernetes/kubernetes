@@ -751,7 +751,7 @@ func (gce *GCECloud) addNodeToInstanceMap(newNode *v1.Node) error {
 	defer gce.instanceNameMapLock.Unlock()
 
 	if newNode != nil {
-		instanceName, err := getInstanceName(newNode.Spec.ProviderID)
+		_, _, instanceName, err := splitProviderID(newNode.Spec.ProviderID)
 		if err != nil {
 			return err
 		}
