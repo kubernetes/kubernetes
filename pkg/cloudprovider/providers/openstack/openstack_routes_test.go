@@ -30,9 +30,70 @@ import (
 func TestRoutes(t *testing.T) {
 	const clusterName = "ignored"
 
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromSecrets()
 	if !ok {
-		t.Skipf("No config found in environment")
+		cfg, ok = configFromEnv()
+		if !ok {
+			t.Skip("No config found in environment")
+		}
+	}
+
+	os, err := newOpenStack(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+	}
+
+	vms := getServers(os)
+	_, err = os.InstanceID()
+	if err != nil || len(vms) == 0 {
+		t.Skipf("Please run this test in an OpenStack vm or create at least one VM in OpenStack before you run this test.")
+	}
+
+	// We know we have at least one vm.
+	servername := vms[0].Name
+
+	// Pick the first router and server to try a test with
+	os.routeOpts.RouterID = getRouters(os)[0].ID
+
+	r, ok := os.Routes()
+	if !ok {
+		t.Skip("Routes() returned false - perhaps your stack does not support Neutron extraroute extension?")
+	}
+
+	newroute := cloudprovider.Route{
+		DestinationCIDR: "10.164.2.0/24",
+		TargetNode:      types.NodeName(servername),
+	}
+	err = r.CreateRoute(context.TODO(), clusterName, "myhint", &newroute)
+	if err != nil {
+		t.Fatalf("CreateRoute error: %v", err)
+	}
+
+	routelist, err := r.ListRoutes(context.TODO(), clusterName)
+	if err != nil {
+		t.Fatalf("ListRoutes() error: %v", err)
+	}
+	for _, route := range routelist {
+		_, cidr, err := net.ParseCIDR(route.DestinationCIDR)
+		if err != nil {
+			t.Logf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
+			continue
+		}
+		t.Logf("%s via %s", cidr, route.TargetNode)
+	}
+
+	err = r.DeleteRoute(context.TODO(), clusterName, &newroute)
+	if err != nil {
+		t.Fatalf("DeleteRoute error: %v", err)
+	}
+}
+
+func TestRoutesWithSecrets(t *testing.T) {
+	const clusterName = "ignored"
+
+	cfg, ok := configFromSecrets()
+	if !ok {
+		t.Skip("No config found in secrets")
 	}
 
 	os, err := newOpenStack(cfg)

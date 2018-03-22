@@ -460,9 +460,24 @@ func TestNodeAddresses(t *testing.T) {
 }
 
 func TestNewOpenStack(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromSecrets()
 	if !ok {
-		t.Skip("No config found in environment")
+		cfg, ok = configFromEnv()
+		if !ok {
+			t.Skip("No config found in environment")
+		}
+	}
+
+	_, err := newOpenStack(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+	}
+}
+
+func TestNewOpenStackWithSecrets(t *testing.T) {
+	cfg, ok := configFromSecrets()
+	if !ok {
+		t.Skip("No config found in secrets")
 	}
 
 	_, err := newOpenStack(cfg)
@@ -472,9 +487,44 @@ func TestNewOpenStack(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromSecrets()
 	if !ok {
-		t.Skip("No config found in environment")
+		cfg, ok = configFromEnv()
+		if !ok {
+			t.Skip("No config found in environment")
+		}
+	}
+
+	versions := []string{"v2", ""}
+
+	for _, v := range versions {
+		t.Logf("Trying LBVersion = '%s'\n", v)
+		cfg.LoadBalancer.LBVersion = v
+
+		os, err := newOpenStack(cfg)
+		if err != nil {
+			t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+		}
+
+		lb, ok := os.LoadBalancer()
+		if !ok {
+			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+		}
+
+		_, exists, err := lb.GetLoadBalancer(context.TODO(), testClusterName, &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "noexist"}})
+		if err != nil {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
+		}
+		if exists {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		}
+	}
+}
+
+func TestLoadBalancerWithSecrets(t *testing.T) {
+	cfg, ok := configFromSecrets()
+	if !ok {
+		t.Skip("No config found in secrets")
 	}
 
 	versions := []string{"v2", ""}
@@ -536,9 +586,81 @@ func TestZones(t *testing.T) {
 var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
 
 func TestVolumes(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := configFromSecrets()
 	if !ok {
-		t.Skip("No config found in environment")
+		cfg, ok = configFromEnv()
+		if !ok {
+			t.Skip("No config found in environment")
+		}
+	}
+
+	os, err := newOpenStack(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+	}
+
+	tags := map[string]string{
+		"test": "value",
+	}
+	vol, _, _, err := os.CreateVolume("kubernetes-test-volume-"+rand.String(10), 1, "", "", &tags)
+	if err != nil {
+		t.Fatalf("Cannot create a new Cinder volume: %v", err)
+	}
+	t.Logf("Volume (%s) created\n", vol)
+
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
+
+	id, err := os.InstanceID()
+	if err != nil {
+		t.Logf("Cannot find instance id: %v - perhaps you are running this test outside a VM launched by OpenStack", err)
+	} else {
+		diskID, err := os.AttachDisk(id, vol)
+		if err != nil {
+			t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
+		}
+		t.Logf("Volume (%s) attached, disk ID: %s\n", vol, diskID)
+
+		WaitForVolumeStatus(t, os, vol, volumeInUseStatus)
+
+		devicePath := os.GetDevicePath(diskID)
+		if diskPathRegexp.FindString(devicePath) == "" {
+			t.Fatalf("GetDevicePath returned and unexpected path for Cinder volume %s, returned %s", vol, devicePath)
+		}
+		t.Logf("Volume (%s) found at path: %s\n", vol, devicePath)
+
+		err = os.DetachDisk(id, vol)
+		if err != nil {
+			t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
+		}
+		t.Logf("Volume (%s) detached\n", vol)
+
+		WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
+	}
+
+	expectedVolSize := resource.MustParse("2Gi")
+	newVolSize, err := os.ExpandVolume(vol, resource.MustParse("1Gi"), expectedVolSize)
+	if err != nil {
+		t.Fatalf("Cannot expand a Cinder volume: %v", err)
+	}
+	if newVolSize != expectedVolSize {
+		t.Logf("Expected: %v but got: %v ", expectedVolSize, newVolSize)
+	}
+	t.Logf("Volume expanded to (%v) \n", newVolSize)
+
+	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus)
+
+	err = os.DeleteVolume(vol)
+	if err != nil {
+		t.Fatalf("Cannot delete Cinder volume %s: %v", vol, err)
+	}
+	t.Logf("Volume (%s) deleted\n", vol)
+
+}
+
+func TestVolumesWithSecrets(t *testing.T) {
+	cfg, ok := configFromSecrets()
+	if !ok {
+		t.Skip("No config found in secrets")
 	}
 
 	os, err := newOpenStack(cfg)
@@ -680,4 +802,81 @@ func TestToAuth3Options(t *testing.T) {
 	if ao.DomainName != cfg.Global.DomainName {
 		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
 	}
+}
+
+func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
+	tests := []testcase{
+		{
+			name:      "persistent volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							Cinder: &v1.CinderVolumeSource{
+								SecretRef: &v1.SecretReference{
+									Name:      "name",
+									Namespace: "ns",
+								},
+								SecretFile: "/etc/openstack/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "ns",
+			expectedError: nil,
+		},
+		{
+			name:      "persistent volume source without namespace",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				PersistentVolume: &v1.PersistentVolume{
+					Spec: v1.PersistentVolumeSpec{
+						PersistentVolumeSource: v1.PersistentVolumeSource{
+							Cinder: &v1.CinderVolumeSource{
+								SecretRef: &v1.SecretReference{
+									Name:      "name",
+									Namespace: "ns",
+								},
+								SecretFile: "/etc/openstack/user.secret",
+							},
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+		{
+			name:      "pod volume source",
+			defaultNs: "default",
+			spec: &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						Cinder: &v1.CinderVolumeSource{
+							SecretRef: &v1.SecretReference{
+								Name:      "name",
+								Namespace: "ns",
+							},
+							SecretFile: "/etc/openstack/user.secret",
+						},
+					},
+				},
+			},
+			expectedName:  "name",
+			expectedNs:    "default",
+			expectedError: nil,
+		},
+	}
+	for _, testcase := range tests {
+		resultName, resultNs, err := getSecretNameAndNamespace(testcase.spec, testcase.defaultNs)
+		if err != testcase.expectedError || resultName != testcase.expectedName || resultNs != testcase.expectedNs {
+			t.Errorf("%s failed: expected err=%v ns=%q name=%q, got %v/%q/%q", testcase.name, testcase.expectedError, testcase.expectedNs, testcase.expectedName,
+				err, resultNs, resultName)
+		}
+	}
+
 }

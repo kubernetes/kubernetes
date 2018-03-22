@@ -28,6 +28,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	dstrings "strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -48,6 +49,9 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -55,6 +59,7 @@ const (
 	ProviderName     = "openstack"
 	availabilityZone = "availability_zone"
 	defaultTimeOut   = 60 * time.Second
+	PluginName       = "kubernetes.io/cinder"
 )
 
 // ErrNotFound is used to inform that the object is missing
@@ -196,6 +201,49 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 	}
 }
 
+func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
+	if spec.Volume != nil && spec.Volume.Cinder != nil {
+		localSecretRef := spec.Volume.Cinder.SecretRef
+		if localSecretRef != nil {
+			return localSecretRef.Name, defaultNamespace, nil
+		}
+		return "", "", nil
+
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Cinder != nil {
+		secretRef := spec.PersistentVolume.Spec.Cinder.SecretRef
+		secretNs := defaultNamespace
+		if secretRef != nil {
+			return secretRef.Name, secretNs, nil
+		}
+		return "", "", nil
+	}
+	return "", "", fmt.Errorf("Spec does not reference an Cinder volume type")
+}
+
+func ParseSecret(spec *volume.Spec, nameSpace string, host volumeHost) (map[string]string, error) {
+	secretName, secretNs, err := getSecretNameAndNamespace(spec, nameSpace)
+	if err != nil {
+		return nil, err
+	}
+	secret := make(map[string]string)
+	if len(secretName) > 0 && len(secretNs) > 0 {
+		// if secret is provideded, retrieve it
+		kubeClient := host.GetKubeClient()
+		if kubeClient == nil {
+			return nil, fmt.Errorf("Cannot get kube client")
+		}
+		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
+		if err != nil {
+			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+		}
+	} else {
+		return secret, err
+	}
+
+	return secret, err
+}
+
 // configFromEnv allows setting up credentials etc using the
 // standard OS_* OpenStack client environment variables.
 func configFromEnv() (cfg Config, ok bool) {
@@ -222,6 +270,76 @@ func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
 	if cfg.Global.DomainName == "" {
 		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
+	}
+
+	ok = cfg.Global.AuthURL != "" &&
+		cfg.Global.Username != "" &&
+		cfg.Global.Password != "" &&
+		(cfg.Global.TenantID != "" || cfg.Global.TenantName != "" ||
+			cfg.Global.DomainID != "" || cfg.Global.DomainName != "" ||
+			cfg.Global.Region != "" || cfg.Global.UserID != "" ||
+			cfg.Global.TrustID != "")
+
+	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
+	cfg.BlockStorage.BSVersion = "auto"
+
+	return
+}
+
+// configFromSecrets allows setting up credentials etc using the
+// secrets.
+func configFromSecret() (cfg Config, ok bool) {
+	spec := &volume.Spec{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Cinder: &v1.CinderVolumeSource{
+						SecretRef: &v1.SecretReference{
+							Name:      "name",
+							Namespace: "ns",
+						},
+						SecretFile: "/etc/openstack/user.secret",
+					},
+				},
+			},
+		},
+	}
+
+	host, err := NewVolumeHost(nil, nil, nil)
+	secret, err := ParseSecret(spec, "default", host)
+	if err == nil {
+		for k, v := range secret {
+			switch dstrings.ToLower(k) {
+			case "authurl":
+				cfg.Global.AuthURL = v
+			case "username":
+				cfg.Global.Username = v
+			case "password":
+				cfg.Global.Password = v
+			case "region":
+				cfg.Global.Region = v
+			case "userid":
+				cfg.Global.UserID = v
+			case "trustid":
+				cfg.Global.TrustID = v
+			case "tenantid":
+				cfg.Global.TenantID = v
+			case "projectid":
+				cfg.Global.TenantID = v
+			case "tenantname":
+				cfg.Global.TenantName = v
+			case "domainid":
+				cfg.Global.DomainID = v
+			case "userdomainid":
+				cfg.Global.DomainID = v
+			case "domainname":
+				cfg.Global.DomainName = v
+			case "userdomainname":
+				cfg.Global.DomainName = v
+			default:
+				return cfg, false
+			}
+		}
 	}
 
 	ok = cfg.Global.AuthURL != "" &&
