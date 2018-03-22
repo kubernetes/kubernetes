@@ -98,12 +98,15 @@ func TestHaRootUID(t *testing.T) {
 	}{
 		"nil sc": {
 			container: &v1.Container{SecurityContext: nil},
+			expect:    false,
 		},
 		"nil runAsuser": {
 			container: containerWithUser(nil),
+			expect:    false,
 		},
 		"runAsUser non-root": {
 			container: containerWithUser(&nonRoot),
+			expect:    false,
 		},
 		"runAsUser root": {
 			container: containerWithUser(&root),
@@ -128,9 +131,11 @@ func TestHasRunAsUser(t *testing.T) {
 	}{
 		"nil sc": {
 			container: &v1.Container{SecurityContext: nil},
+			expect:    false,
 		},
 		"nil runAsUser": {
 			container: containerWithUser(nil),
+			expect:    false,
 		},
 		"valid runAsUser": {
 			container: containerWithUser(&runAsUser),
@@ -156,12 +161,15 @@ func TestHasRootRunAsUser(t *testing.T) {
 	}{
 		"nil sc": {
 			container: &v1.Container{SecurityContext: nil},
+			expect:    false,
 		},
 		"nil runAsuser": {
 			container: containerWithUser(nil),
+			expect:    false,
 		},
 		"runAsUser non-root": {
 			container: containerWithUser(&nonRoot),
+			expect:    false,
 		},
 		"runAsUser root": {
 			container: containerWithUser(&root),
