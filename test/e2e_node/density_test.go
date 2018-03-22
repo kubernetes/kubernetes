@@ -472,21 +472,6 @@ func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 	return latencyMetrics, nil
 }
 
-// verifyPodStartupLatency verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
-// within the threshold.
-func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
-	if actual.Perc50 > expect.Perc50 {
-		return fmt.Errorf("too high pod startup latency 50th percentile: %v", actual.Perc50)
-	}
-	if actual.Perc90 > expect.Perc90 {
-		return fmt.Errorf("too high pod startup latency 90th percentile: %v", actual.Perc90)
-	}
-	if actual.Perc99 > expect.Perc99 {
-		return fmt.Errorf("too high pod startup latency 99th percentile: %v", actual.Perc99)
-	}
-	return nil
-}
-
 // newInformerWatchPod creates an informer to check whether all pods are running.
 func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]metav1.Time, podType string) cache.Controller {
 	ns := f.Namespace.Name
@@ -556,14 +541,14 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyD
 	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
 	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
 
-	podCreateLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLags)}
+	podStartupLatency := framework.ExtractLatencyMetrics(e2eLags)
 
 	// log latency perf data
-	logPerfData(getLatencyPerfData(podCreateLatency.Latency, testInfo), "latency")
+	logPerfData(getLatencyPerfData(podStartupLatency, testInfo), "latency")
 
 	if isVerify {
 		// check whether e2e pod startup time is acceptable.
-		framework.ExpectNoError(verifyPodStartupLatency(podStartupLimits, podCreateLatency.Latency))
+		framework.ExpectNoError(framework.VerifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {
