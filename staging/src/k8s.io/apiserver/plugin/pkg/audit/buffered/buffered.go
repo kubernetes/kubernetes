@@ -18,8 +18,9 @@ package buffered
 
 import (
 	"fmt"
-	"sync"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -89,14 +90,14 @@ type bufferedBackend struct {
 	// Once `shutdownCh` is closed no new events will be sent to the delegate backend.
 	shutdownCh chan struct{}
 
-	// WaitGroup to control the concurrency of sending batches to the delegate backend.
-	// Worker routine calls Add before sending a batch and
-	// then spawns a routine that calls Done after batch was processed by the delegate backend.
-	// This WaitGroup is used to wait for all sending routines to finish before shutting down audit backend.
-	wg sync.WaitGroup
-
 	// Limits the number of batches sent to the delegate backend per second.
 	throttle flowcontrol.RateLimiter
+
+	// Limits the number of go routines sending events to the delegate backend simultaneously.
+	// Worker routine send an element to channel before sending a batch and
+	// then spawns a routine that calls receive from channel after batch was processed by the delegate backend.
+	// Also, this ch is used to wait for all sending routines to finish before shutting down audit backend.
+	ch chan struct{}
 }
 
 var _ audit.Backend = &bufferedBackend{}
@@ -107,14 +108,18 @@ func NewBackend(delegate audit.Backend, config BatchConfig) audit.Backend {
 	if config.ThrottleEnable {
 		throttle = flowcontrol.NewTokenBucketRateLimiter(config.ThrottleQPS, config.ThrottleBurst)
 	}
+	// maxGoRoutines defines the maximum number of go routines sending the audit events simultaneously.
+	// We expect the server to always respond in <5s, so the maximum routines should be 5 * qps.
+	maxGoRoutines := int(5 * config.ThrottleQPS)
+
 	return &bufferedBackend{
 		delegateBackend: delegate,
 		buffer:          make(chan *auditinternal.Event, config.BufferSize),
 		maxBatchSize:    config.MaxBatchSize,
 		maxBatchWait:    config.MaxBatchWait,
 		shutdownCh:      make(chan struct{}),
-		wg:              sync.WaitGroup{},
 		throttle:        throttle,
+		ch:              make(chan struct{}, maxGoRoutines),
 	}
 }
 
@@ -157,9 +162,18 @@ func (b *bufferedBackend) Shutdown() {
 	// - When b.shutdownCh is closed, we know that the goroutine in Run has terminated.
 	// - This means that processIncomingEvents has terminated.
 	// - Which means that b.buffer is closed and cannot accept any new events anymore.
-	// - Because processEvents is called synchronously from the Run goroutine, the waitgroup has its final value.
-	// Hence wg.Wait will not miss any more outgoing batches.
-	b.wg.Wait()
+	// - Because processEvents is called synchronously from the Run goroutine, the b.ch has its final value.
+	// Hence wait for b.ch being empty will not miss any more outgoing batches.
+	if err := wait.PollImmediate(100*time.Microsecond, 60*time.Second, func() (bool, error) {
+		if len(b.ch) == 0 {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		glog.Error("Timeout waiting for all sending routines exit.")
+	}
+
+	glog.Info("Successfully waiting for all sending routines exit.")
 
 	b.delegateBackend.Shutdown()
 }
@@ -228,16 +242,18 @@ func (b *bufferedBackend) processEvents(events []*auditinternal.Event) {
 		return
 	}
 
-	// TODO(audit): Should control the number of active goroutines
-	// if one goroutine takes 5 seconds to finish, the number of goroutines can be 5 * defaultBatchThrottleQPS
 	if b.throttle != nil {
 		b.throttle.Accept()
 	}
 
-	b.wg.Add(1)
+	// Control the maximum number of go routines
+	b.ch <- struct{}{}
+
 	go func() {
-		defer b.wg.Done()
-		defer runtime.HandleCrash()
+		defer func() {
+			<-b.ch
+			runtime.HandleCrash()
+		}()
 
 		// Execute the real processing in a goroutine to keep it from blocking.
 		// This lets the batching routine continue draining the queue immediately.
