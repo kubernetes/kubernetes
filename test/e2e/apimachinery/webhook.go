@@ -788,10 +788,11 @@ func testWebhookForWebhookConfigurations(f *framework.Framework) {
 				Name: "should-be-removable-validating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
+					// This will not match any real resources so this webhook should never be called.
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{"*"},
-						APIVersions: []string{"*"},
-						Resources:   []string{"*"},
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"invalid"},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -831,10 +832,11 @@ func testWebhookForWebhookConfigurations(f *framework.Framework) {
 				Name: "should-be-removable-mutating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
+					// This will not match any real resources so this webhook should never be called.
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{"*"},
-						APIVersions: []string{"*"},
-						Resources:   []string{"*"},
+						APIGroups:   []string{""},
+						APIVersions: []string{"v1"},
+						Resources:   []string{"invalid"},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
