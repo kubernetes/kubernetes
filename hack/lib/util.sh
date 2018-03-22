@@ -23,6 +23,7 @@ kube::util::wait_for_url() {
   local prefix=${2:-}
   local wait=${3:-1}
   local times=${4:-30}
+  local maxtime=${5:-1}
 
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
@@ -32,7 +33,7 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 "$times"); do
     local out
-    if out=$(curl --max-time 1 -gkfs "$url" 2>/dev/null); then
+    if out=$(curl --max-time "$maxtime" -gkfs "$url" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
