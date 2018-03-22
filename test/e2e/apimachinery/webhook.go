@@ -27,6 +27,7 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -159,6 +160,13 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerMutatingWebhookForCRD(f, context, testcrd)
 		defer webhookCleanup()
 		testMutatingCRDWebhook(f, testcrd.Crd, testcrd.DynamicClient)
+	})
+
+	It("Should deny crd creation", func() {
+		crdWebhookCleanup := registerValidatingWebhookForCRD(f, context)
+		defer crdWebhookCleanup()
+
+		testCRDDenyWebhook(f)
 	})
 
 	// TODO: add more e2e tests for mutating webhooks
@@ -1119,5 +1127,94 @@ func testMutatingCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.Cu
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
+	}
+}
+
+func registerValidatingWebhookForCRD(f *framework.Framework, context *certContext) func() {
+	client := f.ClientSet
+	By("Registering the crd webhook via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := webhookConfigName
+	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "deny-crd.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{"apiextensions.k8s.io"},
+						APIVersions: []string{"*"},
+						Resources:   []string{"customresourcedefinitions"},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/always-deny"),
+					},
+					CABundle: context.signingCert,
+				},
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+	return func() {
+		client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(configName, nil)
+	}
+}
+
+func testCRDDenyWebhook(f *framework.Framework) {
+	By("Creating a custom resource definition that should be denied by the webhook")
+	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, "deny")
+	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, "deny")
+	group := fmt.Sprintf("%s-crd-test.k8s.io", f.BaseName)
+	apiVersion := "v1"
+	testcrd := &framework.TestCrd{
+		Name:       name,
+		Kind:       kind,
+		ApiGroup:   group,
+		ApiVersion: apiVersion,
+	}
+
+	// Creating a custom resource definition for use by assorted tests.
+	config, err := framework.LoadConfig()
+	if err != nil {
+		framework.Failf("failed to load config: %v", err)
+		return
+	}
+	apiExtensionClient, err := crdclientset.NewForConfig(config)
+	if err != nil {
+		framework.Failf("failed to initialize apiExtensionClient: %v", err)
+		return
+	}
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: testcrd.GetMetaName()},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   testcrd.ApiGroup,
+			Version: testcrd.ApiVersion,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   testcrd.GetPluralName(),
+				Singular: testcrd.Name,
+				Kind:     testcrd.Kind,
+				ListKind: testcrd.GetListName(),
+			},
+			Scope: apiextensionsv1beta1.NamespaceScoped,
+		},
+	}
+
+	// create CRD
+	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	Expect(err).NotTo(BeNil())
+	expectedErrMsg := "this webhook denies all requests"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 }
