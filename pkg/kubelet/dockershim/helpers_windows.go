@@ -115,6 +115,17 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 		// Todo: Add a kernel version check for more validation
 
 		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
+			// On Windows, every container that is created in a Sandbox, needs to invoke CNI plugin again for adding the Network,
+			// with the shared container name as NetNS info,
+			// This is passed down to the platform to replicate some necessary information to the new container
+
+			//
+			// This place is chosen as a hack for now, since ds.getIP would end up calling CNI's addToNetwork
+			// That is why addToNetwork is required to be idempotent
+
+			// Instead of relying on this call, an explicit call to addToNetwork should be
+			// done immediately after ContainerCreation, in case of Windows only. TBD Issue # to handle this
+
 			if r.HostConfig.Isolation == kubeletapis.HypervIsolationValue {
 				// Hyper-V only supports one container per Pod yet and the container will have a different
 				// IP address from sandbox. Return the first non-sandbox container IP as POD IP.
@@ -127,18 +138,8 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 				ds.getIP(sandboxID, r)
 			}
 		} else {
-			// On Windows, every container that is created in a Sandbox, needs to invoke CNI plugin again for adding the Network,
-			// with the shared container name as NetNS info,
-			// This is passed down to the platform to replicate some necessary information to the new container
-
-			//
-			// This place is chosen as a hack for now, since getContainerIP would end up calling CNI's addToNetwork
-			// That is why addToNetwork is required to be idempotent
-
-			// Instead of relying on this call, an explicit call to addToNetwork should be
-			// done immediately after ContainerCreation, in case of Windows only. TBD Issue # to handle this
-
-			if containerIP := getContainerIP(r); containerIP != "" {
+			// ds.getIP will call the CNI plugin to fetch the IP
+			if containerIP := ds.getIP(c.ID, r); containerIP != "" {
 				return containerIP
 			}
 		}
@@ -152,15 +153,4 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	// Like docker, the referenced container id is used to figure out the network namespace id internally by the platform
 	// so returning the docker networkMode (which holds container:<ref containerid> for network namespace here
 	return string(c.HostConfig.NetworkMode), nil
-}
-
-func getContainerIP(container *dockertypes.ContainerJSON) string {
-	if container.NetworkSettings != nil {
-		for _, network := range container.NetworkSettings.Networks {
-			if network.IPAddress != "" {
-				return network.IPAddress
-			}
-		}
-	}
-	return ""
 }
