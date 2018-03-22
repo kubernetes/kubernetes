@@ -579,16 +579,17 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	stopCh := runControllerAndInformers(t, rm, informers, 0)
 	defer close(stopCh)
 
-	rs := newRS("rs", ns.Name, 2)
+	replicas := 3
+	rs := newRS("rs", ns.Name, replicas)
 	rss, _ := createRSsPods(t, c, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
-	// Verify RS creates 2 pods
+	// Verify RS creates 3 pods
 	podClient := c.CoreV1().Pods(ns.Name)
 	pods := getPods(t, podClient, labelMap())
-	if len(pods.Items) != 2 {
-		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
+	if len(pods.Items) != replicas {
+		t.Fatalf("len(pods) = %d, want %d", len(pods.Items), replicas)
 	}
 
 	// Set first pod as deleting pod
@@ -601,26 +602,41 @@ func TestDeletingAndFailedPods(t *testing.T) {
 		t.Fatalf("Error deleting pod %s: %v", deletingPod.Name, err)
 	}
 
-	// Set second pod as failed pod
-	failedPod := &pods.Items[1]
+	// Set second pod as failed & deleting pod
+	// Set finalizers for the pod to simulate pending deletion status
+	failedDeletingPod := &pods.Items[1]
+	updatePodStatus(t, podClient, failedDeletingPod, func(pod *v1.Pod) {
+		pod.Status.Phase = v1.PodFailed
+		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
+	})
+	if err := c.CoreV1().Pods(ns.Name).Delete(failedDeletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("Error deleting pod %s: %v", failedDeletingPod.Name, err)
+	}
+
+	// Set third pod as failed pod
+	failedPod := &pods.Items[2]
 	updatePodStatus(t, podClient, failedPod, func(pod *v1.Pod) {
 		pod.Status.Phase = v1.PodFailed
 	})
 
-	// Pool until 2 new pods have been created to replace deleting and failed pods
+	// Pool until 2 new pods have been created to replace deleting and failed & deleting pods
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods = getPods(t, podClient, labelMap())
-		return len(pods.Items) == 4, nil
+		return len(pods.Items) == replicas+2, nil
 	}); err != nil {
-		t.Fatalf("Failed to verify 2 new pods have been created (expected 4 pods): %v", err)
+		t.Fatalf("Failed to verify 2 new pods have been created (expected %d pods): %v", replicas+2, err)
 	}
 
 	// Verify deleting and failed pods are among the four pods
 	foundDeletingPod := false
+	foundFailedDeletingPod := false
 	foundFailedPod := false
 	for _, pod := range pods.Items {
 		if pod.UID == deletingPod.UID {
 			foundDeletingPod = true
+		}
+		if pod.UID == failedDeletingPod.UID {
+			foundFailedDeletingPod = true
 		}
 		if pod.UID == failedPod.UID {
 			foundFailedPod = true
@@ -630,9 +646,13 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	if !foundDeletingPod {
 		t.Fatalf("expected deleting pod %s exists, but it is not found", deletingPod.Name)
 	}
-	// Verify failed pod exists
+	// Verify failed deleting pod exists
+	if !foundFailedDeletingPod {
+		t.Fatalf("expected failed deleting pod %s exists, but it is not found", failedDeletingPod.Name)
+	}
+	// Verify failed pod doesn't exist
 	if !foundFailedPod {
-		t.Fatalf("expected failed pod %s exists, but it is not found", failedPod.Name)
+		t.Fatalf("expected failed pod %s not found, but it exists", failedPod.Name)
 	}
 }
 
