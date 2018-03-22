@@ -43,6 +43,7 @@ secondary-range-name = my-secondary-range
 node-tags = my-node-tag1
 node-instance-prefix = my-prefix
 multizone = true
+instance-name = vm-123456abcd
    `
 	reader := strings.NewReader(s)
 	config, err := readConfig(reader)
@@ -61,6 +62,7 @@ multizone = true
 		NodeTags:           []string{"my-node-tag1"},
 		NodeInstancePrefix: "my-prefix",
 		Multizone:          true,
+		InstanceName:       "vm-123456abcd",
 	}}
 
 	if !reflect.DeepEqual(expected, config) {
@@ -460,6 +462,19 @@ func TestGenerateCloudConfigs(t *testing.T) {
 			cloud: func() CloudConfig {
 				v := cloudBoilerplate
 				v.SecondaryRangeName = "my-secondary"
+				return v
+			},
+		},
+		{
+			name: "Instance Name",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.InstanceName = "vm-instancename"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.InstanceName = "vm-instancename"
 				return v
 			},
 		},
