@@ -343,7 +343,11 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 	obj = info.Object
 
 	if !options.DryRun {
-		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
+		help := resource.NewHelper(client, mapping)
+		if !help.NamespaceScoped && nsOverriden {
+			return fmt.Errorf("%s is cluster-scope resources, can not special --namespace %s", gvk.Kind, namespace)
+		}
+		obj, err = help.Create(namespace, false, info.Object)
 		if err != nil {
 			return err
 		}

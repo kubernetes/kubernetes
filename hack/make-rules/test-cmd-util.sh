@@ -470,6 +470,8 @@ run_pod_tests() {
   kubectl create namespace test-kubectl-describe-pod
   # Post-condition: namespace 'test-secrets' is created.
   kube::test::get_object_assert 'namespaces/test-kubectl-describe-pod' "{{$id_field}}" 'test-kubectl-describe-pod'
+  # Test create cluster-scope resources special --namespace should be failed
+  !kubectl create namespace test -n test-kubectl-describe-pod
 
   ### Create a generic secret
   # Pre-condition: no SECRET exists
