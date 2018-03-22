@@ -152,9 +152,9 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.DeleteAll, "all", options.DeleteAll, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", options.IgnoreNotFound, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
 	cmd.Flags().BoolVar(&options.Cascade, "cascade", options.Cascade, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
-	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", options.GracePeriod, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
+	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", options.GracePeriod, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion).")
 	cmd.Flags().BoolVar(&options.DeleteNow, "now", options.DeleteNow, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
-	cmd.Flags().BoolVar(&options.ForceDeletion, "force", options.ForceDeletion, "Immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
+	cmd.Flags().BoolVar(&options.ForceDeletion, "force", options.ForceDeletion, "Only used when grace-period=0. If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
 	cmdutil.AddOutputVarFlagsForMutation(cmd, &options.Output)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
@@ -226,6 +226,8 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 			o.WaitForDeletion = true
 			o.GracePeriod = 1
 		}
+	} else if o.ForceDeletion {
+		fmt.Fprintf(o.ErrOut, "warning: --force is ignored because --grace-period is not 0.\n")
 	}
 	return nil
 }
@@ -254,7 +256,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			// If there is no reaper for this resources and the user didn't explicitly ask for stop.
 			if kubectl.IsNoSuchReaperError(err) && isDefaultDelete {
 				// No client side reaper found. Let the server do cascading deletion.
-				return cascadingDeleteResource(info, out, shortOutput)
+				return cascadingDeleteResource(info, out, shortOutput, gracePeriod)
 			}
 			return cmdutil.AddSourceToErr("reaping", info.Source, err)
 		}
@@ -271,7 +273,7 @@ func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultD
 			}
 		}
 		if !quiet {
-			printDeletion(info, out, shortOutput)
+			printDeletion(info, out, shortOutput, gracePeriod)
 		}
 		return nil
 	})
@@ -302,7 +304,7 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, graceP
 			options = metav1.NewDeleteOptions(int64(gracePeriod))
 		}
 		options.OrphanDependents = &orphan
-		return deleteResource(info, out, shortOutput, options)
+		return deleteResource(info, out, shortOutput, options, gracePeriod)
 	})
 	if err != nil {
 		return err
@@ -313,28 +315,32 @@ func DeleteResult(r *resource.Result, out io.Writer, ignoreNotFound bool, graceP
 	return nil
 }
 
-func cascadingDeleteResource(info *resource.Info, out io.Writer, shortOutput bool) error {
+func cascadingDeleteResource(info *resource.Info, out io.Writer, shortOutput bool, gracePeriod int) error {
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	return deleteResource(info, out, shortOutput, deleteOptions)
+	return deleteResource(info, out, shortOutput, deleteOptions, gracePeriod)
 }
 
-func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, deleteOptions *metav1.DeleteOptions) error {
+func deleteResource(info *resource.Info, out io.Writer, shortOutput bool, deleteOptions *metav1.DeleteOptions, gracePeriod int) error {
 	if err := resource.NewHelper(info.Client, info.Mapping).DeleteWithOptions(info.Namespace, info.Name, deleteOptions); err != nil {
 		return cmdutil.AddSourceToErr("deleting", info.Source, err)
 	}
 
-	printDeletion(info, out, shortOutput)
+	printDeletion(info, out, shortOutput, gracePeriod)
 	return nil
 }
 
 // deletion printing is special because they don't have an object to print.  This logic mirrors PrintSuccess
-func printDeletion(info *resource.Info, out io.Writer, shortOutput bool) {
+func printDeletion(info *resource.Info, out io.Writer, shortOutput bool, gracePeriod int) {
 	operation := "deleted"
 	groupKind := info.Mapping.GroupVersionKind
 	kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
 	if len(groupKind.Group) == 0 {
 		kindString = strings.ToLower(groupKind.Kind)
+	}
+
+	if gracePeriod == 0 {
+		operation = "force deleted"
 	}
 
 	if shortOutput {
