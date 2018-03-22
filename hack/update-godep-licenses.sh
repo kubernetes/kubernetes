@@ -37,7 +37,7 @@ export LC_ALL=C
 # Process package content
 #
 # @param package  The incoming package name
-# @param type     The type of content (LICENSE or COPYRIGHT)
+# @param type     The type of content (LICENSE, COPYRIGHT or COPYING)
 #
 process_content () {
   local package=$1
@@ -64,6 +64,10 @@ process_content () {
     COPYRIGHT) find_names=(-iname 'notice*' -o -iname 'readme*')
                find_maxdepth=3
                ensure_pattern="copyright"
+               ;;
+      COPYING) find_names=(-iname 'copying*')
+               find_maxdepth=1
+               ensure_pattern="license|copyright"
                ;;
   esac
 
@@ -159,6 +163,7 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
                  sort -f); do
   process_content ${PACKAGE} LICENSE
   process_content ${PACKAGE} COPYRIGHT
+  process_content ${PACKAGE} COPYING
 
   # display content
   echo
@@ -171,16 +176,18 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
       file="${CONTENT[${PACKAGE}-LICENSE]-}"
   elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
       file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
+  elif [[ -n "${CONTENT[${PACKAGE}-COPYING]-}" ]]; then
+      file="${CONTENT[${PACKAGE}-COPYING]-}"
   fi
   if [[ -z "${file}" ]]; then
       cat > /dev/stderr << __EOF__
 No license could be found for ${PACKAGE} - aborting.
 
 Options:
-1. Check if the upstream repository has a newer version with LICENSE and/or
-   COPYRIGHT files.
-2. Contact the author of the package to ensure there is a LICENSE and/or
-   COPYRIGHT file present.
+1. Check if the upstream repository has a newer version with LICENSE, COPYRIGHT and/or
+   COPYING files.
+2. Contact the author of the package to ensure there is a LICENSE, COPYRIGHT and/or
+   COPYING file present.
 3. Do not use this package in Kubernetes.
 __EOF__
       exit 9
