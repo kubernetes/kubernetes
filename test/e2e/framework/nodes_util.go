@@ -86,7 +86,7 @@ func ingressUpgradeGCE(isUpgrade bool) error {
 		}
 	} else {
 		// Downgrade to latest release image.
-		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/ingress-gce-glbc-amd64:1.0.0/' /etc/kubernetes/manifests/glbc.manifest"
 	}
 	// Kubelet should restart glbc automatically.
 	sshResult, err := NodeExec(GetMasterHost(), command)
