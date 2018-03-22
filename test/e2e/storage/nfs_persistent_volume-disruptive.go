@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume)
+type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim)
 type disruptiveTest struct {
 	testItStmt string
 	runTest    testBody
@@ -41,7 +41,7 @@ const (
 	MinNodes = 2
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
+var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
 	var (
@@ -234,7 +234,7 @@ var _ = utils.SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 			func(t disruptiveTest) {
 				It(t.testItStmt, func() {
 					By("Executing Spec")
-					t.runTest(c, f, clientPod, pvc, pv)
+					t.runTest(c, f, clientPod, pvc)
 				})
 			}(test)
 		}
@@ -280,5 +280,7 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 	// Ignore deletion errors.  Failing on them will interrupt test cleanup.
 	framework.DeletePodWithWait(f, c, client)
 	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-	framework.DeletePersistentVolume(c, pv.Name)
+	if pv != nil {
+		framework.DeletePersistentVolume(c, pv.Name)
+	}
 }
