@@ -218,6 +218,7 @@ func TestNewNodeInfo(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
+		TransientInfo:       newTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
 		usedPorts: util.HostPortInfo{
@@ -300,6 +301,7 @@ func TestNodeInfoClone(t *testing.T) {
 			nodeInfo: &NodeInfo{
 				requestedResource:   &Resource{},
 				nonzeroRequest:      &Resource{},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
 				usedPorts: util.HostPortInfo{
@@ -368,6 +370,7 @@ func TestNodeInfoClone(t *testing.T) {
 			expected: &NodeInfo{
 				requestedResource:   &Resource{},
 				nonzeroRequest:      &Resource{},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
 				usedPorts: util.HostPortInfo{
@@ -526,6 +529,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
+		TransientInfo:       newTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
 		usedPorts: util.HostPortInfo{
@@ -639,6 +643,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
 				usedPorts: util.HostPortInfo{
@@ -756,6 +761,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          3,
 				usedPorts: util.HostPortInfo{

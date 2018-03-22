@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,8 +45,6 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -451,7 +450,12 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
 	}
-
+	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
+		nodeInfo.TransientInfo.TransientLock.Lock()
+		defer nodeInfo.TransientInfo.TransientLock.Unlock()
+		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = c.maxVolumes - numExistingVolumes
+		nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes = numNewVolumes
+	}
 	return true, nil, nil
 }
 
