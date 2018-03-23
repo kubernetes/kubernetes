@@ -79,11 +79,28 @@ else
     )
 fi
 
+# Set the NODE_INSTANCE_GROUP based on NODE_INSTANCE_PREFIX. 
+# The NODE_INSTANCE_PREFIX and NODE_INSTANCE_GROUP vars are used the 'if' block below the
+# when the provider is gce.
 if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
   NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
 fi
 
-if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+# If the NODE_INSTANCE_GROUP is not set, and the provider is gce run this code block.
+# Or if the we have a NODE_INSTANCE_PREFIX and the provider is gce
+# then run this code block.
+# 
+# This logic allows for the NODE_INSTANCE_GROUP to be set before this script runs, 
+# allowing for installers other than kube-up.sh to run GCE e2e tests. This also
+# allows for additional functionality to be added to kubetest to back out these
+# bash calls.
+#   
+# Note below is copied from the TODO when using the gke cloud provider.
+#
+# TODO(kubernetes/test-infra#3330): Allow NODE_INSTANCE_GROUP to be
+# set before we get here, which eliminates any cluster/gce use if
+# KUBERNETES_CONFORMANCE_PROVIDER is set to "gce".
+if [[ -z "${NODE_INSTANCE_GROUP:-}" && "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ -n "${NODE_INSTANCE_PREFIX:-}" && "${KUBERNETES_PROVIDER}" == "gce" ]]; then
   set_num_migs
   NODE_INSTANCE_GROUP=""
   for ((i=1; i<=${NUM_MIGS}; i++)); do
