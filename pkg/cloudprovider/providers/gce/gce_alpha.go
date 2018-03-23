@@ -30,9 +30,6 @@ const (
 	AlphaFeatureNetworkEndpointGroup = "NetworkEndpointGroup"
 )
 
-// All known alpha features
-var knownAlphaFeatures = map[string]bool{}
-
 type AlphaFeatureGate struct {
 	features map[string]bool
 }
@@ -44,11 +41,7 @@ func (af *AlphaFeatureGate) Enabled(key string) bool {
 func NewAlphaFeatureGate(features []string) *AlphaFeatureGate {
 	featureMap := make(map[string]bool)
 	for _, name := range features {
-		if _, ok := knownAlphaFeatures[name]; !ok {
-			featureMap[name] = false
-		} else {
-			featureMap[name] = true
-		}
+		featureMap[name] = true
 	}
 	return &AlphaFeatureGate{featureMap}
 }

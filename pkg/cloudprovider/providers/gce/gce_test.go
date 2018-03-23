@@ -531,9 +531,6 @@ func getTestOperation() *computev1.Operation {
 }
 
 func TestNewAlphaFeatureGate(t *testing.T) {
-	knownAlphaFeatures["foo"] = true
-	knownAlphaFeatures["bar"] = true
-
 	testCases := []struct {
 		alphaFeatures  []string
 		expectEnabled  []string
@@ -555,7 +552,7 @@ func TestNewAlphaFeatureGate(t *testing.T) {
 		{
 			alphaFeatures:  []string{"aaa", "foo"},
 			expectEnabled:  []string{"foo"},
-			expectDisabled: []string{"aaa"},
+			expectDisabled: []string{},
 		},
 		// enable foo
 		{
@@ -579,8 +576,6 @@ func TestNewAlphaFeatureGate(t *testing.T) {
 			}
 		}
 	}
-	delete(knownAlphaFeatures, "foo")
-	delete(knownAlphaFeatures, "bar")
 }
 
 func TestGetRegionInURL(t *testing.T) {
