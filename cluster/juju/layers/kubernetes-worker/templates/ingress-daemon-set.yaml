@@ -152,7 +152,6 @@ spec:
       containers:
       - image: {{ ingress_image }}
         name: nginx-ingress-{{ juju_application }}
-        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
