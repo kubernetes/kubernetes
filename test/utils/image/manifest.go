@@ -55,7 +55,7 @@ var (
 	GBFrontend         = ImageConfig{sampleRegistry, "gb-frontend", "v5"}
 	GBRedisSlave       = ImageConfig{sampleRegistry, "gb-redisslave", "v2"}
 	Goproxy            = ImageConfig{e2eRegistry, "goproxy", "1.0"}
-	Hostexec           = ImageConfig{e2eRegistry, "hostexec", "1.0"}
+	Hostexec           = ImageConfig{e2eRegistry, "hostexec", "1.1"}
 	Iperf              = ImageConfig{e2eRegistry, "iperf", "1.0"}
 	JessieDnsutils     = ImageConfig{e2eRegistry, "jessie-dnsutils", "1.0"}
 	Kitten             = ImageConfig{e2eRegistry, "kitten", "1.0"}
