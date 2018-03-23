@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,8 +30,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -149,9 +152,17 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 			f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
 	} else {
 		// Pod should remain in the pending state. Wait for the Reason to be set to "AppArmor".
-		w, err := f.PodClient().Watch(metav1.SingleObject(metav1.ObjectMeta{Name: pod.Name}))
-		framework.ExpectNoError(err)
-		_, err = watch.Until(framework.PodStartTimeout, w, func(e watch.Event) (bool, error) {
+		watchFunc := func(sinceResourceVersion string) (watch.Interface, error) {
+			w, err := f.PodClient().Watch(metav1.ListOptions{
+				FieldSelector:   fields.OneTermEqualSelector("metadata.name", pod.Name).String(),
+				ResourceVersion: sinceResourceVersion,
+			})
+			framework.ExpectNoError(err)
+			return w, err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), framework.PodStartTimeout)
+		defer cancel()
+		_, err := watchtools.Until(ctx, "", watchFunc, func(e watch.Event) (bool, error) {
 			switch e.Type {
 			case watch.Deleted:
 				return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, pod.Name)

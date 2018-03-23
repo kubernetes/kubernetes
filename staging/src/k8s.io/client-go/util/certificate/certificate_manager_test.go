@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
@@ -230,30 +229,6 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 
 	if success, err := m.rotateCerts(); success {
 		t.Errorf("Got success from 'rotateCerts', wanted failure")
-	} else if err != nil {
-		t.Errorf("Got error %v from 'rotateCerts', wanted no error.", err)
-	}
-}
-
-func TestRotateCertWaitingForResultError(t *testing.T) {
-	now := time.Now()
-	m := manager{
-		cert: &tls.Certificate{
-			Leaf: &x509.Certificate{
-				NotBefore: now.Add(-2 * time.Hour),
-				NotAfter:  now.Add(-1 * time.Hour),
-			},
-		},
-		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificates.KeyUsage{},
-		certSigningRequestClient: fakeClient{
-			failureType: watchError,
-		},
-	}
-
-	certificateWaitBackoff = wait.Backoff{Steps: 1}
-	if success, err := m.rotateCerts(); success {
-		t.Errorf("Got success from 'rotateCerts', wanted failure.")
 	} else if err != nil {
 		t.Errorf("Got error %v from 'rotateCerts', wanted no error.", err)
 	}
@@ -675,15 +650,6 @@ func TestServerHealth(t *testing.T) {
 			clientErr:        errors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, false),
 			expectRotateFail: true,
 			expectHealthy:    true,
-		},
-		{
-			description: "Conflict error on watch",
-			certs:       currentCerts,
-
-			failureType:      watchError,
-			clientErr:        errors.NewGenericServerResponse(409, "POST", schema.GroupResource{}, "", "", 0, false),
-			expectRotateFail: true,
-			expectHealthy:    false,
 		},
 	}
 

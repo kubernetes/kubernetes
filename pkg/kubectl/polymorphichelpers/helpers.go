@@ -17,6 +17,7 @@ limitations under the License.
 package polymorphichelpers
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -32,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -42,10 +45,12 @@ import (
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
-	options := metav1.ListOptions{LabelSelector: selector}
+func GetFirstPod(client coreclient.PodsGetter, namespace string, labelSelector string, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: labelSelector,
+	}
 
-	podList, err := client.Pods(namespace).List(options)
+	podList, err := client.Pods(namespace).List(listOptions)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -63,25 +68,34 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 		return internalPod, len(podList.Items), nil
 	}
 
-	// Watch until we observe a pod
-	options.ResourceVersion = podList.ResourceVersion
-	w, err := client.Pods(namespace).Watch(options)
+	// Wait until we observe a pod
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.LabelSelector = labelSelector
+			return client.Pods(namespace).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = labelSelector
+			return client.Pods(namespace).Watch(options)
+		},
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	event, err := watchtools.UntilWithSync(ctx, lw, &api.Pod{}, 0, nil, func(event watch.Event) (bool, error) {
+		if event.Type == watch.Added {
+			return true, nil
+		}
+		return false, nil
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer w.Stop()
 
-	condition := func(event watch.Event) (bool, error) {
-		return event.Type == watch.Added || event.Type == watch.Modified, nil
-	}
-	event, err := watch.Until(timeout, w, condition)
-	if err != nil {
-		return nil, 0, err
-	}
 	pod, ok := event.Object.(*api.Pod)
 	if !ok {
 		return nil, 0, fmt.Errorf("%#v is not a pod event", event)
 	}
+
 	return pod, 1, nil
 }
 

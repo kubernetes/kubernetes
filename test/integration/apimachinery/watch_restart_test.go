@@ -234,7 +234,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
 				s, ok := event.Object.(*v1.Secret)
 				if !ok {
-					t.Fatalf("Recived an object that is not a Secret: %#v", event.Object)
+					t.Fatalf("Received an object that is not a Secret: %#v", event.Object)
 				}
 				output = append(output, s.Annotations["count"])
 				// Watch will never end voluntarily

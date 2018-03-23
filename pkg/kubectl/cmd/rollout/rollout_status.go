@@ -17,12 +17,23 @@ limitations under the License.
 package rollout
 
 import (
+	"context"
 	"fmt"
+	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -59,6 +70,7 @@ type RolloutStatusOptions struct {
 
 	Watch    bool
 	Revision int64
+	Timeout  time.Duration
 
 	StatusViewer func(*meta.RESTMapping) (kubectl.StatusViewer, error)
 	Builder      func() *resource.Builder
@@ -73,6 +85,7 @@ func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatus
 		FilenameOptions: &resource.FilenameOptions{},
 		IOStreams:       streams,
 		Watch:           true,
+		Timeout:         0,
 	}
 }
 
@@ -90,7 +103,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate(cmd, args))
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.Run(f))
 		},
 		ValidArgs: validArgs,
 	}
@@ -99,6 +112,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, usage)
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "Watch the status of the rollout until it's done.")
 	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before ending watch, zero means never. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 
 	return cmd
 }
@@ -131,7 +145,7 @@ func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error
 	return nil
 }
 
-func (o *RolloutStatusOptions) Run() error {
+func (o *RolloutStatusOptions) Run(f cmdutil.Factory) error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
@@ -155,11 +169,12 @@ func (o *RolloutStatusOptions) Run() error {
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
-	obj, err := r.Object()
+	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
 		return err
 	}
-	rv, err := meta.NewAccessor().ResourceVersion(obj)
+
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
@@ -169,42 +184,67 @@ func (o *RolloutStatusOptions) Run() error {
 		return err
 	}
 
-	// check if deployment's has finished the rollout
-	status, done, err := statusViewer.Status(info.Namespace, info.Name, o.Revision)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(o.Out, "%s", status)
-	if done {
-		return nil
-	}
-
-	shouldWatch := o.Watch
-	if !shouldWatch {
-		return nil
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return dynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return dynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(options)
+		},
 	}
 
-	// watch for changes to the deployment
-	w, err := r.Watch(rv)
-	if err != nil {
-		return err
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			// We need to make sure we see the object in the cache before we start waiting for events
+			// or we would be waiting for the timeout if such object didn't exist.
+			return true, apierrors.NewNotFound(mapping.Resource.GroupResource(), info.Name)
+		}
+
+		return false, nil
 	}
 
 	// if the rollout isn't done yet, keep watching deployment status
-	intr := interrupt.New(nil, w.Stop)
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	intr := interrupt.New(nil, cancel)
 	return intr.Run(func() error {
-		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
-			// print deployment's status
-			status, done, err := statusViewer.Status(info.Namespace, info.Name, o.Revision)
-			if err != nil {
-				return false, err
+		_, err = watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, 0, preconditionFunc, func(e watch.Event) (bool, error) {
+			switch t := e.Type; t {
+			case watch.Added, watch.Modified:
+				status, done, err := statusViewer.Status(e.Object.(runtime.Unstructured), o.Revision)
+				if err != nil {
+					return false, err
+				}
+				fmt.Fprintf(o.Out, "%s", status)
+				// Quit waiting if the rollout is done
+				if done {
+					return true, nil
+				}
+
+				shouldWatch := o.Watch
+				if !shouldWatch {
+					return true, nil
+				}
+
+				return false, nil
+
+			case watch.Deleted:
+				// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object
+				return true, fmt.Errorf("object has been deleted")
+
+			case watch.Error:
+				return true, fmt.Errorf("watch failed: %v", e.Object)
+
+			default:
+				glog.Fatalf("unexpected event %#v", e)
+				panic("glog failed to exit")
 			}
-			fmt.Fprintf(o.Out, "%s", status)
-			// Quit waiting if the rollout is done
-			if done {
-				return true, nil
-			}
-			return false, nil
 		})
 		return err
 	})

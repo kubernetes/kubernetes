@@ -17,6 +17,7 @@ limitations under the License.
 package csr
 
 import (
+	"context"
 	"crypto"
 	"crypto/sha512"
 	"crypto/x509"
@@ -24,9 +25,10 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/golang/glog"
 	"reflect"
 	"time"
+
+	"github.com/golang/glog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -120,19 +123,24 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 // WaitForCertificate waits for a certificate to be issued until timeout, or returns an error.
 func WaitForCertificate(client certificatesclient.CertificateSigningRequestInterface, req *certificates.CertificateSigningRequest, timeout time.Duration) (certData []byte, err error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", req.Name).String()
-
-	event, err := cache.ListWatchUntil(
-		timeout,
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = fieldSelector
-				return client.List(options)
-			},
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = fieldSelector
-				return client.Watch(options)
-			},
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return client.List(options)
 		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return client.Watch(options)
+		},
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	event, err := watchtools.UntilWithSync(
+		ctx,
+		lw,
+		&certificates.CertificateSigningRequest{},
+		0,
+		nil,
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified, watch.Added:

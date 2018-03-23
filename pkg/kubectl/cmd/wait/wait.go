@@ -17,21 +17,23 @@ limitations under the License.
 package wait
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
@@ -139,7 +141,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	conditionFn, err := conditionFuncFor(flags.ForCondition)
+	conditionFn, err := conditionWaitFuncFor(flags.ForCondition)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +164,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	return o, nil
 }
 
-func conditionFuncFor(condition string) (ConditionFunc, error) {
+func conditionWaitFuncFor(condition string) (ConditionFunc, error) {
 	if strings.ToLower(condition) == "delete" {
 		return IsDeleted, nil
 	}
@@ -206,11 +208,11 @@ type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtim
 
 // RunWait runs the waiting logic
 func (o *WaitOptions) RunWait() error {
+	// TODO: remove this unnecessary GET call, informers now take care about it all
 	return o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
-
 		finalObject, success, err := o.ConditionFn(info, o)
 		if success {
 			o.Printer.PrintObj(finalObject, o.Out)
@@ -224,60 +226,52 @@ func (o *WaitOptions) RunWait() error {
 }
 
 // IsDeleted is a condition func for waiting for something to be deleted
-func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
-	for {
-		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			return info.Object, true, nil
-		}
-		if err != nil {
-			// TODO this could do something slightly fancier if we wish
-			return info.Object, false, err
-		}
-		resourceLocation := ResourceLocation{
-			GroupResource: info.Mapping.Resource.GroupResource(),
-			Namespace:     gottenObj.GetNamespace(),
-			Name:          gottenObj.GetName(),
-		}
-		if uid, ok := o.UIDMap[resourceLocation]; ok {
-			if gottenObj.GetUID() != uid {
-				return gottenObj, true, nil
-			}
-		}
-
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = "metadata.name=" + info.Name
-		watchOptions.ResourceVersion = gottenObj.GetResourceVersion()
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
-		if err != nil {
-			return gottenObj, false, err
-		}
-
-		timeout := endTime.Sub(time.Now())
-		if timeout < 0 {
-			// we're out of time
-			return gottenObj, false, wait.ErrWaitTimeout
-		}
-		watchEvent, err := watch.Until(o.Timeout, objWatch, isDeleted)
-		switch {
-		case err == nil:
-			return watchEvent.Object, true, nil
-		case err == watch.ErrWatchClosed:
-			continue
-		case err == wait.ErrWaitTimeout:
-			if watchEvent != nil {
-				return watchEvent.Object, false, wait.ErrWaitTimeout
-			}
-			return gottenObj, false, wait.ErrWaitTimeout
-		default:
-			return gottenObj, false, err
-		}
+func InformerWait(info *resource.Info, o *WaitOptions, precondition watchtools.PreconditionFunc, condition watchtools.ConditionFunc) (runtime.Object, bool, error) {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(options)
+		},
 	}
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	defer cancel()
+	event, err := watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, 0, precondition, condition)
+	if err != nil {
+		return info.Object, false, err
+	}
+
+	if event == nil {
+		return nil, true, nil
+	}
+
+	return event.Object, true, nil
 }
 
-func isDeleted(event watch.Event) (bool, error) {
-	return event.Type == watch.Deleted, nil
+// IsDeleted is a condition func for waiting for something to be deleted
+func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	conditionFunc := func(event watch.Event) (bool, error) {
+		return event.Type == watch.Deleted, nil
+	}
+
+	return InformerWait(info, o, preconditionFunc, conditionFunc)
 }
 
 // ConditionalWait hold information to check an API status condition
@@ -288,54 +282,7 @@ type ConditionalWait struct {
 
 // IsConditionMet is a conditionfunc for waiting on an API condition to be met
 func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
-	for {
-		resourceVersion := ""
-		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
-		switch {
-		case errors.IsNotFound(err):
-			resourceVersion = "0"
-		case err != nil:
-			return info.Object, false, err
-		default:
-			conditionMet, err := w.checkCondition(gottenObj)
-			if conditionMet {
-				return gottenObj, true, nil
-			}
-			if err != nil {
-				return gottenObj, false, err
-			}
-			resourceVersion = gottenObj.GetResourceVersion()
-		}
-
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = "metadata.name=" + info.Name
-		watchOptions.ResourceVersion = resourceVersion
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
-		if err != nil {
-			return gottenObj, false, err
-		}
-
-		timeout := endTime.Sub(time.Now())
-		if timeout < 0 {
-			// we're out of time
-			return gottenObj, false, wait.ErrWaitTimeout
-		}
-		watchEvent, err := watch.Until(o.Timeout, objWatch, w.isConditionMet)
-		switch {
-		case err == nil:
-			return watchEvent.Object, true, nil
-		case err == watch.ErrWatchClosed:
-			continue
-		case err == wait.ErrWaitTimeout:
-			if watchEvent != nil {
-				return watchEvent.Object, false, wait.ErrWaitTimeout
-			}
-			return gottenObj, false, wait.ErrWaitTimeout
-		default:
-			return gottenObj, false, err
-		}
-	}
+	return InformerWait(info, o, nil, w.isConditionMet)
 }
 
 func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, error) {
@@ -364,8 +311,7 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 
 func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 	if event.Type == watch.Deleted {
-		// this will chain back out, result in another get and an return false back up the chain
-		return false, nil
+		return true, fmt.Errorf("object has been deleted before condition became true")
 	}
 	obj := event.Object.(*unstructured.Unstructured)
 	return w.checkCondition(obj)

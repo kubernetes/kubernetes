@@ -69,8 +69,10 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	watchtools "k8s.io/client-go/tools/watch"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -858,11 +860,21 @@ func WaitForNamespacesDeleted(c clientset.Interface, namespaces []string, timeou
 }
 
 func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountName string, timeout time.Duration) error {
-	w, err := c.CoreV1().ServiceAccounts(ns).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: serviceAccountName}))
-	if err != nil {
-		return err
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", serviceAccountName).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ServiceAccounts(ns).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ServiceAccounts(ns).Watch(options)
+		},
 	}
-	_, err = watch.Until(timeout, w, conditions.ServiceAccountHasSecrets)
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ServiceAccount{}, 0, nil, conditions.ServiceAccountHasSecrets)
 	return err
 }
 
@@ -1570,18 +1582,39 @@ func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, nam
 
 // WaitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
 func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
-	options := metav1.ListOptions{FieldSelector: fields.Set{
-		"metadata.name":      name,
-		"metadata.namespace": ns,
-	}.AsSelector().String()}
-	w, err := c.CoreV1().ReplicationControllers(ns).Watch(options)
-	if err != nil {
-		return err
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ReplicationControllers(ns).List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return c.CoreV1().ReplicationControllers(ns).Watch(options)
+		},
 	}
-	_, err = watch.Until(timeout, w, func(event watch.Event) (bool, error) {
+
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: ns, Name: name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			// We need to make sure we see the object in the cache before we start waiting for events
+			// or we would be waiting for the timeout if such object didn't exist.
+			// (e.g. it was deleted before we started informers so they wouldn't even see the delete event)
+			return true, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, name)
+		}
+
+		return false, nil
+	}
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := watchtools.UntilWithSync(ctx, lw, &v1.ReplicationController{}, 0, preconditionFunc, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
-			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
+			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, name)
 		}
 		switch rc := event.Object.(type) {
 		case *v1.ReplicationController:

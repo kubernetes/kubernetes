@@ -17,14 +17,15 @@ limitations under the License.
 package get
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -63,6 +65,7 @@ type GetOptions struct {
 	Watch     bool
 	WatchOnly bool
 	ChunkSize int64
+	Timeout   time.Duration
 
 	LabelSelector     string
 	FieldSelector     string
@@ -138,6 +141,7 @@ func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptio
 
 		IOStreams:   streams,
 		ChunkSize:   500,
+		Timeout:     0,
 		ServerPrint: true,
 	}
 }
@@ -176,6 +180,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	addServerPrintColumnFlags(cmd, o)
 	cmd.Flags().BoolVar(&o.Export, "export", o.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before ending watch, zero means never. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	return cmd
 }
 
@@ -564,9 +569,15 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	}
 
 	first := true
-	intr := interrupt.New(nil, w.Stop)
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	defer cancel()
+	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
-		_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
+		// FIXME: Switch to watchtools.Until so the closed watches can be retried if possible
+		// Pure WATCH will fail after some time but definitely on API timeout.
+		// Also unit test for this function rely on the fact that it will fail when the API WATCH
+		// is closed which is what needs to be fixed.
+		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			if !isList && first {
 				// drop the initial watch event in the single resource case
 				first = false
