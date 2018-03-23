@@ -28,7 +28,6 @@ type ExtensionsInterface interface {
 	DaemonSetsGetter
 	DeploymentsGetter
 	IngressesGetter
-	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
 }
 
@@ -47,10 +46,6 @@ func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 
 func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
-}
-
-func (c *ExtensionsClient) PodSecurityPolicies() PodSecurityPolicyInterface {
-	return newPodSecurityPolicies(c)
 }
 
 func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {

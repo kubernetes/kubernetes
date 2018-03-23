@@ -25,7 +25,3 @@ type IngressListerExpansion interface{}
 // IngressNamespaceListerExpansion allows custom methods to be added to
 // IngressNamespaceLister.
 type IngressNamespaceListerExpansion interface{}
-
-// PodSecurityPolicyListerExpansion allows custom methods to be added to
-// PodSecurityPolicyLister.
-type PodSecurityPolicyListerExpansion interface{}

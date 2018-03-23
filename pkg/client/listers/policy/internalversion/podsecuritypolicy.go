@@ -22,15 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	policy "k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // PodSecurityPolicyLister helps list PodSecurityPolicies.
 type PodSecurityPolicyLister interface {
 	// List lists all PodSecurityPolicies in the indexer.
-	List(selector labels.Selector) (ret []*extensions.PodSecurityPolicy, err error)
+	List(selector labels.Selector) (ret []*policy.PodSecurityPolicy, err error)
 	// Get retrieves the PodSecurityPolicy from the index for a given name.
-	Get(name string) (*extensions.PodSecurityPolicy, error)
+	Get(name string) (*policy.PodSecurityPolicy, error)
 	PodSecurityPolicyListerExpansion
 }
 
@@ -45,21 +45,21 @@ func NewPodSecurityPolicyLister(indexer cache.Indexer) PodSecurityPolicyLister {
 }
 
 // List lists all PodSecurityPolicies in the indexer.
-func (s *podSecurityPolicyLister) List(selector labels.Selector) (ret []*extensions.PodSecurityPolicy, err error) {
+func (s *podSecurityPolicyLister) List(selector labels.Selector) (ret []*policy.PodSecurityPolicy, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*extensions.PodSecurityPolicy))
+		ret = append(ret, m.(*policy.PodSecurityPolicy))
 	})
 	return ret, err
 }
 
 // Get retrieves the PodSecurityPolicy from the index for a given name.
-func (s *podSecurityPolicyLister) Get(name string) (*extensions.PodSecurityPolicy, error) {
+func (s *podSecurityPolicyLister) Get(name string) (*policy.PodSecurityPolicy, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("podsecuritypolicy"), name)
+		return nil, errors.NewNotFound(policy.Resource("podsecuritypolicy"), name)
 	}
-	return obj.(*extensions.PodSecurityPolicy), nil
+	return obj.(*policy.PodSecurityPolicy), nil
 }

@@ -17,7 +17,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
-        "//pkg/apis/extensions/validation:go_default_library",
+        "//pkg/apis/policy/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
     ],
