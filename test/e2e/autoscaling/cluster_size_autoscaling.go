@@ -1974,6 +1974,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		{label: "metrics-server", minAvailable: 0},
 		{label: "kubernetes-dashboard", minAvailable: 0},
 		{label: "glbc", minAvailable: 0},
+		{label: "metrics-server", minAvailable: 0},
 	}
 	for _, pdbData := range pdbsToAdd {
 		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
