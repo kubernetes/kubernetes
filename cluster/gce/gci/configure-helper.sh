@@ -1682,7 +1682,7 @@ function start-kube-apiserver {
   if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
     local encryption_provider_config_path="/etc/srv/kubernetes/encryption-provider-config.yml"
     echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
-    params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
+    params+=" --encryption-provider-config=${encryption_provider_config_path}"
   fi
 
   src_file="${src_dir}/kube-apiserver.manifest"
