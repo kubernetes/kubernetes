@@ -2308,7 +2308,6 @@ function config-policy-routing {
     ip route add default via "${gateway}" table "${pr_table_name}"
     ip rule add not iif "${nic0}" table "${pr_table_name}"
     ip rule add from "${host_ip}" table main
-    ip rule add to "${host_ip}" table main
   fi
 }
 
