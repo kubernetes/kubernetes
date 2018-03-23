@@ -519,7 +519,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
-			`# hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -541,7 +542,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
-			`# another hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -565,7 +567,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
-			`# hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -595,7 +598,8 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
-			`# another hosts file for testing.
+			`# Kubernetes-managed hosts file (host network).
+# another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
