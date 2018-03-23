@@ -78,6 +78,15 @@ func TestAuditValidOptions(t *testing.T) {
 			return o
 		},
 		expected: "union[buffered<log>,webhook]",
+	}, {
+		name: "default webhook with truncating",
+		options: func() *AuditOptions {
+			o := NewAuditOptions()
+			o.WebhookOptions.ConfigFile = webhookConfig
+			o.WebhookOptions.TruncateOptions.Enabled = true
+			return o
+		},
+		expected: "truncate<buffered<webhook>>",
 	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -146,6 +155,25 @@ func TestAuditInvalidOptions(t *testing.T) {
 			o.WebhookOptions.ConfigFile = "/audit"
 			o.WebhookOptions.BatchOptions.Mode = "batch"
 			o.WebhookOptions.BatchOptions.BatchConfig.ThrottleQPS = -1
+			return o
+		},
+	}, {
+		name: "invalid webhook truncate max event size",
+		options: func() *AuditOptions {
+			o := NewAuditOptions()
+			o.WebhookOptions.ConfigFile = "/audit"
+			o.WebhookOptions.TruncateOptions.Enabled = true
+			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = -1
+			return o
+		},
+	}, {
+		name: "invalid webhook truncate max batch size",
+		options: func() *AuditOptions {
+			o := NewAuditOptions()
+			o.WebhookOptions.ConfigFile = "/audit"
+			o.WebhookOptions.TruncateOptions.Enabled = true
+			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxEventSize = 2
+			o.WebhookOptions.TruncateOptions.TruncateConfig.MaxBatchSize = 1
 			return o
 		},
 	}}
