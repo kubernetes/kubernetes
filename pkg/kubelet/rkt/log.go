@@ -17,13 +17,13 @@ limitations under the License.
 package rkt
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"k8s.io/api/core/v1"

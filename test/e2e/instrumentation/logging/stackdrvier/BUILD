@@ -18,7 +18,6 @@ go_library(
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/instrumentation/logging/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/logging/v2beta1:go_default_library",
         "//vendor/google.golang.org/api/pubsub/v1:go_default_library",

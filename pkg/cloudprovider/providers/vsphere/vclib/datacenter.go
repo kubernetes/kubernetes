@@ -17,6 +17,7 @@ limitations under the License.
 package vclib
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -28,7 +29,6 @@ import (
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 )
 
 // Datacenter extends the govmomi Datacenter object

@@ -17,7 +17,8 @@ limitations under the License.
 package fake
 
 import (
-	"golang.org/x/net/context"
+	"context"
+
 	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 

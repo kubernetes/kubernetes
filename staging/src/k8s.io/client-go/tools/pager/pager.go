@@ -17,9 +17,8 @@ limitations under the License.
 package pager
 
 import (
+	"context"
 	"fmt"
-
-	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"

@@ -17,11 +17,11 @@ limitations under the License.
 package rkt
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
-	"golang.org/x/net/context"
 
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
