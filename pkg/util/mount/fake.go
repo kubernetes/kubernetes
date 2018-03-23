@@ -17,8 +17,12 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -175,7 +179,35 @@ func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
 }
 
 func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return getDeviceNameFromMount(f, mountPath, pluginDir)
+	if runtime.GOOS == "darwin" {
+		return GetDeviceNameFromMountDarwin(f, mountPath, pluginDir)
+	} else {
+		return getDeviceNameFromMount(f, mountPath, pluginDir)
+	}
+}
+
+// getDeviceNameFromMount find the device name from /proc/mounts in which
+// the mount path reference should match the given plugin directory. In case no mount path reference
+// matches, returns the volume name taken from its given mountPath
+func GetDeviceNameFromMountDarwin(mounter Interface, mountPath, pluginDir string) (string, error) {
+	refs, err := GetMountRefsByDev(mounter, mountPath)
+	if err != nil {
+		return "", err
+	}
+	if len(refs) == 0 {
+		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+	}
+	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
+	for _, ref := range refs {
+		if strings.HasPrefix(ref, basemountPath) {
+			volumeID, err := filepath.Rel(basemountPath, ref)
+			if err != nil {
+				return "", err
+			}
+			return volumeID, nil
+		}
+	}
+	return path.Base(mountPath), nil
 }
 
 func (f *FakeMounter) MakeRShared(path string) error {
