@@ -2175,8 +2175,8 @@ function update-dashboard-controller {
 
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
-  local -r coredns_file="${dst_dir}/dns/coredns.yaml"
-  mv "${dst_dir}/dns/coredns.yaml.in" "${coredns_file}"
+  local -r coredns_file="${dst_dir}/dns/coredns/coredns.yaml"
+  mv "${dst_dir}/dns/coredns/coredns.yaml.in" "${coredns_file}"
   # Replace the salt configurations with variable values.
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
@@ -2215,8 +2215,8 @@ function setup-fluentd {
 
 # Sets up the manifests of kube-dns for k8s addons.
 function setup-kube-dns-manifest {
-  local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
-  mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
+  local -r kubedns_file="${dst_dir}/dns/kube-dns/kube-dns.yaml"
+  mv "${dst_dir}/dns/kube-dns/kube-dns.yaml.in" "${kubedns_file}"
   if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
     # Replace with custom GKE kube-dns deployment.
     cat > "${kubedns_file}" <<EOF
@@ -2341,10 +2341,11 @@ EOF
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dns"
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "dns/coredns"
       setup-coredns-manifest
     else
+      setup-addon-manifests "addons" "dns/kube-dns"
       setup-kube-dns-manifest
     fi
   fi
