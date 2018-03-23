@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
+	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
@@ -61,6 +62,9 @@ func TestAddFlags(t *testing.T) {
 		"--audit-log-batch-throttle-enable=true",
 		"--audit-log-batch-throttle-qps=49.5",
 		"--audit-log-batch-throttle-burst=50",
+		"--audit-log-truncate-enabled=true",
+		"--audit-log-truncate-max-batch-size=45",
+		"--audit-log-truncate-max-event-size=44",
 		"--audit-policy-file=/policy",
 		"--audit-webhook-config-file=/webhook-config",
 		"--audit-webhook-mode=blocking",
@@ -70,6 +74,9 @@ func TestAddFlags(t *testing.T) {
 		"--audit-webhook-batch-throttle-enable=false",
 		"--audit-webhook-batch-throttle-qps=43.5",
 		"--audit-webhook-batch-throttle-burst=44",
+		"--audit-webhook-truncate-enabled=true",
+		"--audit-webhook-truncate-max-batch-size=43",
+		"--audit-webhook-truncate-max-event-size=42",
 		"--audit-webhook-initial-backoff=2s",
 		"--authentication-token-webhook-cache-ttl=3m",
 		"--authentication-token-webhook-config-file=/token-webhook-config",
@@ -199,6 +206,13 @@ func TestAddFlags(t *testing.T) {
 						ThrottleBurst:  50,
 					},
 				},
+				TruncateOptions: apiserveroptions.AuditTruncateOptions{
+					Enabled: true,
+					TruncateConfig: audittruncate.Config{
+						MaxBatchSize: 45,
+						MaxEventSize: 44,
+					},
+				},
 			},
 			WebhookOptions: apiserveroptions.AuditWebhookOptions{
 				ConfigFile: "/webhook-config",
@@ -211,6 +225,13 @@ func TestAddFlags(t *testing.T) {
 						ThrottleEnable: false,
 						ThrottleQPS:    43.5,
 						ThrottleBurst:  44,
+					},
+				},
+				TruncateOptions: apiserveroptions.AuditTruncateOptions{
+					Enabled: true,
+					TruncateConfig: audittruncate.Config{
+						MaxBatchSize: 43,
+						MaxEventSize: 42,
 					},
 				},
 				InitialBackoff: 2 * time.Second,
