@@ -27,6 +27,8 @@ service Registration {
 message DevicePluginOptions {
         // Indicates if PreStartContainer call is required before each container start
 	bool pre_start_required = 1;
+	// Indicates if pod annotations are passed to Allocate call
+	bool pod_annotations_required = 2;
 }
 
 message RegisterRequest {
@@ -111,6 +113,9 @@ message AllocateRequest {
 
 message ContainerAllocateRequest {
 	repeated string devicesIDs = 1;
+	// NOTE: Pod annotations are for experimental purpose
+	// Please, don't abuse this
+	map<string, string> podAnnotations = 2;
 }
 
 // AllocateResponse includes the artifacts that needs to be injected into

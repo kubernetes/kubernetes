@@ -13,6 +13,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
         "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",

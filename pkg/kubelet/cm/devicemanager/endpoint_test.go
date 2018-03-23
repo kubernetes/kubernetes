@@ -141,7 +141,10 @@ func TestAllocate(t *testing.T) {
 
 	resp.ContainerResponses = append(resp.ContainerResponses, contResp)
 
+	podAnnotations := map[string]string{"key1": "val1", "key2": "val2"}
+
 	p.SetAllocFunc(func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+		require.Equal(t, podAnnotations, r.ContainerRequests[0].PodAnnotations)
 		return resp, nil
 	})
 
@@ -154,7 +157,7 @@ func TestAllocate(t *testing.T) {
 		t.FailNow()
 	}
 
-	respOut, err := e.allocate([]string{"ADeviceId"})
+	respOut, err := e.allocate([]string{"ADeviceId"}, podAnnotations)
 	require.NoError(t, err)
 	require.Equal(t, resp, respOut)
 }

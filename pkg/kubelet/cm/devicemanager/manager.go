@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
@@ -692,11 +694,23 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			return fmt.Errorf("Unknown Device Plugin %s", resource)
 		}
 
+		// Prepare pod annotations for the endpoint allocate call
+		podAnnotations := make(map[string]string)
+		if eI.opts != nil && eI.opts.PodAnnotationsRequired {
+			// Filter out unwanted annotations
+			for key, value := range pod.Annotations {
+				if strings.HasPrefix(key, core.NodeDeviceManagerAnnotationKeyPrefix) {
+					podAnnotations[key] = value
+				}
+			}
+		}
+
 		devs := allocDevices.UnsortedList()
+
 		// TODO: refactor this part of code to just append a ContainerAllocationRequest
 		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
 		klog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
-		resp, err := eI.e.allocate(devs)
+		resp, err := eI.e.allocate(devs, podAnnotations)
 		metrics.DevicePluginAllocationDuration.WithLabelValues(resource).Observe(metrics.SinceInSeconds(startRPCTime))
 		metrics.DeprecatedDevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
 		if err != nil {

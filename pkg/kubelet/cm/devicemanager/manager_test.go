@@ -380,7 +380,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// preStartContainer calls return errors.
 	e2.stop()
 	as.False(e2.stopTime.IsZero())
-	_, err = e2.allocate([]string{"Device1"})
+	_, err = e2.allocate([]string{"Device1"}, map[string]string{"key1": "val1", "key2": "val2"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
 	_, err = e2.preStartContainer([]string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
@@ -536,7 +536,7 @@ func (a *activePodsStub) updateActivePods(newPods []*v1.Pod) {
 }
 
 type MockEndpoint struct {
-	allocateFunc func(devs []string) (*pluginapi.AllocateResponse, error)
+	allocateFunc func(devs []string, podAllocations map[string]string) (*pluginapi.AllocateResponse, error)
 	initChan     chan []string
 }
 
@@ -550,9 +550,9 @@ func (m *MockEndpoint) preStartContainer(devs []string) (*pluginapi.PreStartCont
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+func (m *MockEndpoint) allocate(devs []string, podAnnotations map[string]string) (*pluginapi.AllocateResponse, error) {
 	if m.allocateFunc != nil {
-		return m.allocateFunc(devs)
+		return m.allocateFunc(devs, podAnnotations)
 	}
 	return nil, nil
 }
@@ -611,7 +611,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		if res.resourceName == "domain2.com/resource2" {
 			testManager.endpoints[res.resourceName] = endpointInfo{
 				e: &MockEndpoint{
-					allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+					allocateFunc: func(devs []string, podAllocations map[string]string) (*pluginapi.AllocateResponse, error) {
 						resp := new(pluginapi.ContainerAllocateResponse)
 						resp.Envs = make(map[string]string)
 						for _, dev := range devs {
@@ -937,7 +937,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Contains(initializedDevs, "dev2")
 	as.Equal(len(initializedDevs), len(res1.devs))
 
-	expectedResps, err := allocateStubFunc()([]string{"dev1", "dev2"})
+	expectedResps, err := allocateStubFunc()([]string{"dev1", "dev2"}, map[string]string{"key1": "val1", "key2": "val2"})
 	as.Nil(err)
 	as.Equal(1, len(expectedResps.ContainerResponses))
 	expectedResp := expectedResps.ContainerResponses[0]
@@ -946,8 +946,8 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
 }
 
-func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error) {
-	return func(devs []string) (*pluginapi.AllocateResponse, error) {
+func allocateStubFunc() func(devs []string, podAllocations map[string]string) (*pluginapi.AllocateResponse, error) {
+	return func(devs []string, podAnnotations map[string]string) (*pluginapi.AllocateResponse, error) {
 		resp := new(pluginapi.ContainerAllocateResponse)
 		resp.Envs = make(map[string]string)
 		for _, dev := range devs {
