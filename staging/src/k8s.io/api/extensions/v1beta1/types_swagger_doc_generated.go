@@ -407,9 +407,9 @@ func (NetworkPolicyList) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicyPeer = map[string]string{
 	"":                  "DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.",
-	"podSelector":       "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.",
-	"namespaceSelector": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.",
-	"ipBlock":           "IPBlock defines policy on a particular IPBlock",
+	"podSelector":       "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods.\n\nIf NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.",
+	"namespaceSelector": "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces.\n\nIf PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.",
+	"ipBlock":           "IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.",
 }
 
 func (NetworkPolicyPeer) SwaggerDoc() map[string]string {
