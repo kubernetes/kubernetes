@@ -130,8 +130,8 @@ function juLog() {
   # calculate vars
   asserts=$(($asserts+1))
   errors=$(($errors+$err))
-  time=`echo "${end} - ${ini}" | bc -l`
-  total=`echo "${total} + ${time}" | bc -l`
+  time=`echo "${end} ${ini}" | awk '{print $1 - $2}'`
+  total=`echo "${total} ${time}" | awk '{print $1 + $2}'`
 
   # write the junit xml report
   ## failure tag
