@@ -74,10 +74,10 @@ process_content () {
   # Start search at package root
   case ${package} in
     github.com/*|golang.org/*|bitbucket.org/*)
-     package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2"/"$3 }')
+     package_root=$(echo "${package}" |awk -F/ '{ print $1"/"$2"/"$3 }')
      ;;
     go4.org/*)
-     package_root=$(echo ${package} |awk -F/ '{ print $1 }')
+     package_root=$(echo "${package}" |awk -F/ '{ print $1 }')
      ;;
     gopkg.in/*)
      # Root of gopkg.in package always ends with '.v(number)' and my contain
@@ -85,10 +85,10 @@ process_content () {
      # - gopkg.in/yaml.v2
      # - gopkg.in/inf.v0
      # - gopkg.in/square/go-jose.v2
-     package_root=$(echo ${package} |grep -oh '.*\.v[0-9]')
+     package_root=$(echo "${package}" |grep -oh '.*\.v[0-9]')
      ;;
     *)
-     package_root=$(echo ${package} |awk -F/ '{ print $1"/"$2 }')
+     package_root=$(echo "${package}" |awk -F/ '{ print $1"/"$2 }')
      ;;
   esac
 
@@ -98,7 +98,7 @@ process_content () {
       [[ -d ${DEPS_DIR}/${dir_root} ]] || continue
 
       # One (set) of these is fine
-      find ${DEPS_DIR}/${dir_root} \
+      find "${DEPS_DIR}/${dir_root}" \
           -xdev -follow -maxdepth ${find_maxdepth} \
           -type f "${find_names[@]}"
     done | sort -u))
@@ -107,9 +107,14 @@ process_content () {
   local f
   index="${package}-${type}"
   if [[ -z "${CONTENT[${index}]-}" ]]; then
-    for f in ${local_files[@]-}; do
+    for f in "${local_files[@]-}"; do
+      if [[ -z "$f" ]]; then
+        # Set the default value and then check it to prevent
+        # accessing potentially empty array
+        continue
+      fi
       # Find some copyright info in any file and break
-      if egrep -i -wq "${ensure_pattern}" "${f}"; then
+      if grep -E -i -wq "${ensure_pattern}" "${f}"; then
         CONTENT[${index}]="${f}"
         break
       fi
@@ -151,19 +156,17 @@ declare -Ag CONTENT
 echo "================================================================================"
 echo "= Kubernetes licensed under: ="
 echo
-cat ${LICENSE_ROOT}/LICENSE
+cat "${LICENSE_ROOT}/LICENSE"
 echo
-echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum | awk '{print $1}')"
+echo "= LICENSE $(cat "${LICENSE_ROOT}/LICENSE" | md5sum | awk '{print $1}')"
 echo "================================================================================"
 ) > ${TMP_LICENSE_FILE}
 
 # Loop through every package in Godeps.json
-for PACKAGE in $(cat Godeps/Godeps.json | \
-                 jq -r ".Deps[].ImportPath" | \
-                 sort -f); do
-  process_content ${PACKAGE} LICENSE
-  process_content ${PACKAGE} COPYRIGHT
-  process_content ${PACKAGE} COPYING
+for PACKAGE in $(jq -r ".Deps[].ImportPath" < Godeps/Godeps.json | sort -f); do
+  process_content "${PACKAGE}" LICENSE
+  process_content "${PACKAGE}" COPYRIGHT
+  process_content "${PACKAGE}" COPYING
 
   # display content
   echo
@@ -195,7 +198,7 @@ __EOF__
   cat "${file}"
 
   echo
-  echo "= ${file} $(cat ${file} | md5sum | awk '{print $1}')"
+  echo "= ${file} $(cat "${file}" | md5sum | awk '{print $1}')"
   echo "================================================================================"
   echo
 done >> ${TMP_LICENSE_FILE}
