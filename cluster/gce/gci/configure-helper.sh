@@ -2284,11 +2284,12 @@ function setup-kubelet-dir {
 
 # Config policy routing.
 #
-# Specifically, with a PTP CNI plugin, for traffic not coming from the network
+# Specifically, with PTP CNI plugin, for traffic not incoming from the network
 # interface that the default route points to, it is always sent to such a
 # network interface.
 function config-policy-routing {
   echo "Configuring policy routing"
+  sysctl net.ipv4.conf.all.rp_filter=2
   local -r tables="/etc/iproute2/rt_tables"
   local reserved_tables="$(grep -v ^# ${tables} | awk '{print $1}')"
   local nic0="$(ip route get 8.8.8.8 | sed -n 's/.*dev \([^\ ]*\) .*/\1/p')"
