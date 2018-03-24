@@ -763,7 +763,7 @@ As announced with the release of version 1.8, the Kubernetes Workloads API is at
 #### **Custom Resources**
 
 *   Validation of resources defined by a Custom Resource Definition (CRD) is now in beta ([#54647](https://github.com/kubernetes/kubernetes/pull/54647),[ @colemickens](https://github.com/colemickens))
-*   An example CRD controller has been added, at [github.com/kubernetes/sample-controller](github.com/kubernetes/sample-controller). ([#52753](https://github.com/kubernetes/kubernetes/pull/52753),[ @munnerz](https://github.com/munnerz))
+*   An example CRD controller has been added, at [github.com/kubernetes/sample-controller](https://github.com/kubernetes/sample-controller). ([#52753](https://github.com/kubernetes/kubernetes/pull/52753),[ @munnerz](https://github.com/munnerz))
 *   Custom resources served by CustomResourceDefinition objects now support field selectors for `metadata.name` and `metadata.namespace`. Also fixed an issue with watching a single object; earlier versions could watch only a collection, and so a watch on an instance would fail.  ([#53345](https://github.com/kubernetes/kubernetes/pull/53345),[ @ncdc](https://github.com/ncdc))
 
 #### **Other**
