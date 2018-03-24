@@ -270,9 +270,13 @@ func getEquivalenceHash(pod *v1.Pod) *equivalencePod {
 	// DeepHashObject considers nil and empty slices to be different. Normalize them.
 	if len(ep.Containers) == 0 {
 		ep.Containers = nil
+	} else {
+		normalizeContainers(ep.Containers)
 	}
 	if len(ep.InitContainers) == 0 {
 		ep.InitContainers = nil
+	} else {
+		normalizeContainers(ep.InitContainers)
 	}
 	if len(ep.Tolerations) == 0 {
 		ep.Tolerations = nil
@@ -289,4 +293,34 @@ func getEquivalenceHash(pod *v1.Pod) *equivalencePod {
 	}
 	// TODO(misterikkit): Also normalize nested maps and slices.
 	return ep
+}
+
+func normalizeContainers(containers []v1.Container) {
+	if len(containers) == 0 {
+		return
+	}
+	for _, container := range containers {
+		if len(container.EnvFrom) == 0 {
+			container.EnvFrom = nil
+		}
+		if len(container.Env) == 0 {
+			container.Env = nil
+		}
+		if len(container.VolumeMounts) == 0 {
+			container.VolumeMounts = nil
+		}
+		if len(container.VolumeDevices) == 0 {
+			container.VolumeDevices = nil
+		}
+		if len(container.Ports) == 0 {
+			container.Ports = nil
+		}
+		if len(container.Args) == 0 {
+			container.Args = nil
+		}
+		if len(container.Command) == 0 {
+			container.Command = nil
+		}
+	}
+	return
 }
