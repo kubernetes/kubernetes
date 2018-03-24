@@ -157,6 +157,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		kubeletapis.LabelHostname,
+		kubeletapis.LabelNodename,
 		kubeletapis.LabelZoneFailureDomain,
 		kubeletapis.LabelZoneRegion,
 		kubeletapis.LabelInstanceType,
@@ -222,6 +223,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
 				kubeletapis.LabelHostname: kl.hostname,
+				kubeletapis.LabelNodename: string(kl.nodeName),
 				kubeletapis.LabelOS:       goruntime.GOOS,
 				kubeletapis.LabelArch:     goruntime.GOARCH,
 			},
