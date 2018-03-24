@@ -18,6 +18,7 @@ install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/
 install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/
 install -p -m 755 -t %{buildroot}%{_bindir} kubeadm
 install -p -m 755 -t %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/ 10-kubeadm.conf
+install -p -m 755 -t %{buildroot}%{_sysconfdir}/sysconfig/ kubelet
 
 %files
 %{_bindir}/kubeadm
