@@ -455,7 +455,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
 		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 		recorder := record.NewFakeRecorder(10)
-		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
+		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder, client}
 
 		stop := make(chan struct{})
 		defer close(stop)
