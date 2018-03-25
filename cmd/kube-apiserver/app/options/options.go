@@ -54,7 +54,6 @@ type ServerRunOptions struct {
 	APIEnablement           *genericoptions.APIEnablementOptions
 
 	AllowPrivileged           bool
-	EnableLogsHandler         bool
 	EventTTL                  time.Duration
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
@@ -91,7 +90,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		StorageSerialization: kubeoptions.NewStorageSerializationOptions(),
 		APIEnablement:        genericoptions.NewAPIEnablementOptions(),
 
-		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
 		MasterCount:            1,
 		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
@@ -148,9 +146,6 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
 		"If true, allow privileged containers. [default=false]")
-
-	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
-		"If true, install a /logs handler for the apiserver logs.")
 
 	// Deprecated in release 1.9
 	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,

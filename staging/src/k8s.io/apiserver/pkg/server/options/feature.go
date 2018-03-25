@@ -17,6 +17,9 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -27,6 +30,8 @@ type FeatureOptions struct {
 	EnableProfiling           bool
 	EnableContentionProfiling bool
 	EnableSwaggerUI           bool
+	EnableLogsHandler         bool
+	LogsDir                   string
 }
 
 func NewFeatureOptions() *FeatureOptions {
@@ -36,6 +41,7 @@ func NewFeatureOptions() *FeatureOptions {
 		EnableProfiling:           defaults.EnableProfiling,
 		EnableContentionProfiling: defaults.EnableContentionProfiling,
 		EnableSwaggerUI:           defaults.EnableSwaggerUI,
+		EnableLogsHandler:         defaults.EnableLogsHandler,
 	}
 }
 
@@ -50,6 +56,10 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 		"Enable lock contention profiling, if profiling is enabled")
 	fs.BoolVar(&o.EnableSwaggerUI, "enable-swagger-ui", o.EnableSwaggerUI,
 		"Enables swagger ui on the apiserver at /swagger-ui")
+	fs.BoolVar(&o.EnableLogsHandler, "enable-logs-handler", o.EnableLogsHandler,
+		"If true, install a /logs handler for the apiserver logs.")
+	fs.StringVar(&o.LogsDir, "logs-dir", o.LogsDir,
+		"Logs directory used for serving logs handler. Default value is `/var/log`.")
 }
 
 func (o *FeatureOptions) ApplyTo(c *server.Config) error {
@@ -60,6 +70,8 @@ func (o *FeatureOptions) ApplyTo(c *server.Config) error {
 	c.EnableProfiling = o.EnableProfiling
 	c.EnableContentionProfiling = o.EnableContentionProfiling
 	c.EnableSwaggerUI = o.EnableSwaggerUI
+	c.EnableLogsHandler = o.EnableLogsHandler
+	c.LogsDir = o.LogsDir
 
 	return nil
 }
@@ -70,5 +82,23 @@ func (o *FeatureOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.EnableLogsHandler && len(o.LogsDir) > 0 {
+		if exist, err := dirExists(o.LogsDir); !exist {
+			errs = append(errs, fmt.Errorf("--logs-dir %q does not exist: %v", o.LogsDir, err))
+		}
+	}
+
 	return errs
+}
+
+// dirExists checks if a path exists and is a directory.
+func dirExists(path string) (bool, error) {
+	fi, err := os.Stat(path)
+	if err == nil && fi.IsDir() {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

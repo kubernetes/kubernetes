@@ -82,6 +82,9 @@ func (s *ServerRunOptions) Validate() []error {
 	if errs := s.APIEnablement.Validate(legacyscheme.Registry, apiextensionsapiserver.Registry, aggregatorscheme.Registry); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
+	if errs := options.Features.Validate(); len(errs) > 0 {
+		errors = append(errors, errs...)
+	}
 
 	return errors
 }

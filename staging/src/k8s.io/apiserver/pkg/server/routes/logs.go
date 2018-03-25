@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,28 +23,40 @@ import (
 	"github.com/emicklei/go-restful"
 )
 
-// Logs adds handlers for the /logs path serving log files from /var/log.
-type Logs struct{}
+// default static logs dir
+const defaultLogDir = "/var/log"
 
+// Logs adds handlers for the /logs path serving log files from LogDir.
+type Logs struct {
+	LogDir string
+}
+
+// Install registers the APIServer's `/logs` handler.
 func (l Logs) Install(c *restful.Container) {
 	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
 	ws := new(restful.WebService)
 	ws.Path("/logs")
 	ws.Doc("get log files")
-	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler).Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
-	ws.Route(ws.GET("/").To(logFileListHandler))
+	ws.Route(ws.GET("/{logpath:*}").To(l.logFileHandler).Param(ws.PathParameter("logpath", "path to the log").DataType("string")))
+	ws.Route(ws.GET("/").To(l.logFileListHandler))
 
 	c.Add(ws)
 }
 
-func logFileHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
+func (l Logs) logFileHandler(req *restful.Request, resp *restful.Response) {
+	logdir := defaultLogDir
+	if len(l.LogDir) > 0 {
+		logdir = l.LogDir
+	}
 	actual := path.Join(logdir, req.PathParameter("logpath"))
 	http.ServeFile(resp.ResponseWriter, req.Request, actual)
 }
 
-func logFileListHandler(req *restful.Request, resp *restful.Response) {
-	logdir := "/var/log"
+func (l Logs) logFileListHandler(req *restful.Request, resp *restful.Response) {
+	logdir := defaultLogDir
+	if len(l.LogDir) > 0 {
+		logdir = l.LogDir
+	}
 	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }

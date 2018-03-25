@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "doc.go",
         "index.go",
+        "logs.go",
         "metrics.go",
         "openapi.go",
         "profiling.go",

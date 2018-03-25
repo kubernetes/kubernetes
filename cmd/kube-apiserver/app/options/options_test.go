@@ -225,6 +225,7 @@ func TestAddFlags(t *testing.T) {
 			EnableSwaggerUI:           true,
 			EnableProfiling:           true,
 			EnableContentionProfiling: true,
+			EnableLogsHandler:         false,
 		},
 		Authentication: &kubeoptions.BuiltInAuthenticationOptions{
 			Anonymous: &kubeoptions.AnonymousAuthenticationOptions{
@@ -269,7 +270,6 @@ func TestAddFlags(t *testing.T) {
 		APIEnablement: &apiserveroptions.APIEnablementOptions{
 			RuntimeConfig: utilflag.ConfigurationMap{},
 		},
-		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,
 		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
 		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
