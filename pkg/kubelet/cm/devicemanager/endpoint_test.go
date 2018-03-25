@@ -183,7 +183,7 @@ func TestPreStartContainer(t *testing.T) {
 	})
 	defer ecleanup(t, p, e)
 
-	resp := new(pluginapi.PreStartContainerResponse)
+	resp := &pluginapi.PreStartContainerResponse{}
 
 	p.SetPreStartContainerFunc(func(r *pluginapi.PreStartContainerRequest, devs map[string]pluginapi.Device) (*pluginapi.PreStartContainerResponse, error) {
 		return resp, nil
