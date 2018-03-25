@@ -106,3 +106,6 @@ const (
 // cache during this grace period to cover the time gap for the capacity change to
 // take effect.
 const endpointStopGracePeriod = time.Duration(5) * time.Minute
+
+// kubeletDeviceManagerCheckpoint is the file name of device plugin checkpoint
+const kubeletDeviceManagerCheckpoint = "kubelet_internal_checkpoint"
