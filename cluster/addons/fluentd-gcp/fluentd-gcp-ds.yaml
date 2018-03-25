@@ -10,6 +10,8 @@ metadata:
     version: v3.0.0
 spec:
   updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 5000
     type: RollingUpdate
   template:
     metadata:
