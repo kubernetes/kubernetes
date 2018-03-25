@@ -2289,7 +2289,9 @@ function setup-kubelet-dir {
 # network interface.
 function config-policy-routing {
   echo "Configuring policy routing"
-  sysctl net.ipv4.conf.all.rp_filter=0
+  if [[ "${NETWORK_POLICY_PROVIDER}" != "calico" ]]; then
+    sysctl net.ipv4.conf.all.rp_filter=2
+  fi
   local -r tables="/etc/iproute2/rt_tables"
   local reserved_tables="$(grep -v ^# ${tables} | awk '{print $1}')"
   local nic0="$(ip route get 8.8.8.8 | sed -n 's/.*dev \([^\ ]*\) .*/\1/p')"
