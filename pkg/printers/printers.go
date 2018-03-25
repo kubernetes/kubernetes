@@ -34,11 +34,17 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 	var printer ResourcePrinter
 	switch format {
 
-	case "json":
-		printer = &JSONPrinter{}
+	case "json", "yaml":
+		jsonYamlFlags := NewJSONYamlPrintFlags()
+		p, matched, err := jsonYamlFlags.ToPrinter(format)
+		if !matched {
+			return nil, fmt.Errorf("unable to match a printer to handle current print options")
+		}
+		if err != nil {
+			return nil, err
+		}
 
-	case "yaml":
-		printer = &YAMLPrinter{}
+		printer = p
 
 	case "name":
 		printer = &NamePrinter{
