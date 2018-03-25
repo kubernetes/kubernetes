@@ -997,6 +997,13 @@ message Image {
     // User name that will run the command(s). This is used if UID is not set
     // and no user is specified when creating container.
     string username = 6;
+    // GID that will run the command(s). This is used as a default if no group is
+    // specified when creating the container. GID and the following group name
+    // are mutually exclusive.
+    Int64Value gid = 7;
+    // Group name that will run the command(s). This is used if GID is not set
+    // and no group is specified when creating container.
+    string groupname = 8;
 }
 
 message ListImagesResponse {

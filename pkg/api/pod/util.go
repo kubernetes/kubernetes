@@ -270,15 +270,18 @@ func DropDisabledRunAsGroupField(podSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
+			podSpec.SecurityContext.RunAsNonRootGroup = nil
 		}
 		for i := range podSpec.Containers {
 			if podSpec.Containers[i].SecurityContext != nil {
 				podSpec.Containers[i].SecurityContext.RunAsGroup = nil
+				podSpec.Containers[i].SecurityContext.RunAsNonRootGroup = nil
 			}
 		}
 		for i := range podSpec.InitContainers {
 			if podSpec.InitContainers[i].SecurityContext != nil {
 				podSpec.InitContainers[i].SecurityContext.RunAsGroup = nil
+				podSpec.InitContainers[i].SecurityContext.RunAsNonRootGroup = nil
 			}
 		}
 	}
