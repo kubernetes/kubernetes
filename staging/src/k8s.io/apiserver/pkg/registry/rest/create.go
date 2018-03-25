@@ -89,6 +89,8 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	FillObjectMetaSystemFields(ctx, objectMeta)
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
+	} else {
+		objectMeta.SetGenerateName("")
 	}
 
 	// Ensure Initializers are not set unless the feature is enabled
