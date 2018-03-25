@@ -282,6 +282,25 @@ data:
       read_from_head true
       tag node-problem-detector
     </source>
+
+    # BEGIN_NODE_JOURNAL
+    # Whether to include node-journal or not is determined when starting the
+    # cluster. It is not changed when the cluster is already running.
+    <source>
+      @type systemd
+      pos_file /var/log/gcp-journald.pos
+      read_from_head true
+      tag node-journal
+    </source>
+
+    <filter node-journal>
+      @type grep
+      <exclude>
+        key _SYSTEMD_UNIT
+        pattern ^(docker|{{ container_runtime }}|kubelet|node-problem-detector)\.service$
+      </exclude>
+    </filter>
+    # END_NODE_JOURNAL
   monitoring.conf: |-
     # This source is used to acquire approximate process start timestamp,
     # which purpose is explained before the corresponding output plugin.
