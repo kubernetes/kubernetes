@@ -109,6 +109,7 @@ func TestNewWithDelegate(t *testing.T) {
     "/healthz/poststarthook/generic-apiserver-start-informers",
     "/healthz/poststarthook/wrapping-post-start-hook",
     "/healthz/wrapping-health",
+    "/metrics",
     "/swaggerapi"
   ]
 }`, t)

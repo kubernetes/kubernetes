@@ -419,7 +419,6 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
-	genericConfig.EnableMetrics = true
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
 		sets.NewString("watch", "proxy"),
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),

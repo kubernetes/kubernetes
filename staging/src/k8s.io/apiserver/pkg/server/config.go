@@ -262,6 +262,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		EnableIndex:                  true,
 		EnableDiscovery:              true,
 		EnableProfiling:              true,
+		EnableMetrics:                true,
 		MaxRequestsInFlight:          400,
 		MaxMutatingRequestsInFlight:  200,
 		RequestTimeout:               time.Duration(60) * time.Second,
