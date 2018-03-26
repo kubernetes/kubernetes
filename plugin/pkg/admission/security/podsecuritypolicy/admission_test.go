@@ -2235,14 +2235,11 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 	}
 	for desc, tc := range tests {
 		t.Run(desc, func(t *testing.T) {
-			var (
-				authz      = &TestAuthorizer{usernameToNamespaceToAllowedPSPs: tc.allowed}
-				privileged = true
-			)
+			authz := &TestAuthorizer{usernameToNamespaceToAllowedPSPs: tc.allowed}
 			pod := goodPod()
 			pod.Namespace = ns
 			pod.Spec.ServiceAccountName = sa
-			pod.Spec.Containers[0].SecurityContext.Privileged = &privileged
+			pod.Spec.SecurityContext.HostPID = true
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
 			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{Name: userName})

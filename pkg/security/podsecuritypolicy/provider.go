@@ -273,10 +273,6 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 
 	allErrs = append(allErrs, s.strategies.CapabilitiesStrategy.Validate(pod, container, sc.Capabilities())...)
 
-	if !s.psp.Spec.HostNetwork && podSC.HostNetwork() {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostNetwork"), podSC.HostNetwork(), "Host network is not allowed to be used"))
-	}
-
 	containersPath := fldPath.Child("containers")
 	for idx, c := range pod.Spec.Containers {
 		idxPath := containersPath.Index(idx)
@@ -287,14 +283,6 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	for idx, c := range pod.Spec.InitContainers {
 		idxPath := containersPath.Index(idx)
 		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
-	}
-
-	if !s.psp.Spec.HostPID && podSC.HostPID() {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPID"), podSC.HostPID(), "Host PID is not allowed to be used"))
-	}
-
-	if !s.psp.Spec.HostIPC && podSC.HostIPC() {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostIPC"), podSC.HostIPC(), "Host IPC is not allowed to be used"))
 	}
 
 	if s.psp.Spec.ReadOnlyRootFilesystem {
