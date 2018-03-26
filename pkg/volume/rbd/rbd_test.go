@@ -538,6 +538,11 @@ func TestConstructVolumeSpec(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	tmpDir, err = filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	fakeVolumeHost := volumetest.NewFakeVolumeHost(tmpDir, nil, nil)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, fakeVolumeHost)
@@ -565,10 +570,10 @@ func TestConstructVolumeSpec(t *testing.T) {
 			t.Fatalf("Create mount path %s failed: %v", c.targetPath, err)
 		}
 		if err = fakeMounter.Mount("/dev/rbd0", c.targetPath, "fake", nil); err != nil {
-			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, podMountPath, err)
+			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, "/dev/rbd0", err)
 		}
 		if err = fakeMounter.Mount(c.targetPath, podMountPath, "fake", []string{"bind"}); err != nil {
-			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, podMountPath, err)
+			t.Fatalf("Bind mount %s to %s failed: %v", podMountPath, c.targetPath, err)
 		}
 		spec, err := plug.ConstructVolumeSpec(c.volumeName, podMountPath)
 		if err != nil {
