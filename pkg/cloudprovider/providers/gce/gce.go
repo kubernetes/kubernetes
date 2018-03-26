@@ -269,9 +269,7 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	// By default, fetch token from GCE metadata server
 	cloudConfig.TokenSource = google.ComputeTokenSource("")
 	cloudConfig.UseMetadataServer = true
-
-	featureMap := make(map[string]bool)
-	cloudConfig.AlphaFeatureGate = &AlphaFeatureGate{featureMap}
+	cloudConfig.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
 	if configFile != nil {
 		if configFile.Global.ApiEndpoint != "" {
 			cloudConfig.ApiEndpoint = configFile.Global.ApiEndpoint
@@ -289,19 +287,7 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 
 		cloudConfig.NodeTags = configFile.Global.NodeTags
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
-
-		alphaFeatureGate, err := NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
-		if err != nil {
-			glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
-		}
-		cloudConfig.AlphaFeatureGate = alphaFeatureGate
-	} else {
-		// initialize AlphaFeatureGate when no AlphaFeatures are configured.
-		alphaFeatureGate, err := NewAlphaFeatureGate([]string{})
-		if err != nil {
-			glog.Errorf("Encountered error for initializing alpha feature gate: %v", err)
-		}
-		cloudConfig.AlphaFeatureGate = alphaFeatureGate
+		cloudConfig.AlphaFeatureGate = NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
 	}
 
 	// retrieve projectID and zone
