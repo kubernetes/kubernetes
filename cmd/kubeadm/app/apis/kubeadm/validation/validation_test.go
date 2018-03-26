@@ -571,7 +571,7 @@ func TestValidateFeatureGates(t *testing.T) {
 		{featureFlag{"Foo": true}, false},
 	}
 	for _, rt := range tests {
-		actual := ValidateFeatureGates(rt.featureGates, nil)
+		actual := ValidateFeatureGates(rt.featureGates, "", nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"failed featureGates:\n\texpected: %t\n\t  actual: %t",

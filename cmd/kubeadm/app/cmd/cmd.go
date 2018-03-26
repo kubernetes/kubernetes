@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 
 	// Register the kubeadm configuration types because CLI flag generation
@@ -81,14 +80,6 @@ func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
-
-	// Wrap not yet fully supported commands in an alpha subcommand
-	experimentalCmd := &cobra.Command{
-		Use:   "alpha",
-		Short: "Experimental sub-commands not yet fully functional.",
-	}
-	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
-	cmds.AddCommand(experimentalCmd)
 
 	return cmds
 }
