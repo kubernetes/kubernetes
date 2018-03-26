@@ -480,7 +480,7 @@ func TestIsOvercommitAllowed(t *testing.T) {
 		},
 		{
 			name:    HugePageResourceName(resource.MustParse("2Mi")),
-			allowed: false,
+			allowed: true,
 		},
 	}
 	for _, testCase := range testCases {

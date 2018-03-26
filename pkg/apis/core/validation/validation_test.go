@@ -3646,28 +3646,6 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 				DNSPolicy:     core.DNSClusterFirst,
 			},
 		},
-	}
-	failureCases := []core.Pod{
-		{ // Basic fields.
-			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-requireCpuOrMemory", Namespace: "ns"},
-			Spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						Resources: core.ResourceRequirements{
-							Requests: core.ResourceList{
-								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-							},
-							Limits: core.ResourceList{
-								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			},
-		},
 		{ // Basic fields.
 			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
 			Spec: core.PodSpec{
@@ -3684,6 +3662,28 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 								core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 								core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 								core.ResourceName("hugepages-2Mi"):     resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+			},
+		},
+	}
+	failureCases := []core.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-requireCpuOrMemory", Namespace: "ns"},
+			Spec: core.PodSpec{
+				Containers: []core.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: core.ResourceRequirements{
+							Requests: core.ResourceList{
+								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: core.ResourceList{
+								core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
 							},
 						},
 					},
