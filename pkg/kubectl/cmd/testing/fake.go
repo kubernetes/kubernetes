@@ -255,9 +255,12 @@ func NewTestFactory() *TestFactory {
 	// specify an optionalClientConfig to explicitly use in testing
 	// to avoid polluting an existing user config.
 	config, configFile := defaultFakeClientConfig()
+	restConfig, _ := config.ClientConfig()
 	return &TestFactory{
-		Factory:        cmdutil.NewFactory(config),
-		tempConfigFile: configFile,
+		Factory:         cmdutil.NewFactory(config),
+		Client:          &fake.RESTClient{},
+		ClientConfigVal: restConfig,
+		tempConfigFile:  configFile,
 	}
 }
 

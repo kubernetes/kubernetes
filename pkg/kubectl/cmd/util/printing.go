@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -234,54 +235,37 @@ func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts printer
 	return printer
 }
 
-// ValidResourceTypeList returns a multi-line string containing the valid resources. May
-// be called before the factory is initialized.
-// TODO: This function implementation should be replaced with a real implementation from the
-//   discovery service.
+// ValidResourceTypeList returns a multi-line string containing the valid resources.
 func ValidResourceTypeList(f ClientAccessFactory) string {
-	// TODO: Should attempt to use the cached discovery list or fallback to a static list
-	// that is calculated from code compiled into the factory.
-	return templates.LongDesc(`Valid resource types include:
-	
-			* all
-			* certificatesigningrequests (aka 'csr')
-			* clusterrolebindings
-			* clusterroles
-			* componentstatuses (aka 'cs')
-			* configmaps (aka 'cm')
-			* controllerrevisions
-			* cronjobs
-			* customresourcedefinition (aka 'crd')
-			* daemonsets (aka 'ds')
-			* deployments (aka 'deploy')
-			* endpoints (aka 'ep')
-			* events (aka 'ev')
-			* horizontalpodautoscalers (aka 'hpa')
-			* ingresses (aka 'ing')
-			* jobs
-			* limitranges (aka 'limits')
-			* namespaces (aka 'ns')
-			* networkpolicies (aka 'netpol')
-			* nodes (aka 'no')
-			* persistentvolumeclaims (aka 'pvc')
-			* persistentvolumes (aka 'pv')
-			* poddisruptionbudgets (aka 'pdb')
-			* podpreset
-			* pods (aka 'po')
-			* podsecuritypolicies (aka 'psp')
-			* podtemplates
-			* replicasets (aka 'rs')
-			* replicationcontrollers (aka 'rc')
-			* resourcequotas (aka 'quota')
-			* rolebindings
-			* roles
-			* secrets
-			* serviceaccounts (aka 'sa')
-			* services (aka 'svc')
-			* statefulsets (aka 'sts')
-			* storageclasses (aka 'sc')
-	
-	`)
+	resourceDes := map[string]string{}
+	if discoveryClient, err := f.DiscoveryClient(); err == nil {
+		if apiResourceList, err := discoveryClient.ServerResources(); err == nil {
+			for _, resources := range apiResourceList {
+				for _, resource := range resources.APIResources {
+					if !strings.Contains(resource.Verbs.String(), "get") || strings.Contains(resource.Name, "/") {
+						continue
+					}
+
+					if _, ok := resourceDes[resource.Name]; !ok {
+						if len(resource.ShortNames) > 0 {
+							resourceDes[resource.Name] = "* " + resource.Name + " (aka '" + strings.Join(resource.ShortNames, ",") + "')"
+						} else {
+							resourceDes[resource.Name] = "* " + resource.Name
+						}
+					}
+				}
+			}
+		}
+	}
+	longDesc := "Valid resource types include:\n\n"
+	desc := make([]string, len(resourceDes)+1)
+	desc[0] = "* all"
+	for _, value := range resourceDes {
+		desc = append(desc, value)
+	}
+	sort.Strings(desc)
+	longDesc = longDesc + strings.Join(desc, "\n")
+	return templates.LongDesc(longDesc)
 }
 
 // Retrieve a list of handled resources from printer as valid args
