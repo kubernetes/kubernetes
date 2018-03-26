@@ -26,6 +26,8 @@ import (
 type AppsInterface interface {
 	RESTClient() rest.Interface
 	ControllerRevisionsGetter
+	DeploymentsGetter
+	ReplicaSetsGetter
 	StatefulSetsGetter
 }
 
@@ -36,6 +38,14 @@ type AppsClient struct {
 
 func (c *AppsClient) ControllerRevisions(namespace string) ControllerRevisionInterface {
 	return newControllerRevisions(c, namespace)
+}
+
+func (c *AppsClient) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
+}
+
+func (c *AppsClient) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
 }
 
 func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {
