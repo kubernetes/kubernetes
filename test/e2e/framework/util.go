@@ -2984,7 +2984,7 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 }
 
 // DeleteResourceAndPods deletes a given resource and all pods it spawned
-func DeleteResourceAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, kind schema.GroupKind, ns, name string) error {
+func DeleteResourceAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, kind schema.GroupKind, ns, name string) error {
 	By(fmt.Sprintf("deleting %v %s in namespace %s", kind, name, ns))
 
 	rtObject, err := getRuntimeObjectForKind(clientset, kind, ns, name)
@@ -3005,7 +3005,7 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	}
 	defer ps.Stop()
 	startTime := time.Now()
-	if err := testutils.DeleteResourceUsingReaperWithRetries(internalClientset, kind, ns, name, nil); err != nil {
+	if err := testutils.DeleteResourceUsingReaperWithRetries(internalClientset, kind, ns, name, nil, scaleClient); err != nil {
 		return fmt.Errorf("error while stopping %v: %s: %v", kind, name, err)
 	}
 	deleteTime := time.Now().Sub(startTime)

@@ -155,8 +155,8 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
 }
 
-func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
-	return DeleteResourceAndPods(clientset, internalClientset, api.Kind("ReplicationController"), ns, name)
+func DeleteRCAndPods(clientset clientset.Interface, internalClientset internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, name string) error {
+	return DeleteResourceAndPods(clientset, internalClientset, scaleClient, api.Kind("ReplicationController"), ns, name)
 }
 
 func ScaleRC(clientset clientset.Interface, internalClientset internalclientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {

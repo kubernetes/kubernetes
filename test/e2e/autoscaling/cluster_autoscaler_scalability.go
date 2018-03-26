@@ -347,7 +347,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		timeToWait := 5 * time.Minute
 		podsConfig := reserveMemoryRCConfig(f, "unschedulable-pod", unschedulablePodReplicas, totalMemReservation, timeToWait)
 		framework.RunRC(*podsConfig) // Ignore error (it will occur because pods are unschedulable)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, podsConfig.Name)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, podsConfig.Name)
 
 		// Ensure that no new nodes have been added so far.
 		Expect(framework.NumberOfReadyNodes(f.ClientSet)).To(Equal(nodeCount))
@@ -417,7 +417,7 @@ func simpleScaleUpTestWithTolerance(f *framework.Framework, config *scaleUpTestC
 	}
 	timeTrack(start, fmt.Sprintf("Scale up to %v", config.expectedResult.nodes))
 	return func() error {
-		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, config.extraPods.Name)
+		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, config.extraPods.Name)
 	}
 }
 
@@ -500,7 +500,7 @@ func createHostPortPodsWithMemory(f *framework.Framework, id string, replicas, p
 	err := framework.RunRC(*config)
 	framework.ExpectNoError(err)
 	return func() error {
-		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, id)
+		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, id)
 	}
 }
 
@@ -540,7 +540,7 @@ func distributeLoad(f *framework.Framework, namespace string, id string, podDist
 	framework.ExpectNoError(framework.RunRC(*rcConfig))
 	framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, f.ClientSet))
 	return func() error {
-		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, id)
+		return framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, id)
 	}
 }
 

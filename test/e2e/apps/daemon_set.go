@@ -70,7 +70,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
 				By(fmt.Sprintf("Deleting DaemonSet %q with reaper", ds.Name))
-				dsReaper, err := kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), f.InternalClientset)
+				dsReaper, err := kubectl.ReaperFor(extensionsinternal.Kind("DaemonSet"), f.InternalClientset, f.ScalesGetter)
 				Expect(err).NotTo(HaveOccurred())
 				err = dsReaper.Stop(f.Namespace.Name, ds.Name, 0, nil)
 				Expect(err).NotTo(HaveOccurred())

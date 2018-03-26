@@ -36,6 +36,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
+	scaleclient "k8s.io/client-go/scale"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -86,6 +87,7 @@ type ResourceConsumer struct {
 	nsName                   string
 	clientSet                clientset.Interface
 	internalClientset        *internalclientset.Clientset
+	scaleClient              scaleclient.ScalesGetter
 	cpu                      chan int
 	mem                      chan int
 	customMetric             chan int
@@ -104,15 +106,15 @@ func GetResourceConsumerImage() string {
 	return resourceConsumerImage
 }
 
-func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
-		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, internalClientset)
+		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, internalClientset, scaleClient)
 }
 
 // TODO this still defaults to replication controller
-func NewStaticResourceConsumer(name, nsName string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+func NewStaticResourceConsumer(name, nsName string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, KindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
-		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, clientset, internalClientset)
+		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, clientset, internalClientset, scaleClient)
 }
 
 /*
@@ -123,7 +125,7 @@ memLimit argument is in megabytes, memLimit is a maximum amount of memory that c
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
 func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
-	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 
 	runServiceAndWorkloadForResourceConsumer(clientset, internalClientset, nsName, name, kind, replicas, cpuLimit, memLimit)
 	rc := &ResourceConsumer{
@@ -133,6 +135,7 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 		nsName:                   nsName,
 		clientSet:                clientset,
 		internalClientset:        internalClientset,
+		scaleClient:              scaleClient,
 		cpu:                      make(chan int),
 		mem:                      make(chan int),
 		customMetric:             make(chan int),
@@ -401,9 +404,9 @@ func (rc *ResourceConsumer) CleanUp() {
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
 	kind := rc.kind.GroupKind()
-	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, kind, rc.nsName, rc.name))
+	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, rc.scaleClient, kind, rc.nsName, rc.name))
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(rc.name, nil))
-	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, api.Kind("ReplicationController"), rc.nsName, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, rc.scaleClient, api.Kind("ReplicationController"), rc.nsName, rc.controllerName))
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(rc.controllerName, nil))
 }
 

@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -178,10 +179,6 @@ type ObjectMappingFactory interface {
 
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object, timeout time.Duration) (*restclient.Request, error)
-	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
-	Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
-	// Returns a Reaper for gracefully shutting down resources.
-	Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 	// Returns a HistoryViewer for viewing change history
 	HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error)
 	// Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error
@@ -213,6 +210,12 @@ type BuilderFactory interface {
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.
 	PluginRunner() plugins.PluginRunner
+	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
+	Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
+	// ScaleClient gives you back scale getter
+	ScaleClient() (scaleclient.ScalesGetter, error)
+	// Returns a Reaper for gracefully shutting down resources.
+	Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 type factory struct {
