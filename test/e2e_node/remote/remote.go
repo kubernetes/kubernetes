@@ -23,6 +23,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -66,7 +68,7 @@ func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFilePrefix string, testArgs string, ginkgoArgs string, systemSpecName string) (string, bool, error) {
 	// Create the temp staging directory
 	glog.V(2).Infof("Staging test binaries on %q", host)
-	workspace := fmt.Sprintf("/tmp/node-e2e-%s", getTimestamp())
+	workspace := newWorkspaceDir()
 	// Do not sudo here, so that we can use scp to copy test archive to the directdory.
 	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
@@ -126,11 +128,33 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	return output, len(aggErrs) == 0, utilerrors.NewAggregate(aggErrs)
 }
 
-// timestampFormat is the timestamp format used in the node e2e directory name.
-const timestampFormat = "20060102T150405"
+const (
+	// workspaceDirPrefix is the string prefix used in the workspace directory name.
+	workspaceDirPrefix = "node-e2e-"
+	// timestampFormat is the timestamp format used in the node e2e directory name.
+	timestampFormat = "20060102T150405"
+)
 
 func getTimestamp() string {
 	return fmt.Sprintf(time.Now().Format(timestampFormat))
+}
+
+func newWorkspaceDir() string {
+	return filepath.Join("/tmp", workspaceDirPrefix+getTimestamp())
+}
+
+// Parses the workspace directory name and gets the timestamp part of it.
+// This can later be used to name other artifacts (such as the
+// kubelet-${instance}.service systemd transient service used to launch
+// Kubelet) so that they can be matched to each other.
+func GetTimestampFromWorkspaceDir(dir string) string {
+	dirTimestamp := strings.TrimPrefix(filepath.Base(dir), workspaceDirPrefix)
+	re := regexp.MustCompile("^\\d{8}T\\d{6}$")
+	if re.MatchString(dirTimestamp) {
+		return dirTimestamp
+	}
+	// Fallback: if we can't find that timestamp, default to using Now()
+	return getTimestamp()
 }
 
 func getTestArtifacts(host, testDir string) error {
