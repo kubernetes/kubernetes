@@ -731,9 +731,10 @@ func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 
 // This implementation is shared between Linux and NsEnterMounter
 func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error {
-	glog.V(4).Infof("Cleaning up subpath mounts for %s", podDir)
 	// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/*
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
+	glog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
+
 	containerDirs, err := ioutil.ReadDir(subPathDir)
 	if err != nil {
 		if os.IsNotExist(err) {
