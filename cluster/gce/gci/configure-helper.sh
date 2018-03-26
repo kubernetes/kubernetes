@@ -2288,8 +2288,12 @@ function setup-kubelet-dir {
 # interface that the default route points to, it is always sent to such a
 # network interface.
 function config-policy-routing {
+  # Do not apply policy routing if kubenet is used.
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
+    return
+  fi
   echo "Configuring policy routing"
-  if [[ "${NETWORK_POLICY_PROVIDER}" != "calico" ]]; then
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" != "calico" ]]; then
     sysctl net.ipv4.conf.all.rp_filter=2
   fi
   local -r tables="/etc/iproute2/rt_tables"
