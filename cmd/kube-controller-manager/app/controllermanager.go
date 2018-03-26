@@ -381,7 +381,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
-	if err := genericcontrollerconfig.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
+	if err := genericcontrollerconfig.WaitForAPIServer(versionedClient, 5*time.Minute); err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
 	}
 
