@@ -759,6 +759,11 @@ func (s ActivePods) Less(i, j int) bool {
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
 		return afterOrZero(&s[i].CreationTimestamp, &s[j].CreationTimestamp)
 	}
+	// 7. The ones already marked for deletions < running pods
+	// This is used to filter out the pods in GetFirstPod() used in CLI.
+	if s[i].DeletionTimestamp != nil && s[j].DeletionTimestamp == nil {
+		return true
+	}
 	return false
 }
 

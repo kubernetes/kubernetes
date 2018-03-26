@@ -342,7 +342,7 @@ func TestActivePodFiltering(t *testing.T) {
 }
 
 func TestSortingActivePods(t *testing.T) {
-	numPods := 9
+	numPods := 10
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
 	podList := newPodList(nil, numPods, v1.PodRunning, rc)
@@ -351,6 +351,7 @@ func TestSortingActivePods(t *testing.T) {
 	for i := range podList.Items {
 		pods[i] = &podList.Items[i]
 	}
+	now := metav1.Now()
 	// pods[0] is not scheduled yet.
 	pods[0].Spec.NodeName = ""
 	pods[0].Status.Phase = v1.PodPending
@@ -360,38 +361,41 @@ func TestSortingActivePods(t *testing.T) {
 	// pods[2] is unknown.
 	pods[2].Spec.NodeName = "foo"
 	pods[2].Status.Phase = v1.PodUnknown
-	// pods[3] is running but not ready.
+	// pods[3] is being deleted
 	pods[3].Spec.NodeName = "foo"
 	pods[3].Status.Phase = v1.PodRunning
-	// pods[4] is running and ready but without LastTransitionTime.
-	now := metav1.Now()
+	pods[3].DeletionTimestamp = &now
+	// pods[4] is running but not ready.
 	pods[4].Spec.NodeName = "foo"
 	pods[4].Status.Phase = v1.PodRunning
-	pods[4].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
-	pods[4].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
-	// pods[5] is running and ready and with LastTransitionTime.
+	// pods[5] is running and ready but without LastTransitionTime.
 	pods[5].Spec.NodeName = "foo"
 	pods[5].Status.Phase = v1.PodRunning
-	pods[5].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: now}}
+	pods[5].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
 	pods[5].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
-	// pods[6] is running ready for a longer time than pods[5].
-	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	// pods[6] is running and ready and with LastTransitionTime.
 	pods[6].Spec.NodeName = "foo"
 	pods[6].Status.Phase = v1.PodRunning
-	pods[6].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[6].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: now}}
 	pods[6].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
-	// pods[7] has lower container restart count than pods[6].
+	// pods[7] is running ready for a longer time than pods[5].
+	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
 	pods[7].Spec.NodeName = "foo"
 	pods[7].Status.Phase = v1.PodRunning
 	pods[7].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
-	pods[7].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
-	pods[7].CreationTimestamp = now
-	// pods[8] is older than pods[7].
+	pods[7].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
+	// pods[8] has lower container restart count than pods[6].
 	pods[8].Spec.NodeName = "foo"
 	pods[8].Status.Phase = v1.PodRunning
 	pods[8].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
 	pods[8].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
-	pods[8].CreationTimestamp = then
+	pods[8].CreationTimestamp = now
+	// pods[9] is older than pods[7].
+	pods[9].Spec.NodeName = "foo"
+	pods[9].Status.Phase = v1.PodRunning
+	pods[9].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
+	pods[9].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
+	pods[9].CreationTimestamp = then
 
 	getOrder := func(pods []*v1.Pod) []string {
 		names := make([]string, len(pods))
