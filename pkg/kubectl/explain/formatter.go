@@ -48,7 +48,11 @@ func (f *Formatter) Write(str string, a ...interface{}) error {
 	for i := 0; i < f.IndentLevel; i++ {
 		indent = indent + " "
 	}
-	_, err := io.WriteString(f.Writer, indent+fmt.Sprintf(str, a...)+"\n")
+
+	if len(a) > 0 {
+		str = fmt.Sprintf(str, a...)
+	}
+	_, err := io.WriteString(f.Writer, indent+str+"\n")
 	return err
 }
 
