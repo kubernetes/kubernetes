@@ -192,7 +192,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 	}
 	if len(overlapRCs) > 0 {
 		return fmt.Errorf(
-			"Detected overlapping controllers for rc %v: %v, please manage deletion individually with --cascade=false.",
+			"overlapped controllers are detected for rc %v: %v, please manage deletion individually with --cascade=false.",
 			ctrl.Name, strings.Join(overlapRCs, ","))
 	}
 	if len(exactMatchRCs) == 1 {
@@ -262,7 +262,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 			names = append(names, overlappingRS.Name)
 		}
 		return fmt.Errorf(
-			"Detected overlapping ReplicaSets for ReplicaSet %v: %v, please manage deletion individually with --cascade=false.",
+			"overlapped ReplicaSets are detected for ReplicaSet %v: %v, please manage deletion individually with --cascade=false.",
 			rs.Name, strings.Join(names, ","))
 	}
 	if len(exactMatchRSs) == 0 {
