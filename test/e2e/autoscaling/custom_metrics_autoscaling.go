@@ -138,11 +138,11 @@ func customMetricTest(f *framework.Framework, kubeClient clientset.Interface, hp
 	}
 	defer monitoring.CleanupDescriptors(gcmService, projectId)
 
-	err = monitoring.CreateAdapter()
+	err = monitoring.CreateAdapter(monitoring.AdapterDefault)
 	if err != nil {
 		framework.Failf("Failed to set up: %v", err)
 	}
-	defer monitoring.CleanupAdapter()
+	defer monitoring.CleanupAdapter(monitoring.AdapterDefault)
 
 	// Run application that exports the metric
 	err = createDeploymentToScale(f, kubeClient, deployment, pod)
