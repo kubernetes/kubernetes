@@ -61,3 +61,7 @@ func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
 func (b *FakeVolumeBinder) GetBindingsCache() PodBindingCache {
 	return nil
 }
+
+func (b *FakeVolumeBinder) GetMatchingCache() PVCMatchingCache {
+	return nil
+}

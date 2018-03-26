@@ -82,6 +82,9 @@ type SchedulerVolumeBinder interface {
 
 	// GetBindingsCache returns the cache used (if any) to store volume binding decisions.
 	GetBindingsCache() PodBindingCache
+
+	// GetMatchingCache returns the cased used (if any) to store pvc matching states.
+	GetMatchingCache() PVCMatchingCache
 }
 
 type volumeBinder struct {
@@ -95,6 +98,9 @@ type volumeBinder struct {
 	// Stores binding decisions that were made in FindPodVolumes for use in AssumePodVolumes.
 	// AssumePodVolumes modifies the bindings again for use in BindPodVolumes.
 	podBindingCache PodBindingCache
+
+	// Stores pvc matchings that were made in FindPodVolumes.
+	pvcMatchingCache PVCMatchingCache
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
@@ -112,11 +118,12 @@ func NewVolumeBinder(
 	}
 
 	b := &volumeBinder{
-		ctrl:            ctrl,
-		pvcCache:        pvcInformer.Lister(),
-		nodeCache:       nodeInformer.Lister(),
-		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
-		podBindingCache: NewPodBindingCache(),
+		ctrl:             ctrl,
+		pvcCache:         pvcInformer.Lister(),
+		nodeCache:        nodeInformer.Lister(),
+		pvCache:          NewPVAssumeCache(pvInformer.Informer()),
+		podBindingCache:  NewPodBindingCache(),
+		pvcMatchingCache: NewPVCMatchingCache(),
 	}
 
 	return b
@@ -124,6 +131,10 @@ func NewVolumeBinder(
 
 func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 	return b.podBindingCache
+}
+
+func (b *volumeBinder) GetMatchingCache() PVCMatchingCache {
+	return b.pvcMatchingCache
 }
 
 // FindPodVolumes caches the matching PVs per node in podBindingCache
@@ -354,16 +365,38 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*bindingI
 	chosenPVs := map[string]*v1.PersistentVolume{}
 
 	for _, bindingInfo := range claimsToBind {
-		// Get storage class name from each PVC
-		storageClassName := ""
-		storageClass := bindingInfo.pvc.Spec.StorageClassName
-		if storageClass != nil {
-			storageClassName = *storageClass
-		}
-		allPVs := b.pvCache.ListPVs(storageClassName)
+		matchingState := b.pvcMatchingCache.GetMatching(pod, bindingInfo.pvc)
+		if matchingState == nil {
+			// No cache.
+			matchingState = &matching{}
 
-		// Find a matching PV
-		bindingInfo.pv, err = findMatchingVolume(bindingInfo.pvc, allPVs, node, chosenPVs, true)
+			// Get storage class name from each PVC
+			storageClassName := ""
+			storageClass := bindingInfo.pvc.Spec.StorageClassName
+			if storageClass != nil {
+				storageClassName = *storageClass
+			}
+			allPVs := b.pvCache.ListPVs(storageClassName)
+
+			// Find a matching PV
+			matchingState.pv, matchingState.err = findMatchingVolume(bindingInfo.pvc, allPVs, node, chosenPVs, true)
+			allPVsHasNoNodeAffinity := true
+			for _, pv := range allPVs {
+				if volumeutil.HasNodeAffinity(pv) {
+					allPVsHasNoNodeAffinity = false
+					break
+				}
+			}
+			if allPVsHasNoNodeAffinity {
+				// If none of the PVs have node affinity. The result of the first
+				// attempt is final result. Store it in cache.
+				b.pvcMatchingCache.UpdateMatching(pod, bindingInfo.pvc, matchingState)
+			}
+		}
+
+		err = matchingState.err
+		bindingInfo.pv = matchingState.pv
+
 		if err != nil {
 			return false, err
 		}

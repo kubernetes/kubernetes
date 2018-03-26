@@ -16,6 +16,7 @@ go_library(
         "scheduler_binder.go",
         "scheduler_binder_cache.go",
         "scheduler_binder_fake.go",
+        "scheduler_pvc_cache.go",
         "volume_host.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume",
@@ -73,6 +74,7 @@ go_test(
         "scheduler_assume_cache_test.go",
         "scheduler_binder_cache_test.go",
         "scheduler_binder_test.go",
+        "scheduler_pvc_cache_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
