@@ -73,7 +73,7 @@ func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
 
-		allocFunc: defaultAllocFunc,
+		allocFunc:             defaultAllocFunc,
 		preStartContainerFunc: defaultPreStartContainerFunc,
 	}
 }
