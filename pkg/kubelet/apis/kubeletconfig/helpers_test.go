@@ -168,6 +168,7 @@ var (
 		"EvictionSoft[*]",
 		"EvictionSoftGracePeriod[*]",
 		"FailSwapOn",
+		"PlegRelistThreshold.Duration",
 		"FeatureGates[*]",
 		"FileCheckFrequency.Duration",
 		"HTTPCheckFrequency.Duration",

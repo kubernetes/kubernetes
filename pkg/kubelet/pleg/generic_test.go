@@ -42,17 +42,18 @@ type TestGenericPLEG struct {
 	clock   *clock.FakeClock
 }
 
-func newTestGenericPLEG() *TestGenericPLEG {
+func newTestGenericPLEG(relistThreshold time.Duration) *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
 	clock := clock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
-		relistPeriod: time.Hour,
-		runtime:      fakeRuntime,
-		eventChannel: make(chan *PodLifecycleEvent, 100),
-		podRecords:   make(podRecords),
-		clock:        clock,
+		relistPeriod:    time.Hour,
+		relistThreshold: relistThreshold,
+		runtime:         fakeRuntime,
+		eventChannel:    make(chan *PodLifecycleEvent, 100),
+		podRecords:      make(podRecords),
+		clock:           clock,
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
@@ -93,7 +94,7 @@ func verifyEvents(t *testing.T, expected, actual []*PodLifecycleEvent) {
 }
 
 func TestRelisting(t *testing.T) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(3 * time.Minute)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
@@ -168,7 +169,7 @@ func TestDetectingContainerDeaths(t *testing.T) {
 }
 
 func testReportMissingContainers(t *testing.T, numRelists int) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(3 * time.Minute)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	runtime.AllPodList = []*containertest.FakePod{
@@ -209,7 +210,7 @@ func testReportMissingContainers(t *testing.T, numRelists int) {
 }
 
 func testReportMissingPods(t *testing.T, numRelists int) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(3 * time.Minute)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	runtime.AllPodList = []*containertest.FakePod{
@@ -345,22 +346,31 @@ func TestRemoveCacheEntry(t *testing.T) {
 }
 
 func TestHealthy(t *testing.T) {
-	testPleg := newTestGenericPLEG()
-	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
-	ok, _ := pleg.Healthy()
-	assert.True(t, ok, "pleg should be healthy")
+	cases := []time.Duration{
+		3 * time.Minute,
+		5 * time.Minute,
+		0 * time.Minute,
+		-3 * time.Minute,
+	}
+	for i, c := range cases {
+		testStr := fmt.Sprintf("test[%d]", i)
+		testPleg := newTestGenericPLEG(c)
+		pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
+		ok, _ := pleg.Healthy()
+		assert.True(t, ok, "pleg should be healthy", testStr)
 
-	// Advance the clock without any relisting.
-	clock.Step(time.Minute * 10)
-	ok, _ = pleg.Healthy()
-	assert.False(t, ok, "pleg should be unhealthy")
+		// Advance the clock without any relisting.
+		clock.Step(time.Minute * 10)
+		ok, _ = pleg.Healthy()
+		assert.False(t, ok, "pleg should be unhealthy", testStr)
 
-	// Relist and than advance the time by 1 minute. pleg should be healthy
-	// because this is within the allowed limit.
-	pleg.relist()
-	clock.Step(time.Minute * 1)
-	ok, _ = pleg.Healthy()
-	assert.True(t, ok, "pleg should be healthy")
+		// Relist and than advance the time by 1 minute. pleg should be healthy
+		// because this is within the allowed limit.
+		pleg.relist()
+		clock.Step(time.Minute * 1)
+		ok, _ = pleg.Healthy()
+		assert.True(t, ok, "pleg should be healthy", testStr)
+	}
 }
 
 func TestRelistWithReinspection(t *testing.T) {
@@ -433,7 +443,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 // Test detecting sandbox state changes.
 func TestRelistingWithSandboxes(t *testing.T) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(3 * time.Minute)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.

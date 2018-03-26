@@ -49,6 +49,10 @@ import (
 type GenericPLEG struct {
 	// The period for relisting.
 	relistPeriod time.Duration
+	// The threshold needs to be greater than the relisting period + the
+	// relisting time, which can vary significantly. Set a conservative
+	// threshold to avoid flipping between healthy and unhealthy.
+	relistThreshold time.Duration
 	// The container runtime.
 	runtime kubecontainer.Runtime
 	// The channel from which the subscriber listens events.
@@ -76,11 +80,6 @@ const (
 	plegContainerExited      plegContainerState = "exited"
 	plegContainerUnknown     plegContainerState = "unknown"
 	plegContainerNonExistent plegContainerState = "non-existent"
-
-	// The threshold needs to be greater than the relisting period + the
-	// relisting time, which can vary significantly. Set a conservative
-	// threshold to avoid flipping between healthy and unhealthy.
-	relistThreshold = 3 * time.Minute
 )
 
 func convertState(state kubecontainer.ContainerState) plegContainerState {
@@ -107,14 +106,15 @@ type podRecord struct {
 type podRecords map[types.UID]*podRecord
 
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
-	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
+	relistPeriod time.Duration, relistThreshold time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
-		relistPeriod: relistPeriod,
-		runtime:      runtime,
-		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
-		podRecords:   make(podRecords),
-		cache:        cache,
-		clock:        clock,
+		relistPeriod:    relistPeriod,
+		relistThreshold: relistThreshold,
+		runtime:         runtime,
+		eventChannel:    make(chan *PodLifecycleEvent, channelCapacity),
+		podRecords:      make(podRecords),
+		cache:           cache,
+		clock:           clock,
 	}
 }
 
@@ -131,10 +131,16 @@ func (g *GenericPLEG) Start() {
 }
 
 func (g *GenericPLEG) Healthy() (bool, error) {
+	// relistThreshold must greater than 0, else default to 3 minutes.
+	if g.relistThreshold <= 0 {
+		glog.Warningf("Incorrect relistThreshold setting: %v, it must be greater than 0, now reset to 3 minutes.", g.relistThreshold)
+		g.relistThreshold = 3 * time.Minute
+	}
+
 	relistTime := g.getRelistTime()
 	elapsed := g.clock.Since(relistTime)
-	if elapsed > relistThreshold {
-		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
+	if elapsed > g.relistThreshold {
+		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, g.relistThreshold)
 	}
 	return true, nil
 }
