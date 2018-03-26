@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cloud_cidr_allocator_test.go",
         "controller_test.go",
         "range_allocator_test.go",
         "timeout_test.go",
