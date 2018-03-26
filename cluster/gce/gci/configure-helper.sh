@@ -183,6 +183,7 @@ function safe-format-and-mount() {
   mkdir -p "${mountpoint}"
   echo "Mounting '${device}' at '${mountpoint}'"
   mount -o discard,defaults "${device}" "${mountpoint}"
+  chmod a+w "${mountpoint}"
 }
 
 # Gets a devices UUID and bind mounts the device to mount location in
