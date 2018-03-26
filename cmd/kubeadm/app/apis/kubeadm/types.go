@@ -157,6 +157,10 @@ type Networking struct {
 	PodSubnet string
 	// DNSDomain is the dns domain used by k8s services. Defaults to "cluster.local".
 	DNSDomain string
+	// NodeCIDRMaskSize is the size of the Pod subnet allocated to each node. Only
+	// applies when PodSubnet is also specified. Defaults to "24" for IPv4 or a
+	// calculated subset of an IPv6 PodSubnet.
+	NodeCIDRMaskSize string
 }
 
 // Etcd contains elements describing Etcd configuration.
