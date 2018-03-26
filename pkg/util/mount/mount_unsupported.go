@@ -47,7 +47,15 @@ func (mounter *Mounter) Unmount(target string) error {
 // GetMountRefs finds all other references to the device referenced
 // by mountPath; returns a list of paths.
 func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	return []string{}, nil
+	mps, err := mounter.List()
+	if err != nil {
+		return nil, err
+	}
+	var refs []string
+	for i := range mps {
+		refs = append(refs, mps[i].Path)
+	}
+	return refs, nil
 }
 
 func (mounter *Mounter) List() ([]MountPoint, error) {
