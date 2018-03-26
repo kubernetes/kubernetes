@@ -48,7 +48,7 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 }
 
 func startStatefulSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "statefulsets"}] {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
 		return false, nil
 	}
 	go statefulset.NewStatefulSetController(
