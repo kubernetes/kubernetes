@@ -104,7 +104,8 @@ do
           # This happens when the instance has been deleted. We can hence ignore
           # this instance.
           echo "Looks like ${instance} got deleted. Ignoring it"
-          continue
+          success=1
+          break
         fi
         output=$("${KUBECTL}" replace -f "${filename}" --namespace="${namespace}") || true
         rm "${filename}"
