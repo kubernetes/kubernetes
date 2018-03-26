@@ -59,32 +59,32 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DaemonSetStatus_To_v1beta2_DaemonSetStatus,
 		Convert_v1beta2_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
 		Convert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateStrategy,
-		Convert_v1beta2_Deployment_To_extensions_Deployment,
-		Convert_extensions_Deployment_To_v1beta2_Deployment,
-		Convert_v1beta2_DeploymentCondition_To_extensions_DeploymentCondition,
-		Convert_extensions_DeploymentCondition_To_v1beta2_DeploymentCondition,
-		Convert_v1beta2_DeploymentList_To_extensions_DeploymentList,
-		Convert_extensions_DeploymentList_To_v1beta2_DeploymentList,
-		Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec,
-		Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec,
-		Convert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus,
-		Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus,
-		Convert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy,
-		Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy,
-		Convert_v1beta2_ReplicaSet_To_extensions_ReplicaSet,
-		Convert_extensions_ReplicaSet_To_v1beta2_ReplicaSet,
-		Convert_v1beta2_ReplicaSetCondition_To_extensions_ReplicaSetCondition,
-		Convert_extensions_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition,
-		Convert_v1beta2_ReplicaSetList_To_extensions_ReplicaSetList,
-		Convert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList,
-		Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
-		Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec,
-		Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus,
-		Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus,
+		Convert_v1beta2_Deployment_To_apps_Deployment,
+		Convert_apps_Deployment_To_v1beta2_Deployment,
+		Convert_v1beta2_DeploymentCondition_To_apps_DeploymentCondition,
+		Convert_apps_DeploymentCondition_To_v1beta2_DeploymentCondition,
+		Convert_v1beta2_DeploymentList_To_apps_DeploymentList,
+		Convert_apps_DeploymentList_To_v1beta2_DeploymentList,
+		Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec,
+		Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec,
+		Convert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus,
+		Convert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus,
+		Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy,
+		Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy,
+		Convert_v1beta2_ReplicaSet_To_apps_ReplicaSet,
+		Convert_apps_ReplicaSet_To_v1beta2_ReplicaSet,
+		Convert_v1beta2_ReplicaSetCondition_To_apps_ReplicaSetCondition,
+		Convert_apps_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition,
+		Convert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList,
+		Convert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList,
+		Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec,
+		Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec,
+		Convert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus,
+		Convert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus,
 		Convert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
 		Convert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet,
-		Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
-		Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment,
+		Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment,
+		Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment,
 		Convert_v1beta2_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy,
 		Convert_apps_RollingUpdateStatefulSetStrategy_To_v1beta2_RollingUpdateStatefulSetStrategy,
 		Convert_v1beta2_Scale_To_autoscaling_Scale,
@@ -363,30 +363,30 @@ func autoConvert_extensions_DaemonSetUpdateStrategy_To_v1beta2_DaemonSetUpdateSt
 	return nil
 }
 
-func autoConvert_v1beta2_Deployment_To_extensions_Deployment(in *v1beta2.Deployment, out *extensions.Deployment, s conversion.Scope) error {
+func autoConvert_v1beta2_Deployment_To_apps_Deployment(in *v1beta2.Deployment, out *apps.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_extensions_Deployment_To_v1beta2_Deployment(in *extensions.Deployment, out *v1beta2.Deployment, s conversion.Scope) error {
+func autoConvert_apps_Deployment_To_v1beta2_Deployment(in *apps.Deployment, out *v1beta2.Deployment, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta2_DeploymentCondition_To_extensions_DeploymentCondition(in *v1beta2.DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
-	out.Type = extensions.DeploymentConditionType(in.Type)
+func autoConvert_v1beta2_DeploymentCondition_To_apps_DeploymentCondition(in *v1beta2.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+	out.Type = apps.DeploymentConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -395,12 +395,12 @@ func autoConvert_v1beta2_DeploymentCondition_To_extensions_DeploymentCondition(i
 	return nil
 }
 
-// Convert_v1beta2_DeploymentCondition_To_extensions_DeploymentCondition is an autogenerated conversion function.
-func Convert_v1beta2_DeploymentCondition_To_extensions_DeploymentCondition(in *v1beta2.DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
-	return autoConvert_v1beta2_DeploymentCondition_To_extensions_DeploymentCondition(in, out, s)
+// Convert_v1beta2_DeploymentCondition_To_apps_DeploymentCondition is an autogenerated conversion function.
+func Convert_v1beta2_DeploymentCondition_To_apps_DeploymentCondition(in *v1beta2.DeploymentCondition, out *apps.DeploymentCondition, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeploymentCondition_To_apps_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_extensions_DeploymentCondition_To_v1beta2_DeploymentCondition(in *extensions.DeploymentCondition, out *v1beta2.DeploymentCondition, s conversion.Scope) error {
+func autoConvert_apps_DeploymentCondition_To_v1beta2_DeploymentCondition(in *apps.DeploymentCondition, out *v1beta2.DeploymentCondition, s conversion.Scope) error {
 	out.Type = v1beta2.DeploymentConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
@@ -410,18 +410,18 @@ func autoConvert_extensions_DeploymentCondition_To_v1beta2_DeploymentCondition(i
 	return nil
 }
 
-// Convert_extensions_DeploymentCondition_To_v1beta2_DeploymentCondition is an autogenerated conversion function.
-func Convert_extensions_DeploymentCondition_To_v1beta2_DeploymentCondition(in *extensions.DeploymentCondition, out *v1beta2.DeploymentCondition, s conversion.Scope) error {
-	return autoConvert_extensions_DeploymentCondition_To_v1beta2_DeploymentCondition(in, out, s)
+// Convert_apps_DeploymentCondition_To_v1beta2_DeploymentCondition is an autogenerated conversion function.
+func Convert_apps_DeploymentCondition_To_v1beta2_DeploymentCondition(in *apps.DeploymentCondition, out *v1beta2.DeploymentCondition, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentCondition_To_v1beta2_DeploymentCondition(in, out, s)
 }
 
-func autoConvert_v1beta2_DeploymentList_To_extensions_DeploymentList(in *v1beta2.DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
+func autoConvert_v1beta2_DeploymentList_To_apps_DeploymentList(in *v1beta2.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.Deployment, len(*in))
+		*out = make([]apps.Deployment, len(*in))
 		for i := range *in {
-			if err := Convert_v1beta2_Deployment_To_extensions_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1beta2_Deployment_To_apps_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -431,18 +431,18 @@ func autoConvert_v1beta2_DeploymentList_To_extensions_DeploymentList(in *v1beta2
 	return nil
 }
 
-// Convert_v1beta2_DeploymentList_To_extensions_DeploymentList is an autogenerated conversion function.
-func Convert_v1beta2_DeploymentList_To_extensions_DeploymentList(in *v1beta2.DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
-	return autoConvert_v1beta2_DeploymentList_To_extensions_DeploymentList(in, out, s)
+// Convert_v1beta2_DeploymentList_To_apps_DeploymentList is an autogenerated conversion function.
+func Convert_v1beta2_DeploymentList_To_apps_DeploymentList(in *v1beta2.DeploymentList, out *apps.DeploymentList, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeploymentList_To_apps_DeploymentList(in, out, s)
 }
 
-func autoConvert_extensions_DeploymentList_To_v1beta2_DeploymentList(in *extensions.DeploymentList, out *v1beta2.DeploymentList, s conversion.Scope) error {
+func autoConvert_apps_DeploymentList_To_v1beta2_DeploymentList(in *apps.DeploymentList, out *v1beta2.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1beta2.Deployment, len(*in))
 		for i := range *in {
-			if err := Convert_extensions_Deployment_To_v1beta2_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_apps_Deployment_To_v1beta2_Deployment(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -452,12 +452,12 @@ func autoConvert_extensions_DeploymentList_To_v1beta2_DeploymentList(in *extensi
 	return nil
 }
 
-// Convert_extensions_DeploymentList_To_v1beta2_DeploymentList is an autogenerated conversion function.
-func Convert_extensions_DeploymentList_To_v1beta2_DeploymentList(in *extensions.DeploymentList, out *v1beta2.DeploymentList, s conversion.Scope) error {
-	return autoConvert_extensions_DeploymentList_To_v1beta2_DeploymentList(in, out, s)
+// Convert_apps_DeploymentList_To_v1beta2_DeploymentList is an autogenerated conversion function.
+func Convert_apps_DeploymentList_To_v1beta2_DeploymentList(in *apps.DeploymentList, out *v1beta2.DeploymentList, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentList_To_v1beta2_DeploymentList(in, out, s)
 }
 
-func autoConvert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta2.DeploymentSpec, out *extensions.DeploymentSpec, s conversion.Scope) error {
+func autoConvert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta2.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
 	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -465,7 +465,7 @@ func autoConvert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta2
 	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -475,7 +475,12 @@ func autoConvert_v1beta2_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta2
 	return nil
 }
 
-func autoConvert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(in *extensions.DeploymentSpec, out *v1beta2.DeploymentSpec, s conversion.Scope) error {
+// Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec is an autogenerated conversion function.
+func Convert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(in *v1beta2.DeploymentSpec, out *apps.DeploymentSpec, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeploymentSpec_To_apps_DeploymentSpec(in, out, s)
+}
+
+func autoConvert_apps_DeploymentSpec_To_v1beta2_DeploymentSpec(in *apps.DeploymentSpec, out *v1beta2.DeploymentSpec, s conversion.Scope) error {
 	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -483,7 +488,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(in *extensi
 	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
+	if err := Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
@@ -494,24 +499,24 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta2_DeploymentSpec(in *extensi
 	return nil
 }
 
-func autoConvert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus(in *v1beta2.DeploymentStatus, out *extensions.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus(in *v1beta2.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
-	out.Conditions = *(*[]extensions.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apps.DeploymentCondition)(unsafe.Pointer(&in.Conditions))
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	return nil
 }
 
-// Convert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus is an autogenerated conversion function.
-func Convert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus(in *v1beta2.DeploymentStatus, out *extensions.DeploymentStatus, s conversion.Scope) error {
-	return autoConvert_v1beta2_DeploymentStatus_To_extensions_DeploymentStatus(in, out, s)
+// Convert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus is an autogenerated conversion function.
+func Convert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus(in *v1beta2.DeploymentStatus, out *apps.DeploymentStatus, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeploymentStatus_To_apps_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(in *extensions.DeploymentStatus, out *v1beta2.DeploymentStatus, s conversion.Scope) error {
+func autoConvert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus(in *apps.DeploymentStatus, out *v1beta2.DeploymentStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	out.UpdatedReplicas = in.UpdatedReplicas
@@ -523,17 +528,17 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(in *ext
 	return nil
 }
 
-// Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus is an autogenerated conversion function.
-func Convert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(in *extensions.DeploymentStatus, out *v1beta2.DeploymentStatus, s conversion.Scope) error {
-	return autoConvert_extensions_DeploymentStatus_To_v1beta2_DeploymentStatus(in, out, s)
+// Convert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus is an autogenerated conversion function.
+func Convert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus(in *apps.DeploymentStatus, out *v1beta2.DeploymentStatus, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentStatus_To_v1beta2_DeploymentStatus(in, out, s)
 }
 
-func autoConvert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy(in *v1beta2.DeploymentStrategy, out *extensions.DeploymentStrategy, s conversion.Scope) error {
-	out.Type = extensions.DeploymentStrategyType(in.Type)
+func autoConvert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1beta2.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+	out.Type = apps.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
-		*out = new(extensions.RollingUpdateDeployment)
-		if err := Convert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(*in, *out, s); err != nil {
+		*out = new(apps.RollingUpdateDeployment)
+		if err := Convert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -542,12 +547,17 @@ func autoConvert_v1beta2_DeploymentStrategy_To_extensions_DeploymentStrategy(in 
 	return nil
 }
 
-func autoConvert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *extensions.DeploymentStrategy, out *v1beta2.DeploymentStrategy, s conversion.Scope) error {
+// Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy is an autogenerated conversion function.
+func Convert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in *v1beta2.DeploymentStrategy, out *apps.DeploymentStrategy, s conversion.Scope) error {
+	return autoConvert_v1beta2_DeploymentStrategy_To_apps_DeploymentStrategy(in, out, s)
+}
+
+func autoConvert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1beta2.DeploymentStrategy, s conversion.Scope) error {
 	out.Type = v1beta2.DeploymentStrategyType(in.Type)
 	if in.RollingUpdate != nil {
 		in, out := &in.RollingUpdate, &out.RollingUpdate
 		*out = new(v1beta2.RollingUpdateDeployment)
-		if err := Convert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(*in, *out, s); err != nil {
+		if err := Convert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -556,40 +566,45 @@ func autoConvert_extensions_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in 
 	return nil
 }
 
-func autoConvert_v1beta2_ReplicaSet_To_extensions_ReplicaSet(in *v1beta2.ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
+// Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy is an autogenerated conversion function.
+func Convert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in *apps.DeploymentStrategy, out *v1beta2.DeploymentStrategy, s conversion.Scope) error {
+	return autoConvert_apps_DeploymentStrategy_To_v1beta2_DeploymentStrategy(in, out, s)
+}
+
+func autoConvert_v1beta2_ReplicaSet_To_apps_ReplicaSet(in *v1beta2.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_v1beta2_ReplicaSet_To_extensions_ReplicaSet is an autogenerated conversion function.
-func Convert_v1beta2_ReplicaSet_To_extensions_ReplicaSet(in *v1beta2.ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
-	return autoConvert_v1beta2_ReplicaSet_To_extensions_ReplicaSet(in, out, s)
+// Convert_v1beta2_ReplicaSet_To_apps_ReplicaSet is an autogenerated conversion function.
+func Convert_v1beta2_ReplicaSet_To_apps_ReplicaSet(in *v1beta2.ReplicaSet, out *apps.ReplicaSet, s conversion.Scope) error {
+	return autoConvert_v1beta2_ReplicaSet_To_apps_ReplicaSet(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSet_To_v1beta2_ReplicaSet(in *extensions.ReplicaSet, out *v1beta2.ReplicaSet, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSet_To_v1beta2_ReplicaSet(in *apps.ReplicaSet, out *v1beta2.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_extensions_ReplicaSet_To_v1beta2_ReplicaSet is an autogenerated conversion function.
-func Convert_extensions_ReplicaSet_To_v1beta2_ReplicaSet(in *extensions.ReplicaSet, out *v1beta2.ReplicaSet, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSet_To_v1beta2_ReplicaSet(in, out, s)
+// Convert_apps_ReplicaSet_To_v1beta2_ReplicaSet is an autogenerated conversion function.
+func Convert_apps_ReplicaSet_To_v1beta2_ReplicaSet(in *apps.ReplicaSet, out *v1beta2.ReplicaSet, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSet_To_v1beta2_ReplicaSet(in, out, s)
 }
 
-func autoConvert_v1beta2_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1beta2.ReplicaSetCondition, out *extensions.ReplicaSetCondition, s conversion.Scope) error {
-	out.Type = extensions.ReplicaSetConditionType(in.Type)
+func autoConvert_v1beta2_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1beta2.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+	out.Type = apps.ReplicaSetConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -597,12 +612,12 @@ func autoConvert_v1beta2_ReplicaSetCondition_To_extensions_ReplicaSetCondition(i
 	return nil
 }
 
-// Convert_v1beta2_ReplicaSetCondition_To_extensions_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_v1beta2_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *v1beta2.ReplicaSetCondition, out *extensions.ReplicaSetCondition, s conversion.Scope) error {
-	return autoConvert_v1beta2_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in, out, s)
+// Convert_v1beta2_ReplicaSetCondition_To_apps_ReplicaSetCondition is an autogenerated conversion function.
+func Convert_v1beta2_ReplicaSetCondition_To_apps_ReplicaSetCondition(in *v1beta2.ReplicaSetCondition, out *apps.ReplicaSetCondition, s conversion.Scope) error {
+	return autoConvert_v1beta2_ReplicaSetCondition_To_apps_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *v1beta2.ReplicaSetCondition, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1beta2.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = v1beta2.ReplicaSetConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -611,18 +626,18 @@ func autoConvert_extensions_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(i
 	return nil
 }
 
-// Convert_extensions_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition is an autogenerated conversion function.
-func Convert_extensions_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *v1beta2.ReplicaSetCondition, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in, out, s)
+// Convert_apps_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition is an autogenerated conversion function.
+func Convert_apps_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in *apps.ReplicaSetCondition, out *v1beta2.ReplicaSetCondition, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetCondition_To_v1beta2_ReplicaSetCondition(in, out, s)
 }
 
-func autoConvert_v1beta2_ReplicaSetList_To_extensions_ReplicaSetList(in *v1beta2.ReplicaSetList, out *extensions.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList(in *v1beta2.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.ReplicaSet, len(*in))
+		*out = make([]apps.ReplicaSet, len(*in))
 		for i := range *in {
-			if err := Convert_v1beta2_ReplicaSet_To_extensions_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1beta2_ReplicaSet_To_apps_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -632,18 +647,18 @@ func autoConvert_v1beta2_ReplicaSetList_To_extensions_ReplicaSetList(in *v1beta2
 	return nil
 }
 
-// Convert_v1beta2_ReplicaSetList_To_extensions_ReplicaSetList is an autogenerated conversion function.
-func Convert_v1beta2_ReplicaSetList_To_extensions_ReplicaSetList(in *v1beta2.ReplicaSetList, out *extensions.ReplicaSetList, s conversion.Scope) error {
-	return autoConvert_v1beta2_ReplicaSetList_To_extensions_ReplicaSetList(in, out, s)
+// Convert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList is an autogenerated conversion function.
+func Convert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList(in *v1beta2.ReplicaSetList, out *apps.ReplicaSetList, s conversion.Scope) error {
+	return autoConvert_v1beta2_ReplicaSetList_To_apps_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList(in *extensions.ReplicaSetList, out *v1beta2.ReplicaSetList, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList(in *apps.ReplicaSetList, out *v1beta2.ReplicaSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1beta2.ReplicaSet, len(*in))
 		for i := range *in {
-			if err := Convert_extensions_ReplicaSet_To_v1beta2_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_apps_ReplicaSet_To_v1beta2_ReplicaSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -653,12 +668,12 @@ func autoConvert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList(in *extensi
 	return nil
 }
 
-// Convert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList is an autogenerated conversion function.
-func Convert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList(in *extensions.ReplicaSetList, out *v1beta2.ReplicaSetList, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSetList_To_v1beta2_ReplicaSetList(in, out, s)
+// Convert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList is an autogenerated conversion function.
+func Convert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList(in *apps.ReplicaSetList, out *v1beta2.ReplicaSetList, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetList_To_v1beta2_ReplicaSetList(in, out, s)
 }
 
-func autoConvert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1beta2.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+func autoConvert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta2.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
 	if err := meta_v1.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -670,7 +685,12 @@ func autoConvert_v1beta2_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *v1beta2
 	return nil
 }
 
-func autoConvert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *v1beta2.ReplicaSetSpec, s conversion.Scope) error {
+// Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec is an autogenerated conversion function.
+func Convert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in *v1beta2.ReplicaSetSpec, out *apps.ReplicaSetSpec, s conversion.Scope) error {
+	return autoConvert_v1beta2_ReplicaSetSpec_To_apps_ReplicaSetSpec(in, out, s)
+}
+
+func autoConvert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1beta2.ReplicaSetSpec, s conversion.Scope) error {
 	if err := meta_v1.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
@@ -682,22 +702,27 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *extensi
 	return nil
 }
 
-func autoConvert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *v1beta2.ReplicaSetStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
+// Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec is an autogenerated conversion function.
+func Convert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in *apps.ReplicaSetSpec, out *v1beta2.ReplicaSetSpec, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetSpec_To_v1beta2_ReplicaSetSpec(in, out, s)
+}
+
+func autoConvert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1beta2.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
-	out.Conditions = *(*[]extensions.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apps.ReplicaSetCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
-// Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *v1beta2.ReplicaSetStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
-	return autoConvert_v1beta2_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in, out, s)
+// Convert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus is an autogenerated conversion function.
+func Convert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus(in *v1beta2.ReplicaSetStatus, out *apps.ReplicaSetStatus, s conversion.Scope) error {
+	return autoConvert_v1beta2_ReplicaSetStatus_To_apps_ReplicaSetStatus(in, out, s)
 }
 
-func autoConvert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *extensions.ReplicaSetStatus, out *v1beta2.ReplicaSetStatus, s conversion.Scope) error {
+func autoConvert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1beta2.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -707,9 +732,9 @@ func autoConvert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *ext
 	return nil
 }
 
-// Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus is an autogenerated conversion function.
-func Convert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *extensions.ReplicaSetStatus, out *v1beta2.ReplicaSetStatus, s conversion.Scope) error {
-	return autoConvert_extensions_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in, out, s)
+// Convert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus is an autogenerated conversion function.
+func Convert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in *apps.ReplicaSetStatus, out *v1beta2.ReplicaSetStatus, s conversion.Scope) error {
+	return autoConvert_apps_ReplicaSetStatus_To_v1beta2_ReplicaSetStatus(in, out, s)
 }
 
 func autoConvert_v1beta2_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in *v1beta2.RollingUpdateDaemonSet, out *extensions.RollingUpdateDaemonSet, s conversion.Scope) error {
@@ -722,13 +747,13 @@ func autoConvert_extensions_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemo
 	return nil
 }
 
-func autoConvert_v1beta2_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(in *v1beta2.RollingUpdateDeployment, out *extensions.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_v1beta2_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1beta2.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	return nil
 }
 
-func autoConvert_extensions_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *v1beta2.RollingUpdateDeployment, s conversion.Scope) error {
+func autoConvert_apps_RollingUpdateDeployment_To_v1beta2_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1beta2.RollingUpdateDeployment, s conversion.Scope) error {
 	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
 	return nil
