@@ -421,7 +421,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1beta1_allowedhostpath">v1beta1.AllowedHostPath</h3>
 <div class="paragraph">
-<p>AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.</p>
+<p>AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined. Deprecated: use AllowedHostPath from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1508,7 +1508,7 @@ Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> an
 <div class="sect2">
 <h3 id="_v1beta1_podsecuritypolicylist">v1beta1.PodSecurityPolicyList</h3>
 <div class="paragraph">
-<p>PodSecurityPolicyList is a list of PodSecurityPolicy objects.</p>
+<p>PodSecurityPolicyList is a list of PodSecurityPolicy objects. Deprecated: use PodSecurityPolicyList from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -1604,7 +1604,7 @@ Examples: <code>/foo</code> would allow <code>/foo</code>, <code>/foo/</code> an
 <div class="sect2">
 <h3 id="_v1beta1_fsgroupstrategyoptions">v1beta1.FSGroupStrategyOptions</h3>
 <div class="paragraph">
-<p>FSGroupStrategyOptions defines the strategy type and options used to create the strategy.</p>
+<p>FSGroupStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use FSGroupStrategyOptions from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -2989,7 +2989,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_selinuxstrategyoptions">v1beta1.SELinuxStrategyOptions</h3>
 <div class="paragraph">
-<p>SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.</p>
+<p>SELinuxStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use SELinuxStrategyOptions from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3030,7 +3030,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_runasuserstrategyoptions">v1beta1.RunAsUserStrategyOptions</h3>
 <div class="paragraph">
-<p>RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.</p>
+<p>RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use RunAsUserStrategyOptions from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -3362,7 +3362,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_supplementalgroupsstrategyoptions">v1beta1.SupplementalGroupsStrategyOptions</h3>
 <div class="paragraph">
-<p>SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.</p>
+<p>SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4318,7 +4318,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1beta1_podsecuritypolicy">v1beta1.PodSecurityPolicy</h3>
 <div class="paragraph">
-<p>PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.</p>
+<p>PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container. Deprecated: use PodSecurityPolicy from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6756,7 +6756,7 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <div class="sect2">
 <h3 id="_v1beta1_allowedflexvolume">v1beta1.AllowedFlexVolume</h3>
 <div class="paragraph">
-<p>AllowedFlexVolume represents a single Flexvolume that is allowed to be used.</p>
+<p>AllowedFlexVolume represents a single Flexvolume that is allowed to be used. Deprecated: use AllowedFlexVolume from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7522,7 +7522,7 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <div class="sect2">
 <h3 id="_v1beta1_hostportrange">v1beta1.HostPortRange</h3>
 <div class="paragraph">
-<p>HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.</p>
+<p>HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined. Deprecated: use HostPortRange from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -7901,7 +7901,7 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <div class="sect2">
 <h3 id="_v1beta1_podsecuritypolicyspec">v1beta1.PodSecurityPolicySpec</h3>
 <div class="paragraph">
-<p>PodSecurityPolicySpec defines the policy enforced.</p>
+<p>PodSecurityPolicySpec defines the policy enforced. Deprecated: use PodSecurityPolicySpec from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -8315,7 +8315,7 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <div class="sect2">
 <h3 id="_v1beta1_idrange">v1beta1.IDRange</h3>
 <div class="paragraph">
-<p>IDRange provides a min/max of an allowed range of IDs.</p>
+<p>IDRange provides a min/max of an allowed range of IDs. Deprecated: use IDRange from policy API Group instead.</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>

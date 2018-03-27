@@ -10188,7 +10188,7 @@
    },
    "v1beta1.PodSecurityPolicyList": {
     "id": "v1beta1.PodSecurityPolicyList",
-    "description": "PodSecurityPolicyList is a list of PodSecurityPolicy objects.",
+    "description": "PodSecurityPolicyList is a list of PodSecurityPolicy objects. Deprecated: use PodSecurityPolicyList from policy API Group instead.",
     "required": [
      "items"
     ],
@@ -10216,7 +10216,7 @@
    },
    "v1beta1.PodSecurityPolicy": {
     "id": "v1beta1.PodSecurityPolicy",
-    "description": "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+    "description": "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container. Deprecated: use PodSecurityPolicy from policy API Group instead.",
     "properties": {
      "kind": {
       "type": "string",
@@ -10238,7 +10238,7 @@
    },
    "v1beta1.PodSecurityPolicySpec": {
     "id": "v1beta1.PodSecurityPolicySpec",
-    "description": "PodSecurityPolicySpec defines the policy enforced.",
+    "description": "PodSecurityPolicySpec defines the policy enforced. Deprecated: use PodSecurityPolicySpec from policy API Group instead.",
     "required": [
      "seLinux",
      "runAsUser",
@@ -10347,7 +10347,7 @@
    },
    "v1beta1.HostPortRange": {
     "id": "v1beta1.HostPortRange",
-    "description": "HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined.",
+    "description": "HostPortRange defines a range of host ports that will be enabled by a policy for pods to use.  It requires both the start and end to be defined. Deprecated: use HostPortRange from policy API Group instead.",
     "required": [
      "min",
      "max"
@@ -10367,7 +10367,7 @@
    },
    "v1beta1.SELinuxStrategyOptions": {
     "id": "v1beta1.SELinuxStrategyOptions",
-    "description": "SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "description": "SELinuxStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use SELinuxStrategyOptions from policy API Group instead.",
     "required": [
      "rule"
     ],
@@ -10384,7 +10384,7 @@
    },
    "v1beta1.RunAsUserStrategyOptions": {
     "id": "v1beta1.RunAsUserStrategyOptions",
-    "description": "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.",
+    "description": "RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy. Deprecated: use RunAsUserStrategyOptions from policy API Group instead.",
     "required": [
      "rule"
     ],
@@ -10404,7 +10404,7 @@
    },
    "v1beta1.IDRange": {
     "id": "v1beta1.IDRange",
-    "description": "IDRange provides a min/max of an allowed range of IDs.",
+    "description": "IDRange provides a min/max of an allowed range of IDs. Deprecated: use IDRange from policy API Group instead.",
     "required": [
      "min",
      "max"
@@ -10424,7 +10424,7 @@
    },
    "v1beta1.SupplementalGroupsStrategyOptions": {
     "id": "v1beta1.SupplementalGroupsStrategyOptions",
-    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.",
+    "description": "SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.",
     "properties": {
      "rule": {
       "type": "string",
@@ -10441,7 +10441,7 @@
    },
    "v1beta1.FSGroupStrategyOptions": {
     "id": "v1beta1.FSGroupStrategyOptions",
-    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy.",
+    "description": "FSGroupStrategyOptions defines the strategy type and options used to create the strategy. Deprecated: use FSGroupStrategyOptions from policy API Group instead.",
     "properties": {
      "rule": {
       "type": "string",
@@ -10458,7 +10458,7 @@
    },
    "v1beta1.AllowedHostPath": {
     "id": "v1beta1.AllowedHostPath",
-    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined.",
+    "description": "AllowedHostPath defines the host volume conditions that will be enabled by a policy for pods to use. It requires the path prefix to be defined. Deprecated: use AllowedHostPath from policy API Group instead.",
     "properties": {
      "pathPrefix": {
       "type": "string",
@@ -10468,7 +10468,7 @@
    },
    "v1beta1.AllowedFlexVolume": {
     "id": "v1beta1.AllowedFlexVolume",
-    "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used.",
+    "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used. Deprecated: use AllowedFlexVolume from policy API Group instead.",
     "required": [
      "driver"
     ],
