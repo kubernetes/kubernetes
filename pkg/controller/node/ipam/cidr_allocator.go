@@ -68,7 +68,13 @@ const (
 	cidrUpdateQueueSize = 5000
 
 	// cidrUpdateRetries is the no. of times a NodeSpec update will be retried before dropping it.
-	cidrUpdateRetries = 10
+	cidrUpdateRetries = 3
+
+	// updateRetryTimeout is the time to wait before requeing a failed node for retry
+	updateRetryTimeout = 100 * time.Millisecond
+
+	// updateMaxRetries is the max retries for a failed node
+	updateMaxRetries = 10
 )
 
 // CIDRAllocator is an interface implemented by things that know how
