@@ -19,7 +19,6 @@ package printers
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -110,21 +109,20 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 		jsonpathPrinter.AllowMissingKeys(allowMissingTemplateKeys)
 		printer = jsonpathPrinter
 
-	case "custom-columns":
-		var err error
-		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, decoders[0], options.NoHeaders); err != nil {
+	case "custom-columns", "custom-columns-file":
+		customColumnsFlags := &CustomColumnsPrintFlags{
+			NoHeaders:        options.NoHeaders,
+			TemplateArgument: formatArgument,
+		}
+		customColumnsPrinter, matched, err := customColumnsFlags.ToPrinter(format)
+		if !matched {
+			return nil, fmt.Errorf("unable to match a name printer to handle current print options")
+		}
+		if err != nil {
 			return nil, err
 		}
 
-	case "custom-columns-file":
-		file, err := os.Open(formatArgument)
-		if err != nil {
-			return nil, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
-		}
-		defer file.Close()
-		if printer, err = NewCustomColumnsPrinterFromTemplate(file, decoders[0]); err != nil {
-			return nil, err
-		}
+		printer = customColumnsPrinter
 
 	case "wide":
 		fallthrough

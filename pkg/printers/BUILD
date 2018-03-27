@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "customcolumn.go",
+        "customcolumn_flags.go",
         "humanreadable.go",
         "interface.go",
         "json.go",
@@ -44,6 +45,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
+        "customcolumn_flags_test.go",
         "customcolumn_test.go",
         "json_yaml_flags_test.go",
         "name_flags_test.go",
