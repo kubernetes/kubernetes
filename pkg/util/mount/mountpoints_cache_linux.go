@@ -57,6 +57,10 @@ func (c *mountPointsCache) Get(list func() ([]MountPoint, error)) ([]MountPoint,
 	c.RUnlock()
 	c.Lock()
 	defer c.Unlock()
+	// Double-checking locking criterion.
+	if !c.stale {
+		return c.mountpoints, nil
+	}
 	mountpoints, err := list()
 	if err != nil {
 		return nil, err
@@ -92,6 +96,7 @@ func (c *mountPointsCache) poll(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+	defer unix.Close(fd)
 	pollfds := []unix.PollFd{
 		{
 			Fd:      int32(fd),
@@ -103,6 +108,7 @@ func (c *mountPointsCache) poll(stopCh <-chan struct{}) error {
 		select {
 		case <-stopCh:
 			return nil
+		default:
 		}
 		n, err := unix.Poll(pollfds, 50)
 		if err != nil {
