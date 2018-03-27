@@ -108,6 +108,9 @@ type Interface interface {
 	// subpath starts. On the other hand, Interface.CleanSubPaths must be called
 	// when the pod finishes.
 	PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error)
+	// Start starts the mounter. On some platforms (e.g. linux), mounter runs a
+	// goroutine to watch change events of mountpoints.
+	Start(stopCh <-chan struct{})
 }
 
 type Subpath struct {

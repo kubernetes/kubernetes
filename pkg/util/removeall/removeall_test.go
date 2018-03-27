@@ -106,6 +106,10 @@ func (mounter *fakeMounter) MakeRShared(path string) error {
 	return nil
 }
 
+func (mounter *fakeMounter) Start(stopCh <-chan struct{}) {
+	return
+}
+
 func TestRemoveAllOneFilesystem(t *testing.T) {
 	tests := []struct {
 		name string

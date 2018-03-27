@@ -388,6 +388,10 @@ func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
 }
 
+func (fftc *fakeFileTypeChecker) Start(stopCh <-chan struct{}) {
+	return
+}
+
 func setUp() error {
 	err := os.MkdirAll("/tmp/ExistingFolder", os.FileMode(0755))
 	if err != nil {
