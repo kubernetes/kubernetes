@@ -48,6 +48,7 @@ go_test(
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/kubectl/util:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
