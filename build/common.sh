@@ -478,7 +478,16 @@ function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
+
+  local -a build_args=()
+  if [ -n "${HTTP_PROXY:-}" ]; then
+    build_args+=("--build-arg" "HTTP_PROXY=${HTTP_PROXY}")
+  fi
+  if [ -n "${HTTPS_PROXY:-}" ]; then
+    build_args+=("--build-arg" "HTTPS_PROXY=${HTTPS_PROXY}")
+  fi
+
+  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" ${build_args[@]:-} "${context_dir}")
 
   kube::log::status "Building Docker image ${image}"
   local docker_output
