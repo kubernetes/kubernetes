@@ -19,6 +19,7 @@ package fc
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -424,6 +425,9 @@ func Test_getWwnsLunWwidsError(t *testing.T) {
 }
 
 func Test_ConstructVolumeSpec(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skipf("Test_ConstructVolumeSpec is not supported on GOOS=%s", runtime.GOOS)
+	}
 	fm := &mount.FakeMounter{
 		MountPoints: []mount.MountPoint{
 			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~fc/fc-in-pod1"},
