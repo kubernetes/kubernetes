@@ -152,6 +152,9 @@ type GCECloud struct {
 
 	// New code generated interface to the GCE compute library.
 	c cloud.Cloud
+
+	// Keep a reference of this around so we can inject a new cloud.RateLimiter implementation.
+	s *cloud.Service
 }
 
 // TODO: replace gcfg with json
@@ -508,15 +511,25 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 
 	gce.manager = &gceServiceManager{gce}
-	gce.c = cloud.NewGCE(&cloud.Service{
+	gce.s = &cloud.Service{
 		GA:            service,
 		Alpha:         serviceAlpha,
 		Beta:          serviceBeta,
 		ProjectRouter: &gceProjectRouter{gce},
 		RateLimiter:   &gceRateLimiter{gce},
-	})
+	}
+	gce.c = cloud.NewGCE(gce.s)
 
 	return gce, nil
+}
+
+// SetRateLimiter adds a custom cloud.RateLimiter implementation.
+// WARNING: Calling this could have unexpected behavior if you have in-flight
+// requests. It is best to use this immediately after creating a GCECloud.
+func (g *GCECloud) SetRateLimiter(rl cloud.RateLimiter) {
+	if rl != nil {
+		g.s.RateLimiter = rl
+	}
 }
 
 // determineSubnetURL queries for all subnetworks in a region for a given network and returns
