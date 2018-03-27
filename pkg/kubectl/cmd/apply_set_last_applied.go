@@ -143,12 +143,12 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 			if errors.IsNotFound(err) {
 				return err
 			} else {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 		}
 		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 		}
 		if originalBuf == nil && !o.CreateAnnotation {
 			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)

@@ -154,6 +154,17 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	return nil
 }
 
+// String returns the general purpose string representation
+func (i *Info) String() string {
+	basicInfo := fmt.Sprintf("Name: %q, Namespace: %q\nObject: %+q", i.Name, i.Namespace, i.Object)
+	if i.Mapping != nil {
+		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource,
+			i.Mapping.GroupVersionKind.String())
+		return fmt.Sprint(mappingInfo, "\n", basicInfo)
+	}
+	return basicInfo
+}
+
 // Namespaced returns true if the object belongs to a namespace
 func (i *Info) Namespaced() bool {
 	return i.Mapping != nil && i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
