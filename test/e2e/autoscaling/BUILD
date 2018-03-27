@@ -11,7 +11,7 @@ go_library(
         "autoscaling_timer.go",
         "cluster_autoscaler_scalability.go",
         "cluster_size_autoscaling.go",
-        "custom_metrics_autoscaling.go",
+        "custom_metrics_stackdriver_autoscaling.go",
         "dns_autoscaling.go",
         "framework.go",
         "horizontal_pod_autoscaling.go",
