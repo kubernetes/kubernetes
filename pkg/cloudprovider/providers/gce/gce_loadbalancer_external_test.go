@@ -953,3 +953,98 @@ func TestEnsureExternalLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
 	msg := fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 	checkEvent(t, recorder, msg, true)
 }
+
+type EnsureELBParams struct {
+	clusterName, clusterID string
+	apiService             *v1.Service
+	existingFwdRule        *compute.ForwardingRule
+	nodes                  []*v1.Node
+}
+
+// newEnsureELBParams is the constructor of EnsureELBParams.
+func newEnsureELBParams(nodes []*v1.Node) *EnsureELBParams {
+	vals := DefaultTestClusterValues()
+	return &EnsureELBParams{
+		vals.ClusterName,
+		vals.ClusterID,
+		fakeApiService.DeepCopy(),
+		nil,
+		nodes,
+	}
+}
+
+// callEnsureExternalLoadBalancerAndCheckError wraps calling for
+// ensureExternalLoadBalancer, so TestEnsureExternalLoadBalancerErrors can be
+// easily maintained if the interface changes.
+func callEnsureExternalLoadBalancerAndCheckError(t *testing.T, gce *GCECloud, params *EnsureELBParams) {
+	status, err := gce.ensureExternalLoadBalancer(
+		params.clusterName,
+		params.clusterID,
+		params.apiService,
+		params.existingFwdRule,
+		params.nodes,
+	)
+	assert.Error(t, err)
+	assert.Nil(t, status)
+}
+
+func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	c := gce.c.(*cloud.MockGCE)
+	var params *EnsureELBParams
+
+	params = newEnsureELBParams(nodes)
+	params.nodes = []*v1.Node{}
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+
+	params = newEnsureELBParams(nodes)
+	params.nodes = []*v1.Node{{}}
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+
+	params = newEnsureELBParams(nodes)
+	c.MockForwardingRules.GetHook = mock.GetForwardingRulesInternalErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockForwardingRules.GetHook = nil
+
+	params = newEnsureELBParams(nodes)
+	c.MockAddresses.GetHook = mock.GetAddressesInternalErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockAddresses.GetHook = nil
+
+	params = newEnsureELBParams(nodes)
+	params.apiService.Spec.LoadBalancerSourceRanges = []string{"BadSourceRange"}
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+
+	params = newEnsureELBParams(nodes)
+	c.MockFirewalls.GetHook = mock.GetFirewallsUnauthorizedErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockFirewalls.GetHook = nil
+
+	params = newEnsureELBParams(nodes)
+	c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockFirewalls.InsertHook = nil
+
+	params = newEnsureELBParams(nodes)
+	c.MockTargetPools.GetHook = mock.GetTargetPoolInternalErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockTargetPools.GetHook = nil
+
+	params = newEnsureELBParams(nodes)
+	c.MockHttpHealthChecks.GetHook = mock.GetHTTPHealthChecksInternalErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockHttpHealthChecks.GetHook = nil
+
+	params = newEnsureELBParams(nodes)
+	c.MockTargetPools.InsertHook = mock.InsertTargetPoolsInternalErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockTargetPools.InsertHook = nil
+
+	params = newEnsureELBParams(nodes)
+	c.MockForwardingRules.InsertHook = mock.InsertForwardingRulesInternalErrHook
+	callEnsureExternalLoadBalancerAndCheckError(t, gce, params)
+	c.MockForwardingRules.InsertHook = nil
+}
