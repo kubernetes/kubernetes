@@ -7,13 +7,13 @@
   - k8s.io/kubernetes/pkg/fieldpath
   - k8s.io/kubernetes/pkg/util
   - k8s.io/api/core/v1
+  - k8s.io/kubernetes/pkg/apis/apps
+  - k8s.io/api/apps/v1
 
   # the following are temporary and should go away. Think twice (or more) before adding anything here.
   # Main goal: pkg/apis should be as self-contained as possible.
-  - k8s.io/kubernetes/pkg/apis/extensions
   - k8s.io/kubernetes/pkg/api/legacyscheme
   - k8s.io/kubernetes/pkg/api/testapi
-  - k8s.io/api/extensions/v1beta1
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
 
