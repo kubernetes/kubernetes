@@ -102,10 +102,10 @@ func (_mr *_MockNetworkPluginRecorder) Name() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
 }
 
-func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID, annotations map[string]string) error {
+func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID, annotations map[string]string) (string, error) {
 	ret := _m.ctrl.Call(_m, "SetUpPod", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
-	return ret0
+	return "", ret0
 }
 
 func (_mr *_MockNetworkPluginRecorder) SetUpPod(arg0, arg1, arg2 interface{}) *gomock.Call {

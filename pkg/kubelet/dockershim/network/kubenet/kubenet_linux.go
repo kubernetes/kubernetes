@@ -379,7 +379,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) (string, error) {
 	plugin.mu.Lock()
 	defer plugin.mu.Unlock()
 
@@ -389,7 +389,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 	}()
 
 	if err := plugin.Status(); err != nil {
-		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
+		return "", fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
 	if err := plugin.setup(namespace, name, id, annotations); err != nil {
@@ -399,7 +399,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 			// Not a hard error or warning
 			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
 		}
-		return err
+		return "", err
 	}
 
 	// Need to SNAT outbound traffic from cluster
@@ -407,7 +407,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		glog.Errorf("Failed to ensure MASQ rule: %v", err)
 	}
 
-	return nil
+	return plugin.podIPs[id], nil
 }
 
 // Tears down as much of a pod's network as it can even if errors occur.  Returns

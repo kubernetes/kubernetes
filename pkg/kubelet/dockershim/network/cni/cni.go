@@ -25,6 +25,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrenttype "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -214,30 +215,43 @@ func (plugin *cniNetworkPlugin) Status() error {
 	return plugin.checkInitialized()
 }
 
-func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
+func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) (string, error) {
 	if err := plugin.checkInitialized(); err != nil {
-		return err
+		return "", err
 	}
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
-		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
+		return "", fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
+	var result cnitypes.Result
 	// Windows doesn't have loNetwork. It comes only with Linux
 	if plugin.loNetwork != nil {
-		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations); err != nil {
+		if result, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations); err != nil {
 			glog.Errorf("Error while adding to cni lo network: %s", err)
-			return err
+			return "", err
 		}
 	}
 
-	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations)
+	result, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
-		return err
+		return "", err
 	}
 
-	return err
+	ret, err := cnicurrenttype.NewResultFromResult(result)
+	if err != nil {
+		return "", err
+	}
+	var ip string
+	for _, ipConfig := range ret.IPs {
+		if !ipConfig.Address.IP.IsLoopback() {
+			// Return the first Non-Loopback IP
+			ip = ipConfig.Address.IP.String()
+			break
+		}
+	}
+	return ip, err
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
