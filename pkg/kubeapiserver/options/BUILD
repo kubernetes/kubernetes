@@ -90,8 +90,12 @@ go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
+        "authorization_test.go",
         "storage_versions_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
+    deps = [
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+    ],
 )

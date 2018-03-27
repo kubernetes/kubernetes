@@ -109,7 +109,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		kubeAPIServerOptions.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
 		kubeAPIServerOptions.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
 		kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
-		kubeAPIServerOptions.Authorization.Mode = "RBAC"
+		kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
 
 		tunneler, proxyTransport, err := app.CreateNodeDialer(kubeAPIServerOptions)
 		if err != nil {

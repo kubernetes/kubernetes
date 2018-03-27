@@ -75,7 +75,7 @@ func TestAddFlags(t *testing.T) {
 		"--audit-webhook-version=audit.k8s.io/v1alpha1",
 		"--authentication-token-webhook-cache-ttl=3m",
 		"--authentication-token-webhook-config-file=/token-webhook-config",
-		"--authorization-mode=AlwaysDeny",
+		"--authorization-mode=AlwaysDeny,RBAC",
 		"--authorization-policy-file=/policy",
 		"--authorization-webhook-cache-authorized-ttl=3m",
 		"--authorization-webhook-cache-unauthorized-ttl=1m",
@@ -252,7 +252,7 @@ func TestAddFlags(t *testing.T) {
 			TokenFailureCacheTTL: 0,
 		},
 		Authorization: &kubeoptions.BuiltInAuthorizationOptions{
-			Mode:                        "AlwaysDeny",
+			Modes:                       []string{"AlwaysDeny", "RBAC"},
 			PolicyFile:                  "/policy",
 			WebhookConfigFile:           "/webhook-config",
 			WebhookCacheAuthorizedTTL:   180000000000,
