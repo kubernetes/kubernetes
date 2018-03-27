@@ -408,3 +408,28 @@ func UpdateRegionBackendServiceHook(ctx context.Context, key *meta.Key, obj *ga.
 	m.Objects[*key] = &cloud.MockRegionBackendServicesObj{Obj: obj}
 	return nil
 }
+
+// InsertFirewallsUnauthorizedErrHook mocks firewall insertion. A forbidden error will be thrown as return.
+func InsertFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) (bool, error) {
+	return true, &googleapi.Error{Code: http.StatusForbidden}
+}
+
+// UpdateFirewallsUnauthorizedErrHook mocks firewall updating. A forbidden error will be thrown as return.
+func UpdateFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) error {
+	return &googleapi.Error{Code: http.StatusForbidden}
+}
+
+// DeleteFirewallsUnauthorizedErrHook mocks firewall deletion. A forbidden error will be thrown as return.
+func DeleteFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, m *cloud.MockFirewalls) (bool, error) {
+	return true, &googleapi.Error{Code: http.StatusForbidden}
+}
+
+// GetFirewallsUnauthorizedErrHook mocks firewall information retrival. A forbidden error will be thrown as return.
+func GetFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, m *cloud.MockFirewalls) (bool, *ga.Firewall, error) {
+	return true, nil, &googleapi.Error{Code: http.StatusForbidden}
+}
+
+// GetTargetPoolInternalErrHook mocks getting target pool. It returns a internal server error.
+func GetTargetPoolInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockTargetPools) (bool, *ga.TargetPool, error) {
+	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError}
+}

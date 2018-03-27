@@ -23,7 +23,9 @@ package gce
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
+	"testing"
 
 	compute "google.golang.org/api/compute/v1"
 
@@ -33,6 +35,16 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+)
+
+// TODO(yankaiz): Create shared error types for both test/non-test codes.
+const (
+	eventReasonManualChange = "LoadBalancerManualChange"
+	eventMsgFirewallChange  = "Firewall change required by network admin"
+	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
+	errStrLbNoHosts         = "Cannot EnsureLoadBalancer() with no hosts"
+	wrongTier               = "SupremeLuxury"
+	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
 )
 
 type TestClusterValues struct {
@@ -53,13 +65,7 @@ func DefaultTestClusterValues() TestClusterValues {
 	}
 }
 
-var fakeApiService = &v1.Service{
-	Spec: v1.ServiceSpec{
-		SessionAffinity: v1.ServiceAffinityClientIP,
-		Type:            v1.ServiceTypeClusterIP,
-		Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
-	},
-}
+var fakeApiService *v1.Service
 
 type fakeRoundTripper struct{}
 
@@ -172,4 +178,20 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([
 	}
 
 	return nodes, nil
+}
+
+func setup() {
+	fakeApiService = &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: ""},
+		Spec: v1.ServiceSpec{
+			SessionAffinity: v1.ServiceAffinityClientIP,
+			Type:            v1.ServiceTypeClusterIP,
+			Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
+		},
+	}
+}
+
+func TestMain(m *testing.M) {
+	setup()
+	os.Exit(m.Run())
 }
