@@ -59,8 +59,8 @@ var (
 		# Create a pod based on the JSON passed into stdin.
 		cat pod.json | kubectl create -f -
 
-		# Edit the data in docker-registry.yaml in JSON using the v1 API format then create the resource using the edited data.
-		kubectl create -f docker-registry.yaml --edit --output-version=v1 -o json`))
+		# Edit the data in docker-registry.yaml in JSON then create the resource using the edited data.
+		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

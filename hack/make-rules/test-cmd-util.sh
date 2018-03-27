@@ -361,7 +361,7 @@ run_pod_tests() {
   kube::test::get_object_assert 'pods/valid-pod' "{{.metadata.namespace}} {{.metadata.name}}" '<no value> valid-pod' "--export=true"
 
   ### Dump current valid-pod POD
-  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1 "${kube_flags[@]}")
+  output_pod=$(kubectl get pod valid-pod -o yaml "${kube_flags[@]}")
 
   ### Delete POD valid-pod by id
   # Pre-condition: valid-pod POD exists
@@ -2566,7 +2566,7 @@ run_service_tests() {
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
 
   ### Dump current redis-master service
-  output_service=$(kubectl get service redis-master -o json --output-version=v1 "${kube_flags[@]}")
+  output_service=$(kubectl get service redis-master -o json "${kube_flags[@]}")
 
   ### Delete redis-master-service by id
   # Pre-condition: redis-master service exists
