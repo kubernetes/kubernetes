@@ -86,20 +86,20 @@ func TestV1beta2StatefulSetSpecConversion(t *testing.T) {
 		// apps -> v1beta2
 		internal1 := &v1beta2.StatefulSetSpec{}
 		if err := legacyscheme.Scheme.Convert(tc.stsSpec1, internal1, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "from extensions to v1beta2", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "from apps to v1beta2", err)
 		}
 
 		if !apiequality.Semantic.DeepEqual(internal1, tc.stsSepc2) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "from extensions to v1beta2", tc.stsSepc2, internal1)
+			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "from apps to v1beta2", tc.stsSepc2, internal1)
 		}
 
 		// v1beta2 -> apps
 		internal2 := &apps.StatefulSetSpec{}
 		if err := legacyscheme.Scheme.Convert(tc.stsSepc2, internal2, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "from v1beta2 to extensions", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "from v1beta2 to apps", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal2, tc.stsSpec1) {
-			t.Errorf("%q- %q: expected\n\t%#v, got \n\t%#v", k, "from v1beta2 to extensions", tc.stsSpec1, internal2)
+			t.Errorf("%q- %q: expected\n\t%#v, got \n\t%#v", k, "from v1beta2 to apps", tc.stsSpec1, internal2)
 		}
 	}
 }
@@ -262,15 +262,15 @@ func TestV1beta2StatefulSetStatusConversion(t *testing.T) {
 
 func TestV1beta2DeploymentConversion(t *testing.T) {
 	replica := utilpointer.Int32Ptr(2)
-	rollbackTo := new(extensions.RollbackConfig)
+	rollbackTo := new(apps.RollbackConfig)
 	rollbackTo.Revision = int64(2)
 	testcases := map[string]struct {
-		deployment1 *extensions.Deployment
+		deployment1 *apps.Deployment
 		deployment2 *v1beta2.Deployment
 	}{
 		"Deployment Conversion 1": {
-			deployment1: &extensions.Deployment{
-				Spec: extensions.DeploymentSpec{
+			deployment1: &apps.Deployment{
+				Spec: apps.DeploymentSpec{
 					Replicas:   *replica,
 					RollbackTo: rollbackTo,
 					Template: api.PodTemplateSpec{
@@ -295,8 +295,8 @@ func TestV1beta2DeploymentConversion(t *testing.T) {
 			},
 		},
 		"Deployment Conversion 2": {
-			deployment1: &extensions.Deployment{
-				Spec: extensions.DeploymentSpec{
+			deployment1: &apps.Deployment{
+				Spec: apps.DeploymentSpec{
 					Replicas: *replica,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
@@ -319,22 +319,22 @@ func TestV1beta2DeploymentConversion(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		// extensions -> v1beta2
+		// apps -> v1beta2
 		internal1 := &v1beta2.Deployment{}
 		if err := legacyscheme.Scheme.Convert(tc.deployment1, internal1, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "from extensions to v1beta2", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "from apps to v1beta2", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal1, tc.deployment2) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "from extensions to v1beta2", tc.deployment2, internal1)
+			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "from apps to v1beta2", tc.deployment2, internal1)
 		}
 
-		// v1beta2 -> extensions
-		internal2 := &extensions.Deployment{}
+		// v1beta2 -> apps
+		internal2 := &apps.Deployment{}
 		if err := legacyscheme.Scheme.Convert(tc.deployment2, internal2, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "from v1beta2 to extensions", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "from v1beta2 to apps", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal2, tc.deployment1) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "from v1beta2 to extensions", tc.deployment1, internal2)
+			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "from v1beta2 to apps", tc.deployment1, internal2)
 		}
 	}
 }
@@ -396,11 +396,11 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 	progressDeadlineSeconds := utilpointer.Int32Ptr(2)
 
 	testcases := map[string]struct {
-		deploymentSpec1 *extensions.DeploymentSpec
+		deploymentSpec1 *apps.DeploymentSpec
 		deploymentSpec2 *v1beta2.DeploymentSpec
 	}{
 		"DeploymentSpec Conversion 1": {
-			deploymentSpec1: &extensions.DeploymentSpec{
+			deploymentSpec1: &apps.DeploymentSpec{
 				Replicas: *replica,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -418,7 +418,7 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 			},
 		},
 		"DeploymentSpec Conversion 2": {
-			deploymentSpec1: &extensions.DeploymentSpec{
+			deploymentSpec1: &apps.DeploymentSpec{
 				Replicas:             *replica,
 				RevisionHistoryLimit: revisionHistoryLimit,
 				MinReadySeconds:      2,
@@ -442,7 +442,7 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 			},
 		},
 		"DeploymentSpec Conversion 3": {
-			deploymentSpec1: &extensions.DeploymentSpec{
+			deploymentSpec1: &apps.DeploymentSpec{
 				Replicas:                *replica,
 				ProgressDeadlineSeconds: progressDeadlineSeconds,
 				Template: api.PodTemplateSpec{
@@ -463,69 +463,29 @@ func TestV1beta2DeploymentSpecConversion(t *testing.T) {
 		},
 	}
 
-	// extensions -> v1beta2
+	// apps -> v1beta2
 	for k, tc := range testcases {
 		internal := &v1beta2.DeploymentSpec{}
 		if err := legacyscheme.Scheme.Convert(tc.deploymentSpec1, internal, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", "extensions -> v1beta2", k, err)
+			t.Errorf("%q - %q: unexpected error: %v", "apps -> v1beta2", k, err)
 		}
 
 		if !apiequality.Semantic.DeepEqual(internal, tc.deploymentSpec2) {
-			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", "extensions -> v1beta2", k, tc.deploymentSpec2, internal)
+			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", "apps -> v1beta2", k, tc.deploymentSpec2, internal)
 		}
 	}
 
-	// v1beta2 -> extensions
+	// v1beta2 -> apps
 	for k, tc := range testcases {
-		internal := &extensions.DeploymentSpec{}
+		internal := &apps.DeploymentSpec{}
 		if err := legacyscheme.Scheme.Convert(tc.deploymentSpec2, internal, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", "v1beta2 -> extensions", k, err)
+			t.Errorf("%q - %q: unexpected error: %v", "v1beta2 -> apps", k, err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal, tc.deploymentSpec1) {
-			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", "v1beta2 -> extensions", k, tc.deploymentSpec1, internal)
+			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", "v1beta2 -> apps", k, tc.deploymentSpec1, internal)
 		}
 	}
 
-}
-
-func TestV1beta2DeploymentStrategyConversion(t *testing.T) {
-	maxUnavailable := intstr.FromInt(2)
-	maxSurge := intstr.FromInt(2)
-	extensionsRollingUpdate := extensions.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge}
-	v1beta2RollingUpdate := v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
-	testcases := map[string]struct {
-		deploymentStrategy1 *extensions.DeploymentStrategy
-		deploymentStrategy2 *v1beta2.DeploymentStrategy
-	}{
-		"DeploymentStrategy Conversion 1": {
-			deploymentStrategy1: &extensions.DeploymentStrategy{Type: extensions.DeploymentStrategyType("foo")},
-			deploymentStrategy2: &v1beta2.DeploymentStrategy{Type: v1beta2.DeploymentStrategyType("foo")},
-		},
-		"DeploymentStrategy Conversion 2": {
-			deploymentStrategy1: &extensions.DeploymentStrategy{Type: extensions.DeploymentStrategyType("foo"), RollingUpdate: &extensionsRollingUpdate},
-			deploymentStrategy2: &v1beta2.DeploymentStrategy{Type: v1beta2.DeploymentStrategyType("foo"), RollingUpdate: &v1beta2RollingUpdate},
-		},
-	}
-
-	for k, tc := range testcases {
-		// extensions -> v1beta2
-		internal1 := &v1beta2.DeploymentStrategy{}
-		if err := legacyscheme.Scheme.Convert(tc.deploymentStrategy1, internal1, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "extensions -> v1beta2", err)
-		}
-		if !apiequality.Semantic.DeepEqual(internal1, tc.deploymentStrategy2) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "extensions -> v1beta2", tc.deploymentStrategy2, internal1)
-		}
-
-		// v1beta2 -> extensions
-		internal2 := &extensions.DeploymentStrategy{}
-		if err := legacyscheme.Scheme.Convert(tc.deploymentStrategy2, internal2, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "v1beta2 -> extensions", err)
-		}
-		if !apiequality.Semantic.DeepEqual(internal2, tc.deploymentStrategy1) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "v1beta2 -> extensions", tc.deploymentStrategy1, internal2)
-		}
-	}
 }
 
 func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
@@ -533,121 +493,44 @@ func TestV1beta2RollingUpdateDeploymentConversion(t *testing.T) {
 	maxUnavailable := intstr.FromInt(2)
 	maxSurge := intstr.FromInt(2)
 	testcases := map[string]struct {
-		rollingUpdateDeployment1 *extensions.RollingUpdateDeployment
+		rollingUpdateDeployment1 *apps.RollingUpdateDeployment
 		rollingUpdateDeployment2 *v1beta2.RollingUpdateDeployment
 	}{
 		"RollingUpdateDeployment Conversion 1": {
-			rollingUpdateDeployment1: &extensions.RollingUpdateDeployment{},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{},
 			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &nilIntStr, MaxSurge: &nilIntStr},
 		},
 		"RollingUpdateDeployment Conversion 2": {
-			rollingUpdateDeployment1: &extensions.RollingUpdateDeployment{MaxUnavailable: maxUnavailable},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable},
 			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &nilIntStr},
 		},
 		"RollingUpdateDeployment Conversion 3": {
-			rollingUpdateDeployment1: &extensions.RollingUpdateDeployment{MaxSurge: maxSurge},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxSurge: maxSurge},
 			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxSurge: &maxSurge, MaxUnavailable: &nilIntStr},
 		},
 		"RollingUpdateDeployment Conversion 4": {
-			rollingUpdateDeployment1: &extensions.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge},
 			rollingUpdateDeployment2: &v1beta2.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge},
 		},
 	}
 
 	for k, tc := range testcases {
-		// extensions -> v1beta2
+		// apps -> v1beta2
 		internal1 := &v1beta2.RollingUpdateDeployment{}
 		if err := legacyscheme.Scheme.Convert(tc.rollingUpdateDeployment1, internal1, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "extensions -> v1beta2", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "apps -> v1beta2", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal1, tc.rollingUpdateDeployment2) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "extensions -> v1beta2", tc.rollingUpdateDeployment2, internal1)
+			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "apps -> v1beta2", tc.rollingUpdateDeployment2, internal1)
 		}
 
-		// v1beta2 -> extensions
-		internal2 := &extensions.RollingUpdateDeployment{}
+		// v1beta2 -> apps
+		internal2 := &apps.RollingUpdateDeployment{}
 		if err := legacyscheme.Scheme.Convert(tc.rollingUpdateDeployment2, internal2, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "v1beta2 -> extensions", err)
+			t.Errorf("%q - %q: unexpected error: %v", k, "v1beta2 -> apps", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal2, tc.rollingUpdateDeployment1) {
-			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "v1beta2 -> extensions", tc.rollingUpdateDeployment1, internal2)
-		}
-	}
-}
-
-func TestV1beta2ReplicaSetSpecConversion(t *testing.T) {
-	replicas := new(int32)
-	*replicas = 2
-	matchExpressions := []metav1.LabelSelectorRequirement{
-		{Key: "foo", Operator: metav1.LabelSelectorOpIn, Values: []string{"foo"}},
-	}
-	matchLabels := map[string]string{"foo": "bar"}
-	selector := &metav1.LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions}
-
-	testcases := map[string]struct {
-		replicaset1 *extensions.ReplicaSetSpec
-		replicaset2 *v1beta2.ReplicaSetSpec
-	}{
-		"ReplicaSetSpec Conversion 1": {
-			replicaset1: &extensions.ReplicaSetSpec{
-				Replicas:        *replicas,
-				MinReadySeconds: 2,
-				Template: api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						SecurityContext: new(api.PodSecurityContext),
-					},
-				},
-			},
-			replicaset2: &v1beta2.ReplicaSetSpec{
-				Replicas:        replicas,
-				MinReadySeconds: 2,
-				Template: v1.PodTemplateSpec{
-					Spec: v1.PodSpec{
-						SecurityContext: new(v1.PodSecurityContext),
-					},
-				},
-			},
-		},
-		"ReplicaSetSpec Conversion 2": {
-			replicaset1: &extensions.ReplicaSetSpec{
-				Replicas: *replicas,
-				Selector: selector,
-				Template: api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						SecurityContext: new(api.PodSecurityContext),
-					},
-				},
-			},
-			replicaset2: &v1beta2.ReplicaSetSpec{
-				Replicas: replicas,
-				Selector: selector,
-				Template: v1.PodTemplateSpec{
-					Spec: v1.PodSpec{
-						SecurityContext: new(v1.PodSecurityContext),
-					},
-				},
-			},
-		},
-	}
-
-	for k, tc := range testcases {
-		// extensions -> v1beta2
-		internal1 := &v1beta2.ReplicaSetSpec{}
-		if err := legacyscheme.Scheme.Convert(tc.replicaset1, internal1, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "extensions -> v1beta2", err)
-		}
-
-		if !apiequality.Semantic.DeepEqual(internal1, tc.replicaset2) {
-			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", k, "extensions -> v1beta2", tc.replicaset2, internal1)
-		}
-
-		// v1beta2 -> extensions
-		internal2 := &extensions.ReplicaSetSpec{}
-		if err := legacyscheme.Scheme.Convert(tc.replicaset2, internal2, nil); err != nil {
-			t.Errorf("%q - %q: unexpected error: %v", k, "v1beta2 -> extensions", err)
-		}
-		if !apiequality.Semantic.DeepEqual(internal2, tc.replicaset1) {
-			t.Errorf("%q - %q: expected\n\t%+v, got \n\t%+v", k, "v1beta2 -> extensions", tc.replicaset1, internal2)
+			t.Errorf("%q - %q: expected\n\t%#v, got \n\t%#v", k, "v1beta2 -> apps", tc.rollingUpdateDeployment1, internal2)
 		}
 	}
 }
