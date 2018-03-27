@@ -184,7 +184,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			hostPath, cleanupAction, err = mounter.PrepareSafeSubpath(mountutil.Subpath{
 				VolumeMountIndex: i,
 				Path:             hostPath,
-				VolumeName:       mount.Name,
+				VolumeName:       vol.InnerVolumeSpecName,
 				VolumePath:       volumePath,
 				PodDir:           podDir,
 				ContainerName:    container.Name,

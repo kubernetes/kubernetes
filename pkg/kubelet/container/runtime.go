@@ -452,6 +452,9 @@ type VolumeInfo struct {
 	// SELinuxLabeled indicates whether this volume has had the
 	// pod's SELinux label applied to it or not
 	SELinuxLabeled bool
+	// Inner volume spec name, which is the PV name if used, otherwise
+	// it is the same as the outer volume spec name.
+	InnerVolumeSpecName string
 }
 
 type VolumeMap map[string]VolumeInfo
