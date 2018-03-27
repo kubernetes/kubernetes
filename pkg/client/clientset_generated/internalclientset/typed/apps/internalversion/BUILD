@@ -10,8 +10,10 @@ go_library(
     srcs = [
         "apps_client.go",
         "controllerrevision.go",
+        "deployment.go",
         "doc.go",
         "generated_expansion.go",
+        "replicaset.go",
         "statefulset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion",

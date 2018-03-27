@@ -9,7 +9,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "controllerrevision.go",
+        "deployment.go",
         "expansion_generated.go",
+        "replicaset.go",
         "statefulset.go",
         "statefulset_expansion.go",
     ],
