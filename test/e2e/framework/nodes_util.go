@@ -317,8 +317,7 @@ func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]str
 		go func() { result <- WaitForNodeToBeReady(c, n, timeout) }()
 	}
 	failed := false
-	// TODO(mbforbes): Change to `for range` syntax once we support only Go
-	// >= 1.4.
+
 	for i := range nodeList.Items {
 		_ = i
 		if !<-result {
