@@ -52,8 +52,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
@@ -63,7 +61,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/schedulerconfig"
+	schedulerconfigv1alpha1 "k8s.io/kubernetes/pkg/scheduler/apis/schedulerconfig/v1alpha1"
+
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
@@ -81,7 +84,7 @@ type Options struct {
 	ConfigFile string
 
 	// config is the scheduler server's configuration object.
-	config *componentconfig.KubeSchedulerConfiguration
+	config *schedulerconfig.KubeSchedulerConfiguration
 
 	scheme *runtime.Scheme
 	codecs serializer.CodecFactory
@@ -113,7 +116,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.healthzAddress, "address", o.healthzAddress, "The IP address to serve on (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
 	fs.StringVar(&o.algorithmProvider, "algorithm-provider", o.algorithmProvider, "The scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
 	fs.StringVar(&o.policyConfigFile, "policy-config-file", o.policyConfigFile, "File with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config==true")
-	usage := fmt.Sprintf("Name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config==false. The config must be provided as the value of an element in 'Data' map with the key='%v'", componentconfig.SchedulerPolicyConfigMapKey)
+	usage := fmt.Sprintf("Name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config==false. The config must be provided as the value of an element in 'Data' map with the key='%v'", schedulerconfig.SchedulerPolicyConfigMapKey)
 	fs.StringVar(&o.policyConfigMapName, "policy-configmap", o.policyConfigMapName, usage)
 	fs.StringVar(&o.policyConfigMapNamespace, "policy-configmap-namespace", o.policyConfigMapNamespace, "The namespace where policy ConfigMap is located. The system namespace will be used if this is not provided or is empty.")
 	fs.BoolVar(&o.useLegacyPolicyConfig, "use-legacy-policy-config", false, "When set to true, scheduler will ignore policy ConfigMap and uses policy config file")
@@ -139,16 +142,16 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 func NewOptions() (*Options, error) {
 	o := &Options{
-		config: new(componentconfig.KubeSchedulerConfiguration),
+		config: new(schedulerconfig.KubeSchedulerConfiguration),
 	}
 
 	o.scheme = runtime.NewScheme()
 	o.codecs = serializer.NewCodecFactory(o.scheme)
 
-	if err := componentconfig.AddToScheme(o.scheme); err != nil {
+	if err := schedulerconfig.AddToScheme(o.scheme); err != nil {
 		return nil, err
 	}
-	if err := componentconfigv1alpha1.AddToScheme(o.scheme); err != nil {
+	if err := schedulerconfigv1alpha1.AddToScheme(o.scheme); err != nil {
 		return nil, err
 	}
 
@@ -219,25 +222,26 @@ func (o *Options) applyDeprecatedHealthzPortToConfig() {
 // 3. --algorithm-provider to use a named algorithm provider.
 func (o *Options) applyDeprecatedAlgorithmSourceOptionsToConfig() {
 	switch {
+
 	case o.useLegacyPolicyConfig || (len(o.policyConfigFile) > 0 && o.policyConfigMapName == ""):
-		o.config.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
-			Policy: &componentconfig.SchedulerPolicySource{
-				File: &componentconfig.SchedulerPolicyFileSource{
+		o.config.AlgorithmSource = schedulerconfig.SchedulerAlgorithmSource{
+			Policy: &schedulerconfig.SchedulerPolicySource{
+				File: &schedulerconfig.SchedulerPolicyFileSource{
 					Path: o.policyConfigFile,
 				},
 			},
 		}
 	case len(o.policyConfigMapName) > 0:
-		o.config.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
-			Policy: &componentconfig.SchedulerPolicySource{
-				ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+		o.config.AlgorithmSource = schedulerconfig.SchedulerAlgorithmSource{
+			Policy: &schedulerconfig.SchedulerPolicySource{
+				ConfigMap: &schedulerconfig.SchedulerPolicyConfigMapSource{
 					Name:      o.policyConfigMapName,
 					Namespace: o.policyConfigMapNamespace,
 				},
 			},
 		}
 	case len(o.algorithmProvider) > 0:
-		o.config.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
+		o.config.AlgorithmSource = schedulerconfig.SchedulerAlgorithmSource{
 			Provider: &o.algorithmProvider,
 		}
 	}
@@ -254,7 +258,7 @@ func (o *Options) Validate(args []string) error {
 
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeSchedulerConfiguration object.
-func (o *Options) loadConfigFromFile(file string) (*componentconfig.KubeSchedulerConfiguration, error) {
+func (o *Options) loadConfigFromFile(file string) (*schedulerconfig.KubeSchedulerConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -264,32 +268,32 @@ func (o *Options) loadConfigFromFile(file string) (*componentconfig.KubeSchedule
 }
 
 // loadConfig decodes data as a KubeSchedulerConfiguration object.
-func (o *Options) loadConfig(data []byte) (*componentconfig.KubeSchedulerConfiguration, error) {
+func (o *Options) loadConfig(data []byte) (*schedulerconfig.KubeSchedulerConfiguration, error) {
 	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	config, ok := configObj.(*componentconfig.KubeSchedulerConfiguration)
+	config, ok := configObj.(*schedulerconfig.KubeSchedulerConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
 	return config, nil
 }
 
-func (o *Options) ApplyDefaults(in *componentconfig.KubeSchedulerConfiguration) (*componentconfig.KubeSchedulerConfiguration, error) {
-	external, err := o.scheme.ConvertToVersion(in, componentconfigv1alpha1.SchemeGroupVersion)
+func (o *Options) ApplyDefaults(in *schedulerconfig.KubeSchedulerConfiguration) (*schedulerconfig.KubeSchedulerConfiguration, error) {
+	external, err := o.scheme.ConvertToVersion(in, schedulerconfigv1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	o.scheme.Default(external)
 
-	internal, err := o.scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion)
+	internal, err := o.scheme.ConvertToVersion(external, schedulerconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	out := internal.(*componentconfig.KubeSchedulerConfiguration)
+	out := internal.(*schedulerconfig.KubeSchedulerConfiguration)
 
 	return out, nil
 }
@@ -362,7 +366,7 @@ type SchedulerServer struct {
 	Client                         clientset.Interface
 	InformerFactory                informers.SharedInformerFactory
 	PodInformer                    coreinformers.PodInformer
-	AlgorithmSource                componentconfig.SchedulerAlgorithmSource
+	AlgorithmSource                schedulerconfig.SchedulerAlgorithmSource
 	HardPodAffinitySymmetricWeight int32
 	EventClient                    v1core.EventsGetter
 	Recorder                       record.EventRecorder
@@ -376,7 +380,7 @@ type SchedulerServer struct {
 }
 
 // NewSchedulerServer creates a runnable SchedulerServer from configuration.
-func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, master string) (*SchedulerServer, error) {
+func NewSchedulerServer(config *schedulerconfig.KubeSchedulerConfiguration, master string) (*SchedulerServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -384,7 +388,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 	// Configz registration.
 	// only register if we're actually exposing it somewhere
 	if len(config.MetricsBindAddress) > 0 || len(config.HealthzBindAddress) > 0 {
-		if c, err := configz.New("componentconfig"); err == nil {
+		if c, err := configz.New("schedulerconfig"); err == nil {
 			c.Set(config)
 		} else {
 			return nil, fmt.Errorf("unable to register configz: %s", err)
@@ -442,7 +446,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(config schedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)
@@ -473,7 +477,7 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 // makeHealthzServer creates a healthz server from the config, and will also
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
-func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
+func makeHealthzServer(config *schedulerconfig.KubeSchedulerConfiguration) *http.Server {
 	mux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(mux)
 	if config.HealthzBindAddress == config.MetricsBindAddress {
@@ -493,7 +497,7 @@ func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http
 }
 
 // makeMetricsServer builds a metrics server from the config.
-func makeMetricsServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
+func makeMetricsServer(config *schedulerconfig.KubeSchedulerConfiguration) *http.Server {
 	mux := mux.NewPathRecorderMux("kube-scheduler")
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
@@ -511,7 +515,7 @@ func makeMetricsServer(config *componentconfig.KubeSchedulerConfiguration) *http
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config schedulerconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
 	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
 		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
@@ -689,9 +693,9 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 			if err != nil {
 				return nil, fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
 			}
-			data, found := policyConfigMap.Data[componentconfig.SchedulerPolicyConfigMapKey]
+			data, found := policyConfigMap.Data[schedulerconfig.SchedulerPolicyConfigMapKey]
 			if !found {
-				return nil, fmt.Errorf("missing policy config map value at key %q", componentconfig.SchedulerPolicyConfigMapKey)
+				return nil, fmt.Errorf("missing policy config map value at key %q", schedulerconfig.SchedulerPolicyConfigMapKey)
 			}
 			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
 			if err != nil {

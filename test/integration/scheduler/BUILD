@@ -1,88 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
-
-go_test(
-    name = "go_default_test",
-    size = "large",
-    srcs = [
-        "extender_test.go",
-        "main_test.go",
-        "predicates_test.go",
-        "preemption_test.go",
-        "priorities_test.go",
-        "scheduler_test.go",
-        "taint_test.go",
-        "volume_binding_test.go",
-    ],
-    embed = [":go_default_library"],
-    tags = ["integration"],
-    deps = [
-        "//cmd/kube-scheduler/app:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
-        "//pkg/controller/nodelifecycle:go_default_library",
-        "//pkg/controller/volume/persistentvolume:go_default_library",
-        "//pkg/features:go_default_library",
-        "//pkg/kubeapiserver/admission:go_default_library",
-        "//pkg/scheduler:go_default_library",
-        "//pkg/scheduler/algorithm:go_default_library",
-        "//pkg/scheduler/algorithmprovider:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/factory:go_default_library",
-        "//pkg/scheduler/schedulercache:go_default_library",
-        "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
-        "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
-        "//test/e2e/framework:go_default_library",
-        "//test/integration/framework:go_default_library",
-        "//test/utils:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
-        "//vendor/k8s.io/api/storage/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//vendor/k8s.io/client-go/informers:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
-    ],
-)
-
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [":package-srcs"],
-    tags = ["automanaged"],
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/test/integration/scheduler",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -103,4 +25,62 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "extender_test.go",
+        "main_test.go",
+        "priorities_test.go",
+        "taint_test.go",
+        "volume_binding_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/testapi:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
+        "//pkg/controller/nodelifecycle:go_default_library",
+        "//pkg/controller/volume/persistentvolume:go_default_library",
+        "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/algorithm:go_default_library",
+        "//pkg/scheduler/algorithmprovider:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/factory:go_default_library",
+        "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
+        "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
+        "//test/e2e/framework:go_default_library",
+        "//test/integration/framework:go_default_library",
+        "//test/utils:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/storage/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/client-go/informers:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/client-go/tools/record:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

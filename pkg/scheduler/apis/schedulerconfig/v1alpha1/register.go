@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // GroupName is the group name use in this package
-const GroupName = "componentconfig"
+const GroupName = "kubescheduler.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
@@ -39,10 +40,19 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs)
+	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs, addCustomConversions)
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion)
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&KubeSchedulerConfiguration{},
+	)
 	return nil
+}
+
+func addCustomConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
+		v1.Convert_Pointer_bool_To_bool,
+		v1.Convert_bool_To_Pointer_bool,
+	)
 }

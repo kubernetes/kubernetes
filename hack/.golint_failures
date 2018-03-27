@@ -324,6 +324,8 @@ pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
 pkg/routes
 pkg/scheduler/api
+pkg/scheduler/apis/schedulerconfig
+pkg/scheduler/apis/schedulerconfig/v1alpha1
 pkg/security/apparmor
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group

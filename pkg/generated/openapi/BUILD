@@ -16,6 +16,7 @@ openapi_library(
         "pkg/apis/componentconfig/v1alpha1",
         "pkg/kubelet/apis/kubeletconfig/v1beta1",
         "pkg/proxy/apis/kubeproxyconfig/v1alpha1",
+        "pkg/scheduler/apis/schedulerconfig/v1alpha1",
         "pkg/version",
     ],
     tags = ["automanaged"],

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+// +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/scheduler/apis/schedulerconfig
+// +k8s:openapi-gen=true
+// +k8s:defaulter-gen=TypeMeta
+
+package v1alpha1 // import "k8s.io/kubernetes/pkg/scheduler/apis/schedulerconfig/v1alpha1"

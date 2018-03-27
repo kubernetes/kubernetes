@@ -1,31 +1,23 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "defaults.go",
         "doc.go",
+        "helpers.go",
         "register.go",
         "types.go",
-        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/apis/schedulerconfig",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["defaults_test.go"],
-    embed = [":go_default_library"],
 )
 
 filegroup(
@@ -37,7 +29,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/scheduler/apis/schedulerconfig/scheme:all-srcs",
+        "//pkg/scheduler/apis/schedulerconfig/v1alpha1:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
