@@ -564,6 +564,119 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 	})
 
+	Describe("GCE [Slow] [Feature:HTTP2]", func() {
+		var gceController *framework.GCEIngressController
+
+		// Platform specific setup
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			By("Initializing gce controller")
+			gceController = &framework.GCEIngressController{
+				Ns:     ns,
+				Client: jig.Client,
+				Cloud:  framework.TestContext.CloudConfig,
+			}
+			err := gceController.Init()
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// Platform specific cleanup
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				framework.DescribeIng(ns)
+			}
+			if jig.Ingress == nil {
+				By("No ingress created, no cleanup necessary")
+				return
+			}
+			By("Deleting ingress")
+			jig.TryDeleteIngress()
+
+			By("Cleaning up cloud resources")
+			Expect(gceController.CleanupGCEIngressController()).NotTo(HaveOccurred())
+		})
+
+		It("should be able to switch between HTTPS and HTTP2 modes", func() {
+			By("Create a basic HTTP2 ingress")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "http2"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+
+			address, err := jig.WaitForIngressAddress(jig.Client, jig.Ingress.Namespace, jig.Ingress.Name, framework.LoadBalancerPollTimeout)
+
+			By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTP2", address))
+			timeoutClient := &http.Client{Timeout: framework.IngressReqTimeout}
+			err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
+				if err != nil {
+					framework.Logf("SimpleGET failed: %v", err)
+					return false, nil
+				}
+				if !strings.Contains(resp, "request_version=2") {
+					return false, fmt.Errorf("request wasn't served by HTTP2, response body: %s", resp)
+				}
+				if !strings.Contains(resp, "request_scheme=https") {
+					return false, fmt.Errorf("request wasn't served by HTTPS, response body: %s", resp)
+				}
+				framework.Logf("Poll succeeded, request was served by HTTP2")
+				return true, nil
+			})
+			Expect(err).NotTo(HaveOccurred(), "Failed to get HTTP2")
+
+			By("Switch backend service to use HTTPS")
+			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[framework.ServiceApplicationProtocolKey] = `{"http2":"HTTPS"}`
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			resp := ""
+			err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				resp, err = framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
+				if err != nil {
+					framework.Logf("SimpleGET failed: %v", err)
+					return false, nil
+				}
+				if !strings.Contains(resp, "request_version=1.1") {
+					framework.Logf("Waiting for transition to HTTP/1")
+					return false, nil
+				}
+				framework.Logf("Poll succeeded, request was served by HTTP")
+				return true, nil
+			})
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get HTTP, response body: %v", resp))
+
+			By("Switch backend service to use HTTP2")
+			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[framework.ServiceApplicationProtocolKey] = `{"http2":"HTTP2"}`
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			timeoutClient = &http.Client{Timeout: framework.IngressReqTimeout}
+			err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				resp, err = framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
+				if err != nil {
+					framework.Logf("SimpleGET failed: %v", err)
+					return false, nil
+				}
+				if !strings.Contains(resp, "request_version=2") {
+					framework.Logf("Waiting for transition to HTTP/2")
+					return false, nil
+				}
+				if !strings.Contains(resp, "request_scheme=https") {
+					return false, nil
+				}
+				framework.Logf("Poll succeeded, request was served by HTTP2")
+				return true, nil
+			})
+			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get HTTP2, response body: %v", resp))
+		})
+	})
+
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
 		var gceController *framework.GCEIngressController
 		var ipName, ipAddress string
