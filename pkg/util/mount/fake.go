@@ -208,7 +208,3 @@ func (f *FakeMounter) CleanSubPaths(podDir string, volumeName string) error {
 func (mounter *FakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return nil
 }
-
-func (f *FakeMounter) Start(stopCh <-chan struct{}) {
-	return
-}

@@ -107,10 +107,6 @@ func (mi *fakeMountInterface) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
 }
 
-func (mi *fakeMountInterface) Start(stopCh <-chan struct{}) {
-	return
-}
-
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{

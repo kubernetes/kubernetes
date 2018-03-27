@@ -68,6 +68,9 @@ func (m *execMounter) doExecMount(source, target, fstype string, options []strin
 			err, "mount", source, target, fstype, options, string(output))
 	}
 
+	if mounterCache, ok := m.wrappedMounter.(MounterWithMountPointsCache); ok {
+		mounterCache.MarkCacheStale()
+	}
 	return err
 }
 
@@ -75,6 +78,9 @@ func (m *execMounter) doExecMount(source, target, fstype string, options []strin
 func (m *execMounter) Unmount(target string) error {
 	outputBytes, err := m.exec.Run("umount", target)
 	if err == nil {
+		if mounterCache, ok := m.wrappedMounter.(MounterWithMountPointsCache); ok {
+			mounterCache.MarkCacheStale()
+		}
 		glog.V(5).Infof("Exec unmounted %s: %s", target, string(outputBytes))
 	} else {
 		glog.V(5).Infof("Failed to exec unmount %s: err: %q, umount output: %s", target, err, string(outputBytes))
@@ -150,8 +156,4 @@ func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
 
 func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
-}
-
-func (m *execMounter) Start(stopCh <-chan struct{}) {
-	m.wrappedMounter.Start(stopCh)
 }

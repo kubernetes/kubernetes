@@ -69,6 +69,8 @@ type Mounter struct {
 	mpCache     *mountPointsCache
 }
 
+var _ MounterWithMountPointsCache = &Mounter{}
+
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
 // mounterPath allows using an alternative to `/bin/mount` for mounting.
@@ -965,6 +967,10 @@ func (mounter *Mounter) Start(stopCh <-chan struct{}) {
 
 	<-stopCh
 	glog.Infof("Shutting down Mounter")
+}
+
+func (mounter *Mounter) MarkCacheStale() {
+	mounter.mpCache.markStale()
 }
 
 // This implementation is shared between Linux and NsEnterMounter
