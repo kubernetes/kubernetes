@@ -159,6 +159,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	)
 
 	BeforeEach(func() {
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+
 		// Get all the schedulable nodes
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
@@ -399,6 +401,32 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			fileDoesntExistCmd := createFileDoesntExistCmd(volumePath, testFile)
 			err = framework.IssueSSHCommand(fileDoesntExistCmd, framework.TestContext.Provider, config.node0)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("Deleting provisioner daemonset")
+			deleteProvisionerDaemonset(config)
+		})
+		It("should not create local persistent volume for filesystem volume that was not bind mounted", func() {
+
+			directoryPath := filepath.Join(config.discoveryDir, "notbindmount")
+			By("Creating a directory, not bind mounted, in discovery directory")
+			mkdirCmd := fmt.Sprintf("mkdir -p %v -m 777", directoryPath)
+			err := framework.IssueSSHCommand(mkdirCmd, framework.TestContext.Provider, config.node0)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Starting a provisioner daemonset")
+			createProvisionerDaemonset(config)
+
+			By("Allowing provisioner to run for 30s and discover potential local PVs")
+			time.Sleep(30 * time.Second)
+
+			By("Examining provisioner logs for not an actual mountpoint message")
+			provisionerPodName := findProvisionerDaemonsetPodName(config)
+			logs, err := framework.GetPodLogs(config.client, config.ns, provisionerPodName, "" /*containerName*/)
+			Expect(err).NotTo(HaveOccurred(),
+				"Error getting logs from pod %s in namespace %s", provisionerPodName, config.ns)
+
+			expectedLogMessage := "Path \"/mnt/local-storage/notbindmount\" is not an actual mountpoint"
+			Expect(strings.Contains(logs, expectedLogMessage)).To(BeTrue())
 
 			By("Deleting provisioner daemonset")
 			deleteProvisionerDaemonset(config)
@@ -1395,6 +1423,22 @@ func createProvisionerDaemonset(config *localTestConfig) {
 
 	kind := schema.GroupKind{Group: "extensions", Kind: "DaemonSet"}
 	framework.WaitForControlledPodsRunning(config.client, config.ns, daemonSetName, kind)
+}
+
+func findProvisionerDaemonsetPodName(config *localTestConfig) string {
+	podList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
+	if err != nil {
+		framework.Failf("could not get the pod list: %v", err)
+		return ""
+	}
+	pods := podList.Items
+	for _, pod := range pods {
+		if strings.HasPrefix(pod.Name, daemonSetName) && pod.Spec.NodeName == config.node0.Name {
+			return pod.Name
+		}
+	}
+	framework.Failf("Unable to find provisioner daemonset pod on node0")
+	return ""
 }
 
 func deleteProvisionerDaemonset(config *localTestConfig) {
