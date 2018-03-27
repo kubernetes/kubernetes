@@ -87,30 +87,6 @@ func (pe PreconditionError) Error() string {
 	return fmt.Sprintf("Expected %s to be %s, was %s", pe.Precondition, pe.ExpectedValue, pe.ActualValue)
 }
 
-type ScaleErrorType int
-
-const (
-	ScaleGetFailure ScaleErrorType = iota
-	ScaleUpdateFailure
-	ScaleUpdateConflictFailure
-)
-
-// A ScaleError is returned when a scale request passes
-// preconditions but fails to actually scale the controller.
-type ScaleError struct {
-	FailureType     ScaleErrorType
-	ResourceVersion string
-	ActualError     error
-}
-
-func (c ScaleError) Error() string {
-	msg := fmt.Sprintf("Scaling the resource failed with: %v", c.ActualError)
-	if len(c.ResourceVersion) > 0 {
-		msg += fmt.Sprintf("; Current resource version %s", c.ResourceVersion)
-	}
-	return msg
-}
-
 // RetryParams encapsulates the retry parameters used by kubectl's scaler.
 type RetryParams struct {
 	Interval, Timeout time.Duration
@@ -127,16 +103,14 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		if updatedResourceVersion != nil {
 			*updatedResourceVersion = rv
 		}
-		switch e, _ := err.(ScaleError); err.(type) {
-		case nil:
-			return true, nil
-		case ScaleError:
-			// Retry only on update conflicts.
-			if e.FailureType == ScaleUpdateConflictFailure {
-				return false, nil
-			}
+		// Retry only on update conflicts.
+		if errors.IsConflict(err) {
+			return false, nil
 		}
-		return false, err
+		if err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 }
 
@@ -163,7 +137,7 @@ type jobScaler struct {
 func (scaler *jobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	job, err := scaler.c.Jobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "", err}
+		return "", err
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateJob(job); err != nil {
@@ -174,10 +148,7 @@ func (scaler *jobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	job.Spec.Parallelism = &parallelism
 	updatedJob, err := scaler.c.Jobs(namespace).Update(job)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, job.ResourceVersion, err}
-		}
-		return "", ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
+		return "", err
 	}
 	return updatedJob.ObjectMeta.ResourceVersion, nil
 }
@@ -234,7 +205,7 @@ var _ Scaler = &genericScaler{}
 func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
 	scale, err := s.scaleNamespacer.Scales(namespace).Get(s.targetGR, name)
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "", err}
+		return "", err
 	}
 	if preconditions != nil {
 		if err := preconditions.validate(scale); err != nil {
@@ -245,10 +216,7 @@ func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *Scale
 	scale.Spec.Replicas = int32(newSize)
 	updatedScale, err := s.scaleNamespacer.Scales(namespace).Update(s.targetGR, scale)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
-		}
-		return "", ScaleError{ScaleUpdateFailure, scale.ResourceVersion, err}
+		return "", err
 	}
 	return updatedScale.ResourceVersion, nil
 }

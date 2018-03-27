@@ -87,8 +87,7 @@ func TestReplicationControllerScaleInvalid(t *testing.T) {
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
-	e, ok := err.(ScaleError)
-	if err == nil || !ok || e.FailureType != ScaleUpdateFailure {
+	if err == nil {
 		t.Errorf("Expected error on invalid update failure, got %v", err)
 	}
 	actions := scaleClient.Actions()
@@ -252,8 +251,7 @@ func TestJobScaleInvalid(t *testing.T) {
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
-	e, ok := err.(ScaleError)
-	if err == nil || !ok || e.FailureType != ScaleUpdateFailure {
+	if err == nil {
 		t.Errorf("Expected error on invalid update failure, got %v", err)
 	}
 }
@@ -486,8 +484,7 @@ func TestDeploymentScaleInvalid(t *testing.T) {
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
-	e, ok := err.(ScaleError)
-	if err == nil || !ok || e.FailureType != ScaleUpdateFailure {
+	if err == nil {
 		t.Errorf("Expected error on invalid update failure, got %v", err)
 	}
 	actions := scaleClient.Actions()
@@ -599,8 +596,7 @@ func TestStatefulSetScaleInvalid(t *testing.T) {
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
-	e, ok := err.(ScaleError)
-	if err == nil || !ok || e.FailureType != ScaleUpdateFailure {
+	if err == nil {
 		t.Errorf("Expected error on invalid update failure, got %v", err)
 	}
 	actions := scaleClient.Actions()
@@ -712,8 +708,7 @@ func TestReplicaSetScaleInvalid(t *testing.T) {
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
-	e, ok := err.(ScaleError)
-	if err == nil || !ok || e.FailureType != ScaleUpdateFailure {
+	if err == nil {
 		t.Errorf("Expected error on invalid update failure, got %v", err)
 	}
 	actions := scaleClient.Actions()
@@ -859,7 +854,7 @@ func TestGenericScale(t *testing.T) {
 			resName:      "abc",
 			scaleGetter:  scaleClient,
 		},
-		// scenario 2: a resource name cannot be empty
+		//scenario 2: a resource name cannot be empty
 		{
 			name:         "a resource name cannot be empty",
 			precondition: ScalePrecondition{10, ""},
@@ -883,8 +878,8 @@ func TestGenericScale(t *testing.T) {
 	}
 
 	// act
-	for index, scenario := range scenarios {
-		t.Run(fmt.Sprintf("running scenario %d: %s", index+1, scenario.name), func(t *testing.T) {
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
 			target := NewScaler(scenario.scaleGetter, scenario.targetGR)
 
 			err := target.Scale("default", scenario.resName, uint(scenario.newSize), &scenario.precondition, nil, scenario.waitForReplicas)
