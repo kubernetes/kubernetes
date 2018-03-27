@@ -109,7 +109,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now make sure they're spread across zones
-	zoneNames, err := getZoneNames(f.ClientSet)
+	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
 }
@@ -125,29 +125,13 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 		node.Name, kubeletapis.LabelZoneFailureDomain)
 }
 
-// TODO (verult) Merge with framework.GetClusterZones()
-// Find the names of all zones in which we have nodes in this cluster.
-func getZoneNames(c clientset.Interface) ([]string, error) {
-	zoneNames := sets.NewString()
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	for _, node := range nodes.Items {
-		zoneName, err := getZoneNameForNode(node)
-		Expect(err).NotTo(HaveOccurred())
-		zoneNames.Insert(zoneName)
-	}
-	return zoneNames.List(), nil
-}
-
 // Return the number of zones in which we have nodes in this cluster.
 func getZoneCount(c clientset.Interface) (int, error) {
-	zoneNames, err := getZoneNames(c)
+	zoneNames, err := framework.GetClusterZones(c)
 	if err != nil {
 		return -1, err
 	}
-	return len(zoneNames), nil
+	return zoneNames.Len(), nil
 }
 
 // Find the name of the zone in which the pod is scheduled
@@ -160,7 +144,8 @@ func getZoneNameForPod(c clientset.Interface, pod v1.Pod) (string, error) {
 
 // Determine whether a set of pods are approximately evenly spread
 // across a given set of zones
-func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []string) (bool, error) {
+func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zonesSet sets.String) (bool, error) {
+	zoneNames := zonesSet.List()
 	podsPerZone := make(map[string]int)
 	for _, zoneName := range zoneNames {
 		podsPerZone[zoneName] = 0
@@ -238,7 +223,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now make sure they're spread across zones
-	zoneNames, err := getZoneNames(f.ClientSet)
+	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
 }
