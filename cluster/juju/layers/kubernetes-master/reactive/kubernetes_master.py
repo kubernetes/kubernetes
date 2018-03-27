@@ -1076,6 +1076,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     args = {}
     for arg in prev_args:
         # remove previous args by setting to null
+        # note this is so we remove them from the snap's config
         args[arg] = 'null'
     for k, v in base_args.items():
         args[k] = v
@@ -1099,6 +1100,14 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
 
+    # at one point in time, this code would set ca-client-cert,
+    # but this was removed. This was before configure_kubernetes_service
+    # kept track of old arguments and removed them, so client-ca-cert
+    # was able to hang around forever stored in the snap configuration.
+    # This removes that stale configuration from the snap if it still
+    # exists.
+    api_opts['client-ca-file'] = 'null'
+    
     if is_privileged():
         api_opts['allow-privileged'] = 'true'
         set_state('kubernetes-master.privileged')
