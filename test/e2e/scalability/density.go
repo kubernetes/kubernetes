@@ -171,8 +171,8 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		if numNodes <= 100 {
 			apiserverCPU = 1.8
 			apiserverMem = 1700 * (1024 * 1024)
-			controllerCPU = 0.5
-			controllerMem = 500 * (1024 * 1024)
+			controllerCPU = 0.6
+			controllerMem = 530 * (1024 * 1024)
 			schedulerCPU = 0.4
 			schedulerMem = 180 * (1024 * 1024)
 		}
