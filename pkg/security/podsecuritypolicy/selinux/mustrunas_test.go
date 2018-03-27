@@ -29,6 +29,10 @@ func TestMustRunAsOptions(t *testing.T) {
 		opts *extensions.SELinuxStrategyOptions
 		pass bool
 	}{
+		"nil opts": {
+			opts: nil,
+			pass: false,
+		},
 		"invalid opts": {
 			opts: &extensions.SELinuxStrategyOptions{},
 			pass: false,
