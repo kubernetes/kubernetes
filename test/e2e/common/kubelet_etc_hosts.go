@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"bytes"
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
@@ -43,6 +44,7 @@ type KubeletManagedHostConfig struct {
 	pod            *v1.Pod
 	f              *framework.Framework
 	tmpEtcHostFile *os.File
+	etcHostsFile   string
 }
 
 var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
@@ -81,24 +83,32 @@ func (config *KubeletManagedHostConfig) verifyEtcHosts() {
 }
 
 func (config *KubeletManagedHostConfig) setup() {
-	etcHostContents := `127.0.0.1	localhost
+	var err error
+
+	// create a temporary /etc/hosts file if local /etc/hosts has the managed host header
+	hostsFileContent, err := ioutil.ReadFile("/etc/hosts")
+	if err == nil && bytes.HasPrefix(hostsFileContent, []byte(etcHostsPartialContent)) {
+		etcHostContents := `127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
 ff00::0	ip6-mcastprefix
 ff02::1	ip6-allnodes
 ff02::2	ip6-allrouters`
 
-	// Write the data to a temp file.
-	var err error
-	config.tmpEtcHostFile, err = ioutil.TempFile("", "etc-hosts")
-	if err != nil {
-		framework.Failf("failed to create temp file for /etc/hosts: %v", err)
-	}
-	if _, err := config.tmpEtcHostFile.Write([]byte(etcHostContents)); err != nil {
-		framework.Failf("Failed to write temp file for /etc/hosts data: %v", err)
-	}
-	if err := config.tmpEtcHostFile.Close(); err != nil {
-		framework.Failf("Failed to close temp file: %v", err)
+		// Write the data to a temp file.
+		config.tmpEtcHostFile, err = ioutil.TempFile("", "etc-hosts")
+		if err != nil {
+			framework.Failf("failed to create temp file for /etc/hosts: %v", err)
+		}
+		if _, err := config.tmpEtcHostFile.Write([]byte(etcHostContents)); err != nil {
+			framework.Failf("Failed to write temp file for /etc/hosts data: %v", err)
+		}
+		if err := config.tmpEtcHostFile.Close(); err != nil {
+			framework.Failf("Failed to close temp file: %v", err)
+		}
+		config.etcHostsFile = config.tmpEtcHostFile.Name()
+	} else {
+		config.etcHostsFile = "/etc/hosts"
 	}
 
 	By("Creating hostNetwork=false pod")
@@ -215,7 +225,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {
 					Name: "host-etc-hosts",
 					VolumeSource: v1.VolumeSource{
 						HostPath: &v1.HostPathVolumeSource{
-							Path: config.tmpEtcHostFile.Name(),
+							Path: config.etcHostsFile,
 							Type: hostPathType,
 						},
 					},
