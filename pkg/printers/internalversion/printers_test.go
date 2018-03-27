@@ -1535,14 +1535,19 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 				t.Errorf("%d: Expect printing object to contain namespace: %#v", i, test.obj)
 			}
 		} else {
-			// Expect error when trying to get all namespaces for un-namespaced object.
+			// Expect output not to include namespace when requested.
 			printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
-				WithNamespace: true,
+				WithNamespace: false,
 			})
+			AddHandlers(printer)
 			buffer := &bytes.Buffer{}
 			err := printer.PrintObj(test.obj, buffer)
-			if err == nil {
-				t.Errorf("Expected error when printing un-namespaced type")
+			if err != nil {
+				t.Fatalf("An error occurred printing object: %#v", err)
+			}
+			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s", namespaceName))
+			if matched {
+				t.Errorf("%d: Unexpect printing object to contain namespace: %#v", i, test.obj)
 			}
 		}
 	}
