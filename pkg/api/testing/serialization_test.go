@@ -27,8 +27,8 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
@@ -43,10 +43,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	k8s_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	k8s_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -64,14 +64,14 @@ func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runti
 	return item
 }
 
-func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
-	intermediate1 := &extensions.ReplicaSet{}
-	if err := k8s_v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
+func Convert_v1_ReplicaSet_to_api_ReplicationController(in *appsv1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
+	intermediate1 := &apps.ReplicaSet{}
+	if err := k8s_v1.Convert_v1_ReplicaSet_To_apps_ReplicaSet(in, intermediate1, s); err != nil {
 		return err
 	}
 
 	intermediate2 := &v1.ReplicationController{}
-	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+	if err := k8s_api_v1.Convert_apps_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
 		return err
 	}
 
@@ -79,14 +79,14 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := legacyscheme.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
+	if err := legacyscheme.Scheme.AddConversionFuncs(Convert_v1_ReplicaSet_to_api_ReplicationController); err != nil {
 		t.Fatal(err)
 	}
 
-	rs := &extensions.ReplicaSet{}
+	rs := &apps.ReplicaSet{}
 	rc := &api.ReplicationController{}
 
-	extGroup := testapi.Extensions
+	extGroup := testapi.Apps
 	defaultGroup := testapi.Default
 
 	fuzzInternalObject(t, extGroup.InternalGroupVersion(), rs, rand.Int63())
@@ -100,7 +100,7 @@ func TestSetControllerConversion(t *testing.T) {
 		},
 	}
 
-	t.Logf("rs._internal.extensions -> rs.v1beta1.extensions")
+	t.Logf("rs._internal.apps -> rs.v1.apps")
 	data, err := runtime.Encode(extGroup.Codec(), rs)
 	if err != nil {
 		t.Fatalf("unexpected encoding error: %v", err)
@@ -115,7 +115,7 @@ func TestSetControllerConversion(t *testing.T) {
 		),
 	)
 
-	t.Logf("rs.v1beta1.extensions -> rc._internal")
+	t.Logf("rs.v1.apps -> rc._internal")
 	if err := runtime.DecodeInto(decoder, data, rc); err != nil {
 		t.Fatalf("unexpected decoding error: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestSetControllerConversion(t *testing.T) {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
 
-	t.Logf("rc.v1 -> rs._internal.extensions")
+	t.Logf("rc.v1 -> rs._internal.apps")
 	if err := runtime.DecodeInto(decoder, data, rs); err != nil {
 		t.Fatalf("unexpected decoding error: %v", err)
 	}
