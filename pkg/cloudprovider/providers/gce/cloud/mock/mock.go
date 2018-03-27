@@ -433,3 +433,38 @@ func GetFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, m *clou
 func GetTargetPoolInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockTargetPools) (bool, *ga.TargetPool, error) {
 	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError}
 }
+
+// GetForwardingRulesInternalErrHook mocks getting forwarding rules and returns an internal server error.
+func GetForwardingRulesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockForwardingRules) (bool, *ga.ForwardingRule, error) {
+	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError, Message: fmt.Sprintf("Internal server error.")}
+}
+
+// GetAddressesInternalErrHook mocks getting network address and returns an internal server error.
+func GetAddressesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockAddresses) (bool, *ga.Address, error) {
+	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError, Message: fmt.Sprintf("Internal server error.")}
+}
+
+// GetHTTPHealthChecksInternalErrHook mocks getting http health check and returns an internal server error.
+func GetHTTPHealthChecksInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockHttpHealthChecks) (bool, *ga.HttpHealthCheck, error) {
+	return true, nil, &googleapi.Error{Code: http.StatusInternalServerError, Message: fmt.Sprintf("Internal server error.")}
+}
+
+// InsertTargetPoolsInternalErrHook mocks getting target pool and returns an internal server error.
+func InsertTargetPoolsInternalErrHook(ctx context.Context, key *meta.Key, obj *ga.TargetPool, m *cloud.MockTargetPools) (bool, error) {
+	return true, &googleapi.Error{Code: http.StatusInternalServerError, Message: fmt.Sprintf("Internal server error.")}
+}
+
+// InsertForwardingRulesInternalErrHook mocks getting forwarding rule and returns an internal server error.
+func InsertForwardingRulesInternalErrHook(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule, m *cloud.MockForwardingRules) (bool, error) {
+	return true, &googleapi.Error{Code: http.StatusInternalServerError, Message: fmt.Sprintf("Internal server error.")}
+}
+
+// DeleteAddressesNotFoundErrHook mocks deleting network address and returns a not found error.
+func DeleteAddressesNotFoundErrHook(ctx context.Context, key *meta.Key, m *cloud.MockAddresses) (bool, error) {
+	return true, &googleapi.Error{Code: http.StatusNotFound, Message: fmt.Sprintf("Not found error.")}
+}
+
+// DeleteAddressesInternalErrHook mocks delete address and returns an internal server error.
+func DeleteAddressesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockAddresses) (bool, error) {
+	return true, &googleapi.Error{Code: http.StatusInternalServerError, Message: fmt.Sprintf("Internal server error.")}
+}
