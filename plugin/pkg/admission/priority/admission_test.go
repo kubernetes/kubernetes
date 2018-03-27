@@ -24,13 +24,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) {
@@ -75,58 +75,58 @@ var nondefaultClass1 = &scheduling.PriorityClass{
 	Description: "Just a test priority class",
 }
 
-func TestPriorityClassAdmission(t *testing.T) {
-	var tooHighPriorityClass = &scheduling.PriorityClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "PriorityClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "toohighclass",
-		},
-		Value:       schedulerapi.HighestUserDefinablePriority + 1,
-		Description: "Just a test priority class",
-	}
+var systemClusterCritical = &scheduling.PriorityClass{
+	TypeMeta: metav1.TypeMeta{
+		Kind: "PriorityClass",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name: scheduling.SystemClusterCritical,
+	},
+	Value:         scheduling.SystemCriticalPriority,
+	GlobalDefault: true,
+}
 
+func TestPriorityClassAdmission(t *testing.T) {
 	var systemClass = &scheduling.PriorityClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "PriorityClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: schedulerapi.SystemClusterCritical,
+			Name: scheduling.SystemPriorityClassPrefix + "test",
 		},
-		Value:       schedulerapi.HighestUserDefinablePriority + 1,
-		Description: "Name conflicts with system priority class names",
+		Value:       scheduling.HighestUserDefinablePriority + 1,
+		Description: "Name has system critical prefix",
 	}
 
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
 		newClass        *scheduling.PriorityClass
+		userInfo        user.Info
 		expectError     bool
 	}{
 		{
 			"one default class",
 			[]*scheduling.PriorityClass{},
 			defaultClass1,
+			nil,
 			false,
 		},
 		{
 			"more than one default classes",
 			[]*scheduling.PriorityClass{defaultClass1},
 			defaultClass2,
+			nil,
 			true,
 		},
 		{
-			"too high PriorityClass value",
-			[]*scheduling.PriorityClass{},
-			tooHighPriorityClass,
-			true,
-		},
-		{
-			"system name conflict",
+			"system name and value are allowed by admission controller",
 			[]*scheduling.PriorityClass{},
 			systemClass,
-			true,
+			&user.DefaultInfo{
+				Name: user.APIServerUser,
+			},
+			false,
 		},
 	}
 
@@ -146,7 +146,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			scheduling.Resource("priorityclasses").WithVersion("version"),
 			"",
 			admission.Create,
-			nil,
+			test.userInfo,
 		)
 		err := ctrl.Validate(attrs)
 		glog.Infof("Got %v", err)
@@ -322,7 +322,7 @@ func TestPodAdmission(t *testing.T) {
 						Name: containerName,
 					},
 				},
-				PriorityClassName: schedulerapi.SystemClusterCritical,
+				PriorityClassName: scheduling.SystemClusterCritical,
 			},
 		},
 		// pod[5]: mirror Pod with a system priority class name
@@ -419,9 +419,9 @@ func TestPodAdmission(t *testing.T) {
 		},
 		{
 			"pod with a system priority class",
-			[]*scheduling.PriorityClass{},
+			[]*scheduling.PriorityClass{systemClusterCritical},
 			*pods[4],
-			schedulerapi.SystemCriticalPriority,
+			scheduling.SystemCriticalPriority,
 			false,
 		},
 		{
@@ -440,9 +440,9 @@ func TestPodAdmission(t *testing.T) {
 		},
 		{
 			"mirror pod with system priority class",
-			[]*scheduling.PriorityClass{},
+			[]*scheduling.PriorityClass{systemClusterCritical},
 			*pods[5],
-			schedulerapi.SystemCriticalPriority,
+			scheduling.SystemCriticalPriority,
 			false,
 		},
 		{
@@ -454,9 +454,9 @@ func TestPodAdmission(t *testing.T) {
 		},
 		{
 			"pod with critical pod annotation",
-			[]*scheduling.PriorityClass{},
+			[]*scheduling.PriorityClass{systemClusterCritical},
 			*pods[7],
-			schedulerapi.SystemCriticalPriority,
+			scheduling.SystemCriticalPriority,
 			false,
 		},
 	}

@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -154,7 +153,7 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 		if len(pod.Spec.PriorityClassName) == 0 &&
 			utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
 			kubelettypes.IsCritical(a.GetNamespace(), pod.Annotations) {
-			pod.Spec.PriorityClassName = schedulerapi.SystemClusterCritical
+			pod.Spec.PriorityClassName = scheduling.SystemClusterCritical
 		}
 		if len(pod.Spec.PriorityClassName) == 0 {
 			var err error
@@ -163,22 +162,17 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
 		} else {
-			// First try to resolve by system priority classes.
-			priority, ok = schedulerapi.SystemPriorityClasses[pod.Spec.PriorityClassName]
-			if !ok {
-				// Now that we didn't find any system priority, try resolving by user defined priority classes.
-				pc, err := p.lister.Get(pod.Spec.PriorityClassName)
-
-				if err != nil {
-					if errors.IsNotFound(err) {
-						return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", pod.Spec.PriorityClassName))
-					}
-
-					return fmt.Errorf("failed to get PriorityClass with name %s: %v", pod.Spec.PriorityClassName, err)
+			// Try resolving the priority class name.
+			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return admission.NewForbidden(a, fmt.Errorf("no PriorityClass with name %v was found", pod.Spec.PriorityClassName))
 				}
 
-				priority = pc.Value
+				return fmt.Errorf("failed to get PriorityClass with name %s: %v", pod.Spec.PriorityClassName, err)
 			}
+
+			priority = pc.Value
 		}
 		pod.Spec.Priority = &priority
 	}
@@ -191,12 +185,6 @@ func (p *priorityPlugin) validatePriorityClass(a admission.Attributes) error {
 	pc, ok := a.GetObject().(*scheduling.PriorityClass)
 	if !ok {
 		return errors.NewBadRequest("resource was marked with kind PriorityClass but was unable to be converted")
-	}
-	if pc.Value > schedulerapi.HighestUserDefinablePriority {
-		return admission.NewForbidden(a, fmt.Errorf("maximum allowed value of a user defined priority is %v", schedulerapi.HighestUserDefinablePriority))
-	}
-	if _, ok := schedulerapi.SystemPriorityClasses[pc.Name]; ok {
-		return admission.NewForbidden(a, fmt.Errorf("the name of the priority class is a reserved name for system use only: %v", pc.Name))
 	}
 	// If the new PriorityClass tries to be the default priority, make sure that no other priority class is marked as default.
 	if pc.GlobalDefault {

@@ -68,9 +68,7 @@ func (priorityClassStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (priorityClassStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidatePriorityClass(obj.(*scheduling.PriorityClass))
-	updateErrorList := validation.ValidatePriorityClassUpdate(obj.(*scheduling.PriorityClass), old.(*scheduling.PriorityClass))
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidatePriorityClassUpdate(obj.(*scheduling.PriorityClass), old.(*scheduling.PriorityClass))
 }
 
 // AllowUnconditionalUpdate is the default update policy for PriorityClass objects.

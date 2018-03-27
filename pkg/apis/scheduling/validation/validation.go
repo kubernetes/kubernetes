@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -24,22 +25,21 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
-// ValidatePriorityClassName checks whether the given priority class name is valid.
-func ValidatePriorityClassName(name string, prefix bool) []string {
-	var allErrs []string
-	if strings.HasPrefix(name, scheduling.SystemPriorityClassPrefix) {
-		allErrs = append(allErrs, "priority class names with '"+scheduling.SystemPriorityClassPrefix+"' prefix are reserved for system use only")
-	}
-	allErrs = append(allErrs, apivalidation.NameIsDNSSubdomain(name, prefix)...)
-	return allErrs
-}
-
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
 // set correctly.
 func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, false, ValidatePriorityClassName, field.NewPath("metadata"))...)
-	// The "Value" field can be any valid integer. So, no need to validate.
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	// If the priorityClass starts with a system prefix, it must be one of the
+	// predefined system priority classes.
+	if strings.HasPrefix(pc.Name, scheduling.SystemPriorityClassPrefix) {
+		if is, err := scheduling.IsKnownSystemPriorityClass(pc); !is {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "name"), "priority class names with '"+scheduling.SystemPriorityClassPrefix+"' prefix are reserved for system use only. error: "+err.Error()))
+		}
+	} else if pc.Value > scheduling.HighestUserDefinablePriority {
+		// Non-system critical priority classes are not allowed to have a value larger than HighestUserDefinablePriority.
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), fmt.Sprintf("maximum allowed value of a user defined priority is %v", scheduling.HighestUserDefinablePriority)))
+	}
 	return allErrs
 }
 

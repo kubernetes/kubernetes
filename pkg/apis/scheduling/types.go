@@ -23,9 +23,17 @@ const (
 	// that do not specify any priority class and there is no priority class
 	// marked as default.
 	DefaultPriorityWhenNoDefaultClassExists = 0
+	// HighestUserDefinablePriority is the highest priority for user defined priority classes. Priority values larger than 1 billion are reserved for Kubernetes system use.
+	HighestUserDefinablePriority = int32(1000000000)
+	// SystemCriticalPriority is the beginning of the range of priority values for critical system components.
+	SystemCriticalPriority = 2 * HighestUserDefinablePriority
 	// SystemPriorityClassPrefix is the prefix reserved for system priority class names. Other priority
 	// classes are not allowed to start with this prefix.
 	SystemPriorityClassPrefix = "system-"
+	// NOTE: In order to avoid conflict of names with user-defined priority classes, all the names must
+	// start with SystemPriorityClassPrefix.
+	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
+	SystemNodeCritical    = SystemPriorityClassPrefix + "node-critical"
 )
 
 // +genclient
