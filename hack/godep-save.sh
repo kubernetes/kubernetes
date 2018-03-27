@@ -81,6 +81,11 @@ done
 rm -rf vendor/github.com/docker/docker/project/
 
 kube::log::status "Updating BUILD files"
+# Assume that anything imported through godep doesn't need Bazel to build.
+# Prune out any Bazel build files, since these can break the build due to
+# missing dependencies that aren't included by godep.
+find vendor/ -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) \
+  -exec rm -f {} \;
 hack/update-bazel.sh >/dev/null
 
 kube::log::status "Updating LICENSES file"
