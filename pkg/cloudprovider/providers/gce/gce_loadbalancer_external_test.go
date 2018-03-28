@@ -259,8 +259,13 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	}
 }
 
-func createExternalLoadBalancer(gce *GCECloud, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
-	nodes, err := createAndInsertNodes(gce, nodeNames, zoneName)
+type nodeConfig struct {
+	name         string
+	instanceName string
+}
+
+func createExternalLoadBalancer(gce *GCECloud, nodeConfigs []nodeConfig, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
+	nodes, err := createAndInsertNodes(gce, nodeConfigs, zoneName)
 	if err != nil {
 		return nil, err
 	}
@@ -276,12 +281,12 @@ func createExternalLoadBalancer(gce *GCECloud, nodeNames []string, clusterName, 
 
 func TestEnsureExternalLoadBalancer(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeName := "test-node-1"
+	testNodeConfig := nodeConfig{"test-node-1", "test-instance-1"}
 
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	status, err := createExternalLoadBalancer(gce, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	status, err := createExternalLoadBalancer(gce, []nodeConfig{testNodeConfig}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
 
@@ -297,7 +302,7 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	for _, fwName := range fwNames {
 		firewall, err := gce.GetFirewall(fwName)
 		require.NoError(t, err)
-		assert.Equal(t, []string{nodeName}, firewall.TargetTags)
+		assert.Equal(t, []string{testNodeConfig.instanceName}, firewall.TargetTags)
 		assert.NotEmpty(t, firewall.SourceRanges)
 	}
 
@@ -323,16 +328,16 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 
 func TestUpdateExternalLoadBalancer(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeName := "test-node-1"
+	testNodeConfig := nodeConfig{"test-node-1", "test-instance-1"}
 
-	gce, err := fakeGCECloud((DefaultTestClusterValues()))
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
-	_, err = createExternalLoadBalancer(gce, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createExternalLoadBalancer(gce, []nodeConfig{testNodeConfig}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
-	newNodeName := "test-node-2"
-	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName}, vals.ZoneName)
+	newNodeConfig := nodeConfig{"test-node-2", "test-instance-2"}
+	newNodes, err := createAndInsertNodes(gce, []nodeConfig{testNodeConfig, newNodeConfig}, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Add the new node, then check that it is properly added to the TargetPool
@@ -348,16 +353,16 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	assert.Contains(
 		t,
 		pool.Instances,
-		fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName),
+		fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, testNodeConfig.instanceName),
 	)
 
 	assert.Contains(
 		t,
 		pool.Instances,
-		fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, newNodeName),
+		fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, newNodeConfig.instanceName),
 	)
 
-	newNodes, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	newNodes, err = createAndInsertNodes(gce, []nodeConfig{testNodeConfig}, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Remove the new node by calling updateExternalLoadBalancer with a list
@@ -371,7 +376,7 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 
 	assert.Equal(
 		t,
-		[]string{fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName)},
+		[]string{fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, testNodeConfig.instanceName)},
 		pool.Instances,
 	)
 }
@@ -381,7 +386,7 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createExternalLoadBalancer(gce, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
@@ -457,7 +462,7 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	err = gce.ReserveAlphaRegionAddress(addressObj, gce.region)
 	require.NoError(t, err)
 
-	_, err = createExternalLoadBalancer(gce, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createExternalLoadBalancer(gce, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	require.NoError(t, err)
 
 	// Expect forwarding rule tier to not be Standard

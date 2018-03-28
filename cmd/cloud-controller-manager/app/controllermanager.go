@@ -206,6 +206,10 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *rest
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(c)())
 
+	if informerUser, ok := cloud.(cloudprovider.InformerUser); ok {
+		informerUser.SetInformers(sharedInformers)
+	}
+
 	// Start the CloudNodeController
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		sharedInformers.Core().V1().Nodes(),

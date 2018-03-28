@@ -94,6 +94,7 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          zonesWithNodes,
 		nodeInformerSynced: func() bool { return true },
+		instanceNameMap:    make(map[string]string),
 	}
 
 	c := cloud.NewMockGCE(&gceProjectRouter{gce})
@@ -125,24 +126,25 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 	return gce, nil
 }
 
-func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([]*v1.Node, error) {
+func createAndInsertNodes(gce *GCECloud, nodeConfigs []nodeConfig, zoneName string) ([]*v1.Node, error) {
 	nodes := []*v1.Node{}
 
-	for _, name := range nodeNames {
+	for _, nodeConfig := range nodeConfigs {
 		// Inserting the same node name twice causes an error - here we check if
 		// the instance exists already before insertion.
 		// TestUpdateExternalLoadBalancer inserts a new node, and relies on an older
 		// node to already have been inserted.
-		instance, _ := gce.getInstanceByName(name)
+		gce.instanceNameMap[nodeConfig.name] = nodeConfig.instanceName
+		instance, _ := gce.getInstanceByName(nodeConfig.instanceName)
 
 		if instance == nil {
 			err := gce.InsertInstance(
 				gce.ProjectID(),
 				zoneName,
 				&compute.Instance{
-					Name: name,
+					Name: nodeConfig.instanceName,
 					Tags: &compute.Tags{
-						Items: []string{name},
+						Items: []string{nodeConfig.instanceName},
 					},
 				},
 			)
@@ -155,9 +157,9 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([
 			nodes,
 			&v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
+					Name: nodeConfig.name,
 					Labels: map[string]string{
-						kubeletapis.LabelHostname:          name,
+						kubeletapis.LabelHostname:          nodeConfig.name,
 						kubeletapis.LabelZoneFailureDomain: zoneName,
 					},
 				},

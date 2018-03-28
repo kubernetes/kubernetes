@@ -49,9 +49,9 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
 
-	hostNames := nodeNames(nodes)
+	instanceNames := gce.instanceNames(nodes)
 	supportsNodesHealthCheck := supportsNodesHealthCheck(nodes)
-	hosts, err := gce.getInstancesByNames(hostNames)
+	hosts, err := gce.getInstancesByNames(instanceNames)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
 	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
-	glog.V(2).Infof("ensureExternalLoadBalancer(%s, %v, %v, %v, %v, %v)", lbRefStr, gce.region, requestedIP, portStr, hostNames, apiService.Annotations)
+	glog.V(2).Infof("ensureExternalLoadBalancer(%s, %v, %v, %v, %v, %v)", lbRefStr, gce.region, requestedIP, portStr, instanceNames, apiService.Annotations)
 
 	// Check the current and the desired network tiers. If they do not match,
 	// tear down the existing resources with the wrong tier.
@@ -276,7 +276,8 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 
 // updateExternalLoadBalancer is the external implementation of LoadBalancer.UpdateLoadBalancer.
 func (gce *GCECloud) updateExternalLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	hosts, err := gce.getInstancesByNames(nodeNames(nodes))
+	instanceNames := gce.instanceNames(nodes)
+	hosts, err := gce.getInstancesByNames(instanceNames)
 	if err != nil {
 		return err
 	}
@@ -729,6 +730,14 @@ func nodeNames(nodes []*v1.Node) []string {
 	ret := make([]string, len(nodes))
 	for i, node := range nodes {
 		ret[i] = node.Name
+	}
+	return ret
+}
+
+func (gce *GCECloud) instanceNames(nodes []*v1.Node) []string {
+	ret := make([]string, len(nodes))
+	for i, node := range nodes {
+		ret[i] = gce.mapNodeNameToInstanceName(types.NodeName(node.Name))
 	}
 	return ret
 }

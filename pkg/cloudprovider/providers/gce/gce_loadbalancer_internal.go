@@ -311,7 +311,7 @@ func (gce *GCECloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcN
 
 func (gce *GCECloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
 	glog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
-	targetTags, err := gce.GetNodeTags(nodeNames(nodes))
+	targetTags, err := gce.GetNodeTags(nodes)
 	if err != nil {
 		return err
 	}

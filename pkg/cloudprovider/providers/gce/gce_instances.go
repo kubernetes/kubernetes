@@ -611,7 +611,7 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 // GetNodeTags will first try returning the list of tags specified in GCE cloud Configuration.
 // If they weren't provided, it'll compute the host tags with the given hostnames. If the list
 // of hostnames has not changed, a cached set of nodetags are returned.
-func (gce *GCECloud) GetNodeTags(nodeNames []string) ([]string, error) {
+func (gce *GCECloud) GetNodeTags(nodes []*v1.Node) ([]string, error) {
 	// If nodeTags were specified through configuration, use them
 	if len(gce.nodeTags) > 0 {
 		return gce.nodeTags, nil
@@ -621,13 +621,13 @@ func (gce *GCECloud) GetNodeTags(nodeNames []string) ([]string, error) {
 	defer gce.computeNodeTagLock.Unlock()
 
 	// Early return if hosts have not changed
-	hosts := sets.NewString(nodeNames...)
+	hosts := sets.NewString(nodeNames(nodes)...)
 	if hosts.Equal(gce.lastKnownNodeNames) {
 		return gce.lastComputedNodeTags, nil
 	}
 
 	// Get GCE instance data by hostname
-	instances, err := gce.getInstancesByNames(nodeNames)
+	instances, err := gce.getInstancesByNames(gce.instanceNames(nodes))
 	if err != nil {
 		return nil, err
 	}
