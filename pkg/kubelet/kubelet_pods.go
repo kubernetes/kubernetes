@@ -68,6 +68,10 @@ import (
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
+const (
+	managedFileHeader = "# Kubernetes-managed hosts file.\n"
+)
+
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
@@ -356,6 +360,12 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 	if err != nil {
 		return nil, err
 	}
+	// If we are running in a DIND environment, the /etc/hosts file already has the
+	// file header, so we should strip it out since the file header is used to signal
+	// that the container's /etc/hosts is managed.
+	if bytes.HasPrefix(hostsFileContent, []byte(managedFileHeader)) {
+		hostsFileContent = hostsFileContent[len(managedFileHeader):]
+	}
 	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
 	return hostsFileContent, nil
 }
@@ -364,7 +374,7 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 // information.
 func managedHostsFileContent(hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
 	var buffer bytes.Buffer
-	buffer.WriteString("# Kubernetes-managed hosts file.\n")
+	buffer.WriteString(managedFileHeader)
 	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
 	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
 	buffer.WriteString("fe00::0\tip6-localnet\n")
