@@ -400,7 +400,7 @@ data:
       labels {
         # The logging backend will take responsibility for double writing to
         # the necessary resource types when this label is set.
-        "logging.googleapis.com/k8s_compatibility": "true"
+        "logging.googleapis.com/k8s_compatibility": "{{ fluentd_k8s_compatibility }}"
       }
     </match>
 
@@ -428,7 +428,7 @@ data:
       labels {
         # The logging backend will take responsibility for double writing to
         # the necessary resource types when this label is set.
-        "logging.googleapis.com/k8s_compatibility": "true"
+        "logging.googleapis.com/k8s_compatibility": "{{ fluentd_k8s_compatibility }}"
       }
     </match>
 metadata:

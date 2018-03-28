@@ -2051,6 +2051,24 @@ function setup-coredns-manifest {
   sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${SERVICE_CLUSTER_IP_RANGE}@g" "${coredns_file}"
 }
 
+function setup-fluentd {
+  local -r dst_dir="$1"
+  local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
+  local -r fluentd_gcp_configmap_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-configmap.yaml"
+  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.2-1.5.28-1}"
+  sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
+  if [[ "${LOGGING_STACKDRIVER_RESOURCES:-}" == "new" ]]; then
+    fluentd_k8s_compatibility="true"
+  else
+    fluentd_k8s_compatibility="false"
+  fi
+  sed -i -e "s@{{ fluentd_k8s_compatibility }}@${fluentd_k8s_compatibility}@g" "${fluentd_gcp_yaml}"
+  update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
+  start-fluentd-resource-update ${fluentd_gcp_yaml}
+  update-container-runtime ${fluentd_gcp_configmap_yaml}
+  update-node-journal ${fluentd_gcp_configmap_yaml}
+}
+
 # Sets up the manifests of kube-dns for k8s addons.
 function setup-kube-dns-manifest {
   local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
@@ -2187,17 +2205,10 @@ EOF
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     setup-addon-manifests "addons" "fluentd-gcp"
+    setup-fluentd ${dst_dir}
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
-    local -r fluentd_gcp_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-ds.yaml"
-    local -r fluentd_gcp_configmap_yaml="${dst_dir}/fluentd-gcp/fluentd-gcp-configmap.yaml"
     update-event-exporter ${event_exporter_yaml}
-    fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.2-1.5.28-1}"
-    sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
-    update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
-    start-fluentd-resource-update ${fluentd_gcp_yaml}
-    update-container-runtime ${fluentd_gcp_configmap_yaml}
-    update-node-journal ${fluentd_gcp_configmap_yaml}
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
