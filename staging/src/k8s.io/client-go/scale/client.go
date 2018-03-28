@@ -138,7 +138,7 @@ func (c *namespacedScaleClient) Get(resource schema.GroupResource, name string) 
 		SubResource("scale").
 		Do()
 	if err := result.Error(); err != nil {
-		return nil, fmt.Errorf("could not fetch the scale for %s %s: %v", resource.String(), name, err)
+		return nil, err
 	}
 
 	scaleBytes, err := result.Raw()

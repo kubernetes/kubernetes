@@ -206,7 +206,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 		// No overlapping controllers.
 		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
-		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
+		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -276,7 +276,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		// No overlapping ReplicaSets.
 		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
-		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil {
+		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -340,7 +340,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForStatefulSet := NewRetryParams(reaper.pollInterval, timeout)
-	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil {
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -368,7 +368,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	// TODO: handle overlapping jobs
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForJobs := NewRetryParams(reaper.pollInterval, timeout)
-	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil {
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	// at this point only dead pods are left, that should be removed
@@ -444,8 +444,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	errList := []error{}
 	for _, rs := range rss {
 		if err := rsReaper.Stop(rs.Namespace, rs.Name, timeout, gracePeriod); err != nil {
-			scaleGetErr, ok := err.(ScaleError)
-			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
+			if errors.IsNotFound(err) {
 				continue
 			}
 			errList = append(errList, err)

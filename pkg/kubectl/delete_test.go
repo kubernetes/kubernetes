@@ -210,54 +210,54 @@ func TestReplicationControllerStop(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		copiedForWatch := test.Objs[0].DeepCopyObject()
-		scaleClient := createFakeScaleClient("replicationcontrollers", "foo", 3, nil)
-		fake := fake.NewSimpleClientset(test.Objs...)
-		fakeWatch := watch.NewFake()
-		fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))
+		t.Run(test.Name, func(t *testing.T) {
+			copiedForWatch := test.Objs[0].DeepCopyObject()
+			scaleClient := createFakeScaleClient("replicationcontrollers", "foo", 3, nil)
+			fake := fake.NewSimpleClientset(test.Objs...)
+			fakeWatch := watch.NewFake()
+			fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))
 
-		go func() {
-			fakeWatch.Add(copiedForWatch)
-		}()
+			go func() {
+				fakeWatch.Add(copiedForWatch)
+			}()
 
-		reaper := ReplicationControllerReaper{fake.Core(), time.Millisecond, time.Millisecond, scaleClient}
-		err := reaper.Stop(ns, name, 0, nil)
-		if !reflect.DeepEqual(err, test.StopError) {
-			t.Errorf("%s unexpected error: %v", test.Name, err)
-			continue
-		}
+			reaper := ReplicationControllerReaper{fake.Core(), time.Millisecond, time.Millisecond, scaleClient}
+			err := reaper.Stop(ns, name, 0, nil)
+			if !reflect.DeepEqual(err, test.StopError) {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-		actions := fake.Actions()
-		if len(actions) != len(test.ExpectedActions) {
-			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
-			continue
-		}
-		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource().GroupResource() != api.Resource("replicationcontrollers") {
-				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+			actions := fake.Actions()
+			if len(actions) != len(test.ExpectedActions) {
+				t.Fatalf("unexpected actions: %v, expected %d actions got %d", actions, len(test.ExpectedActions), len(actions))
 			}
-			if actions[i].GetVerb() != verb {
-				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
-			}
-		}
-		if test.ScaledDown {
-			scale, err := scaleClient.Scales(ns).Get(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, name)
-			if err != nil {
-				t.Error(err)
-			}
-			if scale.Spec.Replicas != 0 {
-				t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
-			}
-			actions := scaleClient.Actions()
-			if len(actions) != len(test.ScaleClientExpectedAction) {
-				t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ScaleClientExpectedAction), len(actions))
-			}
-			for i, verb := range test.ScaleClientExpectedAction {
+			for i, verb := range test.ExpectedActions {
+				if actions[i].GetResource().GroupResource() != api.Resource("replicationcontrollers") {
+					t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], verb)
+				}
 				if actions[i].GetVerb() != verb {
-					t.Errorf("%s unexpected action: %+v, expected %s", test.Name, actions[i].GetVerb(), verb)
+					t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], verb)
 				}
 			}
-		}
+			if test.ScaledDown {
+				scale, err := scaleClient.Scales(ns).Get(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, name)
+				if err != nil {
+					t.Error(err)
+				}
+				if scale.Spec.Replicas != 0 {
+					t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
+				}
+				actions := scaleClient.Actions()
+				if len(actions) != len(test.ScaleClientExpectedAction) {
+					t.Errorf("unexpected actions: %v, expected %d actions got %d", actions, len(test.ScaleClientExpectedAction), len(actions))
+				}
+				for i, verb := range test.ScaleClientExpectedAction {
+					if actions[i].GetVerb() != verb {
+						t.Errorf("unexpected action: %+v, expected %s", actions[i].GetVerb(), verb)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -776,7 +776,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 		},
 	)
 	fake.AddReactor("get", "replicasets", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, ScaleError{ActualError: errors.NewNotFound(api.Resource("replicaset"), "doesn't-matter")}
+		return true, nil, errors.NewNotFound(api.Resource("replicaset"), "doesn't-matter")
 	})
 
 	reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond, nil, schema.GroupResource{}}
