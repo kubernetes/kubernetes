@@ -2385,6 +2385,13 @@ run_secrets_test() {
 
   create_and_use_new_namespace
   kube::log::status "Testing secrets"
+
+  # Ensure dry run succeeds and includes kind, apiVersion and data
+  output_message=$(kubectl create secret generic test --from-literal=key1=value1 --dry-run -o yaml)
+  kube::test::if_has_string "${output_message}" 'kind: Secret'
+  kube::test::if_has_string "${output_message}" 'apiVersion: v1'
+  kube::test::if_has_string "${output_message}" 'key1: dmFsdWUx'
+
   ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
   kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-secrets\" }}found{{end}}{{end}}:' ':'
