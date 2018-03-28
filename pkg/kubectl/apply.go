@@ -17,8 +17,10 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
@@ -75,6 +77,11 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 
 	// Otherwise, use the server side version of the object.
 	accessor := info.Mapping.MetadataAccessor
+
+	// Check current object annotation
+	if _, err := validateAnnotation(info); err != nil {
+		return nil, err
+	}
 	// Get the current annotations from the object.
 	annots, err := accessor.Annotations(info.Object)
 	if err != nil {
@@ -143,4 +150,13 @@ func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info, codec 
 		return CreateApplyAnnotation(info, codec)
 	}
 	return UpdateApplyAnnotation(info, codec)
+}
+
+func validateAnnotation(info *resource.Info) (bool, error) {
+	obj, err := info.Unstructured()
+	if err != nil {
+		return false, fmt.Errorf("failed to get object content")
+	}
+	_, find, err := unstructured.NestedStringMap(obj.UnstructuredContent(), "metadata", "annotations")
+	return find, err
 }
