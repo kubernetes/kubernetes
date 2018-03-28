@@ -276,14 +276,14 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
-	allErrs := []error{}
 	var runObjectMap = map[string]*RunObject{}
 	runObject, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	} else {
 		runObjectMap[generatorName] = runObject
 	}
+	allErrs := []error{}
 	if cmdutil.GetFlagBool(cmd, "expose") {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
 		if len(serviceGenerator) == 0 {
