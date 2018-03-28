@@ -76,6 +76,11 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	if !needsConversion {
+		// We might be an external type, but have empty kind/apiVersion fields. Ensure they are populated before printing.
+		if obj.GetObjectKind().GroupVersionKind().Empty() {
+			obj = obj.DeepCopyObject()
+			obj.GetObjectKind().SetGroupVersionKind(gvks[0])
+		}
 		return p.printer.PrintObj(obj, w)
 	}
 
