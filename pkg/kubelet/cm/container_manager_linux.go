@@ -123,7 +123,7 @@ type containerManagerImpl struct {
 	capacity v1.ResourceList
 	// Absolute cgroupfs path to a cgroup that Kubelet needs to place all pods under.
 	// This path include a top level container for enforcing Node Allocatable.
-	cgroupRoot string
+	cgroupRoot CgroupName
 	// Event recorder interface.
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
@@ -223,7 +223,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
 
-	cgroupRoot := nodeConfig.CgroupRoot
+	// Turn CgroupRoot from a string (in cgroupfs path format) to internal CgroupName
+	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
@@ -236,13 +237,13 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		// of note, we always use the cgroupfs driver when performing this check since
 		// the input is provided in that format.
 		// this is important because we do not want any name conversion to occur.
-		if !cgroupManager.Exists(CgroupName(cgroupRoot)) {
+		if !cgroupManager.Exists(cgroupRoot) {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist: %v", cgroupRoot, err)
 		}
 		glog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
 		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
 		// This way, all sub modules can avoid having to understand the concept of node allocatable.
-		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
+		cgroupRoot = NewCgroupName(cgroupRoot, defaultNodeAllocatableCgroupName)
 	}
 	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 
@@ -305,7 +306,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 		}
 	}
 	return &podContainerManagerNoop{
-		cgroupRoot: CgroupName(cm.cgroupRoot),
+		cgroupRoot: cm.cgroupRoot,
 	}
 }
 
@@ -503,7 +504,7 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 
 // GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods.
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
-	return cm.cgroupManager.Name(CgroupName(cm.cgroupRoot))
+	return cm.cgroupManager.Name(cm.cgroupRoot)
 }
 
 func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {

@@ -387,18 +387,19 @@ func restartKubelet() {
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }
 
-func toCgroupFsName(cgroup string) string {
+func toCgroupFsName(cgroupName cm.CgroupName) string {
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
-		return cm.ConvertCgroupNameToSystemd(cm.CgroupName(cgroup), true)
+		return cgroupName.ToSystemd()
+	} else {
+		return cgroupName.ToCgroupfs()
 	}
-	return cgroup
 }
 
 // reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
 // to make the kernel reclaim memory in the allocatable cgroup
 // the time to reduce pressure may be unbounded, but usually finishes within a second
 func reduceAllocatableMemoryUsage() {
-	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(defaultNodeAllocatableCgroup))
+	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
 	framework.ExpectNoError(err)
 }
