@@ -32,13 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/util/integer"
 	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
@@ -675,56 +671,6 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 		}
 	}
 	return requiredRSs, allRSs
-}
-
-// WaitForReplicaSetUpdated polls the replica set until it is updated.
-func WaitForReplicaSetUpdated(c extensionslisters.ReplicaSetLister, desiredGeneration int64, namespace, name string) error {
-	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.ReplicaSets(namespace).Get(name)
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration, nil
-	})
-}
-
-// WaitForPodsHashPopulated polls the replica set until updated and fully labeled.
-func WaitForPodsHashPopulated(c extensionslisters.ReplicaSetLister, desiredGeneration int64, namespace, name string) error {
-	return wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		rs, err := c.ReplicaSets(namespace).Get(name)
-		if err != nil {
-			return false, err
-		}
-		return rs.Status.ObservedGeneration >= desiredGeneration &&
-			rs.Status.FullyLabeledReplicas == *(rs.Spec.Replicas), nil
-	})
-}
-
-// LabelPodsWithHash labels all pods in the given podList with the new hash label.
-func LabelPodsWithHash(podList *v1.PodList, c clientset.Interface, podLister corelisters.PodLister, namespace, name, hash string) error {
-	for _, pod := range podList.Items {
-		// Ignore inactive Pods.
-		if !controller.IsPodActive(&pod) {
-			continue
-		}
-		// Only label the pod that doesn't already have the new hash
-		if pod.Labels[extensions.DefaultDeploymentUniqueLabelKey] != hash {
-			_, err := UpdatePodWithRetries(c.CoreV1().Pods(namespace), podLister, pod.Namespace, pod.Name,
-				func(podToUpdate *v1.Pod) error {
-					// Precondition: the pod doesn't contain the new hash in its label.
-					if podToUpdate.Labels[extensions.DefaultDeploymentUniqueLabelKey] == hash {
-						return errors.ErrPreconditionViolated
-					}
-					podToUpdate.Labels = labelsutil.AddLabel(podToUpdate.Labels, extensions.DefaultDeploymentUniqueLabelKey, hash)
-					return nil
-				})
-			if err != nil {
-				return fmt.Errorf("error in adding template hash label %s to pod %q: %v", hash, pod.Name, err)
-			}
-			glog.V(4).Infof("Labeled pod %s/%s of ReplicaSet %s/%s with hash %s.", pod.Namespace, pod.Name, namespace, name, hash)
-		}
-	}
-	return nil
 }
 
 // SetFromReplicaSetTemplate sets the desired PodTemplateSpec from a replica set template to the given deployment.
