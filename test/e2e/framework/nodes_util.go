@@ -120,10 +120,11 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 }
 
 func locationParamGKE() string {
-	if TestContext.CloudConfig.Zone != "" {
-		return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	if TestContext.CloudConfig.MultiMaster {
+		// GKE Regional Clusters are being tested.
+		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
 	}
-	return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
 }
 
 func appendContainerCommandGroupIfNeeded(args []string) []string {
