@@ -418,4 +418,3 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 
 	return ""
 }
-
