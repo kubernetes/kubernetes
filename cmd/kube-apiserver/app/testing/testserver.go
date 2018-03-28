@@ -100,6 +100,7 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
 	s.Etcd.StorageConfig = *storageConfig
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
+	s.Authorization.Modes = []string{"AlwaysAllow"}
 
 	fs.Parse(customFlags)
 	completedOptions, err := app.Complete(s)
