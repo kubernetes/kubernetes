@@ -1107,7 +1107,7 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     # This removes that stale configuration from the snap if it still
     # exists.
     api_opts['client-ca-file'] = 'null'
-    
+
     if is_privileged():
         api_opts['allow-privileged'] = 'true'
         set_state('kubernetes-master.privileged')
