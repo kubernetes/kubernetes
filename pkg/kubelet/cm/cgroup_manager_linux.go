@@ -369,7 +369,12 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.CpuPeriod != nil {
 		resources.CpuPeriod = *resourceConfig.CpuPeriod
 	}
-
+	if resourceConfig.CpusetCpus != nil{
+		resources.CpusetCpus = *resourceConfig.CpusetCpus
+	}
+	if resourceConfig.CpusetMems != nil{
+		resources.CpusetMems = *resourceConfig.CpusetMems
+	}
 	// if huge pages are enabled, we set them in libcontainer
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
 		// for each page size enumerated, set that value

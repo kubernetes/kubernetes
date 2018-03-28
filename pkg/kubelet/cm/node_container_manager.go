@@ -44,6 +44,10 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
 		ResourceParameters: getCgroupConfig(cm.capacity),
 	}
+	if err := cm.updateCgroupConfig(cgroupConfig); err != nil{
+		glog.Errorf("Failed to config cpuset for %q cgroup", cm.cgroupRoot)
+		return err
+	}
 	if cm.cgroupManager.Exists(cgroupConfig.Name) {
 		return nil
 	}
@@ -72,7 +76,10 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		Name:               CgroupName(cm.cgroupRoot),
 		ResourceParameters: getCgroupConfig(nodeAllocatable),
 	}
-
+	if err := cm.updateCgroupConfig(cgroupConfig); err != nil{
+		glog.Errorf("Failed to config cpuset for %q cgroup", cm.cgroupRoot)
+		return err
+	}
 	// Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -155,6 +162,14 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 		val := MilliCPUToShares(q.MilliValue())
 		rc.CpuShares = &val
 	}
+	if q, exists := rl[v1.ResourceCPUSetCpus]; exists {
+		val := q.String()
+		rc.CpusetCpus = &val
+	}
+	if q, exists := rl[v1.ResourceCPUSetMems]; exists {
+		val := q.String()
+		rc.CpusetMems = &val
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
 		rc.HugePageLimit = HugePageLimits(rl)
 	}
@@ -183,6 +198,23 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 	}
 	return result
 
+}
+
+// updateCgroupConfig update cpuset config if it's in the kubelet config flags
+func (cm *containerManagerImpl) updateCgroupConfig(cgroupConfig *CgroupConfig) error {
+	if cgroupConfig == nil{
+		return nil
+	}
+	if cm.NodeConfig.KubePodsCpusetCpus != "" {
+		val := cm.NodeConfig.KubePodsCpusetCpus
+		cgroupConfig.ResourceParameters.CpusetCpus = &val
+	}
+	if cm.NodeConfig.KubePodsCpusetMems != "" {
+		val := cm.NodeConfig.KubePodsCpusetMems
+		cgroupConfig.ResourceParameters.CpusetMems = &val
+	}
+
+	return nil
 }
 
 // GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.
