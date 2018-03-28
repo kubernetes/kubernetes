@@ -145,6 +145,13 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				glog.Fatal(err)
 			}
 
+			// check if there are non-flag arguments in the command line
+			cmds := cleanFlagSet.Args()
+			if len(cmds) > 0 {
+				cmd.Usage()
+				glog.Fatalf("unknown command: %s", cmds[0])
+			}
+
 			// short-circuit on help
 			help, err := cleanFlagSet.GetBool("help")
 			if err != nil {
