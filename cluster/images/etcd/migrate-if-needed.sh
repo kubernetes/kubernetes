@@ -187,14 +187,11 @@ TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | awk -F'.' '{print $2}')"
 case "${CURRENT_STORAGE}-${TARGET_STORAGE}" in
   "etcd3-etcd3")
     [ "${TARGET_MINOR_VERSION}" -lt "${CURRENT_MINOR_VERSION}" ] && rollback_etcd3_minor_version
-    break
     ;;
   "etcd3-etcd2")
     rollback_to_etcd2
-    break
     ;;
   *)
-    break
     ;;
 esac
 
