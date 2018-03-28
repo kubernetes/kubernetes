@@ -89,7 +89,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	sw.Do(clientsetTemplate, m)
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
-		// don't generated the default method if generating internalversion clientset
+		// don't generated the default method if generating internal version clientset
 		if g.IsDefaultVersion && g.Version != "" {
 			sw.Do(clientsetInterfaceDefaultVersionImpl, g)
 		}
