@@ -84,7 +84,7 @@ rollback_etcd3_minor_version() {
 
 # Rollback from "3.0.x" version in 'etcd3' mode to "2.2.1" version in 'etcd2' mode, if needed.
 rollback_to_etcd2() {
-  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.2.1" ]; then
+  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-4)" != "3.0." ] || [ "${TARGET_VERSION}" != "2.2.1" ]; then
     echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.2.1"
     return 0
   fi
@@ -123,7 +123,7 @@ fi
 
 echo "$(date +'%Y-%m-%d %H:%M:%S') Detecting if migration is needed"
 
-if [ "${TARGET_STORAGE}" != "etcd2" -a "${TARGET_STORAGE}" != "etcd3" ]; then
+if [ "${TARGET_STORAGE}" != "etcd2" ] && [ "${TARGET_STORAGE}" != "etcd3" ]; then
   echo "Not supported version of storage: ${TARGET_STORAGE}"
   exit 1
 fi
@@ -171,7 +171,7 @@ ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 # If we are upgrading from 2.2.1 and this is the first try for upgrade,
 # do the backup to allow restoring from it in case of failed upgrade.
 BACKUP_DIR="${DATA_DIRECTORY}/migration-backup"
-if [ "${CURRENT_VERSION}" = "2.2.1" -a "${CURRENT_VERSION}" != "${TARGET_VERSION}" -a ! -d "${BACKUP_DIR}" ]; then
+if [ "${CURRENT_VERSION}" = "2.2.1" ] && [ "${CURRENT_VERSION}" != "${TARGET_VERSION}" ] && [ ! -d "${BACKUP_DIR}" ]; then
   echo "Backup etcd before starting migration"
   mkdir "${BACKUP_DIR}"
   ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
@@ -224,7 +224,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     CURRENT_VERSION=${step}
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-2)" = "3." -a "${CURRENT_VERSION}" = "${step}" -a "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
+  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-2)" = "3." ] && [ "${CURRENT_VERSION}" = "${step}" ] && [ "${CURRENT_STORAGE}" = "etcd2" ] && [ "${TARGET_STORAGE}" = "etcd3" ]; then
     # If it is the first 3.x release in the list and we are migrating
     # also from 'etcd2' to 'etcd3', do the migration now.
     echo "Performing etcd2 -> etcd3 migration"
@@ -250,7 +250,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     CURRENT_STORAGE="etcd3"
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-4)" = "3.1." -a "${CURRENT_VERSION}" = "${step}" -a "${CURRENT_STORAGE}" = "etcd3" ]; then
+  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-4)" = "3.1." ] && [ "${CURRENT_VERSION}" = "${step}" ] && [ "${CURRENT_STORAGE}" = "etcd3" ]; then
     # If we are upgrading to 3.1.* release, if the cluster was migrated
     # from v2 version, the v2 data may still be around. So now is the
     # time to actually remove them.
@@ -269,7 +269,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     # Also remove backup from v2->v3 migration.
     rm -rf "${BACKUP_DIR}"
   fi
-  if [ "${CURRENT_VERSION}" = "${TARGET_VERSION}" -a "${CURRENT_STORAGE}" = "${TARGET_STORAGE}" ]; then
+  if [ "${CURRENT_VERSION}" = "${TARGET_VERSION}" ] && [ "${CURRENT_STORAGE}" = "${TARGET_STORAGE}" ]; then
     break
   fi
 done
