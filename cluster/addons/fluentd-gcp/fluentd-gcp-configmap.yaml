@@ -402,6 +402,8 @@ data:
         # the necessary resource types when this label is set.
         "logging.googleapis.com/k8s_compatibility": "true"
       }
+      # Only drop failed entries partially, instead of dropping the whole request.
+      partial_success true
     </match>
 
     # Keep a smaller buffer here since these logs are less important than the user's
@@ -430,9 +432,10 @@ data:
         # the necessary resource types when this label is set.
         "logging.googleapis.com/k8s_compatibility": "true"
       }
+      partial_success true
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.4
+  name: fluentd-gcp-config-v1.2.5
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
