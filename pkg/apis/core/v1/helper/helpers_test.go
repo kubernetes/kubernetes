@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func TestIsDefaultNamespaceResource(t *testing.T) {
+func TestIsNativeResource(t *testing.T) {
 	testCases := []struct {
 		resourceName v1.ResourceName
 		expectVal    bool
@@ -58,7 +58,7 @@ func TestIsDefaultNamespaceResource(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
 			t.Parallel()
-			v := IsDefaultNamespaceResource(tc.resourceName)
+			v := IsNativeResource(tc.resourceName)
 			if v != tc.expectVal {
 				t.Errorf("Got %v but expected %v", v, tc.expectVal)
 			}

@@ -81,7 +81,7 @@ func maskResourceWithPrefix(resource api.ResourceName, prefix string) api.Resour
 func isExtendedResourceNameForQuota(name api.ResourceName) bool {
 	// As overcommit is not supported by extended resources for now,
 	// only quota objects in format of "requests.resourceName" is allowed.
-	return !helper.IsDefaultNamespaceResource(name) && strings.HasPrefix(string(name), api.DefaultResourceRequestsPrefix)
+	return !helper.IsNativeResource(name) && strings.HasPrefix(string(name), api.DefaultResourceRequestsPrefix)
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,

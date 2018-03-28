@@ -36,7 +36,7 @@ import (
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name v1.ResourceName) bool {
-	if IsDefaultNamespaceResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
+	if IsNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
 		return false
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
@@ -47,13 +47,18 @@ func IsExtendedResourceName(name v1.ResourceName) bool {
 	return true
 }
 
-// IsDefaultNamespaceResource returns true if the resource name is in the
+// IsPrefixedNativeResource returns true if the resource name is in the
+// *kubernetes.io/ namespace.
+func IsPrefixedNativeResource(name v1.ResourceName) bool {
+	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+}
+
+// IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
-func IsDefaultNamespaceResource(name v1.ResourceName) bool {
+func IsNativeResource(name v1.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
-		strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
-
+		IsPrefixedNativeResource(name)
 }
 
 // IsHugePageResourceName returns true if the resource name has the huge page
@@ -85,14 +90,15 @@ var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and not blacklisted and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
-	return IsDefaultNamespaceResource(name) &&
+	return IsNativeResource(name) &&
 		!IsHugePageResourceName(name) &&
 		!overcommitBlacklist.Has(string(name))
 }
 
 // Extended and Hugepages resources
 func IsScalarResourceName(name v1.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
+		IsPrefixedNativeResource(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not
