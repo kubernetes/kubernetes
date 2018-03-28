@@ -656,6 +656,8 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
+					KubePodsCpusetCpus:   s.KubePodsCpusetCpus,
+					KubePodsCpusetMems:   s.KubePodsCpusetMems,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 				ExperimentalQOSReserved:               *experimentalQOSReserved,
