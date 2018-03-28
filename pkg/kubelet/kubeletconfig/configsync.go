@@ -168,9 +168,9 @@ func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bo
 	updated, err := cc.checkpointStore.SetCurrentUpdated(source)
 	if err != nil {
 		if source == nil {
-			return false, status.FailSyncReasonSetCurrentLocal, err
+			return false, status.FailSyncReasonAssignLocal, err
 		}
-		return false, fmt.Sprintf(status.FailSyncReasonSetCurrentUIDFmt, source.APIPath(), source.UID()), err
+		return false, fmt.Sprintf(status.FailSyncReasonAssignRemoteFmt, source.APIPath(), source.UID()), err
 	}
 	return updated, "", nil
 }

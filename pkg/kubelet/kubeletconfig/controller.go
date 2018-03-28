@@ -95,9 +95,9 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	if err == nil {
 		// set the status to indicate we will use the assigned config
 		if curSource != nil {
-			cc.configOk.Set(fmt.Sprintf(status.CurRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
+			cc.configOk.Set(fmt.Sprintf(status.AssignedRemoteMessageFmt, curSource.APIPath()), reason, apiv1.ConditionTrue)
 		} else {
-			cc.configOk.Set(status.CurLocalMessage, reason, apiv1.ConditionTrue)
+			cc.configOk.Set(status.AssignedLocalMessage, reason, apiv1.ConditionTrue)
 		}
 
 		// update the last-known-good config if necessary, and start a timer that
@@ -184,26 +184,26 @@ func (cc *Controller) StartSync(client clientset.Interface, eventClient v1core.E
 func (cc *Controller) loadAssignedConfig(local *kubeletconfig.KubeletConfiguration) (*kubeletconfig.KubeletConfiguration, checkpoint.RemoteConfigSource, string, error) {
 	src, err := cc.checkpointStore.Current()
 	if err != nil {
-		return nil, nil, fmt.Sprintf(status.CurFailLoadReasonFmt, "unknown"), err
+		return nil, nil, fmt.Sprintf(status.AssignedFailLoadReasonFmt, "unknown"), err
 	}
 	// nil source is the signal to use the local config
 	if src == nil {
-		return local, src, status.CurLocalOkayReason, nil
+		return local, src, status.AssignedLocalOkReason, nil
 	}
 	curUID := src.UID()
 	// load from checkpoint
 	checkpoint, err := cc.checkpointStore.Load(curUID)
 	if err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailLoadReasonFmt, src.APIPath()), err
+		return nil, src, fmt.Sprintf(status.AssignedFailLoadReasonFmt, src.APIPath()), err
 	}
 	cur, err := checkpoint.Parse()
 	if err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailParseReasonFmt, src.APIPath()), err
+		return nil, src, fmt.Sprintf(status.AssignedFailParseReasonFmt, src.APIPath()), err
 	}
 	if err := validation.ValidateKubeletConfiguration(cur); err != nil {
-		return nil, src, fmt.Sprintf(status.CurFailValidateReasonFmt, src.APIPath()), err
+		return nil, src, fmt.Sprintf(status.AssignedFailValidateReasonFmt, src.APIPath()), err
 	}
-	return cur, src, status.CurRemoteOkayReason, nil
+	return cur, src, status.AssignedRemoteOkReason, nil
 }
 
 // loadLastKnownGoodConfig loads the Kubelet's last-known-good config,
