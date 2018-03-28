@@ -94,8 +94,7 @@ rollback_to_etcd2() {
   mkdir -p "${ROLLBACK_BACKUP_DIR}"
   cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
   echo "Performing etcd3 -> etcd2 rollback"
-  ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
-  if [ "$?" -ne "0" ]; then
+  if ! ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"; then
     echo "Rollback to etcd2 failed"
     exit 1
   fi
