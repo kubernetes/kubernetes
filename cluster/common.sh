@@ -451,7 +451,7 @@ function find-release-tars() {
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
   if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "container-linux" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" ]] ; then
+     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "container-linux" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" || "${NODE_OS_DISTRIBUTION:-}" == "custom" ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -593,7 +593,9 @@ function build-kube-env {
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]] || \
      [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] || \
+     [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "custom" ]] || \
+     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "custom" ]] ; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
     salt_tar_url=$(split_csv "${SALT_TAR_URL}")
@@ -696,8 +698,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "container-linux" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu") ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "container-linux" || "${NODE_OS_DISTRIBUTION}" = "ubuntu" || "${NODE_OS_DISTRIBUTION}" = "custom") ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
