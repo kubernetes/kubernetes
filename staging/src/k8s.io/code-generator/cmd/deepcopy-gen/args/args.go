@@ -36,7 +36,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	return genericArgs, customArgs
 }
 
-// AddFlags add the generator flags to the flag set.
+// AddFlags adds the generator flags to the flag set.
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	pflag.CommandLine.StringSliceVar(&ca.BoundingDirs, "bounding-dirs", ca.BoundingDirs,
 		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
