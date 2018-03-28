@@ -193,10 +193,6 @@ Kubernetes 1.10 includes alpha [Azure support for cluster-autoscaler](https://gi
 
 This release includes a change to [kubectl get and describe to work better with extensions](https://github.com/kubernetes/features/issues/515), as the server, rather than the client, returns this information for a smoother user experience.
 
-### Cluster Lifecycle
-
-This release includes beta [support for out-of-process and out-of-tree cloud providers](https://github.com/kubernetes/features/issues/88).
-
 ### Network
 
 In terms of networking, Kubernetes 1.10 is about control. Users now have beta support for the ability to [configure a pod's resolv.conf](https://github.com/kubernetes/features/issues/504), rather than relying on the cluster DNS, as well as [configuring the NodePort IP address](https://github.com/kubernetes/features/issues/539). You can also  [switch the default DNS plugin to CoreDNS](https://github.com/kubernetes/features/issues/427) (beta). 
