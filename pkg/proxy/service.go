@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -91,7 +90,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *api.ServicePort, servi
 		Protocol:  port.Protocol,
 		NodePort:  int(port.NodePort),
 		// Deep-copy in case the service instance changes
-		LoadBalancerStatus:     *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
+		LoadBalancerStatus:     *service.Status.LoadBalancer.DeepCopy(),
 		SessionAffinityType:    service.Spec.SessionAffinity,
 		StickyMaxAgeSeconds:    stickyMaxAgeSeconds,
 		OnlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
