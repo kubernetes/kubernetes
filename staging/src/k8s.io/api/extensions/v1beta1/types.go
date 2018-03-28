@@ -864,6 +864,7 @@ type ReplicaSetCondition struct {
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
+// Deprecated: use PodSecurityPolicy from policy API Group instead.
 type PodSecurityPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -877,6 +878,7 @@ type PodSecurityPolicy struct {
 }
 
 // PodSecurityPolicySpec defines the policy enforced.
+// Deprecated: use PodSecurityPolicySpec from policy API Group instead.
 type PodSecurityPolicySpec struct {
 	// privileged determines if a pod can request to be run as privileged.
 	// +optional
@@ -948,6 +950,7 @@ type PodSecurityPolicySpec struct {
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
 // for pods to use. It requires the path prefix to be defined.
+// Deprecated: use AllowedHostPath from policy API Group instead.
 type AllowedHostPath struct {
 	// pathPrefix is the path prefix that the host volume must match.
 	// It does not support `*`.
@@ -960,6 +963,7 @@ type AllowedHostPath struct {
 }
 
 // FSType gives strong typing to different file systems that are used by volumes.
+// Deprecated: use FSType from policy API Group instead.
 type FSType string
 
 var (
@@ -988,6 +992,7 @@ var (
 )
 
 // AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
+// Deprecated: use AllowedFlexVolume from policy API Group instead.
 type AllowedFlexVolume struct {
 	// driver is the name of the Flexvolume driver.
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
@@ -995,6 +1000,7 @@ type AllowedFlexVolume struct {
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
 // for pods to use.  It requires both the start and end to be defined.
+// Deprecated: use HostPortRange from policy API Group instead.
 type HostPortRange struct {
 	// min is the start of the range, inclusive.
 	Min int32 `json:"min" protobuf:"varint,1,opt,name=min"`
@@ -1003,6 +1009,7 @@ type HostPortRange struct {
 }
 
 // SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
+// Deprecated: use SELinuxStrategyOptions from policy API Group instead.
 type SELinuxStrategyOptions struct {
 	// rule is the strategy that will dictate the allowable labels that may be set.
 	Rule SELinuxStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=SELinuxStrategy"`
@@ -1014,16 +1021,20 @@ type SELinuxStrategyOptions struct {
 
 // SELinuxStrategy denotes strategy types for generating SELinux options for a
 // Security Context.
+// Deprecated: use SELinuxStrategy from policy API Group instead.
 type SELinuxStrategy string
 
 const (
 	// SELinuxStrategyMustRunAs means that container must have SELinux labels of X applied.
+	// Deprecated: use SELinuxStrategyMustRunAs from policy API Group instead.
 	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
 	// SELinuxStrategyRunAsAny means that container may make requests for any SELinux context labels.
+	// Deprecated: use SELinuxStrategyRunAsAny from policy API Group instead.
 	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
+// Deprecated: use RunAsUserStrategyOptions from policy API Group instead.
 type RunAsUserStrategyOptions struct {
 	// rule is the strategy that will dictate the allowable RunAsUser values that may be set.
 	Rule RunAsUserStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsUserStrategy"`
@@ -1034,6 +1045,7 @@ type RunAsUserStrategyOptions struct {
 }
 
 // IDRange provides a min/max of an allowed range of IDs.
+// Deprecated: use IDRange from policy API Group instead.
 type IDRange struct {
 	// min is the start of the range, inclusive.
 	Min int64 `json:"min" protobuf:"varint,1,opt,name=min"`
@@ -1043,18 +1055,23 @@ type IDRange struct {
 
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
 // Security Context.
+// Deprecated: use RunAsUserStrategy from policy API Group instead.
 type RunAsUserStrategy string
 
 const (
 	// RunAsUserStrategyMustRunAs means that container must run as a particular uid.
+	// Deprecated: use RunAsUserStrategyMustRunAs from policy API Group instead.
 	RunAsUserStrategyMustRunAs RunAsUserStrategy = "MustRunAs"
 	// RunAsUserStrategyMustRunAsNonRoot means that container must run as a non-root uid.
+	// Deprecated: use RunAsUserStrategyMustRunAsNonRoot from policy API Group instead.
 	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategy = "MustRunAsNonRoot"
 	// RunAsUserStrategyRunAsAny means that container may make requests for any uid.
+	// Deprecated: use RunAsUserStrategyRunAsAny from policy API Group instead.
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
 )
 
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+// Deprecated: use FSGroupStrategyOptions from policy API Group instead.
 type FSGroupStrategyOptions struct {
 	// rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
 	// +optional
@@ -1067,16 +1084,20 @@ type FSGroupStrategyOptions struct {
 
 // FSGroupStrategyType denotes strategy types for generating FSGroup values for a
 // SecurityContext
+// Deprecated: use FSGroupStrategyType from policy API Group instead.
 type FSGroupStrategyType string
 
 const (
 	// FSGroupStrategyMustRunAs meant that container must have FSGroup of X applied.
+	// Deprecated: use FSGroupStrategyMustRunAs from policy API Group instead.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
 	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
+	// Deprecated: use FSGroupStrategyRunAsAny from policy API Group instead.
 	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
 )
 
 // SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+// Deprecated: use SupplementalGroupsStrategyOptions from policy API Group instead.
 type SupplementalGroupsStrategyOptions struct {
 	// rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
 	// +optional
@@ -1089,18 +1110,22 @@ type SupplementalGroupsStrategyOptions struct {
 
 // SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
 // groups for a SecurityContext.
+// Deprecated: use SupplementalGroupsStrategyType from policy API Group instead.
 type SupplementalGroupsStrategyType string
 
 const (
 	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
+	// Deprecated: use SupplementalGroupsStrategyMustRunAs from policy API Group instead.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
+	// Deprecated: use SupplementalGroupsStrategyRunAsAny from policy API Group instead.
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodSecurityPolicyList is a list of PodSecurityPolicy objects.
+// Deprecated: use PodSecurityPolicyList from policy API Group instead.
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
