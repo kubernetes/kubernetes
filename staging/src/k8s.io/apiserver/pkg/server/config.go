@@ -222,6 +222,10 @@ type SecureServingInfo struct {
 	// CipherSuites optionally overrides the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []uint16
+
+	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
+	// A value of zero means to use the default provided by golang's HTTP/2 support.
+	HTTP2MaxStreamsPerConnection int
 }
 
 // NewConfig returns a Config struct with the default values
