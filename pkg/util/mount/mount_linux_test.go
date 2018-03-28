@@ -1181,7 +1181,7 @@ func TestBindSubPath(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "subpath-mounting-unix-socket",
+			name: "mount-unix-socket",
 			prepare: func(base string) ([]string, string, string, error) {
 				volpath, subpathMount := getTestPaths(base)
 				mounts := []string{subpathMount}
@@ -1193,9 +1193,9 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 
-				testSocketFile := filepath.Join(volpath, "mount_test.sock")
-				_, err := net.Listen("unix", testSocketFile)
-				return mounts, volpath, testSocketFile, err
+				socketFile, socketCreateError := createSocketFile(volpath)
+
+				return mounts, volpath, socketFile, socketCreateError
 			},
 			expectError: false,
 		},
@@ -1226,6 +1226,7 @@ func TestBindSubPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
+
 		mounts, volPath, subPath, err := test.prepare(base)
 		if err != nil {
 			os.RemoveAll(base)
@@ -1476,29 +1477,29 @@ func TestSafeOpen(t *testing.T) {
 			true,
 		},
 		{
-			"mounting-unix-socket",
+			"mount-unix-socket",
 			func(base string) error {
-				testSocketFile := filepath.Join(base, "mount_test.sock")
-				_, err := net.Listen("unix", testSocketFile)
-				if err != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, err)
+				socketFile, socketError := createSocketFile(base)
+
+				if socketError != nil {
+					return fmt.Errorf("Error preparing socket file %s with %v", socketFile, socketError)
 				}
 				return nil
 			},
-			"mount_test.sock",
+			"mt.sock",
 			false,
 		},
 		{
 			"mounting-unix-socket-in-middle",
 			func(base string) error {
-				testSocketFile := filepath.Join(base, "mount_test.sock")
-				_, err := net.Listen("unix", testSocketFile)
-				if err != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, err)
+				testSocketFile, socketError := createSocketFile(base)
+
+				if socketError != nil {
+					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, socketError)
 				}
 				return nil
 			},
-			"mount_test.sock/bar",
+			"mt.sock/bar",
 			true,
 		},
 	}
@@ -1509,6 +1510,7 @@ func TestSafeOpen(t *testing.T) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
+
 		test.prepare(base)
 		pathToCreate := filepath.Join(base, test.path)
 		fd, err := doSafeOpen(pathToCreate, base)
@@ -1525,6 +1527,25 @@ func TestSafeOpen(t *testing.T) {
 		syscall.Close(fd)
 		os.RemoveAll(base)
 	}
+}
+
+func createSocketFile(socketDir string) (string, error) {
+	testSocketFile := filepath.Join(socketDir, "mt.sock")
+
+	// Switch to volume path and create the socket file
+	// socket file can not have length of more than 108 character
+	// and hence we must use relative path
+	oldDir, _ := os.Getwd()
+
+	err := os.Chdir(socketDir)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		os.Chdir(oldDir)
+	}()
+	_, socketCreateError := net.Listen("unix", "mt.sock")
+	return testSocketFile, socketCreateError
 }
 
 func TestFindExistingPrefix(t *testing.T) {
