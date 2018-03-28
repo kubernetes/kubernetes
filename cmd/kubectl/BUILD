@@ -35,10 +35,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//cmd/kubectl/app:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = [
         "//build/visible_to:cmd_kubectl_CONSUMERS",
