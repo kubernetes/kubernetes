@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -32,7 +33,6 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
@@ -432,17 +432,14 @@ func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // GenerateExpectedCgroupParent returns cgroup parent in syntax expected by cgroup driver
 func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (string, error) {
-	if len(cgroupParent) > 0 {
+	if cgroupParent != "" {
 		// if docker uses the systemd cgroup driver, it expects *.slice style names for cgroup parent.
 		// if we configured kubelet to use --cgroup-driver=cgroupfs, and docker is configured to use systemd driver
 		// docker will fail to launch the container because the name we provide will not be a valid slice.
 		// this is a very good thing.
 		if ds.cgroupDriver == "systemd" {
-			systemdCgroupParent, err := kubecm.ConvertCgroupFsNameToSystemd(cgroupParent)
-			if err != nil {
-				return "", err
-			}
-			cgroupParent = systemdCgroupParent
+			// Pass only the last component of the cgroup path to systemd.
+			cgroupParent = path.Base(cgroupParent)
 		}
 	}
 	glog.V(3).Infof("Setting cgroup parent to: %q", cgroupParent)
