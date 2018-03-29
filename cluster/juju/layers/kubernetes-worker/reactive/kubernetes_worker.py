@@ -746,6 +746,10 @@ def launch_default_ingress_controller():
         else:
             context['ingress_image'] = \
                 "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
+    if get_version('kubelet') < (1, 9):
+        context['daemonset_api_version'] = 'extensions/v1beta1'
+    else:
+        context['daemonset_api_version'] = 'apps/v1beta2'
     context['juju_application'] = hookenv.service_name()
     manifest = addon_path.format('ingress-daemon-set.yaml')
     render('ingress-daemon-set.yaml', manifest, context)
