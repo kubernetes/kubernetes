@@ -330,7 +330,11 @@ func patchResource(
 				return nil, err
 			}
 
-			hasConflicts, err := mergepatch.HasConflicts(originalPatchMap, currentPatchMap)
+			patchMetaFromStruct, err := strategicpatch.NewPatchMetaFromStruct(versionedObj)
+			if err != nil {
+				return nil, err
+			}
+			hasConflicts, err := strategicpatch.MergingMapsHaveConflicts(originalPatchMap, currentPatchMap, patchMetaFromStruct)
 			if err != nil {
 				return nil, err
 			}
