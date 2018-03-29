@@ -197,7 +197,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	isInternal := requiresInternalLoadBalancer(service)
 	var defaultLB *network.LoadBalancer
 	primaryVMSetName := az.vmSet.GetPrimaryVMSetName()
-	defaultLBName := az.getLoadBalancerName(clusterName, primaryVMSetName, isInternal)
+	defaultLBName := az.getLoadBalancerName(clusterName, primaryVMSetName, isInternal, string(getLoadBalancerSku(service).Name))
 
 	existingLBs, err := az.ListLBWithRetry()
 	if err != nil {
@@ -272,7 +272,7 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 	}
 	selectedLBRuleCount := math.MaxInt32
 	for _, currASName := range *vmSetNames {
-		currLBName := az.getLoadBalancerName(clusterName, currASName, isInternal)
+		currLBName := az.getLoadBalancerName(clusterName, currASName, isInternal, string(getLoadBalancerSku(service).Name))
 		lb, exists := mapExistingLBs[currLBName]
 		if !exists {
 			// select this LB as this is a new LB and will have minimum rules

@@ -121,7 +121,7 @@ func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (
 // Thus Azure do not allow mixed type (public and internal) load balancer.
 // So we'd have a separate name for internal load balancer.
 // This would be the name for Azure LoadBalancer resource.
-func (az *Cloud) getLoadBalancerName(clusterName string, vmSetName string, isInternal bool) string {
+func (az *Cloud) getLoadBalancerName(clusterName string, vmSetName string, isInternal bool, lbTypeName string) string {
 	lbNamePrefix := vmSetName
 	if strings.EqualFold(vmSetName, az.vmSet.GetPrimaryVMSetName()) {
 		lbNamePrefix = clusterName
@@ -129,7 +129,7 @@ func (az *Cloud) getLoadBalancerName(clusterName string, vmSetName string, isInt
 	if isInternal {
 		return fmt.Sprintf("%s%s", lbNamePrefix, InternalLoadBalancerNameSuffix)
 	}
-	return lbNamePrefix
+	return fmt.Sprintf("%s-%s", lbNamePrefix, lbTypeName)
 }
 
 // isMasterNode returns true if the node has a master role label.
