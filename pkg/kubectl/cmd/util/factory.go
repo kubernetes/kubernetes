@@ -211,7 +211,7 @@ type BuilderFactory interface {
 	// PluginRunner provides the implementation to be used to run cli plugins.
 	PluginRunner() plugins.PluginRunner
 	// Returns a Scaler for changing the size of the specified RESTMapping type or an error
-	Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error)
+	Scaler() (kubectl.Scaler, error)
 	// ScaleClient gives you back scale getter
 	ScaleClient() (scaleclient.ScalesGetter, error)
 	// Returns a Reaper for gracefully shutting down resources.

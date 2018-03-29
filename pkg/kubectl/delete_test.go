@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakescale "k8s.io/client-go/scale/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -377,103 +376,6 @@ func TestReplicaSetStop(t *testing.T) {
 				if actions[i].GetVerb() != verb {
 					t.Errorf("%s unexpected action: %+v, expected %s", test.Name, actions[i].GetVerb(), verb)
 				}
-			}
-		}
-	}
-}
-
-func TestJobStop(t *testing.T) {
-	name := "foo"
-	ns := "default"
-	zero := int32(0)
-	tests := []struct {
-		Name            string
-		Objs            []runtime.Object
-		StopError       error
-		ExpectedActions []string
-	}{
-		{
-			Name: "OnlyOneJob",
-			Objs: []runtime.Object{
-				&batch.JobList{ // LIST
-					Items: []batch.Job{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: batch.JobSpec{
-								Parallelism: &zero,
-								Selector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"k1": "v1"},
-								},
-							},
-						},
-					},
-				},
-			},
-			StopError: nil,
-			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
-		},
-		{
-			Name: "JobWithDeadPods",
-			Objs: []runtime.Object{
-				&batch.JobList{ // LIST
-					Items: []batch.Job{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: batch.JobSpec{
-								Parallelism: &zero,
-								Selector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{"k1": "v1"},
-								},
-							},
-						},
-					},
-				},
-				&api.PodList{ // LIST
-					Items: []api.Pod{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "pod1",
-								Namespace: ns,
-								Labels:    map[string]string{"k1": "v1"},
-							},
-						},
-					},
-				},
-			},
-			StopError: nil,
-			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
-		},
-	}
-
-	for _, test := range tests {
-		fake := fake.NewSimpleClientset(test.Objs...)
-		reaper := JobReaper{fake.Batch(), fake.Core(), time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
-		if !reflect.DeepEqual(err, test.StopError) {
-			t.Errorf("%s unexpected error: %v", test.Name, err)
-			continue
-		}
-
-		actions := fake.Actions()
-		if len(actions) != len(test.ExpectedActions) {
-			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
-			continue
-		}
-		for i, expAction := range test.ExpectedActions {
-			action := strings.Split(expAction, ":")
-			if actions[i].GetVerb() != action[0] {
-				t.Errorf("%s unexpected verb: %+v, expected %s", test.Name, actions[i], expAction)
-			}
-			if actions[i].GetResource().Resource != action[1] {
-				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
 			}
 		}
 	}
