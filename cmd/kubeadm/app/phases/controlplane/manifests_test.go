@@ -776,9 +776,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16", NodeCIDRMaskSize: "20"},
-				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.0",
+				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
+				CertificatesDir:            testCertsDir,
+				KubernetesVersion:          "v1.7.0",
 			},
 			expected: []string{
 				"kube-controller-manager",
