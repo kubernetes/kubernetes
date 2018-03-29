@@ -63,7 +63,7 @@ func StartScheduler(clientSet clientset.Interface, enableEquivalenceCache bool) 
 
 	evtBroadcaster := record.NewBroadcaster()
 	evtWatch := evtBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
-		Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
+		Interface: clientSet.CoreV1().Events("")})
 
 	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory)
 

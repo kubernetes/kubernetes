@@ -181,9 +181,9 @@ func (o *GenericControllerManagerOptions) Validate() []error {
 	return errors
 }
 
-func createRecorder(kubeClient *kubernetes.Clientset, userAgent string) record.EventRecorder {
+func createRecorder(kubeClient kubernetes.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})
 }
