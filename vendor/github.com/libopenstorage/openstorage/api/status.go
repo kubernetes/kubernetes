@@ -1,5 +1,6 @@
 package api
 
+// StatusKind indicates the severity of a status
 type StatusKind int32
 
 const (
@@ -12,32 +13,35 @@ const (
 )
 
 var statusToStatusKind = map[Status]StatusKind{
-	Status_STATUS_NONE:              StatusSeverityHigh,
-	Status_STATUS_INIT:              StatusSeverityMedium,
-	Status_STATUS_OK:                StatusSeverityLow,
-	Status_STATUS_OFFLINE:           StatusSeverityHigh,
-	Status_STATUS_ERROR:             StatusSeverityHigh,
-	Status_STATUS_NOT_IN_QUORUM:     StatusSeverityHigh,
-	Status_STATUS_DECOMMISSION:      StatusSeverityHigh,
-	Status_STATUS_MAINTENANCE:       StatusSeverityHigh,
-	Status_STATUS_STORAGE_DOWN:      StatusSeverityHigh,
-	Status_STATUS_STORAGE_DEGRADED:  StatusSeverityHigh,
-	Status_STATUS_NEEDS_REBOOT:      StatusSeverityHigh,
-	Status_STATUS_STORAGE_REBALANCE: StatusSeverityMedium,
-	Status_STATUS_STORAGE_DRIVE_REPLACE:     StatusSeverityMedium,
+	Status_STATUS_NONE:                  StatusSeverityHigh,
+	Status_STATUS_INIT:                  StatusSeverityMedium,
+	Status_STATUS_OK:                    StatusSeverityLow,
+	Status_STATUS_OFFLINE:               StatusSeverityHigh,
+	Status_STATUS_ERROR:                 StatusSeverityHigh,
+	Status_STATUS_NOT_IN_QUORUM:         StatusSeverityHigh,
+	Status_STATUS_DECOMMISSION:          StatusSeverityHigh,
+	Status_STATUS_MAINTENANCE:           StatusSeverityHigh,
+	Status_STATUS_STORAGE_DOWN:          StatusSeverityHigh,
+	Status_STATUS_STORAGE_DEGRADED:      StatusSeverityHigh,
+	Status_STATUS_NEEDS_REBOOT:          StatusSeverityHigh,
+	Status_STATUS_STORAGE_REBALANCE:     StatusSeverityMedium,
+	Status_STATUS_STORAGE_DRIVE_REPLACE: StatusSeverityMedium,
 	// Add statuses before MAX
 	Status_STATUS_MAX: StatusSeverityHigh,
 }
 
+// StatusSimpleValueOf returns the string format of Status
 func StatusSimpleValueOf(s string) (Status, error) {
 	obj, err := simpleValueOf("status", Status_value, s)
 	return Status(obj), err
 }
 
+// SimpleString returns the string format of Status
 func (x Status) SimpleString() string {
 	return simpleString("status", Status_name, int32(x))
 }
 
+// StatusKind returns the king of status
 func (x Status) StatusKind() StatusKind {
 	statusType, _ := statusToStatusKind[x]
 	return statusType

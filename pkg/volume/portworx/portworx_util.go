@@ -35,6 +35,7 @@ const (
 	pxdDriverName    = "pxd"
 	pvcClaimLabel    = "pvc"
 	pxServiceName    = "portworx-service"
+	pxDriverName     = "pxd-sched"
 )
 
 type PortworxVolumeUtil struct {
@@ -56,20 +57,26 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	requestGB := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 
 	specHandler := osdspec.NewSpecHandler()
-	spec, err := specHandler.SpecFromOpts(p.options.Parameters)
-	if err != nil {
-		glog.Errorf("Error parsing parameters for PVC: %v. Err: %v", p.options.PVC.Name, err)
-		return "", 0, nil, err
+	spec, locator, source, _ := specHandler.SpecFromOpts(p.options.Parameters)
+	if spec == nil {
+		spec = specHandler.DefaultSpec()
 	}
+
+	// Pass all parameters as volume labels for Portworx server-side processing.
+	spec.VolumeLabels = p.options.Parameters
+	// Update the requested size in the spec
 	spec.Size = uint64(requestGB * 1024 * 1024 * 1024)
-	source := osdapi.Source{}
-	locator := osdapi.VolumeLocator{
-		Name: p.options.PVName,
+	// Change the Portworx Volume name to PV name
+	if locator == nil {
+		locator = &osdapi.VolumeLocator{
+			VolumeLabels: make(map[string]string),
+		}
 	}
+	locator.Name = p.options.PVName
+
 	// Add claim Name as a part of Portworx Volume Labels
-	locator.VolumeLabels = make(map[string]string)
 	locator.VolumeLabels[pvcClaimLabel] = p.options.PVC.Name
-	volumeID, err := driver.Create(&locator, &source, spec)
+	volumeID, err := driver.Create(locator, source, spec)
 	if err != nil {
 		glog.Errorf("Error creating Portworx Volume : %v", err)
 	}
@@ -95,14 +102,14 @@ func (util *PortworxVolumeUtil) DeleteVolume(d *portworxVolumeDeleter) error {
 }
 
 // AttachVolume attaches a Portworx Volume
-func (util *PortworxVolumeUtil) AttachVolume(m *portworxVolumeMounter) (string, error) {
+func (util *PortworxVolumeUtil) AttachVolume(m *portworxVolumeMounter, attachOptions map[string]string) (string, error) {
 	driver, err := util.getPortworxDriver(m.plugin.host, true /*localOnly*/)
 	if err != nil || driver == nil {
 		glog.Errorf("Failed to get portworx driver. Err: %v", err)
 		return "", err
 	}
 
-	devicePath, err := driver.Attach(m.volName)
+	devicePath, err := driver.Attach(m.volName, attachOptions)
 	if err != nil {
 		glog.Errorf("Error attaching Portworx Volume (%v): %v", m.volName, err)
 		return "", err
@@ -118,7 +125,7 @@ func (util *PortworxVolumeUtil) DetachVolume(u *portworxVolumeUnmounter) error {
 		return err
 	}
 
-	err = driver.Detach(u.volName)
+	err = driver.Detach(u.volName, false /*doNotForceDetach*/)
 	if err != nil {
 		glog.Errorf("Error detaching Portworx Volume (%v): %v", u.volName, err)
 		return err
@@ -174,7 +181,7 @@ func isClientValid(client *osdclient.Client) (bool, error) {
 
 func createDriverClient(hostname string) (*osdclient.Client, error) {
 	client, err := volumeclient.NewDriverClient("http://"+hostname+":"+osdMgmtPort,
-		pxdDriverName, osdDriverVersion)
+		pxdDriverName, osdDriverVersion, pxDriverName)
 	if err != nil {
 		return nil, err
 	}

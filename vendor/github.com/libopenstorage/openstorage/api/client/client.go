@@ -16,7 +16,7 @@ var (
 )
 
 // NewClient returns a new REST client for specified server.
-func NewClient(host string, version string) (*Client, error) {
+func NewClient(host, version, userAgent string) (*Client, error) {
 	baseURL, err := url.Parse(host)
 	if err != nil {
 		return nil, err
@@ -25,14 +25,48 @@ func NewClient(host string, version string) (*Client, error) {
 		baseURL.Path = "/"
 	}
 	unix2HTTP(baseURL)
+	hClient := getHTTPClient(host)
+	if hClient == nil {
+		return nil, fmt.Errorf("Unable to parse provided url: %v", host)
+	}
 	c := &Client{
-		base:       baseURL,
-		version:    version,
-		httpClient: getHttpClient(host),
+		base:        baseURL,
+		version:     version,
+		httpClient:  hClient,
+		authstring:  "",
+		accesstoken: "",
+		userAgent:   fmt.Sprintf("%v/%v", userAgent, version),
 	}
 	return c, nil
 }
 
+// NewAuthClient returns a new REST client for specified server.
+func NewAuthClient(host, version, authstring, accesstoken, userAgent string) (*Client, error) {
+	baseURL, err := url.Parse(host)
+	if err != nil {
+		return nil, err
+	}
+	if baseURL.Path == "" {
+		baseURL.Path = "/"
+	}
+	unix2HTTP(baseURL)
+	hClient := getHTTPClient(host)
+	if hClient == nil {
+		return nil, fmt.Errorf("Unable to parse provided url: %v", host)
+	}
+	c := &Client{
+		base:        baseURL,
+		version:     version,
+		httpClient:  hClient,
+		authstring:  authstring,
+		accesstoken: accesstoken,
+		userAgent:   fmt.Sprintf("%v/%v", userAgent, version),
+	}
+	return c, nil
+}
+
+// GetUnixServerPath returns a unix domain socket prepended with the
+// provided path.
 func GetUnixServerPath(socketName string, paths ...string) string {
 	serverPath := "unix://"
 	for _, path := range paths {
@@ -42,13 +76,15 @@ func GetUnixServerPath(socketName string, paths ...string) string {
 	return serverPath
 }
 
-
 // Client is an HTTP REST wrapper. Use one of Get/Post/Put/Delete to get a request
 // object.
 type Client struct {
-	base       *url.URL
-	version    string
-	httpClient *http.Client
+	base        *url.URL
+	version     string
+	httpClient  *http.Client
+	authstring  string
+	accesstoken string
+	userAgent   string
 }
 
 // Status sends a Status request at the /status REST endpoint.
@@ -58,7 +94,7 @@ func (c *Client) Status() (*Status, error) {
 	return status, err
 }
 
-// Version send a request at the /versions REST endpoint.
+// Versions send a request at the /versions REST endpoint.
 func (c *Client) Versions(endpoint string) ([]string, error) {
 	versions := []string{}
 	err := c.Get().Resource(endpoint + "/versions").Do().Unmarshal(&versions)
@@ -67,22 +103,22 @@ func (c *Client) Versions(endpoint string) ([]string, error) {
 
 // Get returns a Request object setup for GET call.
 func (c *Client) Get() *Request {
-	return NewRequest(c.httpClient, c.base, "GET", c.version)
+	return NewRequest(c.httpClient, c.base, "GET", c.version, c.authstring, c.userAgent)
 }
 
 // Post returns a Request object setup for POST call.
 func (c *Client) Post() *Request {
-	return NewRequest(c.httpClient, c.base, "POST", c.version)
+	return NewRequest(c.httpClient, c.base, "POST", c.version, c.authstring, c.userAgent)
 }
 
 // Put returns a Request object setup for PUT call.
 func (c *Client) Put() *Request {
-	return NewRequest(c.httpClient, c.base, "PUT", c.version)
+	return NewRequest(c.httpClient, c.base, "PUT", c.version, c.authstring, c.userAgent)
 }
 
-// Put returns a Request object setup for DELETE call.
+// Delete returns a Request object setup for DELETE call.
 func (c *Client) Delete() *Request {
-	return NewRequest(c.httpClient, c.base, "DELETE", c.version)
+	return NewRequest(c.httpClient, c.base, "DELETE", c.version, c.authstring, c.userAgent)
 }
 
 func unix2HTTP(u *url.URL) {
@@ -94,7 +130,12 @@ func unix2HTTP(u *url.URL) {
 	}
 }
 
-func newHTTPClient(u *url.URL, tlsConfig *tls.Config, timeout time.Duration) *http.Client {
+func newHTTPClient(
+	u *url.URL,
+	tlsConfig *tls.Config,
+	timeout time.Duration,
+	responseTimeout time.Duration,
+) *http.Client {
 	httpTransport := &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
@@ -114,28 +155,24 @@ func newHTTPClient(u *url.URL, tlsConfig *tls.Config, timeout time.Duration) *ht
 		}
 	}
 
-	return &http.Client{Transport: httpTransport}
+	return &http.Client{Transport: httpTransport, Timeout: responseTimeout}
 }
 
-func getHttpClient(host string) *http.Client {
+func getHTTPClient(host string) *http.Client {
+	cacheLock.Lock()
+	defer cacheLock.Unlock()
 	c, ok := httpCache[host]
 	if !ok {
-		cacheLock.Lock()
-		defer cacheLock.Unlock()
-		c, ok = httpCache[host]
-		if !ok {
-			u, err := url.Parse(host)
-			if err != nil {
-				// TODO(pedge): clean up
-				fmt.Println("Failed to parse into url", host)
-				return nil
-			}
-			if u.Path == "" {
-				u.Path = "/"
-			}
-			c = newHTTPClient(u, nil, 10*time.Second)
-			httpCache[host] = c
+		u, err := url.Parse(host)
+		if err != nil {
+			return nil
 		}
+		if u.Path == "" {
+			u.Path = "/"
+		}
+		c = newHTTPClient(u, nil, 10*time.Second, 5*time.Minute)
+		httpCache[host] = c
 	}
+
 	return c
 }

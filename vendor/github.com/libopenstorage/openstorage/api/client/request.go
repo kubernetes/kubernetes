@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"math/rand"
 )
 
 // Request is contructed iteratively by the client and finally dispatched.
@@ -31,6 +32,8 @@ type Request struct {
 	req      *http.Request
 	resp     *http.Response
 	timeout  time.Duration
+	authstring string
+	accesstoken string
 }
 
 // Response is a representation of HTTP response received from the server.
@@ -48,14 +51,17 @@ type Status struct {
 }
 
 // NewRequest instance
-func NewRequest(client *http.Client, base *url.URL, verb string, version string) *Request {
-	return &Request{
+func NewRequest(client *http.Client, base *url.URL, verb string, version string, authstring, userAgent string) *Request {
+	r := &Request{
 		client:  client,
 		verb:    verb,
 		base:    base,
 		path:    base.Path,
 		version: version,
+		authstring: authstring,
 	}
+	r.SetHeader("User-Agent", userAgent)
+	return r
 }
 
 func checkExists(mustExist string, before string) error {
@@ -251,8 +257,19 @@ func (r *Request) Do() *Response {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
+
 	req.Header = r.headers
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Date", time.Now().String())
+
+	if len(r.authstring) > 0 {
+		req.Header.Set("Authorization", "Basic "+ r.authstring)
+	}
+
+	if len(r.accesstoken) > 0 {
+		req.Header.Set("Access-Token", r.accesstoken)
+	}
+
 	resp, err = r.client.Do(req)
 	if err != nil {
 		return &Response{err: err}
@@ -295,10 +312,21 @@ func (r Response) Error() error {
 	return r.err
 }
 
+// FormatError formats the error
 func (r Response) FormatError() error {
 	if len(r.body) == 0 {
 		return fmt.Errorf("Error: %v", r.err)
-	} else {
-		return fmt.Errorf("HTTP-%d: %s", r.statusCode, string(r.body))
 	}
+	return fmt.Errorf("HTTP-%d: %s", r.statusCode, string(r.body))
+}
+
+func digest(method string, path string) string {
+	now := time.Now().String()
+
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+
+	nonce := r1.Intn(10)
+
+	return method + "+" + path + "+" + now + "+" + strconv.Itoa(nonce)
 }

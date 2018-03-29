@@ -17,7 +17,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
-        "//vendor/go.pedge.io/pb/go/google/protobuf:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
+        "//vendor/github.com/mohae/deepcopy:go_default_library",
     ],
 )
 
