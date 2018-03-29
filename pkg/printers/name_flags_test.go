@@ -18,9 +18,6 @@ package printers_test
 
 import (
 	"bytes"
-	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 	"testing"
 
@@ -31,17 +28,6 @@ import (
 
 func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 	testObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-
-	customColumnsFile, err := ioutil.TempFile("", "printers_jsonpath_flags")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer func(tempFile *os.File) {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-	}(customColumnsFile)
-
-	fmt.Fprintf(customColumnsFile, "NAME\n.metadata.name")
 
 	testCases := []struct {
 		name           string
