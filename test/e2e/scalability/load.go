@@ -649,7 +649,6 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
 	framework.ExpectNoError(framework.ScaleResource(
 		config.GetClient(),
-		config.GetInternalClient(),
 		config.GetScalesGetter(),
 		config.GetNamespace(),
 		config.GetName(),
