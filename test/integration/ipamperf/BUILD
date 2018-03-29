@@ -60,6 +60,7 @@ go_library(
         "//vendor/google.golang.org/api/compute/v0.beta:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",

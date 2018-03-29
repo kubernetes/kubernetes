@@ -95,7 +95,7 @@ func NewObserver(clientSet *clientset.Clientset, numNodes int) *Observer {
 // StartObserving starts an asynchronous loop to monitor for node changes.
 // Call Results() to get the test results after starting observer.
 func (o *Observer) StartObserving() error {
-	go o.monitor()
+	o.monitor()
 	glog.Infof("Test observer started")
 	return nil
 }
@@ -173,6 +173,9 @@ func (o *Observer) monitor() {
 				nTime.allocated = time.Now()
 				nTime.podCIDR = newNode.Spec.PodCIDR
 				o.numAllocated++
+				if o.numAllocated%10 == 0 {
+					glog.Infof("progress: %d/%d - %.2d%%", o.numAllocated, o.numNodes, (o.numAllocated * 100.0 / o.numNodes))
+				}
 				// do following check only if numAllocated is modified, as otherwise, redundant updates
 				// can cause wg.Done() to be called multiple times, causing a panic
 				if o.numAdded == o.numNodes && o.numAllocated == o.numNodes {

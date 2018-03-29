@@ -17,13 +17,21 @@ limitations under the License.
 package ipamperf
 
 import (
+	"time"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
+)
+
+const (
+	maxCreateRetries = 10
+	retryDelay       = 10 * time.Second
 )
 
 var (
@@ -71,7 +79,17 @@ func createNodes(apiURL string, config *Config) error {
 	})
 	glog.Infof("Creating %d nodes", config.NumNodes)
 	for i := 0; i < config.NumNodes; i++ {
-		if _, err := clientSet.CoreV1().Nodes().Create(baseNodeTemplate); err != nil {
+		var err error
+		for j := 0; j < maxCreateRetries; j++ {
+			if _, err = clientSet.CoreV1().Nodes().Create(baseNodeTemplate); err != nil && errors.IsServerTimeout(err) {
+				glog.Infof("Server timeout creating nodes, retrying after %v", retryDelay)
+				time.Sleep(retryDelay)
+				continue
+			}
+			break
+		}
+		if err != nil {
+			glog.Errorf("Error creating nodes: %v", err)
 			return err
 		}
 	}
