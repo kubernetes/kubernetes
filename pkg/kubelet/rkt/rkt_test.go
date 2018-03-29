@@ -854,6 +854,28 @@ func TestGetPodStatus(t *testing.T) {
 	}
 }
 
+func TestPodFinishedMarkCommand(t *testing.T) {
+	podDir := "/poddir/fake/tom"
+	rktUID := "rkt-uid-1"
+
+	var testCases = []struct {
+		caseName, touchPath string
+	}{
+		{"correct-1", "/usr/bin/tom/path"},
+		{"incorrect-1", "/usr/bin/tom's/path"},
+	}
+
+	for _, tc := range testCases {
+		_, err := podFinishedMarkCommand(tc.touchPath, podDir, rktUID)
+		if tc.caseName == "correct-1" {
+			assert.NoError(t, err, "the path has no `'` character in it")
+		}
+		if tc.caseName == "incorrect-1" {
+			assert.Errorf(t, err, "the path %s has a `'` character in it", tc.touchPath)
+		}
+	}
+}
+
 func generateCapRetainIsolator(t *testing.T, caps ...string) appctypes.Isolator {
 	retain, err := appctypes.NewLinuxCapabilitiesRetainSet(caps...)
 	if err != nil {
