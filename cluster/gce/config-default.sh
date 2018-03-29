@@ -194,6 +194,25 @@ if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
 fi
 
+
+# Enable AESGCM encryption of secrets by default.
+ENCRYPTION_PROVIDER_CONFIG="${ENCRYPTION_PROVIDER_CONFIG:-}"
+if [[ -z "${ENCRYPTION_PROVIDER_CONFIG}" ]]; then
+    ENCRYPTION_PROVIDER_CONFIG=$(cat << EOM | base64 | tr -d '\r\n'
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - aesgcm:
+        keys:
+        - name: key1
+          secret: $(dd if=/dev/random bs=32 count=1 status=none | base64 | tr -d '\r\n')
+EOM
+)
+fi
+
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
 LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-gcp}" # options: elasticsearch, gcp
