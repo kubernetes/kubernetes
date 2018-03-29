@@ -205,23 +205,6 @@ else
     echo "skipped the build."
 fi
 
-function test_rkt {
-    if [[ -n "${RKT_PATH}" ]]; then
-      ${RKT_PATH} list 2> /dev/null 1> /dev/null
-      if [ "$?" != "0" ]; then
-        echo "Failed to successfully run 'rkt list', please verify that ${RKT_PATH} is the path of rkt binary."
-        exit 1
-      fi
-    else
-      rkt list 2> /dev/null 1> /dev/null
-      if [ "$?" != "0" ]; then
-        echo "Failed to successfully run 'rkt list', please verify that rkt is in \$PATH."
-        exit 1
-      fi
-    fi
-}
-
-
 # Shut down anyway if there's an error.
 set +e
 
@@ -246,8 +229,6 @@ LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
-RKT_PATH=${RKT_PATH:-""}
-RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
@@ -735,8 +716,6 @@ function start_kubelet {
         --vmodule="${LOG_SPEC}" \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
-        --rkt-path="${RKT_PATH}" \
-        --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
         ${cloud_config_arg} \
         --address="${KUBELET_HOST}" \
@@ -964,10 +943,6 @@ fi
 
 if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
   exit 1
-fi
-
-if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
-  test_rkt
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then

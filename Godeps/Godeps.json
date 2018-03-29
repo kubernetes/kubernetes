@@ -142,26 +142,6 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
-			"ImportPath": "github.com/appc/spec/schema",
-			"Comment": "v0.8.9-17-gfc380db",
-			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
-		},
-		{
-			"ImportPath": "github.com/appc/spec/schema/common",
-			"Comment": "v0.8.9-17-gfc380db",
-			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
-		},
-		{
-			"ImportPath": "github.com/appc/spec/schema/types",
-			"Comment": "v0.8.9-17-gfc380db",
-			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
-		},
-		{
-			"ImportPath": "github.com/appc/spec/schema/types/resource",
-			"Comment": "v0.8.9-17-gfc380db",
-			"Rev": "fc380db5fc13c6dd71a5b0bf2af0d182865d1b1d"
-		},
-		{
 			"ImportPath": "github.com/armon/circbuf",
 			"Rev": "bbbad097214e2918d8543d5201d12bfd7bca254d"
 		},
@@ -929,11 +909,6 @@
 			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
 		},
 		{
-			"ImportPath": "github.com/coreos/go-systemd/unit",
-			"Comment": "v14",
-			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
-		},
-		{
 			"ImportPath": "github.com/coreos/go-systemd/util",
 			"Comment": "v14",
 			"Rev": "48702e0da86bd25e76cfef347e2adeb434a0d0a6"
@@ -1229,12 +1204,10 @@
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/internal",
-			"Comment": "v1.0.0-1-gb8dc900",
 			"Rev": "b8dc90050f24c1a73a52f107f3f575be67b21b7c"
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/redis",
-			"Comment": "v1.0.0-1-gb8dc900",
 			"Rev": "b8dc90050f24c1a73a52f107f3f575be67b21b7c"
 		},
 		{
@@ -2814,10 +2787,6 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
-		},
-		{
-			"ImportPath": "go4.org/errorutil",
-			"Rev": "03efcb870d84809319ea509714dd6d19a1498483"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
