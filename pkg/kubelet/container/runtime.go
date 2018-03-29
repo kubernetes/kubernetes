@@ -444,8 +444,6 @@ type RunContainerOptions struct {
 	// this directory will be used to create and mount the log file to
 	// container.TerminationMessagePath
 	PodContainerDir string
-	// The parent cgroup to pass to Docker
-	CgroupParent string
 	// The type of container rootfs
 	ReadOnly bool
 	// hostname for pod containers
