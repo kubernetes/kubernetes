@@ -142,13 +142,28 @@ func (r *Request) nextPageTokens() []interface{} {
 	tokens := []interface{}{}
 	tokenAdded := false
 	for _, outToken := range r.Operation.OutputTokens {
-		v, _ := awsutil.ValuesAtPath(r.Data, outToken)
-		if len(v) > 0 {
-			tokens = append(tokens, v[0])
-			tokenAdded = true
-		} else {
+		vs, _ := awsutil.ValuesAtPath(r.Data, outToken)
+		if len(vs) == 0 {
 			tokens = append(tokens, nil)
+			continue
 		}
+		v := vs[0]
+
+		switch tv := v.(type) {
+		case *string:
+			if len(aws.StringValue(tv)) == 0 {
+				tokens = append(tokens, nil)
+				continue
+			}
+		case string:
+			if len(tv) == 0 {
+				tokens = append(tokens, nil)
+				continue
+			}
+		}
+
+		tokenAdded = true
+		tokens = append(tokens, v)
 	}
 	if !tokenAdded {
 		return nil

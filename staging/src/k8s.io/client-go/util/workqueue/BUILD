@@ -42,7 +42,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["queue_test.go"],
-    deps = ["//vendor/k8s.io/client-go/util/workqueue:go_default_library"],
+    deps = [":go_default_library"],
 )
 
 filegroup(
