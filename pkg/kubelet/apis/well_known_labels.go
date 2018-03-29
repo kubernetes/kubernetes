@@ -18,6 +18,7 @@ package apis
 
 const (
 	LabelHostname           = "kubernetes.io/hostname"
+	LabelNodename           = "kubernetes.io/nodename"
 	LabelZoneFailureDomain  = "failure-domain.beta.kubernetes.io/zone"
 	LabelMultiZoneDelimiter = "__"
 	LabelZoneRegion         = "failure-domain.beta.kubernetes.io/region"

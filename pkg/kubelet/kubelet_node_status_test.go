@@ -908,6 +908,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 				Name: testKubeletHostname,
 				Labels: map[string]string{
 					kubeletapis.LabelHostname: testKubeletHostname,
+					kubeletapis.LabelNodename: testKubeletHostname,
 					kubeletapis.LabelOS:       goruntime.GOOS,
 					kubeletapis.LabelArch:     goruntime.GOARCH,
 				},
