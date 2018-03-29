@@ -116,7 +116,7 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 			AppendHash:     cmdutil.GetFlagBool(cmd, "append-hash"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -206,7 +206,7 @@ func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.
 			FileSources: cmdutil.GetFlagStringSlice(cmd, "from-file"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -273,7 +273,7 @@ func CreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 			AppendHash: cmdutil.GetFlagBool(cmd, "append-hash"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

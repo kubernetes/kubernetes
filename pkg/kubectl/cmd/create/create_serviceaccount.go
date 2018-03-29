@@ -69,7 +69,7 @@ func CreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comman
 	case cmdutil.ServiceAccountV1GeneratorName:
 		generator = &kubectl.ServiceAccountGeneratorV1{Name: name}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

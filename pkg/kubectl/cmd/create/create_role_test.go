@@ -39,7 +39,7 @@ func TestCreateRole(t *testing.T) {
 
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	tests := map[string]struct {
 		verbs         string
@@ -358,7 +358,7 @@ func TestComplete(t *testing.T) {
 
 	tf.Namespace = "test"
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateRole(tf, buf)

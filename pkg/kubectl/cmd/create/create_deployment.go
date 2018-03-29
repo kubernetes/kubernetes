@@ -122,7 +122,7 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
 	generator, ok := generatorFromName(generatorName, imageNames, deploymentName)
 	if !ok {
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{

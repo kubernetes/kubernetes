@@ -44,7 +44,7 @@ const (
 )
 
 func TestTopNodeAllMetrics(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
@@ -60,17 +60,17 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
 			case p == expectedMetricsPath && m == "GET":
 				body, err := marshallBody(metrics)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedMetricsPath)
 				return nil, nil
@@ -78,7 +78,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(tf, nil, buf)
@@ -97,7 +97,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 	customBaseHeapsterServiceAddress := "/api/v1/namespaces/custom-namespace/services/https:custom-heapster-service:/proxy"
 	customBaseMetricsAddress := customBaseHeapsterServiceAddress + "/apis/metrics"
 
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", customBaseMetricsAddress, metricsApiVersion)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
@@ -113,17 +113,17 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
 			case p == expectedMetricsPath && m == "GET":
 				body, err := marshallBody(metrics)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedMetricsPath)
 				return nil, nil
@@ -131,7 +131,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	opts := &TopNodeOptions{
@@ -154,7 +154,7 @@ func TestTopNodeAllMetricsCustomDefaults(t *testing.T) {
 }
 
 func TestTopNodeWithNameMetrics(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetrics := metrics.Items[0]
 	expectedNode := nodes.Items[0]
@@ -176,17 +176,17 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
 			case p == expectedPath && m == "GET":
 				body, err := marshallBody(expectedMetrics)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNode)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNode)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -194,7 +194,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(tf, nil, buf)
@@ -213,7 +213,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 }
 
 func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1alpha1MetricsData()
 	expectedMetrics := metricsv1alpha1api.NodeMetricsList{
 		ListMeta: metrics.ListMeta,
@@ -243,17 +243,17 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
 			case p == expectedPath && m == "GET" && q == expectedQuery:
 				body, err := marshallBody(expectedMetrics)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -261,7 +261,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(tf, nil, buf)
@@ -283,7 +283,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 }
 
 func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	expectedMetrics, nodes := testNodeV1beta1MetricsData()
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
@@ -298,11 +298,11 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, nodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
 				return nil, nil
@@ -314,7 +314,7 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 		return true, expectedMetrics, nil
 	})
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(tf, nil, buf)
@@ -343,7 +343,7 @@ func TestTopNodeAllMetricsFromMetricsServer(t *testing.T) {
 }
 
 func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1beta1MetricsData()
 	expectedMetrics := metrics.Items[0]
 	expectedNode := nodes.Items[0]
@@ -364,11 +364,11 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNode)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNode)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
 				return nil, nil
@@ -380,7 +380,7 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 		return true, &expectedMetrics, nil
 	})
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(tf, nil, buf)
@@ -412,7 +412,7 @@ func TestTopNodeWithNameMetricsFromMetricsServer(t *testing.T) {
 }
 
 func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	metrics, nodes := testNodeV1beta1MetricsData()
 	expectedMetrics := &metricsv1beta1api.NodeMetricsList{
 		ListMeta: metrics.ListMeta,
@@ -440,11 +440,11 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, _ := req.URL.Path, req.Method, req.URL.RawQuery; {
 			case p == "/api":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 			case p == "/apis":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNodes)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &expectedNodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\n", req, req.URL)
 				return nil, nil
@@ -457,7 +457,7 @@ func TestTopNodeWithLabelSelectorMetricsFromMetricsServer(t *testing.T) {
 		return true, expectedMetrics, nil
 	})
 	tf.Namespace = "test"
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(tf, nil, buf)

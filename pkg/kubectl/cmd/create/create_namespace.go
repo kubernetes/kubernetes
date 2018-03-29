@@ -69,7 +69,7 @@ func CreateNamespace(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 	case cmdutil.NamespaceV1GeneratorName:
 		generator = &kubectl.NamespaceGeneratorV1{Name: name}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

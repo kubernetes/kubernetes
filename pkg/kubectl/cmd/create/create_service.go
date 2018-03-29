@@ -83,7 +83,7 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 	return cmd
 }
 
-func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
+func ErrUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
 	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 }
 
@@ -103,7 +103,7 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 			ClusterIP: cmdutil.GetFlagString(cmd, "clusterip"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -161,7 +161,7 @@ func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comma
 			NodePort:  cmdutil.GetFlagInt(cmd, "node-port"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -217,7 +217,7 @@ func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 			ClusterIP: "",
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
@@ -279,7 +279,7 @@ func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 			ClusterIP:    "",
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

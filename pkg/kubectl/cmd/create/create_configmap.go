@@ -99,7 +99,7 @@ func CreateConfigMap(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 			AppendHash:     cmdutil.GetFlagBool(cmd, "append-hash"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

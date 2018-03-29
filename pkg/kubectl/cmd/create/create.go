@@ -203,7 +203,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 
 		if !dryRun {
-			if err := createAndRefresh(info); err != nil {
+			if err := CreateAndRefresh(info); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 		}
@@ -275,8 +275,8 @@ func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Comman
 	return editOptions.Run()
 }
 
-// createAndRefresh creates an object from input info and refreshes info with that object
-func createAndRefresh(info *resource.Info) error {
+// CreateAndRefresh creates an object from input info and refreshes info with that object
+func CreateAndRefresh(info *resource.Info) error {
 	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 	if err != nil {
 		return err

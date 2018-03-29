@@ -26,10 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/staging/src/k8s.io/client-go/dynamic"
 )
 
+var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
+
 func TestExtraArgsFail(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -44,8 +47,8 @@ func TestExtraArgsFail(t *testing.T) {
 }
 
 func TestCreateObject(t *testing.T) {
-	initTestErrorHandler(t)
-	_, _, rc := testData()
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
 	rc.Items[0].Name = "redis-master-controller"
 
 	tf := cmdtesting.NewTestFactory()
@@ -59,7 +62,7 @@ func TestCreateObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -82,8 +85,8 @@ func TestCreateObject(t *testing.T) {
 }
 
 func TestCreateMultipleObject(t *testing.T) {
-	initTestErrorHandler(t)
-	_, svc, rc := testData()
+	cmdtesting.InitTestErrorHandler(t)
+	_, svc, rc := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
@@ -96,9 +99,9 @@ func TestCreateMultipleObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -122,8 +125,8 @@ func TestCreateMultipleObject(t *testing.T) {
 }
 
 func TestCreateDirectory(t *testing.T) {
-	initTestErrorHandler(t)
-	_, _, rc := testData()
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
 	rc.Items[0].Name = "name"
 
 	tf := cmdtesting.NewTestFactory()
@@ -137,7 +140,7 @@ func TestCreateDirectory(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:
-				return &http.Response{StatusCode: http.StatusCreated, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

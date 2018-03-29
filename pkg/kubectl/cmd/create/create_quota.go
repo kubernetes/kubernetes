@@ -78,7 +78,7 @@ func CreateQuota(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args [
 			Scopes: cmdutil.GetFlagString(cmd, "scopes"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,

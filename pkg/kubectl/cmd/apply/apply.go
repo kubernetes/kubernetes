@@ -42,6 +42,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
+	cmdcreate "k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -299,7 +300,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if !dryRun {
 				// Then create the resource and skip the three-way merge
-				if err := createAndRefresh(info); err != nil {
+				if err := cmdcreate.CreateAndRefresh(info); err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
 				if uid, err := info.Mapping.UID(info.Object); err != nil {

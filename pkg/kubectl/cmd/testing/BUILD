@@ -4,12 +4,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake.go",
+        "helpers.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testing",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/testing:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",

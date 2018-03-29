@@ -78,7 +78,7 @@ func CreateRoleBinding(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, 
 			ServiceAccounts: cmdutil.GetFlagStringArray(cmd, "serviceaccount"),
 		}
 	default:
-		return errUnsupportedGenerator(cmd, generatorName)
+		return ErrUnsupportedGenerator(cmd, generatorName)
 	}
 	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
 		Name:                name,
