@@ -406,7 +406,7 @@ func (f *FakeDirectStreamingRuntime) PortForward(pod *Pod, port int32, stream io
 	return f.Err
 }
 
-func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
+func (f *FakeRuntime) GetNetNS(podID string) (string, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -414,7 +414,7 @@ func (f *FakeRuntime) GetNetNS(containerID ContainerID) (string, error) {
 
 	for _, fp := range f.AllPodList {
 		for _, c := range fp.Pod.Containers {
-			if c.ID == containerID {
+			if c.ID.ID == podID {
 				return fp.NetnsPath, nil
 			}
 		}

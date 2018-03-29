@@ -1902,13 +1902,13 @@ func podIsActive(pod *rktapi.Pod) bool {
 }
 
 // GetNetNS returns the network namespace path for the given container
-func (r *Runtime) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
+func (r *Runtime) GetNetNS(podID string) (string, error) {
 	// Currently the containerID is a UUID for a network namespace
 	// This hack is a way to create an unique network namespace for each new starting/restarting Pod
 	// We can do this because we played the same trick in
 	// `networkPlugin.SetUpPod` and `networkPlugin.TearDownPod`.
 	// See https://github.com/kubernetes/kubernetes/issues/45149
-	return netnsPathFromName(containerID.ID), nil
+	return netnsPathFromName(podID), nil
 }
 
 func (r *Runtime) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {

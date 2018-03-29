@@ -130,8 +130,8 @@ func (r *Mock) PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) err
 	return args.Error(0)
 }
 
-func (r *Mock) GetNetNS(containerID ContainerID) (string, error) {
-	args := r.Called(containerID)
+func (r *Mock) GetNetNS(podID string) (string, error) {
+	args := r.Called(podID)
 	return "", args.Error(0)
 }
 

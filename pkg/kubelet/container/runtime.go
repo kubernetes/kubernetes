@@ -100,9 +100,7 @@ type Runtime interface {
 	// Returns the filesystem path of the pod's network namespace; if the
 	// runtime does not handle namespace creation itself, or cannot return
 	// the network namespace path, it should return an error.
-	// TODO: Change ContainerID to a Pod ID since the namespace is shared
-	// by all containers in the pod.
-	GetNetNS(containerID ContainerID) (string, error)
+	GetNetNS(podID string) (string, error)
 	// Returns the container ID that represents the Pod, as passed to network
 	// plugins. For example, if the runtime uses an infra container, returns
 	// the infra container's ContainerID.
