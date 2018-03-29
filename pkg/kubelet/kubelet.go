@@ -740,7 +740,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		var ips []net.IP
 		cfgAddress := net.ParseIP(kubeCfg.Address)
 		if cfgAddress == nil || cfgAddress.IsUnspecified() {
-			localIPs, err := allLocalIPsWithoutLoopback()
+			localIPs, err := allGlobalUnicastIPs()
 			if err != nil {
 				return nil, err
 			}
@@ -1159,7 +1159,7 @@ type Kubelet struct {
 	keepTerminatedPodVolumes bool // DEPRECATED
 }
 
-func allLocalIPsWithoutLoopback() ([]net.IP, error) {
+func allGlobalUnicastIPs() ([]net.IP, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("could not list network interfaces: %v", err)
@@ -1173,7 +1173,7 @@ func allLocalIPsWithoutLoopback() ([]net.IP, error) {
 		for _, address := range addresses {
 			switch v := address.(type) {
 			case *net.IPNet:
-				if !v.IP.IsLoopback() {
+				if v.IP.IsGlobalUnicast() {
 					ips = append(ips, v.IP)
 				}
 			}
