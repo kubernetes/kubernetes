@@ -113,7 +113,7 @@ func (c *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpro
 		if instanceID != "" {
 			instance, found := instances[instanceID]
 			if found {
-				route.TargetNode = mapInstanceToNodeName(instance)
+				route.TargetNode = mapInstanceToNodeName(instance, c.cfg.Global.ExplicitNodeNames)
 				routes = append(routes, route)
 			} else {
 				glog.Warningf("unable to find instance ID %s in the list of instances being routed to", instanceID)
