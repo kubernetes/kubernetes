@@ -12,6 +12,7 @@ go_library(
         "customcolumn.go",
         "customcolumn_flags.go",
         "humanreadable.go",
+        "humanreadable_flags.go",
         "interface.go",
         "json.go",
         "json_yaml_flags.go",
@@ -50,6 +51,7 @@ go_test(
     srcs = [
         "customcolumn_flags_test.go",
         "customcolumn_test.go",
+        "humanreadable_flags_test.go",
         "json_yaml_flags_test.go",
         "jsonpath_flags_test.go",
         "name_flags_test.go",
@@ -59,9 +61,11 @@ go_test(
         ":go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
