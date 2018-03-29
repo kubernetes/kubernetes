@@ -136,21 +136,13 @@ function juLog() {
   # write the junit xml report
   ## failure tag
   [[ ${err} = 0 ]] && failure="" || failure="
-      <failure type=\"ScriptError\" message=\"Script Error\">
-      <![CDATA[
-      ${errMsg}
-      ]]>
-      </failure>
+      <failure type=\"ScriptError\" message=\"Script Error\"><![CDATA[${errMsg}]]></failure>
   "
   ## testcase tag
   content="${content}
     <testcase assertions=\"1\" name=\"${name}\" time=\"${time}\" classname=\"${class}\">
     ${failure}
-    <system-err>
-<![CDATA[
-${errMsg}
-]]>
-    </system-err>
+    <system-err><![CDATA[${errMsg}]]></system-err>
     </testcase>
   "
   ## testsuite block
