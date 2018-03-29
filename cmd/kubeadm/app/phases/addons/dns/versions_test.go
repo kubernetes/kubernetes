@@ -32,12 +32,12 @@ func TestGetKubeDNSVersion(t *testing.T) {
 		{
 			k8sVersion: "v1.9.0",
 			dns:        kubeadmconstants.KubeDNS,
-			expected:   kubeDNSv190AndAboveVersion,
+			expected:   kubeDNSVersion,
 		},
 		{
 			k8sVersion: "v1.10.0",
 			dns:        kubeadmconstants.KubeDNS,
-			expected:   kubeDNSv190AndAboveVersion,
+			expected:   kubeDNSVersion,
 		},
 		{
 			k8sVersion: "v1.9.0",
