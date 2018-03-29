@@ -167,7 +167,7 @@ type resettableRESTMapper interface {
 // Note that discoveryClient should NOT be shared with gc.restMapper, otherwise
 // the mapper's underlying discovery client will be unnecessarily reset during
 // the course of detecting new resources.
-func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, period time.Duration, stopCh <-chan struct{}) {
+func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
 	wait.Until(func() {
 		// Get the current resource list from discovery.
@@ -176,6 +176,14 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 		// Detect first or abnormal sync and try again later.
 		if oldResources == nil || len(oldResources) == 0 {
 			oldResources = newResources
+			return
+		}
+
+		// This can occur if there is an internal error in GetDeletableResources.
+		// If the gc attempts to sync with 0 resources it will block forever.
+		// TODO: Implement a more complete solution for the garbage collector hanging.
+		if len(newResources) == 0 {
+			glog.V(5).Infof("no resources reported by discovery, skipping garbage collector sync")
 			return
 		}
 
