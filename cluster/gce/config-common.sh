@@ -98,6 +98,14 @@ function get-cluster-ip-range {
   echo "${suggested_range}"
 }
 
+function get-random-string() {
+    for i in {0..31};
+    do
+        string+=$(printf "%x" $(($RANDOM%16)) );
+    done;
+    echo $string
+}
+
 # NOTE: Avoid giving nodes empty scopes, because kubelet needs a service account
 # in order to initialize properly.
 NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"

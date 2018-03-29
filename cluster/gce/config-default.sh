@@ -208,7 +208,7 @@ resources:
     - aesgcm:
         keys:
         - name: key1
-          secret: $(dd if=/dev/random bs=32 count=1 status=none | base64 | tr -d '\r\n')
+          secret: $(get-random-string)
 EOM
 )
 fi
