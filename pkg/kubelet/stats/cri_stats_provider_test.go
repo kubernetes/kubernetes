@@ -161,7 +161,7 @@ func TestCRIListPodStats(t *testing.T) {
 		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox1-uid"), cName2): containerLogStats2,
 		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox2-uid"), cName3): containerLogStats4,
 	}
-	fakeLogStatsProvider := NewFakeLogMetricsService(fakeLogStats)
+	fakeLogStatsProvider := newFakeLogMetricsService(fakeLogStats)
 
 	provider := NewCRIStatsProvider(
 		mockCadvisor,
@@ -254,7 +254,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		resourceAnalyzer     = new(fakeResourceAnalyzer)
 		fakeRuntimeService   = critest.NewFakeRuntimeService()
 		fakeImageService     = critest.NewFakeImageService()
-		fakeLogStatsProvider = NewFakeLogMetricsService(nil)
+		fakeLogStatsProvider = newFakeLogMetricsService(nil)
 	)
 
 	mockCadvisor.On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil)
@@ -480,4 +480,29 @@ func makeFakeLogStats(seed int) *volume.Metrics {
 	m.Used = resource.NewQuantity(int64(seed+offsetUsage), resource.BinarySI)
 	m.InodesUsed = resource.NewQuantity(int64(seed+offsetInodeUsage), resource.BinarySI)
 	return m
+}
+
+type fakeLogMetrics struct {
+	fakeStats map[string]*volume.Metrics
+}
+
+func newFakeLogMetricsService(stats map[string]*volume.Metrics) LogMetricsService {
+	return &fakeLogMetrics{fakeStats: stats}
+}
+
+func (l *fakeLogMetrics) GetMetricsProvider(uid types.UID, name string) volume.MetricsProvider {
+	path := kuberuntime.BuildContainerLogsDirectory(uid, name)
+	return newFakeMetricsDu(path, l.fakeStats[path])
+}
+
+type fakeMetricsDu struct {
+	fakeStats *volume.Metrics
+}
+
+func newFakeMetricsDu(path string, stats *volume.Metrics) volume.MetricsProvider {
+	return &fakeMetricsDu{fakeStats: stats}
+}
+
+func (f *fakeMetricsDu) GetMetrics() (*volume.Metrics, error) {
+	return f.fakeStats, nil
 }

@@ -6,7 +6,6 @@ go_library(
         "cadvisor_stats_provider.go",
         "cri_stats_provider.go",
         "helper.go",
-        "log_metrics_provider.go",
         "stats_provider.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -53,7 +52,6 @@ go_library(
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
@@ -90,7 +88,6 @@ go_test(
         "cadvisor_stats_provider_test.go",
         "cri_stats_provider_test.go",
         "helper_test.go",
-        "log_metrics_provider_test.go",
         "stats_provider_test.go",
     ],
     embed = [":go_default_library"],

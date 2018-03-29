@@ -604,6 +604,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		glog.Warningln("rktnetes has been deprecated in favor of rktlet. Please see https://github.com/kubernetes-incubator/rktlet for more information.")
 	}
 
+	klet.containerLogManager = logs.NewStubContainerLogManager()
+
 	// rktnetes cannot be run with CRI.
 	if containerRuntime != kubetypes.RktContainerRuntime {
 		// kubelet defers to the runtime shim to setup networking. Setting
@@ -684,6 +686,19 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerRuntime = runtime
 		klet.runner = runtime
 
+		if containerRuntime == kubetypes.RemoteContainerRuntime {
+			// setup containerLogManager for CRI container runtime
+			containerLogManager, err := logs.NewContainerLogManager(
+				runtimeService,
+				kubeCfg.ContainerLogMaxSize,
+				int(kubeCfg.ContainerLogMaxFiles),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
+			}
+			klet.containerLogManager = containerLogManager
+		}
+
 		if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
 			klet.StatsProvider = stats.NewCadvisorStatsProvider(
 				klet.cadvisor,
@@ -699,8 +714,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 				klet.runtimeCache,
 				runtimeService,
 				imageService,
-				stats.NewLogMetricsService())
+				klet.containerLogManager)
 		}
+
 	} else {
 		// rkt uses the legacy, non-CRI, integration. Configure it the old way.
 		// TODO: Include hairpin mode settings in rkt?
@@ -760,21 +776,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	klet.imageManager = imageManager
-
-	if containerRuntime == kubetypes.RemoteContainerRuntime && utilfeature.DefaultFeatureGate.Enabled(features.CRIContainerLogRotation) {
-		// setup containerLogManager for CRI container runtime
-		containerLogManager, err := logs.NewContainerLogManager(
-			klet.runtimeService,
-			kubeCfg.ContainerLogMaxSize,
-			int(kubeCfg.ContainerLogMaxFiles),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize container log manager: %v", err)
-		}
-		klet.containerLogManager = containerLogManager
-	} else {
-		klet.containerLogManager = logs.NewStubContainerLogManager()
-	}
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
