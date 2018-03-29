@@ -53,7 +53,7 @@ func TestTemplate(t *testing.T) {
 	for name, test := range testCase {
 		buffer := &bytes.Buffer{}
 
-		p, err := NewTemplatePrinter([]byte(test.template))
+		p, err := NewGoTemplatePrinter([]byte(test.template))
 		if err != nil {
 			if test.expectErr == nil {
 				t.Errorf("[%s]expected success but got:\n %v\n", name, err)
