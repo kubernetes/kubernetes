@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -320,80 +321,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should create ingress with pre-shared certificate", func() {
-			preSharedCertName := "test-pre-shared-cert"
-			By(fmt.Sprintf("Creating ssl certificate %q on GCE", preSharedCertName))
-			testHostname := "test.ingress.com"
-			cert, key, err := framework.GenerateRSACerts(testHostname, true)
-			Expect(err).NotTo(HaveOccurred())
-			gceCloud, err := framework.GetGCECloud()
-			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				// We would not be able to delete the cert until ingress controller
-				// cleans up the target proxy that references it.
-				By("Deleting ingress before deleting ssl certificate")
-				if jig.Ingress != nil {
-					jig.TryDeleteIngress()
-				}
-				By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
-				err := wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
-					if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {
-						framework.Logf("Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
-						return false, nil
-					}
-					return true, nil
-				})
-				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to delete ssl certificate %q: %v", preSharedCertName, err))
-			}()
-			_, err = gceCloud.CreateSslCertificate(&compute.SslCertificate{
-				Name:        preSharedCertName,
-				Certificate: string(cert),
-				PrivateKey:  string(key),
-				Description: "pre-shared cert for ingress testing",
-			})
-			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create ssl certificate %q: %v", preSharedCertName, err))
-
-			By("Creating an ingress referencing the pre-shared certificate")
-			// Create an ingress referencing this cert using pre-shared-cert annotation.
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "pre-shared-cert"), ns, map[string]string{
-				framework.IngressPreSharedCertKey: preSharedCertName,
-				framework.IngressAllowHTTPKey:     "false",
-			}, map[string]string{})
-
-			By("Test that ingress works with the pre-shared certificate")
-			err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
-			Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
+			executePresharedCertTest(f, jig, "")
 		})
 
-		It("should create ingress with backside re-encryption", func() {
-			By("Creating a set of ingress, service and deployment that have backside re-encryption configured")
-			deployCreated, svcCreated, ingCreated, err := framework.CreateReencryptionIngress(f.ClientSet, f.Namespace.Name)
-			defer func() {
-				By("Cleaning up re-encryption ingress, service and deployment")
-				if errs := framework.CleanupReencryptionIngress(f.ClientSet, deployCreated, svcCreated, ingCreated); len(errs) > 0 {
-					framework.Failf("Failed to cleanup re-encryption ingress: %v", errs)
-				}
-			}()
-			Expect(err).NotTo(HaveOccurred(), "Failed to create re-encryption ingress")
-
-			By(fmt.Sprintf("Waiting for ingress %s to come up", ingCreated.Name))
-			ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, framework.LoadBalancerPollTimeout)
-			Expect(err).NotTo(HaveOccurred(), "Failed to wait for ingress IP")
-
-			By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
-			timeoutClient := &http.Client{Timeout: framework.IngressReqTimeout}
-			err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
-				resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
-				if err != nil {
-					framework.Logf("SimpleGET failed: %v", err)
-					return false, nil
-				}
-				if !strings.Contains(resp, "request_scheme=https") {
-					return false, fmt.Errorf("request wasn't served by HTTPS, response body: %s", resp)
-				}
-				framework.Logf("Poll succeeded, request was served by HTTPS")
-				return true, nil
-			})
-			Expect(err).NotTo(HaveOccurred(), "Failed to verify backside re-encryption ingress")
+		It("should create ingress with backend HTTPS", func() {
+			executeBacksideBacksideHTTPSTest(f, jig, "")
 		})
 
 		It("multicluster ingress should get instance group annotation", func() {
@@ -603,11 +535,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
 		var gceController *framework.GCEIngressController
+		var ipName string
 
 		// Platform specific setup
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			jig.Class = framework.MulticlusterIngressClassValue
+			jig.PollInterval = 5 * time.Second
 			By("Initializing gce controller")
 			gceController = &framework.GCEIngressController{
 				Ns:     ns,
@@ -616,6 +550,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			err := gceController.Init()
 			Expect(err).NotTo(HaveOccurred())
+
+			// TODO(https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/19):
+			// Kubemci should reserve a static ip if user has not specified one.
+			ipName = "kubemci-" + string(uuid.NewUUID())
+			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
+			ipAddress := gceController.CreateStaticIP(ipName)
+			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
 		})
 
 		// Platform specific cleanup
@@ -635,12 +576,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should conform to Ingress spec", func() {
-			jig.PollInterval = 5 * time.Second
-			// Use the randomly generated namespace name as the ip address name.
-			ipName := ns
-			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
-			ipAddress := gceController.CreateStaticIP(ipName)
-			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
 			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
 				framework.IngressStaticIPKey: ipName,
 			})
@@ -650,6 +585,14 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				By(t.ExitLog)
 				jig.WaitForIngress(false /*waitForNodePort*/)
 			}
+		})
+
+		It("should create ingress with pre-shared certificate", func() {
+			executePresharedCertTest(f, jig, ipName)
+		})
+
+		It("should create ingress with backend HTTPS", func() {
+			executeBacksideBacksideHTTPSTest(f, jig, ipName)
 		})
 	})
 
@@ -704,3 +647,86 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 	})
 })
+
+func executePresharedCertTest(f *framework.Framework, jig *framework.IngressTestJig, staticIPName string) {
+	preSharedCertName := "test-pre-shared-cert"
+	By(fmt.Sprintf("Creating ssl certificate %q on GCE", preSharedCertName))
+	testHostname := "test.ingress.com"
+	cert, key, err := framework.GenerateRSACerts(testHostname, true)
+	Expect(err).NotTo(HaveOccurred())
+	gceCloud, err := framework.GetGCECloud()
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		// We would not be able to delete the cert until ingress controller
+		// cleans up the target proxy that references it.
+		By("Deleting ingress before deleting ssl certificate")
+		if jig.Ingress != nil {
+			jig.TryDeleteIngress()
+		}
+		By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
+		err := wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
+			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {
+				framework.Logf("Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
+				return false, nil
+			}
+			return true, nil
+		})
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to delete ssl certificate %q: %v", preSharedCertName, err))
+	}()
+	_, err = gceCloud.CreateSslCertificate(&compute.SslCertificate{
+		Name:        preSharedCertName,
+		Certificate: string(cert),
+		PrivateKey:  string(key),
+		Description: "pre-shared cert for ingress testing",
+	})
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create ssl certificate %q: %v", preSharedCertName, err))
+
+	By("Creating an ingress referencing the pre-shared certificate")
+	// Create an ingress referencing this cert using pre-shared-cert annotation.
+	ingAnnotations := map[string]string{
+		framework.IngressPreSharedCertKey: preSharedCertName,
+		// Disallow HTTP to save resources. This is irrelevant to the
+		// pre-shared cert test.
+		framework.IngressAllowHTTPKey: "false",
+	}
+	if staticIPName != "" {
+		ingAnnotations[framework.IngressStaticIPKey] = staticIPName
+	}
+	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "pre-shared-cert"), f.Namespace.Name, ingAnnotations, map[string]string{})
+
+	By("Test that ingress works with the pre-shared certificate")
+	err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
+}
+
+func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *framework.IngressTestJig, staticIPName string) {
+	By("Creating a set of ingress, service and deployment that have backside re-encryption configured")
+	deployCreated, svcCreated, ingCreated, err := jig.SetUpBacksideHTTPSIngress(f.ClientSet, f.Namespace.Name, staticIPName)
+	defer func() {
+		By("Cleaning up re-encryption ingress, service and deployment")
+		if errs := jig.DeleteTestResource(f.ClientSet, deployCreated, svcCreated, ingCreated); len(errs) > 0 {
+			framework.Failf("Failed to cleanup re-encryption ingress: %v", errs)
+		}
+	}()
+	Expect(err).NotTo(HaveOccurred(), "Failed to create re-encryption ingress")
+
+	By(fmt.Sprintf("Waiting for ingress %s to come up", ingCreated.Name))
+	ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, framework.LoadBalancerPollTimeout)
+	Expect(err).NotTo(HaveOccurred(), "Failed to wait for ingress IP")
+
+	By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
+	timeoutClient := &http.Client{Timeout: framework.IngressReqTimeout}
+	err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
+		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
+		if err != nil {
+			framework.Logf("SimpleGET failed: %v", err)
+			return false, nil
+		}
+		if !strings.Contains(resp, "request_scheme=https") {
+			return false, fmt.Errorf("request wasn't served by HTTPS, response body: %s", resp)
+		}
+		framework.Logf("Poll succeeded, request was served by HTTPS")
+		return true, nil
+	})
+	Expect(err).NotTo(HaveOccurred(), "Failed to verify backside re-encryption ingress")
+}
