@@ -108,4 +108,4 @@ spec:
           path: /var/lib/docker/containers
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.2.5
+          name: fluentd-gcp-config-v1.2.4
