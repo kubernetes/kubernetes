@@ -23,12 +23,12 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-func scheduleSuccessEvent(podName, nodeName string) func(*v1.Event) bool {
+func scheduleSuccessEvent(ns, podName, nodeName string) func(*v1.Event) bool {
 	return func(e *v1.Event) bool {
 		return e.Type == v1.EventTypeNormal &&
 			e.Reason == "Scheduled" &&
 			strings.HasPrefix(e.Name, podName) &&
-			strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", podName, nodeName))
+			strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v/%v to %v", ns, podName, nodeName))
 	}
 }
 
