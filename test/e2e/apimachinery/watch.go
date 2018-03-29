@@ -64,7 +64,6 @@ var _ = SIGDescribe("Watchers", func() {
 				},
 			},
 			Spec: v1.PodSpec{
-				ActiveDeadlineSeconds: int64ptr(20),
 				Containers: []v1.Container{
 					{
 						Name:  "example",
@@ -81,7 +80,6 @@ var _ = SIGDescribe("Watchers", func() {
 				},
 			},
 			Spec: v1.PodSpec{
-				ActiveDeadlineSeconds: int64ptr(20),
 				Containers: []v1.Container{
 					{
 						Name:  "example",
@@ -97,7 +95,7 @@ var _ = SIGDescribe("Watchers", func() {
 		expectNoEvent(watchB, watch.Added, testPodA)
 
 		testPodA, err = updatePod(f, testPodA.GetName(), func(p *v1.Pod) {
-			p.Spec.ActiveDeadlineSeconds = int64ptr(10)
+			p.ObjectMeta.Labels["mutation"] = "1"
 		})
 		Expect(err).NotTo(HaveOccurred())
 		expectEvent(watchA, watch.Modified, testPodA)
@@ -105,7 +103,7 @@ var _ = SIGDescribe("Watchers", func() {
 		expectNoEvent(watchB, watch.Modified, testPodA)
 
 		testPodA, err = updatePod(f, testPodA.GetName(), func(p *v1.Pod) {
-			p.Spec.ActiveDeadlineSeconds = int64ptr(5)
+			p.ObjectMeta.Labels["mutation"] = "2"
 		})
 		Expect(err).NotTo(HaveOccurred())
 		expectEvent(watchA, watch.Modified, testPodA)
