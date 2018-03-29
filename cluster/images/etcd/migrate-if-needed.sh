@@ -39,14 +39,14 @@
 set -o errexit
 set -o nounset
 
-source $(dirname "$0")/start-stop-etcd.sh
+source "$(dirname "$0")/start-stop-etcd.sh"
 
 # Rollback to previous minor version of etcd 3.x, if needed.
 #
 # Warning: For HA etcd clusters (any cluster with more than one member), all members must be stopped before rolling back, zero
 # downtime rollbacks are not supported.
 rollback_etcd3_minor_version() {
-  if [ ${TARGET_MINOR_VERSION} != $((${CURRENT_MINOR_VERSION}-1)) ]; then
+  if [ "${TARGET_MINOR_VERSION}" != $((${CURRENT_MINOR_VERSION}-1)) ]; then
     echo "Rollback from ${CURRENT_VERSION} to ${TARGET_VERSION} not supported, only rollbacks to the previous minor version are supported."
     exit 1
   fi
@@ -84,7 +84,7 @@ rollback_etcd3_minor_version() {
 
 # Rollback from "3.0.x" version in 'etcd3' mode to "2.2.1" version in 'etcd2' mode, if needed.
 rollback_to_etcd2() {
-  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.2.1" ]; then
+  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-4)" != "3.0." ] || [ "${TARGET_VERSION}" != "2.2.1" ]; then
     echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.2.1"
     return 0
   fi
@@ -94,8 +94,7 @@ rollback_to_etcd2() {
   mkdir -p "${ROLLBACK_BACKUP_DIR}"
   cp -r "${DATA_DIRECTORY}" "${ROLLBACK_BACKUP_DIR}"
   echo "Performing etcd3 -> etcd2 rollback"
-  ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"
-  if [ "$?" -ne "0" ]; then
+  if ! ${ROLLBACK} --data-dir "${DATA_DIRECTORY}"; then
     echo "Rollback to etcd2 failed"
     exit 1
   fi
@@ -124,7 +123,7 @@ fi
 
 echo "$(date +'%Y-%m-%d %H:%M:%S') Detecting if migration is needed"
 
-if [ "${TARGET_STORAGE}" != "etcd2" -a "${TARGET_STORAGE}" != "etcd3" ]; then
+if [ "${TARGET_STORAGE}" != "etcd2" ] && [ "${TARGET_STORAGE}" != "etcd3" ]; then
   echo "Not supported version of storage: ${TARGET_STORAGE}"
   exit 1
 fi
@@ -145,12 +144,12 @@ VERSION_FILE="version.txt"
 CURRENT_STORAGE="etcd2"
 CURRENT_VERSION="2.2.1"
 if [ -e "${DATA_DIRECTORY}/${VERSION_FILE}" ]; then
-  VERSION_CONTENTS="$(cat ${DATA_DIRECTORY}/${VERSION_FILE})"
+  VERSION_CONTENTS="$(cat "${DATA_DIRECTORY}/${VERSION_FILE}")"
   # Example usage: if contents of VERSION_FILE is 2.3.7/etcd2, then
   # - CURRENT_VERSION would be '2.3.7'
   # - CURRENT_STORAGE would be 'etcd2'
-  CURRENT_VERSION="$(echo $VERSION_CONTENTS | cut -d '/' -f 1)"
-  CURRENT_STORAGE="$(echo $VERSION_CONTENTS | cut -d '/' -f 2)"
+  CURRENT_VERSION="$(echo "$VERSION_CONTENTS" | cut -d '/' -f 1)"
+  CURRENT_STORAGE="$(echo "$VERSION_CONTENTS" | cut -d '/' -f 2)"
 fi
 ETCD_DATA_PREFIX="${ETCD_DATA_PREFIX:-/registry}"
 
@@ -160,7 +159,7 @@ ETCD_DATA_PREFIX="${ETCD_DATA_PREFIX:-/registry}"
 if [ ! -d "${DATA_DIRECTORY}" ]; then
   mkdir -p "${DATA_DIRECTORY}"
 fi
-if [ -z "$(ls -A ${DATA_DIRECTORY})" ]; then
+if [ -z "$(ls -A "${DATA_DIRECTORY}")" ]; then
   echo "${DATA_DIRECTORY} is empty - skipping migration"
   echo "${TARGET_VERSION}/${TARGET_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   exit 0
@@ -172,30 +171,27 @@ ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 # If we are upgrading from 2.2.1 and this is the first try for upgrade,
 # do the backup to allow restoring from it in case of failed upgrade.
 BACKUP_DIR="${DATA_DIRECTORY}/migration-backup"
-if [ "${CURRENT_VERSION}" = "2.2.1" -a "${CURRENT_VERSION}" != "${TARGET_VERSION}" -a ! -d "${BACKUP_DIR}" ]; then
+if [ "${CURRENT_VERSION}" = "2.2.1" ] && [ "${CURRENT_VERSION}" != "${TARGET_VERSION}" ] && [ ! -d "${BACKUP_DIR}" ]; then
   echo "Backup etcd before starting migration"
-  mkdir ${BACKUP_DIR}
+  mkdir "${BACKUP_DIR}"
   ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
-  ETCDCTL_API=2 ${ETCDCTL_CMD} --debug backup --data-dir=${DATA_DIRECTORY} \
-    --backup-dir=${BACKUP_DIR}
+  ETCDCTL_API=2 ${ETCDCTL_CMD} --debug backup --data-dir="${DATA_DIRECTORY}" \
+    --backup-dir="${BACKUP_DIR}"
   echo "Backup done in ${BACKUP_DIR}"
 fi
 
-CURRENT_MINOR_VERSION="$(echo ${CURRENT_VERSION} | awk -F'.' '{print $2}')"
-TARGET_MINOR_VERSION="$(echo ${TARGET_VERSION} | awk -F'.' '{print $2}')"
+CURRENT_MINOR_VERSION="$(echo "${CURRENT_VERSION}" | awk -F'.' '{print $2}')"
+TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | awk -F'.' '{print $2}')"
 
 # "rollback-if-needed"
 case "${CURRENT_STORAGE}-${TARGET_STORAGE}" in
   "etcd3-etcd3")
-    [ ${TARGET_MINOR_VERSION} -lt ${CURRENT_MINOR_VERSION} ] && rollback_etcd3_minor_version
-    break
+    [ "${TARGET_MINOR_VERSION}" -lt "${CURRENT_MINOR_VERSION}" ] && rollback_etcd3_minor_version
     ;;
   "etcd3-etcd2")
     rollback_to_etcd2
-    break
     ;;
   *)
-    break
     ;;
 esac
 
@@ -225,14 +221,14 @@ for step in ${SUPPORTED_VERSIONS}; do
     CURRENT_VERSION=${step}
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  if [ "$(echo ${CURRENT_VERSION} | cut -c1-2)" = "3." -a "${CURRENT_VERSION}" = "${step}" -a "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
+  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-2)" = "3." ] && [ "${CURRENT_VERSION}" = "${step}" ] && [ "${CURRENT_STORAGE}" = "etcd2" ] && [ "${TARGET_STORAGE}" = "etcd3" ]; then
     # If it is the first 3.x release in the list and we are migrating
     # also from 'etcd2' to 'etcd3', do the migration now.
     echo "Performing etcd2 -> etcd3 migration"
     START_VERSION="${step}"
     START_STORAGE="etcd3"
     ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
-    ETCDCTL_API=3 ${ETCDCTL_CMD} migrate --data-dir=${DATA_DIRECTORY}
+    ETCDCTL_API=3 ${ETCDCTL_CMD} migrate --data-dir="${DATA_DIRECTORY}"
     echo "Attaching leases to TTL entries"
     # Now attach lease to all keys.
     # To do it, we temporarily start etcd on a random port (so that
@@ -243,7 +239,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     fi
     # Create a lease and attach all keys to it.
     ${ATTACHLEASE} \
-      --etcd-address http://127.0.0.1:${ETCD_PORT} \
+      --etcd-address "http://127.0.0.1:${ETCD_PORT}" \
       --ttl-keys-prefix "${TTL_KEYS_DIRECTORY:-${ETCD_DATA_PREFIX}/events}" \
       --lease-duration 1h
     # Kill etcd and wait until this is down.
@@ -251,7 +247,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     CURRENT_STORAGE="etcd3"
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" = "3.1." -a "${CURRENT_VERSION}" = "${step}" -a "${CURRENT_STORAGE}" = "etcd3" ]; then
+  if [ "$(echo "${CURRENT_VERSION}" | cut -c1-4)" = "3.1." ] && [ "${CURRENT_VERSION}" = "${step}" ] && [ "${CURRENT_STORAGE}" = "etcd3" ]; then
     # If we are upgrading to 3.1.* release, if the cluster was migrated
     # from v2 version, the v2 data may still be around. So now is the
     # time to actually remove them.
@@ -270,7 +266,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     # Also remove backup from v2->v3 migration.
     rm -rf "${BACKUP_DIR}"
   fi
-  if [ "${CURRENT_VERSION}" = "${TARGET_VERSION}" -a "${CURRENT_STORAGE}" = "${TARGET_STORAGE}" ]; then
+  if [ "${CURRENT_VERSION}" = "${TARGET_VERSION}" ] && [ "${CURRENT_STORAGE}" = "${TARGET_STORAGE}" ]; then
     break
   fi
 done
