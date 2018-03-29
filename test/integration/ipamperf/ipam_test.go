@@ -109,6 +109,11 @@ func logResults(allResults []*Results) {
 }
 
 func TestPerformance(t *testing.T) {
+	if testing.Short() {
+		// TODO (#61854) find why flakiness is caused by etcd connectivity before enabling always
+		t.Skip("Skipping because we want to run short tests")
+	}
+
 	apiURL, masterShutdown := util.StartApiserver()
 	defer masterShutdown()
 
