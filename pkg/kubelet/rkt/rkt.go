@@ -1911,8 +1911,8 @@ func (r *Runtime) GetNetNS(containerID kubecontainer.ContainerID) (string, error
 	return netnsPathFromName(containerID.ID), nil
 }
 
-func (r *Runtime) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
-	return kubecontainer.ContainerID{ID: string(pod.ID)}, nil
+func (r *Runtime) GetPodContainerID(pod *kubecontainer.Pod) (string, error) {
+	return string(pod.ID), nil
 }
 
 func (r *Runtime) getKubernetesDirective(serviceFilePath string) (podService podServiceDirective, err error) {

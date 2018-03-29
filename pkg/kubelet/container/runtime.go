@@ -106,8 +106,7 @@ type Runtime interface {
 	// Returns the container ID that represents the Pod, as passed to network
 	// plugins. For example, if the runtime uses an infra container, returns
 	// the infra container's ContainerID.
-	// TODO: Change ContainerID to a Pod ID, see GetNetNS()
-	GetPodContainerID(*Pod) (ContainerID, error)
+	GetPodContainerID(*Pod) (string, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
