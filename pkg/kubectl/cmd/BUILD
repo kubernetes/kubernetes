@@ -167,6 +167,8 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/cmd/apply:go_default_library",
+        "//pkg/kubectl/cmd/create:go_default_library",
         "//pkg/kubectl/cmd/resource:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
