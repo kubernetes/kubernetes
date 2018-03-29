@@ -310,7 +310,9 @@ func TestBadPrinter(t *testing.T) {
 		{"empty template", &printers.PrintOptions{OutputFormatType: "template", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
 		{"bad template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{ .Name", AllowMissingKeys: false}, fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
 		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("templatefile format specified but no template file given")},
+		{"bad go-template-file", &printers.PrintOptions{OutputFormatType: "go-template-file", AllowMissingKeys: false}, fmt.Errorf("templatefile format specified but no template file given")},
 		{"bad jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.Name", AllowMissingKeys: false}, fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
+		{"bad jsonpath-file", &printers.PrintOptions{OutputFormatType: "jsonpath-file", AllowMissingKeys: false}, fmt.Errorf("jsonpath file format specified but no template file given")},
 		{"unknown format", &printers.PrintOptions{OutputFormatType: "anUnknownFormat", OutputFormatArgument: "", AllowMissingKeys: false}, fmt.Errorf("output format \"anUnknownFormat\" not recognized")},
 	}
 	for _, test := range badPrinterTests {
