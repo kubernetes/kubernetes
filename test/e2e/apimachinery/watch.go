@@ -195,7 +195,12 @@ func waitForEvent(w watch.Interface, expectType watch.EventType, expectObject ru
 	defer stopTimer.Stop()
 	for {
 		select {
-		case actual := <-w.ResultChan():
+		case actual, ok := <-w.ResultChan():
+			if ok {
+				framework.Logf("Got : %v %v", actual.Type, actual.Object)
+			} else {
+				framework.Failf("Watch closed unexpectedly")
+			}
 			if expectType == actual.Type && (expectObject == nil || apiequality.Semantic.DeepEqual(expectObject, actual.Object)) {
 				return actual, true
 			}
