@@ -1231,7 +1231,7 @@ func (j *IngressTestJig) TryDeleteIngress() {
 }
 
 func (j *IngressTestJig) TryDeleteGivenIngress(ing *extensions.Ingress) {
-	if err := j.runDelete(ing, j.Class); err != nil {
+	if err := j.runDelete(ing); err != nil {
 		j.Logger.Infof("Error while deleting the ingress %v/%v with class %s: %v", ing.Namespace, ing.Name, j.Class, err)
 	}
 }
@@ -1244,7 +1244,7 @@ func (j *IngressTestJig) TryDeleteGivenService(svc *v1.Service) {
 }
 
 // runDelete runs the required command to delete the given ingress.
-func (j *IngressTestJig) runDelete(ing *extensions.Ingress, class string) error {
+func (j *IngressTestJig) runDelete(ing *extensions.Ingress) error {
 	if j.Class != MulticlusterIngressClassValue {
 		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
 	}
@@ -1531,14 +1531,16 @@ func (cont *NginxIngressController) Init() {
 	Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
 
-func GenerateReencryptionIngressSpec() *extensions.Ingress {
+func generateBacksideHTTPSIngressSpec(ns string) *extensions.Ingress {
 	return &extensions.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "echoheaders-reencryption",
+			Name:      "echoheaders-https",
+			Namespace: ns,
 		},
 		Spec: extensions.IngressSpec{
+			// Note kubemci requres a default backend.
 			Backend: &extensions.IngressBackend{
-				ServiceName: "echoheaders-reencryption",
+				ServiceName: "echoheaders-https",
 				ServicePort: intstr.IntOrString{
 					Type:   intstr.Int,
 					IntVal: 443,
@@ -1548,10 +1550,10 @@ func GenerateReencryptionIngressSpec() *extensions.Ingress {
 	}
 }
 
-func GenerateReencryptionServiceSpec() *v1.Service {
+func generateBacksideHTTPSServiceSpec() *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "echoheaders-reencryption",
+			Name: "echoheaders-https",
 			Annotations: map[string]string{
 				ServiceApplicationProtocolKey: `{"my-https-port":"HTTPS"}`,
 			},
@@ -1564,32 +1566,32 @@ func GenerateReencryptionServiceSpec() *v1.Service {
 				TargetPort: intstr.FromString("echo-443"),
 			}},
 			Selector: map[string]string{
-				"app": "echoheaders-reencryption",
+				"app": "echoheaders-https",
 			},
 			Type: v1.ServiceTypeNodePort,
 		},
 	}
 }
 
-func GenerateReencryptionDeploymentSpec() *extensions.Deployment {
+func generateBacksideHTTPSDeploymentSpec() *extensions.Deployment {
 	return &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "echoheaders-reencryption",
+			Name: "echoheaders-https",
 		},
 		Spec: extensions.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
-				"app": "echoheaders-reencryption",
+				"app": "echoheaders-https",
 			}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "echoheaders-reencryption",
+						"app": "echoheaders-https",
 					},
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "echoheaders-reencryption",
+							Name:  "echoheaders-https",
 							Image: "k8s.gcr.io/echoserver:1.9",
 							Ports: []v1.ContainerPort{{
 								ContainerPort: 8443,
@@ -1603,26 +1605,32 @@ func GenerateReencryptionDeploymentSpec() *extensions.Deployment {
 	}
 }
 
-func CreateReencryptionIngress(cs clientset.Interface, namespace string) (*extensions.Deployment, *v1.Service, *extensions.Ingress, error) {
-	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(GenerateReencryptionDeploymentSpec())
+// SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
+func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*extensions.Deployment, *v1.Service, *extensions.Ingress, error) {
+	deployCreated, err := cs.ExtensionsV1beta1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	svcCreated, err := cs.CoreV1().Services(namespace).Create(GenerateReencryptionServiceSpec())
+	svcCreated, err := cs.CoreV1().Services(namespace).Create(generateBacksideHTTPSServiceSpec())
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ingCreated, err := cs.ExtensionsV1beta1().Ingresses(namespace).Create(GenerateReencryptionIngressSpec())
+	ingToCreate := generateBacksideHTTPSIngressSpec(namespace)
+	if staticIPName != "" {
+		ingToCreate.Annotations[IngressStaticIPKey] = staticIPName
+	}
+	ingCreated, err := j.runCreate(ingToCreate)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	return deployCreated, svcCreated, ingCreated, nil
 }
 
-func CleanupReencryptionIngress(cs clientset.Interface, deploy *extensions.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
+// DeleteTestResource deletes given deployment, service and ingress.
+func (j *IngressTestJig) DeleteTestResource(cs clientset.Interface, deploy *extensions.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
 	var errs []error
 	if ing != nil {
-		if err := cs.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil); err != nil {
+		if err := j.runDelete(ing); err != nil {
 			errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
 		}
 	}
