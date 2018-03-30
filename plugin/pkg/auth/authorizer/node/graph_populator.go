@@ -114,9 +114,14 @@ func (g *graphPopulator) updateNode(oldObj, obj interface{}) {
 }
 
 func (g *graphPopulator) deleteNode(obj interface{}) {
-	node := obj.(*api.Node)
-
-	// TODO(mtaufen): ensure len(nodeName) > 0 in all cases (would sure be nice to have a dependently-typed language here...)
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	node, ok := obj.(*api.Node)
+	if !ok {
+		glog.Infof("unexpected type %T", obj)
+		return
+	}
 
 	// NOTE: We don't remove the node, because if the node is re-created not all pod -> node
 	// links are re-established (we don't get relevant events because the no mutations need
