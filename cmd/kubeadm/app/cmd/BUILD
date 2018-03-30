@@ -50,6 +50,7 @@ go_library(
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/util/kubeletclient:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",

@@ -36,12 +36,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeletclient"
 )
 
 // upgradeVariables holds variables needed for performing an upgrade or planning to do so
 // TODO - Restructure or rename upgradeVariables
 type upgradeVariables struct {
 	client        clientset.Interface
+	kubeletClient kubeletclient.KubeletClient
 	cfg           *kubeadmapiext.MasterConfiguration
 	versionGetter upgrade.VersionGetter
 	waiter        apiclient.Waiter
@@ -52,6 +54,11 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
+	}
+
+	kubeletClient, err := kubeletclient.CreateClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubelet client: %v", err)
 	}
 
 	// Run healthchecks against the cluster
@@ -81,12 +88,13 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 	}
 
 	return &upgradeVariables{
-		client: client,
-		cfg:    cfg,
+		client:        client,
+		kubeletClient: kubeletClient,
+		cfg:           cfg,
 		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
 		versionGetter: upgrade.NewKubeVersionGetter(client, os.Stdout),
 		// Use the waiter conditionally based on the dryrunning variable
-		waiter: getWaiter(dryRun, client),
+		waiter: getWaiter(dryRun, client, kubeletClient),
 	}, nil
 }
 
@@ -147,11 +155,11 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 }
 
 // getWaiter gets the right waiter implementation
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
+func getWaiter(dryRun bool, client clientset.Interface, kubeletClient kubeletclient.KubeletClient) apiclient.Waiter {
 	if dryRun {
 		return dryrunutil.NewWaiter()
 	}
-	return apiclient.NewKubeWaiter(client, upgradeManifestTimeout, os.Stdout)
+	return apiclient.NewKubeWaiter(client, kubeletClient, upgradeManifestTimeout, os.Stdout)
 }
 
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.

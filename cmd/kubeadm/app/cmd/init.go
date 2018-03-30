@@ -61,6 +61,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeletclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -383,9 +384,14 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	kubeletClient, err := kubeletclient.CreateClient()
+	if err != nil {
+		return fmt.Errorf("failed to create kubelet client: %v", err)
+	}
+
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
 	glog.V(1).Infof("[init] waiting for the API server to be healthy")
-	waiter := getWaiter(i, client)
+	waiter := getWaiter(i, client, kubeletClient)
 
 	if err := waitForAPIAndKubelet(waiter); err != nil {
 		ctx := map[string]string{
@@ -552,7 +558,7 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 }
 
 // getWaiter gets the right waiter implementation for the right occasion
-func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
+func getWaiter(i *Init, client clientset.Interface, kubeletClient kubeletclient.KubeletClient) apiclient.Waiter {
 	if i.dryRun {
 		return dryrunutil.NewWaiter()
 	}
@@ -563,7 +569,7 @@ func getWaiter(i *Init, client clientset.Interface) apiclient.Waiter {
 	if i.cfg.ImagePullPolicy == v1.PullNever {
 		timeout = 60 * time.Second
 	}
-	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
+	return apiclient.NewKubeWaiter(client, kubeletClient, timeout, os.Stdout)
 }
 
 // waitForAPIAndKubelet waits primarily for the API server to come up. If that takes a long time, and the kubelet

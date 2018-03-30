@@ -196,7 +196,7 @@ func RunApply(flags *applyFlags) error {
 
 	// Upgrade RBAC rules and addons.
 	glog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, upgradeVars.waiter, internalcfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
 	}
 

@@ -125,3 +125,8 @@ func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) 
 func (w *Waiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return nil
 }
+
+// WaitForMirrorPodHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
+func (w *Waiter) WaitForMirrorPodHashChange(_, _, _ string) error {
+	return nil
+}

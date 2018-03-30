@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeletclient"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -45,6 +46,9 @@ type Waiter interface {
 	// WaitForStaticPodHashChange waits for the given static pod component's static pod hash to get updated.
 	// By doing that we can be sure that the kubelet has restarted the given Static Pod
 	WaitForStaticPodHashChange(nodeName, component, previousHash string) error
+	// WaitForMirrorPodHashChange waits for the given static pod component's static pod hash to get updated.
+	// By doing that we can be sure that the kubelet has restarted the given Static Pod
+	WaitForMirrorPodHashChange(nodeName, component, previousHash string) error
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
 	// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
@@ -55,17 +59,19 @@ type Waiter interface {
 
 // KubeWaiter is an implementation of Waiter that is backed by a Kubernetes client
 type KubeWaiter struct {
-	client  clientset.Interface
-	timeout time.Duration
-	writer  io.Writer
+	client        clientset.Interface
+	kubeletClient kubeletclient.KubeletClient
+	timeout       time.Duration
+	writer        io.Writer
 }
 
 // NewKubeWaiter returns a new Waiter object that talks to the given Kubernetes cluster
-func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.Writer) Waiter {
+func NewKubeWaiter(client clientset.Interface, kubeletClient kubeletclient.KubeletClient, timeout time.Duration, writer io.Writer) Waiter {
 	return &KubeWaiter{
-		client:  client,
-		timeout: timeout,
-		writer:  writer,
+		client:        client,
+		kubeletClient: kubeletClient,
+		timeout:       timeout,
+		writer:        writer,
 	}
 }
 
@@ -162,7 +168,7 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 	mirrorPodHashes := map[string]string{}
 	for _, component := range constants.MasterComponents {
 		err = wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
-			componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+			componentHash, err = getStaticPodHash(w.kubeletClient, nodeName, component)
 			if err != nil {
 				return false, nil
 			}
@@ -183,7 +189,7 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 	componentPodHash := ""
 	var err error
 	err = wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
-		componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+		componentPodHash, err = getStaticPodHash(w.kubeletClient, nodeName, component)
 		if err != nil {
 			return false, nil
 		}
@@ -193,12 +199,12 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 	return componentPodHash, err
 }
 
-// WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
+// WaitForMirrorPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
-func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
+func (w *KubeWaiter) WaitForMirrorPodHashChange(nodeName, component, previousHash string) error {
 	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
 
-		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
+		hash, err := getMirrorPodHash(w.client, nodeName, component)
 		if err != nil {
 			return false, nil
 		}
@@ -211,32 +217,39 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 	})
 }
 
-// getStaticPodControlPlaneHashes computes hashes for all the control plane's Static Pod resources
-func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string) (map[string]string, error) {
+// WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
+// This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
+func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
+	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
 
-	mirrorPodHashes := map[string]string{}
-	for _, component := range constants.MasterComponents {
-		hash, err := getStaticPodSingleHash(client, nodeName, component)
+		hash, err := getStaticPodHash(w.kubeletClient, nodeName, component)
 		if err != nil {
-			return nil, err
+			return false, nil
 		}
-		mirrorPodHashes[component] = hash
-	}
-	return mirrorPodHashes, nil
+		// We should continue polling until the UID changes
+		if hash == previousHash {
+			return false, nil
+		}
+
+		return true, nil
+	})
 }
 
-// getStaticSinglePodHash computes hashes for a single Static Pod resource
-func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
-
-	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
-	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(staticPodName, metav1.GetOptions{})
+// getMirrorPodHash retrieves the static pod hash from the api server
+func getMirrorPodHash(client clientset.Interface, nodeName string, component string) (string, error) {
+	mirrorPodName := fmt.Sprintf("%s-%s", component, nodeName)
+	mirrorPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(mirrorPodName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
+	mirrorPodHash := mirrorPod.Annotations[kubetypes.ConfigHashAnnotationKey]
+	return mirrorPodHash, nil
+}
 
-	staticPodHash := staticPod.Annotations[kubetypes.ConfigHashAnnotationKey]
-	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
-	return staticPodHash, nil
+// getStaticPodHash retrieves the static pod hash from the kubelet api
+func getStaticPodHash(client kubeletclient.KubeletClient, nodeName string, component string) (string, error) {
+	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
+	return client.GetStaticPodConfigHash(staticPodName)
 }
 
 // TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned

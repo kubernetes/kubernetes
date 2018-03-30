@@ -46,6 +46,7 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/util/kubeletclient:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

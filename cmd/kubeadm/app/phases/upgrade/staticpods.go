@@ -190,9 +190,21 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
 
-	// Wait for the static pod component to come up and register itself as a mirror pod
-	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+	if component == "etcd" {
+		etcdCluster := util.LocalEtcdCluster{}
+		_, err := etcdCluster.GetEtcdClusterStatus()
+		if err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
+	} else {
+		if err := waiter.WaitForMirrorPodHashChange(cfg.NodeName, component, beforePodHash); err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
+
+		// Wait for the static pod component to come up and register itself as a mirror pod
+		if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
 	}
 
 	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
