@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -153,5 +154,40 @@ func TestHandlePath(t *testing.T) {
 	}
 	if c.handlePath("vendor", i, nil) != filepath.SkipDir {
 		t.Error("should skip vendor")
+	}
+}
+
+func TestDedupeErrors(t *testing.T) {
+	testcases := []struct {
+		nPlatforms int
+		results    []analyzerResult
+		expected   string
+	}{
+		{1, []analyzerResult{}, ""},
+		{1, []analyzerResult{{"linux/arm", "test", nil}}, ""},
+		{1, []analyzerResult{
+			{"linux/arm", "test", []string{"a"}}},
+			"ERROR(linux/arm) a\n"},
+		{3, []analyzerResult{
+			{"linux/arm", "test", []string{"a"}},
+			{"windows/386", "test", []string{"b"}},
+			{"windows/amd64", "test", []string{"b", "c"}}},
+			"ERROR(linux/arm) a\n" +
+				"ERROR(windows) b\n" +
+				"ERROR(windows/amd64) c\n"},
+	}
+	for _, tc := range testcases {
+		out := &bytes.Buffer{}
+		results := make(chan analyzerResult, len(tc.results))
+		for _, res := range tc.results {
+			results <- res
+		}
+		close(results)
+		dedupeErrors(out, results, len(tc.results)/tc.nPlatforms, tc.nPlatforms)
+		outString := out.String()
+		if outString != tc.expected {
+			t.Errorf("dedupeErrors(%v) = '%s', expected '%s'",
+				tc.results, outString, tc.expected)
+		}
 	}
 }
