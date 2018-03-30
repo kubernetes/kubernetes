@@ -276,14 +276,14 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
-	allErrs := []error{}
-	var runObjectMap = map[string]*RunObject{}
+	var createdObjects = []*RunObject{}
 	runObject, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
-		allErrs = append(allErrs, err)
+		return err
 	} else {
-		runObjectMap[generatorName] = runObject
+		createdObjects = append(createdObjects, runObject)
 	}
+	allErrs := []error{}
 	if cmdutil.GetFlagBool(cmd, "expose") {
 		serviceGenerator := cmdutil.GetFlagString(cmd, "service-generator")
 		if len(serviceGenerator) == 0 {
@@ -293,7 +293,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else {
-			runObjectMap[generatorName] = serviceRunObject
+			createdObjects = append(createdObjects, serviceRunObject)
 		}
 	}
 
@@ -345,7 +345,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		}
 
 		if remove {
-			for _, obj := range runObjectMap {
+			for _, obj := range createdObjects {
 				namespace, err = obj.Mapping.MetadataAccessor.Namespace(obj.Object)
 				if err != nil {
 					return err
