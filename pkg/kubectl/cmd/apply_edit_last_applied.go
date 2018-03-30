@@ -33,7 +33,7 @@ var (
 		Edit the latest last-applied-configuration annotations of resources from the default editor.
 
 		The edit-last-applied command allows you to directly edit any API resource you can retrieve via the
-		command line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
+		command line tools. It will open the editor defined by your ` + "`KUBE_EDITOR`" + `, or EDITOR
 		environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
 		You can edit multiple objects, although changes are applied one at a time. The command
 		accepts filenames as well as command line arguments, although the files you point to must

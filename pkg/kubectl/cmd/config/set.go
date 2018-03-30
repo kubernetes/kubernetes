@@ -48,15 +48,15 @@ type setOptions struct {
 var set_long = templates.LongDesc(`
 	Sets an individual value in a kubeconfig file
 
-	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
+	PROPERTY-NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
 
-	PROPERTY_VALUE is the new value you wish to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.`)
+	PROPERTY-VALUE is the new value you wish to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.`)
 
 func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: "set PROPERTY_NAME PROPERTY_VALUE",
+		Use: "set PROPERTY-NAME PROPERTY-VALUE",
 		DisableFlagsInUseLine: true,
 		Short: i18n.T("Sets an individual value in a kubeconfig file"),
 		Long:  set_long,
@@ -67,7 +67,7 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 		},
 	}
 
-	f := cmd.Flags().VarPF(&options.setRawBytes, "set-raw-bytes", "", "When writing a []byte PROPERTY_VALUE, write the given string directly without base64 decoding.")
+	f := cmd.Flags().VarPF(&options.setRawBytes, "set-raw-bytes", "", "When writing a []byte PROPERTY-VALUE, write the given string directly without base64 decoding.")
 	f.NoOptDefVal = "true"
 	return cmd
 }

@@ -36,7 +36,7 @@ type RenameContextOptions struct {
 }
 
 const (
-	renameContextUse = "rename-context CONTEXT_NAME NEW_NAME"
+	renameContextUse = "rename-context CONTEXT-NAME NEW-NAME"
 
 	renameContextShort = "Renames a context from the kubeconfig file."
 )
@@ -45,9 +45,9 @@ var (
 	renameContextLong = templates.LongDesc(`
 		Renames a context from the kubeconfig file.
 
-		CONTEXT_NAME is the context name that you wish change.
+		CONTEXT-NAME is the context name that you wish change.
 
-		NEW_NAME is the new name you wish to set.
+		NEW-NAME is the new name you wish to set.
 		
 		Note: In case the context being renamed is the 'current-context', this field will also be updated.`)
 
