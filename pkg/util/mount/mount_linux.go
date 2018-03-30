@@ -773,11 +773,11 @@ func doBindSubPath(mounter Interface, subpath Subpath, kubeletPid int) (hostPath
 
 	// Create target of the bind mount. A directory for directories, empty file
 	// for everything else.
-	t, err := os.Lstat(subpath.Path)
+	fileType, err := mounter.GetFileType(subpath.Path)
 	if err != nil {
-		return "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
+		return "", fmt.Errorf("getFileType %s failed: %s", subpath.Path, err)
 	}
-	if t.Mode()&os.ModeDir > 0 {
+	if fileType == FileTypeDirectory {
 		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
 			return "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
 		}
