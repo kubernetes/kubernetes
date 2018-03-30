@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -342,15 +344,9 @@ func TestPodFitsResources(t *testing.T) {
 		RegisterPredicateMetadataProducerWithExtendedResourceOptions(test.ignoredExtendedResources)
 		meta := PredicateMetadata(test.pod, nil)
 		fits, reasons, err := PodFitsResources(test.pod, meta, test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, test.reasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
+		assert.Equal(t, fits, test.fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 	}
 
 	notEnoughPodsTests := []struct {
@@ -397,15 +393,9 @@ func TestPodFitsResources(t *testing.T) {
 		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0, 0, 0)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, test.reasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
+		assert.Equal(t, fits, test.fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 	}
 
 	storagePodsTests := []struct {
@@ -455,17 +445,10 @@ func TestPodFitsResources(t *testing.T) {
 		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, test.reasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
+		assert.Equal(t, fits, test.fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 	}
-
 }
 
 func TestPodFitsHost(t *testing.T) {
@@ -516,15 +499,9 @@ func TestPodFitsHost(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
 		fits, reasons, err := PodFitsHost(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: unexpected difference: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, fits, test.fits, "%s: unexpected difference: expected: %v got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -654,15 +631,9 @@ func TestPodFitsHostPorts(t *testing.T) {
 
 	for _, test := range tests {
 		fits, reasons, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if test.fits != fits {
-			t.Errorf("%s: expected %v, saw %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected %v, saw %v", test.test, test.fits, fits)
 	}
 }
 
@@ -704,18 +675,9 @@ func TestGCEDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if test.isOk && !ok {
-			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
-		if !test.isOk && ok {
-			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, ok || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.isOk, ok, "%s: expected %v, got %v.  %v %s %s", test.test, test.isOk, ok, test.pod, test.nodeInfo, test.test)
 	}
 }
 
@@ -757,18 +719,9 @@ func TestAWSDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if test.isOk && !ok {
-			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
-		if !test.isOk && ok {
-			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, ok || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.isOk, ok, "%s: expected %v, got %v. %v %s %s", test.test, test.isOk, ok, test.pod, test.nodeInfo, test.test)
 	}
 }
 
@@ -816,18 +769,9 @@ func TestRBDDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if test.isOk && !ok {
-			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
-		if !test.isOk && ok {
-			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, ok || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.isOk, ok, "%s: expected %v, got %v. %v %s %s", test.test, test.isOk, ok, test.pod, test.nodeInfo, test.test)
 	}
 }
 
@@ -875,18 +819,9 @@ func TestISCSIDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if test.isOk && !ok {
-			t.Errorf("%s: expected ok, got none.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
-		if !test.isOk && ok {
-			t.Errorf("%s: expected no ok, got one.  %v %s %s", test.test, test.pod, test.nodeInfo, test.test)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, ok || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.isOk, ok, "%s: expected %v, got %v. %v %s %s", test.test, test.isOk, ok, test.pod, test.nodeInfo, test.test)
 	}
 }
 
@@ -1350,15 +1285,9 @@ func TestPodFitsSelector(t *testing.T) {
 		nodeInfo.SetNode(&node)
 
 		fits, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -1417,15 +1346,9 @@ func TestNodeLabelPresence(t *testing.T) {
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
 		fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -1572,15 +1495,9 @@ func TestServiceAffinity(t *testing.T) {
 			})
 			if pmeta, ok := (PredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
 				fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
-				if err != nil {
-					t.Errorf("%s: unexpected error: %v", test.test, err)
-				}
-				if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-				}
-				if fits != test.fits {
-					t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-				}
+				assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+				assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+				assert.Equal(t, test.fits, fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 			} else {
 				t.Errorf("Error casting.")
 			}
@@ -1998,15 +1915,9 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
 		pred := NewMaxPDVolumeCountPredicate(EBSVolumeFilterType, pvInfo, pvcInfo)
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected %v, got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -2124,15 +2035,9 @@ func TestRunGeneralPredicates(t *testing.T) {
 	for _, test := range resourceTests {
 		test.nodeInfo.SetNode(test.node)
 		fits, reasons, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, test.reasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
+		assert.Equal(t, test.fits, fits, "%s: expected: %v got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -2743,12 +2648,8 @@ func TestInterPodAffinity(t *testing.T) {
 		nodeInfo.SetNode(test.node)
 		nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
 		fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-		if !fits && !reflect.DeepEqual(reasons, test.expectFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.expectFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected %v got %v", test.test, test.fits, fits)
-		}
+		assert.True(t, fits || reflect.DeepEqual(reasons, test.expectFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.expectFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected %v got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -3174,18 +3075,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				nodeInfo.SetNode(&node)
 				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
 				fits2, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-				if err != nil {
-					t.Errorf("%s: unexpected error: %v", test.test, err)
-				}
-				if !fits2 && !reflect.DeepEqual(reasons, selectorExpectedFailureReasons) {
-					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, selectorExpectedFailureReasons)
-				}
+				assert.NoError(t, err, "s: unexpected error: %v", test.test, err)
+				assert.True(t, fits2 || reflect.DeepEqual(reasons, selectorExpectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.test, reasons, selectorExpectedFailureReasons)
 				fits = fits && fits2
 			}
 
-			if fits != test.fits[node.Name] {
-				t.Errorf("%s: expected %v for %s got %v", test.test, test.fits[node.Name], node.Name, fits)
-			}
+			assert.Equal(t, test.fits[node.Name], fits, "%s: expected %v for %s got %v", test.test, test.fits[node.Name], node.Name, fits)
 		}
 	}
 }
@@ -3379,15 +3274,9 @@ func TestPodToleratesTaints(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&test.node)
 		fits, reasons, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if err != nil {
-			t.Errorf("%s, unexpected error: %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s, expected: %v got %v", test.test, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s, unexpected error: %v", test.test, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s, unexpected failure reason: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s, expected: %v got %v", test.test, test.fits, fits)
 	}
 }
 
@@ -3489,15 +3378,9 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 
 	for _, test := range tests {
 		fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.name, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected %v got %v", test.name, test.fits, fits)
 	}
 }
 
@@ -3561,15 +3444,9 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 
 	for _, test := range tests {
 		fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
-		}
+		assert.NoError(t, err, "%s: unexpected error: %v", test.name, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.name, reasons, expectedFailureReasons)
+		assert.Equal(t, test.fits, fits, "%s: expected %v got %v", test.name, test.fits, fits)
 	}
 }
 
@@ -3638,10 +3515,8 @@ func TestNodeConditionPredicate(t *testing.T) {
 
 	for _, test := range tests {
 		nodeInfo := makeEmptyNodeInfo(test.node)
-		if fit, reasons, err := CheckNodeConditionPredicate(nil, nil, nodeInfo); fit != test.schedulable {
-			t.Errorf("%s: expected: %t, got %t; %+v, %v",
-				test.node.Name, test.schedulable, fit, reasons, err)
-		}
+		fit, reasons, err := CheckNodeConditionPredicate(nil, nil, nodeInfo)
+		assert.Equal(t, test.schedulable, fit, "%s: expected: %t, got %t; %+v, %v", test.node.Name, test.schedulable, fit, reasons, err)
 	}
 }
 
@@ -3778,16 +3653,9 @@ func TestVolumeZonePredicate(t *testing.T) {
 		node.SetNode(test.Node)
 
 		fits, reasons, err := fit(test.Pod, nil, node)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.Name, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
-		}
-		if fits != test.Fits {
-			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
-		}
-
+		assert.NoError(t, err, "%s: unexpected error: %v", test.Name, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
+		assert.Equal(t, test.Fits, fits, "%s: expected %v got %v", test.Name, test.Fits, fits)
 	}
 }
 
@@ -3871,16 +3739,9 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 		node.SetNode(test.Node)
 
 		fits, reasons, err := fit(test.Pod, nil, node)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.Name, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
-		}
-		if fits != test.Fits {
-			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
-		}
-
+		assert.NoError(t, err, "%s: unexpected error: %v", test.Name, err)
+		assert.True(t, fits || reflect.DeepEqual(reasons, expectedFailureReasons), "%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
+		assert.Equal(t, test.Fits, fits, "%s: expected %v got %v", test.Name, test.Fits, fits)
 	}
 }
 
@@ -3991,21 +3852,13 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		node.SetNode(test.Node)
 
 		fits, _, err := fit(test.Pod, nil, node)
-		if !test.ExpectFailure && err != nil {
-			t.Errorf("%s: unexpected error: %v", test.Name, err)
-		}
-		if test.ExpectFailure && err == nil {
-			t.Errorf("%s: expected error, got success", test.Name)
-		}
-		if fits != test.Fits {
-			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
-		}
+		assert.True(t, test.ExpectFailure || err == nil, "%s: unexpected error: %v", test.Name, err)
+		assert.False(t, test.ExpectFailure && err == nil, "%s: expected error, got success", test.Name)
+		assert.Equal(t, test.Fits, fits, "%s: expected %v got %v", test.Name, test.Fits, fits)
 	}
 
 	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
-	}
+	assert.NoError(t, err, "Failed to disable feature gate for VolumeScheduling: %v", err)
 }
 
 func TestGetMaxVols(t *testing.T) {
@@ -4037,9 +3890,7 @@ func TestGetMaxVols(t *testing.T) {
 	for _, test := range tests {
 		os.Setenv(KubeMaxPDVols, test.rawMaxVols)
 		result := getMaxVols(defaultValue)
-		if result != test.expected {
-			t.Errorf("%s: expected %v got %v", test.test, test.expected, result)
-		}
+		assert.Equal(t, test.expected, result, "%s: expected %v got %v", test.test, test.expected, result)
 	}
 
 	os.Unsetenv(KubeMaxPDVols)
