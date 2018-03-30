@@ -28,6 +28,7 @@ import (
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gcm "google.golang.org/api/monitoring/v3"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
@@ -111,7 +112,7 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	defer kubeClient.RbacV1().ClusterRoleBindings().Delete("custom-metrics-reader", &metav1.DeleteOptions{})
 
 	// Run application that exports the metric
-	err = createSDExporterPods(f, kubeClient)
+	_, err = createSDExporterPods(f, kubeClient)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %s", err)
 	}
@@ -125,6 +126,7 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	verifyResponsesFromCustomMetricsAPI(f, customMetricsClient, discoveryClient)
 }
 
+// TODO(kawych): migrate this test to new resource model
 func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface, externalMetricsClient externalclient.ExternalMetricsClient) {
 	projectId := framework.TestContext.CloudConfig.ProjectID
 
@@ -144,17 +146,17 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	defer CleanupDescriptors(gcmService, projectId)
 
 	// Both deployments - for old and new resource model - expose External Metrics API.
-	err = CreateAdapter(AdapterForNewResourceModel)
+	err = CreateAdapter(AdapterForOldResourceModel)
 	if err != nil {
 		framework.Failf("Failed to set up: %s", err)
 	}
-	defer CleanupAdapter(AdapterForNewResourceModel)
+	defer CleanupAdapter(AdapterForOldResourceModel)
 
 	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
 	defer kubeClient.RbacV1().ClusterRoleBindings().Delete("custom-metrics-reader", &metav1.DeleteOptions{})
 
 	// Run application that exports the metric
-	err = createSDExporterPods(f, kubeClient)
+	pod, err := createSDExporterPods(f, kubeClient)
 	if err != nil {
 		framework.Failf("Failed to create stackdriver-exporter pod: %s", err)
 	}
@@ -165,7 +167,7 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	//       i.e. pod creation, first time series exported
 	time.Sleep(60 * time.Second)
 
-	verifyResponseFromExternalMetricsAPI(f, externalMetricsClient)
+	verifyResponseFromExternalMetricsAPI(f, externalMetricsClient, pod)
 }
 
 func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsClient customclient.CustomMetricsClient, discoveryClient *discovery.DiscoveryClient) {
@@ -212,13 +214,13 @@ func verifyResponsesFromCustomMetricsAPI(f *framework.Framework, customMetricsCl
 	}
 }
 
-func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetricsClient externalclient.ExternalMetricsClient) {
-	req1, _ := labels.NewRequirement("resource.type", selection.Equals, []string{"k8s_pod"})
+func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetricsClient externalclient.ExternalMetricsClient, pod *v1.Pod) {
+	req1, _ := labels.NewRequirement("resource.type", selection.Equals, []string{"gke_container"})
 	// It's important to filter out only metrics from the right namespace, since multiple e2e tests
 	// may run in the same project concurrently. "dummy" is added to test
-	req2, _ := labels.NewRequirement("resource.labels.namespace_name", selection.In, []string{string(f.Namespace.Name), "dummy"})
-	req3, _ := labels.NewRequirement("resource.labels.pod_name", selection.Exists, []string{})
-	req4, _ := labels.NewRequirement("resource.labels.location", selection.NotEquals, []string{"dummy"})
+	req2, _ := labels.NewRequirement("resource.labels.pod_id", selection.In, []string{string(pod.UID), "dummy"})
+	req3, _ := labels.NewRequirement("resource.labels.namespace_id", selection.Exists, []string{})
+	req4, _ := labels.NewRequirement("resource.labels.zone", selection.NotEquals, []string{"dummy"})
 	req5, _ := labels.NewRequirement("resource.labels.cluster_name", selection.NotIn, []string{"foo", "bar"})
 	values, err := externalMetricsClient.
 		NamespacedMetrics("dummy").
@@ -232,7 +234,7 @@ func verifyResponseFromExternalMetricsAPI(f *framework.Framework, externalMetric
 	if values.Items[0].MetricName != "custom.googleapis.com|"+CustomMetricName ||
 		values.Items[0].Value.Value() != CustomMetricValue ||
 		// Check one label just to make sure labels are included
-		values.Items[0].MetricLabels["resource.labels.namespace_name"] != string(f.Namespace.Name) {
+		values.Items[0].MetricLabels["resource.labels.pod_id"] != string(pod.UID) {
 		framework.Failf("Unexpected result for metric %s: %v", CustomMetricName, values.Items[0])
 	}
 }
@@ -248,11 +250,11 @@ func cleanupSDExporterPod(f *framework.Framework, cs clientset.Interface) {
 	}
 }
 
-func createSDExporterPods(f *framework.Framework, cs clientset.Interface) error {
-	_, err := cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue))
+func createSDExporterPods(f *framework.Framework, cs clientset.Interface) (*v1.Pod, error) {
+	pod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod1, f.Namespace.Name, stackdriverExporterLabel, CustomMetricName, CustomMetricValue))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	_, err = cs.CoreV1().Pods(f.Namespace.Name).Create(StackdriverExporterPod(stackdriverExporterPod2, f.Namespace.Name, stackdriverExporterLabel, UnusedMetricName, UnusedMetricValue))
-	return err
+	return pod, err
 }
