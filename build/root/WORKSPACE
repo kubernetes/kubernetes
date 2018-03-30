@@ -1,8 +1,7 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "66282d078c1847c2d876c02c5dabd4fd57cc75eb41a9668a2374352fa73b4587",
-    strip_prefix = "rules_go-ff7e3364d9383cf14155f8c2efc87218d07eb03b",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/ff7e3364d9383cf14155f8c2efc87218d07eb03b.tar.gz"],
+    sha256 = "4b2c61795ac2eefcb28f3eb8e1cb2d8fb3c2eafa0f6712473bc5f93728f38758",
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.10.2/rules_go-0.10.2.tar.gz"],
 )
 
 http_archive(
@@ -46,7 +45,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.9.3",
+    go_version = "1.10.1",
 )
 
 docker_repositories()
