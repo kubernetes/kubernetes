@@ -17,8 +17,6 @@ limitations under the License.
 package apiclient
 
 import (
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -43,11 +42,11 @@ type Waiter interface {
 	WaitForPodToDisappear(staticPodName string) error
 	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
 	WaitForStaticPodSingleHash(nodeName string, component string) (string, error)
+	// WaitForStaticPodHashChange waits for the given static pod component's static pod hash to get updated.
+	// By doing that we can be sure that the kubelet has restarted the given Static Pod
+	WaitForStaticPodHashChange(nodeName, component, previousHash string) error
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
-	// WaitForStaticPodControlPlaneHashChange waits for the given static pod component's static pod hash to get updated.
-	// By doing that we can be sure that the kubelet has restarted the given Static Pod
-	WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error
 	// WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 	WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error
 	// SetTimeout adjusts the timeout to the specified duration
@@ -194,17 +193,17 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 	return componentPodHash, err
 }
 
-// WaitForStaticPodControlPlaneHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
+// WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
-func (w *KubeWaiter) WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error {
+func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
 	return wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
 
-		hashes, err := getStaticPodControlPlaneHashes(w.client, nodeName)
+		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {
 			return false, nil
 		}
 		// We should continue polling until the UID changes
-		if hashes[component] == previousHash {
+		if hash == previousHash {
 			return false, nil
 		}
 
@@ -235,12 +234,9 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 		return "", err
 	}
 
-	podBytes, err := json.Marshal(staticPod)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%x", sha256.Sum256(podBytes)), nil
+	staticPodHash := staticPod.Annotations[kubetypes.ConfigHashAnnotationKey]
+	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
+	return staticPodHash, nil
 }
 
 // TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned
