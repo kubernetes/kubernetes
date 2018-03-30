@@ -953,3 +953,114 @@ func TestEnsureExternalLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
 	msg := fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 	checkEvent(t, recorder, msg, true)
 }
+
+type EnsureELBParams struct {
+	clusterName     string
+	clusterID       string
+	apiService      *v1.Service
+	existingFwdRule *compute.ForwardingRule
+	nodes           []*v1.Node
+}
+
+// newEnsureELBParams is the constructor of EnsureELBParams.
+func newEnsureELBParams(nodes []*v1.Node) *EnsureELBParams {
+	vals := DefaultTestClusterValues()
+	return &EnsureELBParams{
+		vals.ClusterName,
+		vals.ClusterID,
+		fakeApiService.DeepCopy(),
+		nil,
+		nodes,
+	}
+}
+
+// TestEnsureExternalLoadBalancerErrors tests the function
+// ensureExternalLoadBalancer, making sure the system won't panic when
+// exceptions raised by gce.
+func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	var params *EnsureELBParams
+
+	for desc, tc := range map[string]struct {
+		adjustParams func(*EnsureELBParams)
+		injectMock   func(*cloud.MockGCE)
+	}{
+		"No hosts provided": {
+			adjustParams: func(params *EnsureELBParams) {
+				params.nodes = []*v1.Node{}
+			},
+		},
+		"Invalid node provided": {
+			adjustParams: func(params *EnsureELBParams) {
+				params.nodes = []*v1.Node{{}}
+			},
+		},
+		"Get forwarding rules failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockForwardingRules.GetHook = mock.GetForwardingRulesInternalErrHook
+			},
+		},
+		"Get addresses failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockAddresses.GetHook = mock.GetAddressesInternalErrHook
+			},
+		},
+		"Bad load balancer source range provided": {
+			adjustParams: func(params *EnsureELBParams) {
+				params.apiService.Spec.LoadBalancerSourceRanges = []string{"BadSourceRange"}
+			},
+		},
+		"Get firewall failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockFirewalls.GetHook = mock.GetFirewallsUnauthorizedErrHook
+			},
+		},
+		"Create firewall failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
+			},
+		},
+		"Get target pool failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockTargetPools.GetHook = mock.GetTargetPoolInternalErrHook
+			},
+		},
+		"Get HTTP health checks failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockHttpHealthChecks.GetHook = mock.GetHTTPHealthChecksInternalErrHook
+			},
+		},
+		"Create target pools failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockTargetPools.InsertHook = mock.InsertTargetPoolsInternalErrHook
+			},
+		},
+		"Create forwarding rules failed": {
+			injectMock: func(c *cloud.MockGCE) {
+				c.MockForwardingRules.InsertHook = mock.InsertForwardingRulesInternalErrHook
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+			require.NoError(t, err)
+			params = newEnsureELBParams(nodes)
+			if tc.adjustParams != nil {
+				tc.adjustParams(params)
+			}
+			if tc.injectMock != nil {
+				tc.injectMock(gce.c.(*cloud.MockGCE))
+			}
+			status, err := gce.ensureExternalLoadBalancer(
+				params.clusterName,
+				params.clusterID,
+				params.apiService,
+				params.existingFwdRule,
+				params.nodes,
+			)
+			assert.Error(t, err, "Should return an error when "+desc)
+			assert.Nil(t, status, "Should not return a status when "+desc)
+		})
+	}
+}
