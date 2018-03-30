@@ -117,8 +117,8 @@ func (w *fakeWaiter) WaitForStaticPodSingleHash(_ string, _ string) (string, err
 	return "", w.errsToReturn[waitForHashes]
 }
 
-// WaitForStaticPodControlPlaneHashChange returns an error if set from errsToReturn
-func (w *fakeWaiter) WaitForStaticPodControlPlaneHashChange(_, _, _ string) error {
+// WaitForStaticPodHashChange returns an error if set from errsToReturn
+func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
 	return w.errsToReturn[waitForHashChange]
 }
 
