@@ -1,5 +1,15 @@
 # GENERATED FILE. Use with Kubernetes 1.7+
 # TO UPDATE, modify files in install/kubernetes/templates and run install/updateVersion.sh
+#
+# Required for Istio as k8s addon.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    istio-injection: enabled
+    addonmanager.kubernetes.io/mode: Reconcile
+---
 ################################
 # Istio system namespace
 ################################
@@ -8,7 +18,6 @@ kind: Namespace
 metadata:
   name: istio-system
   labels:
-    istio-injection: enabled
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
 ---
