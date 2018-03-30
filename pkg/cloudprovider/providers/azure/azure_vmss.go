@@ -547,7 +547,7 @@ func (ss *scaleSet) updateVMSSInstancesWithRetry(scaleSetName string, vmInstance
 
 // EnsureHostsInPool ensures the given Node's primary IP configurations are
 // participating in the specified LoadBalancer Backend Pool.
-func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string) error {
+func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
 	virtualMachineScaleSet, exists, err := ss.getScaleSetWithRetry(vmSetName)
 	if err != nil {
 		glog.Errorf("ss.getScaleSetWithRetry(%s) for service %q failed: %v", vmSetName, serviceName, err)

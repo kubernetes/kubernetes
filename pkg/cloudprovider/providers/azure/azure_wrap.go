@@ -19,6 +19,7 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -241,4 +242,12 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 	}
 
 	return newTimedcache(rtCacheTTL, getter)
+}
+
+func (az *Cloud) useStandardLoadBalancer() bool {
+	return strings.EqualFold(az.LoadBalancerSku, loadBalancerSkuStandard)
+}
+
+func (az *Cloud) excludeMasterNodesFromStandardLB() bool {
+	return az.ExcludeMasterFromStandardLB != nil && *az.ExcludeMasterFromStandardLB
 }
