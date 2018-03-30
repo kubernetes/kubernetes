@@ -26,6 +26,7 @@ func createMergeStrategy(options Options, strategic *delegatingStrategy) mergeSt
 	return mergeStrategy{
 		strategic,
 		options,
+		CreateCompareStrategy(),
 	}
 }
 
@@ -33,10 +34,17 @@ func createMergeStrategy(options Options, strategic *delegatingStrategy) mergeSt
 type mergeStrategy struct {
 	strategic *delegatingStrategy
 	options   Options
+	compare   apply.Compare
 }
 
 // MergeList merges the lists in a ListElement into a single Result
 func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
+	// Conflict detection enabled for merge list
+	if v.options.FailOnConflict {
+		if !v.compare.CompareList(e) {
+			return apply.Result{}, fmt.Errorf("MergeMap failed because of detected conflicts")
+		}
+	}
 	// No merge logic if adding or deleting a field
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
@@ -72,11 +80,16 @@ func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 
 // MergeMap merges the maps in a MapElement into a single Result
 func (v mergeStrategy) MergeMap(e apply.MapElement) (apply.Result, error) {
+	// Conflict detection enabled for merge map
+	if v.options.FailOnConflict {
+		if !v.compare.CompareMap(e) {
+			return apply.Result{}, fmt.Errorf("MergeMap failed because of detected conflicts")
+		}
+	}
 	// No merge logic if adding or deleting a field
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
 	}
-
 	return v.doMergeMap(e.GetValues())
 }
 
@@ -86,7 +99,6 @@ func (v mergeStrategy) MergeType(e apply.TypeElement) (apply.Result, error) {
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
 	}
-
 	return v.doMergeMap(e.GetValues())
 }
 

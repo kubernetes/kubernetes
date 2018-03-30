@@ -36,6 +36,11 @@ func (e ListElement) Merge(v Strategy) (Result, error) {
 	return v.MergeList(e)
 }
 
+// Compare implements Element.Compare, detect conflicts of recorded and remote list elements
+func (e ListElement) Compare(v Compare) bool {
+	return v.CompareList(e)
+}
+
 var _ Element = &ListElement{}
 
 // ListElementData contains the recorded, local and remote data for a list

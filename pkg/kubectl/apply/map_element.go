@@ -41,6 +41,11 @@ func (e MapElement) GetValues() map[string]Element {
 	return e.Values
 }
 
+// Compare implements Element.Compare, detects conflicts between remote and record in mapElement
+func (e MapElement) Compare(v Compare) bool {
+	return v.CompareMap(e)
+}
+
 var _ Element = &MapElement{}
 
 // MapElementData contains the recorded, local and remote data for a map or type

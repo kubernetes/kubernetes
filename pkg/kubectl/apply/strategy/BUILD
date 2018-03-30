@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "compare_visitor.go",
         "doc.go",
         "merge.go",
         "merge_visitor.go",
@@ -18,6 +19,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
+        "compare_visitor_test.go",
         "merge_map_list_test.go",
         "merge_map_test.go",
         "merge_primitive_list_test.go",

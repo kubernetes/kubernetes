@@ -31,4 +31,9 @@ func (e PrimitiveElement) Merge(v Strategy) (Result, error) {
 	return v.MergePrimitive(e)
 }
 
+// Compare implements Element.Compare, detects conflicts between remote and record in primitiveElement
+func (e PrimitiveElement) Compare(v Compare) bool {
+	return v.ComparePrimitive(e)
+}
+
 var _ Element = &PrimitiveElement{}

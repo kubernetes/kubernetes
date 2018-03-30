@@ -35,6 +35,11 @@ func (e TypeElement) Merge(v Strategy) (Result, error) {
 	return v.MergeType(e)
 }
 
+// Compare implements Element.Compare
+func (e TypeElement) Compare(v Compare) bool {
+	return v.CompareType(e)
+}
+
 // GetValues implements Element.GetValues
 func (e TypeElement) GetValues() map[string]Element {
 	return e.Values

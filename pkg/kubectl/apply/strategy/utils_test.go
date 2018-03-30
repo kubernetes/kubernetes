@@ -64,3 +64,15 @@ func create(config string) map[string]interface{} {
 
 	return result
 }
+
+// run compare test
+func runTest(instance apply.Compare, recorded, local, remote, expected map[string]interface{}, res bool) {
+	runCompare(instance, recorded, local, remote, expected, res, fakeResources)
+}
+
+func runCompare(instance apply.Compare, recorded, local, remote, expected map[string]interface{}, res bool, resources openapi.Resources) {
+	parseFactory := parse.Factory{Resources: resources}
+	parsed, err := parseFactory.CreateElement(recorded, local, remote)
+	Expect(err).Should(Not(HaveOccurred()))
+	Expect(parsed.Compare(instance)).Should(Equal(res), fmt.Sprintf("RESULT: %v\n", parsed.Compare(instance)))
+}
