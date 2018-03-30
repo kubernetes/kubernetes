@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -892,6 +893,126 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("Expect node port type service, got none")
+	}
+}
+func TestLoadBalanceSourceRanges(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcLBIP := "1.2.3.4"
+	svcLBSource := "10.0.0.0/8"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+	epIP := "10.180.0.1"
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: api.ProtocolTCP,
+			}}
+			svc.Status.LoadBalancer.Ingress = []api.LoadBalancerIngress{{
+				IP: svcLBIP,
+			}}
+			svc.Spec.LoadBalancerSourceRanges = []string{
+				svcLBSource,
+			}
+		}),
+	)
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP:       epIP,
+					NodeName: strPtr(testHostname),
+				}},
+				Ports: []api.EndpointPort{{
+					Name: svcPortName.Port,
+					Port: int32(svcPort),
+				}},
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	// Check ipvs service and destinations
+	services, err := ipvs.GetVirtualServers()
+	if err != nil {
+		t.Errorf("Failed to get ipvs services, err: %v", err)
+	}
+	found := false
+	for _, svc := range services {
+		fmt.Printf("address: %s:%d, %s", svc.Address.String(), svc.Port, svc.Protocol)
+		if svc.Address.Equal(net.ParseIP(svcLBIP)) && svc.Port == uint16(svcPort) && svc.Protocol == string(api.ProtocolTCP) {
+			destinations, _ := ipvs.GetRealServers(svc)
+			if len(destinations) != 1 {
+				t.Errorf("Unexpected %d destinations, expect 0 destinations", len(destinations))
+			}
+			for _, ep := range destinations {
+				if ep.Address.String() == epIP && ep.Port == uint16(svcPort) {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Errorf("Did not got expected loadbalance service")
+	}
+
+	// Check ipset entry
+	expectIPSet := map[string]*utilipset.Entry{
+		KubeLoadBalancerSet: {
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		},
+		KubeLoadBalancerMasqSet: {
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			SetType:  utilipset.HashIPPort,
+		},
+		KubeLoadBalancerSourceCIDRSet: {
+			IP:       svcLBIP,
+			Port:     svcPort,
+			Protocol: strings.ToLower(string(api.ProtocolTCP)),
+			Net:      svcLBSource,
+			SetType:  utilipset.HashIPPortNet,
+		},
+	}
+	for set, entry := range expectIPSet {
+		ents, err := ipset.ListEntries(set)
+		if err != nil || len(ents) != 1 {
+			t.Errorf("Check ipset entries failed for ipset: %q", set)
+			continue
+		}
+		if ents[0] != entry.String() {
+			t.Errorf("Check ipset entries failed for ipset: %q", set)
+		}
+	}
+
+	// Check iptables chain and rules
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeFWRules := ipt.GetRules(string(KubeFireWallChain))
+	if !hasJump(kubeSvcRules, string(KubeMarkMasqChain), KubeLoadBalancerMasqSet) {
+		t.Errorf("Didn't find jump from chain %v match set %v to MASQUERADE", kubeServicesChain, KubeLoadBalancerMasqSet)
+	}
+	if !hasJump(kubeSvcRules, string(KubeFireWallChain), KubeLoadBalancerSet) {
+		t.Errorf("Didn't find jump from chain %v match set %v to %v", kubeServicesChain,
+			KubeLoadBalancerSet, KubeFireWallChain)
+	}
+	if !hasJump(kubeFWRules, "ACCEPT", KubeLoadBalancerSourceCIDRSet) {
+		t.Errorf("Didn't find jump from chain %v match set %v to ACCEPT", kubeServicesChain, KubeLoadBalancerSourceCIDRSet)
 	}
 }
 
@@ -2276,4 +2397,20 @@ func Test_syncService(t *testing.T) {
 			t.Errorf("Case [%d], unexpected mismatch, expect: %#v, got: %#v", i, testCases[i].newVirtualServer, list[0])
 		}
 	}
+}
+
+func hasJump(rules []iptablestest.Rule, destChain, ipSet string) bool {
+	match := false
+	for _, r := range rules {
+		if r[iptablestest.Jump] == destChain {
+			match = true
+			if ipSet != "" {
+				if strings.Contains(r[iptablestest.MatchSet], ipSet) {
+					return true
+				}
+				match = false
+			}
+		}
+	}
+	return match
 }

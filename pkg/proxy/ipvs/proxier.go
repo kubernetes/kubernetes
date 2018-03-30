@@ -1145,10 +1145,13 @@ func (proxier *Proxier) syncProxyRules() {
 	}
 	if !proxier.lbWhiteListCIDRSet.isEmpty() || !proxier.lbWhiteListIPSet.isEmpty() {
 		// link kube-services chain -> kube-fire-wall chain
-		args := []string{"-m", "set", "--match-set", proxier.lbIngressSet.Name, "dst,dst", "-j", string(KubeFireWallChain)}
-		if _, err := proxier.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, kubeServicesChain, args...); err != nil {
-			glog.Errorf("Failed to ensure that ipset %s chain %s jumps to %s: %v", proxier.lbIngressSet.Name, kubeServicesChain, KubeFireWallChain, err)
+		args := []string{
+			"-A", string(kubeServicesChain),
+			"-m", "set", "--match-set", proxier.lbIngressSet.Name,
+			"dst,dst",
+			"-j", string(KubeFireWallChain),
 		}
+		writeLine(proxier.natRules, args...)
 		if !proxier.lbWhiteListCIDRSet.isEmpty() {
 			args = append(args[:0],
 				"-A", string(KubeFireWallChain),
