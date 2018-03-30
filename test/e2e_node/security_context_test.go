@@ -113,7 +113,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
-	Context("when creating a pod in the host PID namespace", func() {
+	Context("[Feature:HostAccess] when creating a pod in the host PID namespace", func() {
 		makeHostPidPod := func(podName, image string, command []string, hostPID bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -193,7 +193,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
-	Context("when creating a pod in the host IPC namespace", func() {
+	Context("[Feature:HostAccess] when creating a pod in the host IPC namespace", func() {
 		makeHostIPCPod := func(podName, image string, command []string, hostIPC bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -272,7 +272,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
-	Context("when creating a pod in the host network namespace", func() {
+	Context("[Feature:HostAccess] when creating a pod in the host network namespace", func() {
 		makeHostNetworkPod := func(podName, image string, command []string, hostNetwork bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
