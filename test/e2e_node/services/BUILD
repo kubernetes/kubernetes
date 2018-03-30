@@ -31,6 +31,7 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e_node/builder:go_default_library",
+        "//test/e2e_node/remote:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v2http:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
