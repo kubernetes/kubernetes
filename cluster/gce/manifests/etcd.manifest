@@ -37,6 +37,12 @@
       { "name": "INITIAL_CLUSTER",
         "value": "{{ etcd_cluster }}"
       },
+      { "name": "LISTEN_PEER_URLS",
+        "value": "{{ etcd_protocol }}://{{ host_ip }}:{{ server_port }}"
+      },
+      { "name": "INITIAL_ADVERTISE_PEER_URLS",
+        "value": "{{ etcd_protocol }}://{{ hostname }}:{{ server_port }}"
+      },
       { "name": "ETCD_CREDS",
         "value": "{{ etcd_creds }}"
       }
