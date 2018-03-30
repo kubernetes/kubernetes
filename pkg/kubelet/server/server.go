@@ -223,7 +223,7 @@ func (s *Server) InstallAuthFilter() {
 		// Authenticate
 		u, ok, err := s.auth.AuthenticateRequest(req.Request)
 		if err != nil {
-			glog.Errorf("Unable to authenticate the request due to an error: %v", err)
+			glog.Errorf("Unable to authenticate the request from %s due to an error: %v", req.Request.RemoteAddr, err)
 			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
 			return
 		}
