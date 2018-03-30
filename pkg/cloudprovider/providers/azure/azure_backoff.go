@@ -17,13 +17,14 @@ limitations under the License.
 package azure
 
 import (
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // requestBackoff if backoff is disabled in cloud provider it
@@ -47,6 +48,9 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 	var retryErr error
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		machine, retryErr = az.getVirtualMachine(name)
+		if retryErr == cloudprovider.InstanceNotFound {
+			return true, cloudprovider.InstanceNotFound
+		}
 		if retryErr != nil {
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
 			return false, nil

@@ -179,6 +179,9 @@ func (az *Cloud) getStandardInstanceID(name types.NodeName) (string, error) {
 	var err error
 	az.operationPollRateLimiter.Accept()
 	machine, err = az.getVirtualMachine(name)
+	if err == cloudprovider.InstanceNotFound {
+		return "", cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		if az.CloudProviderBackoff {
 			glog.V(2).Infof("InstanceID(%s) backing off", name)
