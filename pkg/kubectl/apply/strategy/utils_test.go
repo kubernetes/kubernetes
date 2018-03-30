@@ -32,6 +32,11 @@ import (
 	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
+const (
+	hasConflict = true
+	noConflict  = false
+)
+
 var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
 
 // run parses the openapi and runs the tests
@@ -63,4 +68,18 @@ func create(config string) map[string]interface{} {
 		Not(HaveOccurred()), fmt.Sprintf("Could not parse config:\n\n%s\n", config))
 
 	return result
+}
+
+func runConflictTest(instance apply.Strategy, recorded, local, remote map[string]interface{}, isConflict bool) {
+	parseFactory := parse.Factory{Resources: fakeResources}
+	parsed, err := parseFactory.CreateElement(recorded, local, remote)
+	Expect(err).Should(Not(HaveOccurred()))
+
+	merged, err := parsed.Merge(instance)
+	if isConflict {
+		Expect(err).Should(HaveOccurred())
+	} else {
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(merged.Operation).Should(Equal(apply.SET))
+	}
 }

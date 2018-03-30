@@ -416,3 +416,8 @@ func (e HasElementData) HasLocal() bool {
 func (e HasElementData) HasRemote() bool {
 	return e.remoteSet
 }
+
+// ConflictDetector defines the capability to detect conflict. An element can examine remote/recorded value to detect conflict.
+type ConflictDetector interface {
+	HasConflict() error
+}
