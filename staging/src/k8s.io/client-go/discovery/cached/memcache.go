@@ -38,10 +38,12 @@ import (
 type memCacheClient struct {
 	delegate discovery.DiscoveryInterface
 
-	lock                   sync.RWMutex
-	groupToServerResources map[string]*metav1.APIResourceList
-	groupList              *metav1.APIGroupList
-	cacheValid             bool
+	lock                         sync.RWMutex
+	groupToServerResources       map[string]*metav1.APIResourceList
+	groupList                    *metav1.APIGroupList
+	preferredResources           []*metav1.APIResourceList
+	preferredNamespacedResources []*metav1.APIResourceList
+	cacheValid                   bool
 }
 
 var (
@@ -96,18 +98,22 @@ func (d *memCacheClient) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
-// TODO: Should this also be cached? The results seem more likely to be
-// inconsistent with ServerGroups and ServerResources given the requirement to
-// actively Invalidate.
 func (d *memCacheClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return d.delegate.ServerPreferredResources()
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	if !d.cacheValid {
+		return nil, ErrCacheEmpty
+	}
+	return d.preferredResources, nil
 }
 
-// TODO: Should this also be cached? The results seem more likely to be
-// inconsistent with ServerGroups and ServerResources given the requirement to
-// actively Invalidate.
 func (d *memCacheClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return d.delegate.ServerPreferredNamespacedResources()
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	if !d.cacheValid {
+		return nil, ErrCacheEmpty
+	}
+	return d.preferredNamespacedResources, nil
 }
 
 func (d *memCacheClient) ServerVersion() (*version.Info, error) {
@@ -162,7 +168,19 @@ func (d *memCacheClient) Invalidate() {
 		}
 	}
 
-	d.groupToServerResources, d.groupList = rl, gl
+	prl, err := d.delegate.ServerPreferredResources()
+	if err != nil || len(prl) == 0 {
+		utilruntime.HandleError(fmt.Errorf("couldn't get preferred resource list; will keep using cached value. (%v)", err))
+		return
+	}
+
+	pnrl, err := d.delegate.ServerPreferredNamespacedResources()
+	if err != nil || len(pnrl) == 0 {
+		utilruntime.HandleError(fmt.Errorf("couldn't get preferred namespaced resource list; will keep using cached value. (%v)", err))
+		return
+	}
+
+	d.groupToServerResources, d.groupList, d.preferredResources, d.preferredNamespacedResources = rl, gl, prl, pnrl
 	d.cacheValid = true
 }
 
@@ -173,7 +191,9 @@ func (d *memCacheClient) Invalidate() {
 // NOTE: The client will NOT resort to live lookups on cache misses.
 func NewMemCacheClient(delegate discovery.DiscoveryInterface) discovery.CachedDiscoveryInterface {
 	return &memCacheClient{
-		delegate:               delegate,
-		groupToServerResources: map[string]*metav1.APIResourceList{},
+		delegate:                     delegate,
+		groupToServerResources:       map[string]*metav1.APIResourceList{},
+		preferredResources:           []*metav1.APIResourceList{},
+		preferredNamespacedResources: []*metav1.APIResourceList{},
 	}
 }
