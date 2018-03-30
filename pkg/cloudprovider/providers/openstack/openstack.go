@@ -416,10 +416,40 @@ func foreachServer(client *gophercloud.ServiceClient, opts servers.ListOptsBuild
 }
 
 func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
+	glog.V(5).Infof("Looking up server by instance name : %v", name)
+	srv, err := getServerByInstanceName(client, name)
+	if err == nil {
+		glog.V(5).Infof("Found server : %v/%v", srv.ID, srv.Name)
+		return srv, err
+	}
+	glog.V(5).Infof("Looking up server by host name : %v", name)
+	return getServerByHostName(client, name)
+}
+
+type listOpts struct {
+	Hostname string `q:"hostname"`
+}
+
+func (opts listOpts) ToServerListQuery() (string, error) {
+	q, err := gophercloud.BuildQueryString(opts)
+	return q.String(), err
+}
+
+func getServerByHostName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
+	opts := listOpts{
+		Hostname: fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
+	}
+	return getServer(client, opts)
+}
+
+func getServerByInstanceName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
 	opts := servers.ListOpts{
 		Name: fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
 	}
+	return getServer(client, opts)
+}
 
+func getServer(client *gophercloud.ServiceClient, opts servers.ListOptsBuilder) (*servers.Server, error) {
 	pager := servers.List(client, opts)
 
 	serverList := make([]servers.Server, 0, 1)
