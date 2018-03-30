@@ -337,6 +337,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
+		supportedTypes := []string{
+			string(types.JSONPatchType),
+			string(types.MergePatchType),
+			string(types.StrategicMergePatchType),
+		}
+
 		resultObj, err := patchResource(
 			ctx,
 			admissionMutation,
@@ -348,7 +354,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			name,
 			patchType,
 			patch,
-			namer, creater, defaulter, convertor, kind, resource, codec, utiltrace.New("Patch"+name))
+			namer, creater, defaulter, convertor, kind, resource, codec, utiltrace.New("Patch"+name), supportedTypes)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
