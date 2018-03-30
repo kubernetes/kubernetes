@@ -366,6 +366,9 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	var err error
 
 	machine, err = as.getVirtualMachine(types.NodeName(name))
+	if err == cloudprovider.InstanceNotFound {
+		return "", cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		if as.CloudProviderBackoff {
 			glog.V(2).Infof("InstanceID(%s) backing off", name)
