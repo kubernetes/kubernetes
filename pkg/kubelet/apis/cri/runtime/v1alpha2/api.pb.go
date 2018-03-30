@@ -557,7 +557,8 @@ type LinuxSandboxSecurityContext struct {
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,2,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
 	// UID to run sandbox processes as, when applicable.
 	RunAsUser *Int64Value `protobuf:"bytes,3,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
-	// GID to run sandbox processes as, when applicable.
+	// GID to run sandbox processes as, when applicable. run_as_group should only
+	// be specified when run_as_user is specified; otherwise, the runtime MUST error.
 	RunAsGroup *Int64Value `protobuf:"bytes,8,opt,name=run_as_group,json=runAsGroup" json:"run_as_group,omitempty"`
 	// If set, the root filesystem of the sandbox is read-only.
 	ReadonlyRootfs bool `protobuf:"varint,4,opt,name=readonly_rootfs,json=readonlyRootfs,proto3" json:"readonly_rootfs,omitempty"`
@@ -1465,8 +1466,9 @@ type LinuxContainerSecurityContext struct {
 	// UID to run the container process as. Only one of run_as_user and
 	// run_as_username can be specified at a time.
 	RunAsUser *Int64Value `protobuf:"bytes,5,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
-	// GID to run the container process as. Only one of run_as_group and
-	// run_as_groupname can be specified at a time.
+	// GID to run the container process as. run_as_group should only be specified
+	// when run_as_user or run_as_username is specified; otherwise, the runtime
+	// MUST error.
 	RunAsGroup *Int64Value `protobuf:"bytes,12,opt,name=run_as_group,json=runAsGroup" json:"run_as_group,omitempty"`
 	// User name to run the container process as. If specified, the user MUST
 	// exist in the container image (i.e. in the /etc/passwd inside the image),
