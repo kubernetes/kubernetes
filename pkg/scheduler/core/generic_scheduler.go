@@ -282,6 +282,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 					}
 					return nil, err
 				}
+
 				// Replace nodeToVictims with new result after preemption. So the
 				// rest of extenders can continue use it as parameter.
 				nodeToVictims = newNodeToVictims
