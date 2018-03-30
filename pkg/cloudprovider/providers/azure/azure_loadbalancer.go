@@ -219,8 +219,14 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 		}
 	}
 
-	// service does not have a load balancer, select one
-	if wantLb {
+	hasMode, _, _ := getServiceLoadBalancerMode(service)
+	if az.useStandardLoadBalancer() && hasMode {
+		return nil, nil, false, fmt.Errorf("standard load balancer doesn't work with annotation %q", ServiceAnnotationLoadBalancerMode)
+	}
+
+	// service does not have a basic load balancer, select one.
+	// Standard load balancer doesn't need this because all backends nodes should be added to same LB.
+	if wantLb && !az.useStandardLoadBalancer() {
 		// select new load balancer for service
 		selectedLB, exists, err := az.selectLoadBalancer(clusterName, service, &existingLBs, nodes)
 		if err != nil {
@@ -236,6 +242,11 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 			Name:                         &defaultLBName,
 			Location:                     &az.Location,
 			LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
+		}
+		if az.useStandardLoadBalancer() {
+			defaultLB.Sku = &network.LoadBalancerSku{
+				Name: network.LoadBalancerSkuNameStandard,
+			}
 		}
 	}
 
@@ -427,6 +438,12 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 	pip.Tags = &map[string]*string{"service": &serviceName}
+	if az.useStandardLoadBalancer() {
+		pip.Sku = &network.PublicIPAddressSku{
+			Name: network.PublicIPAddressSkuNameStandard,
+		}
+	}
+
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIPWithRetry(pipResourceGroup, pip)
@@ -804,7 +821,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	if wantLb && nodes != nil {
 		// Add the machines to the backend pool if they're not already
 		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
-		err := az.vmSet.EnsureHostsInPool(serviceName, nodes, lbBackendPoolID, vmSetName)
+		err := az.vmSet.EnsureHostsInPool(serviceName, nodes, lbBackendPoolID, vmSetName, isInternal)
 		if err != nil {
 			return nil, err
 		}
