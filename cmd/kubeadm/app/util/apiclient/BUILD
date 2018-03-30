@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
