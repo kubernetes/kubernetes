@@ -162,13 +162,13 @@ func checkDestinationIsDir(dest fileSpec, f cmdutil.Factory, cmd *cobra.Command)
 }
 
 func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, src, dest fileSpec) error {
-	if len(src.File) == 0 {
+	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
 	}
 	reader, writer := io.Pipe()
 
 	// strip trailing slash (if any)
-	if strings.HasSuffix(string(dest.File[len(dest.File)-1]), "/") {
+	if dest.File != "/" && strings.HasSuffix(string(dest.File[len(dest.File)-1]), "/") {
 		dest.File = dest.File[:len(dest.File)-1]
 	}
 
@@ -209,7 +209,7 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 }
 
 func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, dest fileSpec) error {
-	if len(src.File) == 0 {
+	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
 	}
 
