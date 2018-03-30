@@ -66,7 +66,8 @@ const (
 type Mounter struct {
 	mounterPath string
 	withSystemd bool
-	mpCache     *mountPointsCache
+	// Optional mountpoints cache.
+	mpCache *mountPointsCache
 }
 
 var _ MounterWithMountPointsCache = &Mounter{}
@@ -78,7 +79,6 @@ func New(mounterPath string) Interface {
 	return &Mounter{
 		mounterPath: mounterPath,
 		withSystemd: detectSystemd(),
-		mpCache:     newMountPointsCache(),
 	}
 }
 
@@ -154,7 +154,7 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s\n",
 			err, mountCmd, args, string(output))
 	}
-	if err == nil {
+	if err == nil && m.mpCache != nil {
 		// Invalidate cache immediately.
 		m.mpCache.markStale()
 	}
@@ -255,7 +255,7 @@ func (mounter *Mounter) Unmount(target string) error {
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
 	}
-	if err == nil {
+	if err == nil && mounter.mpCache != nil {
 		// Invalidate cache immediately.
 		mounter.mpCache.markStale()
 	}
@@ -264,6 +264,9 @@ func (mounter *Mounter) Unmount(target string) error {
 
 // List returns a list of all mounted filesystems.
 func (mounter *Mounter) List() ([]MountPoint, error) {
+	if mounter.mpCache == nil {
+		return listProcMounts(procMountsPath)
+	}
 	return mounter.mpCache.Get(func() ([]MountPoint, error) {
 		return listProcMounts(procMountsPath)
 	})
@@ -960,9 +963,10 @@ func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMo
 	return doSafeMakeDir(pathname, base, perm)
 }
 
-func (mounter *Mounter) Start(stopCh <-chan struct{}) {
+func (mounter *Mounter) EnableAndPolling(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
+	mounter.mpCache = newMountPointsCache()
 	go mounter.mpCache.Run(stopCh)
 
 	<-stopCh
@@ -970,6 +974,9 @@ func (mounter *Mounter) Start(stopCh <-chan struct{}) {
 }
 
 func (mounter *Mounter) MarkCacheStale() {
+	if mounter.mpCache == nil {
+		return
+	}
 	mounter.mpCache.markStale()
 }
 

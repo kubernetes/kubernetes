@@ -346,7 +346,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	bootstrapCheckpointPath string) (*Kubelet, error) {
+	bootstrapCheckpointPath string,
+	disableMountpointsCache bool) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -533,6 +534,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
+		disableMountpointsCache:                 disableMountpointsCache,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
@@ -1157,6 +1159,9 @@ type Kubelet struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	keepTerminatedPodVolumes bool // DEPRECATED
+
+	// This flag, if set, disables mountpoints cache.
+	disableMountpointsCache bool
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1340,8 +1345,10 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	// Start mounter if it implements mount.MounterWithMountPointsCache.
-	if mounterCache, ok := kl.mounter.(mount.MounterWithMountPointsCache); ok {
-		go mounterCache.Start(wait.NeverStop)
+	if !kl.disableMountpointsCache {
+		if mounterCache, ok := kl.mounter.(mount.MounterWithMountPointsCache); ok {
+			go mounterCache.EnableAndPolling(wait.NeverStop)
+		}
 	}
 
 	// Start volume manager
