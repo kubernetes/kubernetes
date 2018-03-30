@@ -657,12 +657,12 @@ func (h *editHeader) writeTo(w io.Writer, editMode EditMode) error {
 
 	for _, r := range h.reasons {
 		if len(r.other) > 0 {
-			fmt.Fprintf(w, "# %s:\n", r.head)
+			fmt.Fprintf(w, "# %s:\n", hashOnLineBreak(r.head))
 		} else {
-			fmt.Fprintf(w, "# %s\n", r.head)
+			fmt.Fprintf(w, "# %s\n", hashOnLineBreak(r.head))
 		}
 		for _, o := range r.other {
-			fmt.Fprintf(w, "# * %s\n", o)
+			fmt.Fprintf(w, "# * %s\n", hashOnLineBreak(o))
 		}
 		fmt.Fprintln(w, "#")
 	}
@@ -737,4 +737,19 @@ func hasLines(r io.Reader) (bool, error) {
 		return false, err
 	}
 	return false, nil
+}
+
+// hashOnLineBreak returns a string built from the provided string by inserting any necessary '#'
+// characters after '\n' characters, indicating a comment.
+func hashOnLineBreak(s string) string {
+	r := ""
+	for i, ch := range s {
+		j := i + 1
+		if j < len(s) && ch == '\n' && s[j] != '#' {
+			r += "\n# "
+		} else {
+			r += string(ch)
+		}
+	}
+	return r
 }
