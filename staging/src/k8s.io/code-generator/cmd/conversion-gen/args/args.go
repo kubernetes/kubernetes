@@ -42,7 +42,7 @@ type CustomArgs struct {
 	// generator pick up manually written conversion funcs from external packages.
 	ExtraPeerDirs []string
 
-	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
+	// SkipUnsafe indicates whether to generate unsafe conversions to improve the efficiency
 	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
 	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
 	// allow structs that are identical to be assigned to each other.
