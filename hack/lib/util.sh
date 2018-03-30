@@ -428,7 +428,7 @@ kube::util::ensure_clean_working_dir() {
 # Ensure that the given godep version is installed and in the path.  Almost
 # nobody should use any version but the default.
 kube::util::ensure_godep_version() {
-  GODEP_VERSION=${1:-"v79"} # this version is known to work
+  GODEP_VERSION=${1:-"v80"} # this version is known to work
 
   if [[ "$(godep version 2>/dev/null)" == *"godep ${GODEP_VERSION}"* ]]; then
     return
