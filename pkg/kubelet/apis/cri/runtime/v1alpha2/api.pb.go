@@ -354,10 +354,10 @@ func (m *VersionResponse) GetRuntimeApiVersion() string {
 type DNSConfig struct {
 	// List of DNS servers of the cluster.
 	Servers []string `protobuf:"bytes,1,rep,name=servers" json:"servers,omitempty"`
-	// List of DNS search domains of the cluster.
+	// List of DNS search domains of the cluster. Optional.
 	Searches []string `protobuf:"bytes,2,rep,name=searches" json:"searches,omitempty"`
-	// List of DNS options. See https://linux.die.net/man/5/resolv.conf
-	// for all available options.
+	// List of DNS options. Optional.
+	// See https://linux.die.net/man/5/resolv.conf for all available options.
 	Options []string `protobuf:"bytes,3,rep,name=options" json:"options,omitempty"`
 }
 
@@ -442,7 +442,7 @@ type Mount struct {
 	Readonly bool `protobuf:"varint,3,opt,name=readonly,proto3" json:"readonly,omitempty"`
 	// If set, the mount needs SELinux relabeling.
 	SelinuxRelabel bool `protobuf:"varint,4,opt,name=selinux_relabel,json=selinuxRelabel,proto3" json:"selinux_relabel,omitempty"`
-	// Requested propagation mode.
+	// Requested propagation mode. Optional.
 	Propagation MountPropagation `protobuf:"varint,5,opt,name=propagation,proto3,enum=runtime.v1alpha2.MountPropagation" json:"propagation,omitempty"`
 }
 
@@ -550,19 +550,19 @@ func (m *Int64Value) GetValue() int64 {
 // 2) It may not be applicable to a PodSandbox which does not contain any running
 //    process.
 type LinuxSandboxSecurityContext struct {
-	// Configurations for the sandbox's namespaces.
+	// Configurations for the sandbox's namespaces. Optional.
 	// This will be used only if the PodSandbox uses namespace for isolation.
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,1,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
-	// Optional SELinux context to be applied.
+	// Optional SELinux context to be applied. Optional.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,2,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// UID to run sandbox processes as, when applicable.
+	// UID to run sandbox processes as, when applicable. Optional.
 	RunAsUser *Int64Value `protobuf:"bytes,3,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
-	// GID to run sandbox processes as, when applicable.
+	// GID to run sandbox processes as, when applicable. Optional.
 	RunAsGroup *Int64Value `protobuf:"bytes,8,opt,name=run_as_group,json=runAsGroup" json:"run_as_group,omitempty"`
 	// If set, the root filesystem of the sandbox is read-only.
 	ReadonlyRootfs bool `protobuf:"varint,4,opt,name=readonly_rootfs,json=readonlyRootfs,proto3" json:"readonly_rootfs,omitempty"`
 	// List of groups applied to the first process run in the sandbox, in
-	// addition to the sandbox's primary GID.
+	// addition to the sandbox's primary GID. Optional.
 	SupplementalGroups []int64 `protobuf:"varint,5,rep,packed,name=supplemental_groups,json=supplementalGroups" json:"supplemental_groups,omitempty"`
 	// Indicates whether the sandbox will be asked to run a privileged
 	// container. If a privileged container is to be executed within it, this
@@ -570,7 +570,8 @@ type LinuxSandboxSecurityContext struct {
 	// This allows a sandbox to take additional security precautions if no
 	// privileged containers are expected to be run.
 	Privileged bool `protobuf:"varint,6,opt,name=privileged,proto3" json:"privileged,omitempty"`
-	// Seccomp profile for the sandbox, candidate values are:
+	// Seccomp profile for the sandbox. Optional.
+	// Candidate values are:
 	// * docker/default: the default profile for the docker container runtime
 	// * unconfined: unconfined profile, ie, no seccomp sandboxing
 	// * localhost/<full-path-to-profile>: the profile installed on the node.
@@ -646,9 +647,9 @@ type LinuxPodSandboxConfig struct {
 	// The cgroupfs style syntax will be used, but the container runtime can
 	// convert it to systemd semantics if needed.
 	CgroupParent string `protobuf:"bytes,1,opt,name=cgroup_parent,json=cgroupParent,proto3" json:"cgroup_parent,omitempty"`
-	// LinuxSandboxSecurityContext holds sandbox security attributes.
+	// LinuxSandboxSecurityContext holds sandbox security attributes. Optional.
 	SecurityContext *LinuxSandboxSecurityContext `protobuf:"bytes,2,opt,name=security_context,json=securityContext" json:"security_context,omitempty"`
-	// Sysctls holds linux sysctls config for the sandbox.
+	// Sysctls holds linux sysctls config for the sandbox. Optional.
 	Sysctls map[string]string `protobuf:"bytes,3,rep,name=sysctls" json:"sysctls,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
@@ -773,7 +774,7 @@ type PodSandboxConfig struct {
 	// and the CRI). Whenever possible, however, runtime authors SHOULD
 	// consider proposing new typed fields for any new features instead.
 	Annotations map[string]string `protobuf:"bytes,7,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// Optional configurations specific to Linux hosts.
+	// Sandbox configurations specific to Linux hosts. Optional.
 	Linux *LinuxPodSandboxConfig `protobuf:"bytes,8,opt,name=linux" json:"linux,omitempty"`
 }
 
@@ -1005,7 +1006,8 @@ type PodSandboxStatus struct {
 	Network *PodSandboxNetworkStatus `protobuf:"bytes,5,opt,name=network" json:"network,omitempty"`
 	// Linux-specific status to a pod sandbox.
 	Linux *LinuxPodSandboxStatus `protobuf:"bytes,6,opt,name=linux" json:"linux,omitempty"`
-	// Labels are key-value pairs that may be used to scope and select individual resources.
+	// Labels are key-value pairs that may be used to scope and select individual
+	// resources. Optional.
 	Labels map[string]string `protobuf:"bytes,7,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Unstructured key-value map holding arbitrary metadata.
 	// Annotations MUST NOT be altered by the runtime; the value of this field
@@ -1122,11 +1124,11 @@ func (m *PodSandboxStateValue) GetState() PodSandboxState {
 // PodSandboxFilter is used to filter a list of PodSandboxes.
 // All those fields are combined with 'AND'
 type PodSandboxFilter struct {
-	// ID of the sandbox.
+	// ID of the sandbox. Optional.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// State of the sandbox.
+	// State of the sandbox. Optional.
 	State *PodSandboxStateValue `protobuf:"bytes,2,opt,name=state" json:"state,omitempty"`
-	// LabelSelector to select matches.
+	// LabelSelector to select matches. Optional.
 	// Only api.MatchLabels is supported for now and the requirements
 	// are ANDed. MatchExpressions is not supported yet.
 	LabelSelector map[string]string `protobuf:"bytes,3,rep,name=label_selector,json=labelSelector" json:"label_selector,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -1158,7 +1160,7 @@ func (m *PodSandboxFilter) GetLabelSelector() map[string]string {
 }
 
 type ListPodSandboxRequest struct {
-	// PodSandboxFilter to filter a list of PodSandboxes.
+	// PodSandboxFilter to filter a list of PodSandboxes. Optional.
 	Filter *PodSandboxFilter `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
 }
 
@@ -1411,9 +1413,9 @@ func (m *SELinuxOption) GetLevel() string {
 
 // Capability contains the container capabilities to add or drop
 type Capability struct {
-	// List of capabilities to add.
+	// List of capabilities to add. Optional.
 	AddCapabilities []string `protobuf:"bytes,1,rep,name=add_capabilities,json=addCapabilities" json:"add_capabilities,omitempty"`
-	// List of capabilities to drop.
+	// List of capabilities to drop. Optional.
 	DropCapabilities []string `protobuf:"bytes,2,rep,name=drop_capabilities,json=dropCapabilities" json:"drop_capabilities,omitempty"`
 }
 
@@ -1437,7 +1439,7 @@ func (m *Capability) GetDropCapabilities() []string {
 
 // LinuxContainerSecurityContext holds linux security configuration that will be applied to a container.
 type LinuxContainerSecurityContext struct {
-	// Capabilities to add or drop.
+	// Capabilities to add or drop. Optional.
 	Capabilities *Capability `protobuf:"bytes,1,opt,name=capabilities" json:"capabilities,omitempty"`
 	// If set, run container in privileged mode.
 	// Privileged mode is incompatible with the following options. If
@@ -1457,34 +1459,37 @@ type LinuxContainerSecurityContext struct {
 	// 7. All devices from the host's /dev are available within the container.
 	// 8. SELinux restrictions are not applied (e.g. label=disabled).
 	Privileged bool `protobuf:"varint,2,opt,name=privileged,proto3" json:"privileged,omitempty"`
-	// Configurations for the container's namespaces.
+	// Configurations for the container's namespaces. Optional.
 	// Only used if the container uses namespace for isolation.
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,3,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
-	// SELinux context to be optionally applied.
+	// SELinux context to be optionally applied. Optional.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,4,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// UID to run the container process as. Only one of run_as_user and
-	// run_as_username can be specified at a time.
+	// UID to run the container process as. Optional.
+	// Only one of run_as_user and run_as_username can be specified at a time.
 	RunAsUser *Int64Value `protobuf:"bytes,5,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
-	// GID to run the container process as. Only one of run_as_group and
-	// run_as_groupname can be specified at a time.
+	// GID to run the container process as. Optional.
+	// Only one of run_as_group and run_as_groupname can be specified at a time.
 	RunAsGroup *Int64Value `protobuf:"bytes,12,opt,name=run_as_group,json=runAsGroup" json:"run_as_group,omitempty"`
-	// User name to run the container process as. If specified, the user MUST
-	// exist in the container image (i.e. in the /etc/passwd inside the image),
-	// and be resolved there by the runtime; otherwise, the runtime MUST error.
+	// User name to run the container process as. Optional.
+	// If specified, the user MUST exist in the container image (i.e. in the
+	// /etc/passwd inside the image), and be resolved there by the runtime;
+	// otherwise, the runtime MUST error.
 	RunAsUsername string `protobuf:"bytes,6,opt,name=run_as_username,json=runAsUsername,proto3" json:"run_as_username,omitempty"`
 	// If set, the root filesystem of the container is read-only.
 	ReadonlyRootfs bool `protobuf:"varint,7,opt,name=readonly_rootfs,json=readonlyRootfs,proto3" json:"readonly_rootfs,omitempty"`
 	// List of groups applied to the first process run in the container, in
-	// addition to the container's primary GID.
+	// addition to the container's primary GID. Optional.
 	SupplementalGroups []int64 `protobuf:"varint,8,rep,packed,name=supplemental_groups,json=supplementalGroups" json:"supplemental_groups,omitempty"`
-	// AppArmor profile for the container, candidate values are:
+	// AppArmor profile for the container. Optional.
+	// Candidate values are:
 	// * runtime/default: equivalent to not specifying a profile.
 	// * unconfined: no profiles are loaded
 	// * localhost/<profile_name>: profile loaded on the node
 	//    (localhost) by name. The possible profile names are detailed at
 	//    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
 	ApparmorProfile string `protobuf:"bytes,9,opt,name=apparmor_profile,json=apparmorProfile,proto3" json:"apparmor_profile,omitempty"`
-	// Seccomp profile for the container, candidate values are:
+	// Seccomp profile for the container. Optional.
+	// Candidate values are:
 	// * docker/default: the default profile for the docker container runtime
 	// * unconfined: unconfined profile, ie, no seccomp sandboxing
 	// * localhost/<full-path-to-profile>: the profile installed on the node.
@@ -1591,7 +1596,7 @@ func (m *LinuxContainerSecurityContext) GetNoNewPrivs() bool {
 type LinuxContainerConfig struct {
 	// Resources specification for the container.
 	Resources *LinuxContainerResources `protobuf:"bytes,1,opt,name=resources" json:"resources,omitempty"`
-	// LinuxContainerSecurityContext configuration for the container.
+	// LinuxContainerSecurityContext configuration for the container. Optional.
 	SecurityContext *LinuxContainerSecurityContext `protobuf:"bytes,2,opt,name=security_context,json=securityContext" json:"security_context,omitempty"`
 }
 
@@ -1754,17 +1759,17 @@ type ContainerConfig struct {
 	Metadata *ContainerMetadata `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
 	// Image to use.
 	Image *ImageSpec `protobuf:"bytes,2,opt,name=image" json:"image,omitempty"`
-	// Command to execute (i.e., entrypoint for docker)
+	// Command to execute (i.e., entrypoint for docker). Optional.
 	Command []string `protobuf:"bytes,3,rep,name=command" json:"command,omitempty"`
-	// Args for the Command (i.e., command for docker)
+	// Args for the Command (i.e., command for docker). Optional.
 	Args []string `protobuf:"bytes,4,rep,name=args" json:"args,omitempty"`
-	// Current working directory of the command.
+	// Current working directory of the command. Optional.
 	WorkingDir string `protobuf:"bytes,5,opt,name=working_dir,json=workingDir,proto3" json:"working_dir,omitempty"`
-	// List of environment variable to set in the container.
+	// List of environment variable to set in the container. Optional.
 	Envs []*KeyValue `protobuf:"bytes,6,rep,name=envs" json:"envs,omitempty"`
-	// Mounts for the container.
+	// Mounts for the container. Optional.
 	Mounts []*Mount `protobuf:"bytes,7,rep,name=mounts" json:"mounts,omitempty"`
-	// Devices for the container.
+	// Devices for the container. Optional.
 	Devices []*Device `protobuf:"bytes,8,rep,name=devices" json:"devices,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	// Label keys are of the form:
@@ -1774,7 +1779,7 @@ type ContainerConfig struct {
 	//     name ::= DNS_LABEL
 	Labels map[string]string `protobuf:"bytes,9,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Unstructured key-value map that may be used by the kubelet to store and
-	// retrieve arbitrary metadata.
+	// retrieve arbitrary metadata. Optional.
 	//
 	// Annotations MUST NOT be altered by the runtime; the annotations stored
 	// here MUST be returned in the ContainerStatus associated with the container
@@ -2076,13 +2081,13 @@ func (m *ContainerStateValue) GetState() ContainerState {
 // ContainerFilter is used to filter containers.
 // All those fields are combined with 'AND'
 type ContainerFilter struct {
-	// ID of the container.
+	// ID of the container. Optional.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// State of the container.
+	// State of the container. Optional.
 	State *ContainerStateValue `protobuf:"bytes,2,opt,name=state" json:"state,omitempty"`
-	// ID of the PodSandbox.
+	// ID of the PodSandbox. Optional.
 	PodSandboxId string `protobuf:"bytes,3,opt,name=pod_sandbox_id,json=podSandboxId,proto3" json:"pod_sandbox_id,omitempty"`
-	// LabelSelector to select matches.
+	// LabelSelector to select matches. Optional.
 	// Only api.MatchLabels is supported for now and the requirements
 	// are ANDed. MatchExpressions is not supported yet.
 	LabelSelector map[string]string `protobuf:"bytes,4,rep,name=label_selector,json=labelSelector" json:"label_selector,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -2751,7 +2756,7 @@ func (m *PortForwardResponse) GetUrl() string {
 }
 
 type ImageFilter struct {
-	// Spec of the image.
+	// Spec of the image. Optional.
 	Image *ImageSpec `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
 }
 
@@ -2792,12 +2797,13 @@ type Image struct {
 	RepoDigests []string `protobuf:"bytes,3,rep,name=repo_digests,json=repoDigests" json:"repo_digests,omitempty"`
 	// Size of the image in bytes. Must be > 0.
 	Size_ uint64 `protobuf:"varint,4,opt,name=size,proto3" json:"size,omitempty"`
-	// UID that will run the command(s). This is used as a default if no user is
-	// specified when creating the container. UID and the following user name
-	// are mutually exclusive.
+	// UID that will run the command(s). Optional.
+	// This is used as a default if no user is specified when creating the
+	// container. UID and the following user name are mutually exclusive.
 	Uid *Int64Value `protobuf:"bytes,5,opt,name=uid" json:"uid,omitempty"`
-	// User name that will run the command(s). This is used if UID is not set
-	// and no user is specified when creating container.
+	// User name that will run the command(s). Optional.
+	// This is used if UID is not set and no user is specified when creating
+	// container.
 	Username string `protobuf:"bytes,6,opt,name=username,proto3" json:"username,omitempty"`
 }
 
@@ -2923,9 +2929,9 @@ type AuthConfig struct {
 	Auth          string `protobuf:"bytes,3,opt,name=auth,proto3" json:"auth,omitempty"`
 	ServerAddress string `protobuf:"bytes,4,opt,name=server_address,json=serverAddress,proto3" json:"server_address,omitempty"`
 	// IdentityToken is used to authenticate the user and get
-	// an access token for the registry.
+	// an access token for the registry. Optional.
 	IdentityToken string `protobuf:"bytes,5,opt,name=identity_token,json=identityToken,proto3" json:"identity_token,omitempty"`
-	// RegistryToken is a bearer token to be sent to a registry
+	// RegistryToken is a bearer token to be sent to a registry. Optional.
 	RegistryToken string `protobuf:"bytes,6,opt,name=registry_token,json=registryToken,proto3" json:"registry_token,omitempty"`
 }
 
@@ -2978,7 +2984,7 @@ func (m *AuthConfig) GetRegistryToken() string {
 type PullImageRequest struct {
 	// Spec of the image.
 	Image *ImageSpec `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
-	// Authentication configuration for pulling the image.
+	// Authentication configuration for pulling the image. Optional.
 	Auth *AuthConfig `protobuf:"bytes,2,opt,name=auth" json:"auth,omitempty"`
 	// Config of the PodSandbox, which is used to pull image in PodSandbox context.
 	SandboxConfig *PodSandboxConfig `protobuf:"bytes,3,opt,name=sandbox_config,json=sandboxConfig" json:"sandbox_config,omitempty"`
@@ -3357,7 +3363,7 @@ func (m *ContainerStatsResponse) GetStats() *ContainerStats {
 }
 
 type ListContainerStatsRequest struct {
-	// Filter for the list request.
+	// Filter for the list request. Optional.
 	Filter *ContainerStatsFilter `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
 }
 
@@ -3375,11 +3381,11 @@ func (m *ListContainerStatsRequest) GetFilter() *ContainerStatsFilter {
 // ContainerStatsFilter is used to filter containers.
 // All those fields are combined with 'AND'
 type ContainerStatsFilter struct {
-	// ID of the container.
+	// ID of the container. Optional.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// ID of the PodSandbox.
+	// ID of the PodSandbox. Optional.
 	PodSandboxId string `protobuf:"bytes,2,opt,name=pod_sandbox_id,json=podSandboxId,proto3" json:"pod_sandbox_id,omitempty"`
-	// LabelSelector to select matches.
+	// LabelSelector to select matches. Optional.
 	// Only api.MatchLabels is supported for now and the requirements
 	// are ANDed. MatchExpressions is not supported yet.
 	LabelSelector map[string]string `protobuf:"bytes,3,rep,name=label_selector,json=labelSelector" json:"label_selector,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`

@@ -59,6 +59,10 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 
 // Version returns the runtime name, runtime version and runtime API version.
 func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResponse, error) {
+	if apiVersion == "" {
+		return nil, errors.New("apiVersion not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -80,6 +84,10 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig) (string, error) {
+	if err := validatePodSandboxConfig(config); err != nil {
+		return "", err
+	}
+
 	// Use 2 times longer timeout for sandbox operation (4 mins by default)
 	// TODO: Make the pod sandbox timeout configurable.
 	ctx, cancel := getContextWithTimeout(r.timeout * 2)
@@ -105,6 +113,10 @@ func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forced to termination.
 func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
+	if podSandBoxID == "" {
+		return errors.New("podSandBoxID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -122,6 +134,10 @@ func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
 // RemovePodSandbox removes the sandbox. If there are any containers in the
 // sandbox, they should be forcibly removed.
 func (r *RemoteRuntimeService) RemovePodSandbox(podSandBoxID string) error {
+	if podSandBoxID == "" {
+		return errors.New("podSandBoxID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -138,6 +154,10 @@ func (r *RemoteRuntimeService) RemovePodSandbox(podSandBoxID string) error {
 
 // PodSandboxStatus returns the status of the PodSandbox.
 func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeapi.PodSandboxStatus, error) {
+	if podSandBoxID == "" {
+		return nil, errors.New("podSandBoxID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -175,6 +195,16 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 
 // CreateContainer creates a new container in the specified PodSandbox.
 func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	if podSandBoxID == "" {
+		return "", errors.New("podSandBoxID not set")
+	}
+	if err := validateContainerConfig(config); err != nil {
+		return "", err
+	}
+	if err := validatePodSandboxConfig(sandboxConfig); err != nil {
+		return "", err
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -199,6 +229,10 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 
 // StartContainer starts the container.
 func (r *RemoteRuntimeService) StartContainer(containerID string) error {
+	if containerID == "" {
+		return errors.New("containerID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -215,6 +249,10 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
+	if containerID == "" {
+		return errors.New("containerID not set")
+	}
+
 	// Use timeout + default timeout (2 minutes) as timeout to leave extra time
 	// for SIGKILL container and request latency.
 	t := r.timeout + time.Duration(timeout)*time.Second
@@ -236,6 +274,10 @@ func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) 
 // RemoveContainer removes the container. If the container is running, the container
 // should be forced to removal.
 func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
+	if containerID == "" {
+		return errors.New("containerID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -268,6 +310,10 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter
 
 // ContainerStatus returns the container status.
 func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error) {
+	if containerID == "" {
+		return nil, errors.New("containerID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -291,6 +337,10 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 
 // UpdateContainerResources updates a containers resource config
 func (r *RemoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	if containerID == "" {
+		return errors.New("containerID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -346,6 +396,10 @@ func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
 func (r *RemoteRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+	if err := validateExecRequest(req); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -366,6 +420,10 @@ func (r *RemoteRuntimeService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.Ex
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 func (r *RemoteRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+	if err := validateAttachRequest(req); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -385,6 +443,10 @@ func (r *RemoteRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeap
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 func (r *RemoteRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+	if err := validatePortForwardRequest(req); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -446,6 +508,10 @@ func (r *RemoteRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 
 // ContainerStats returns the stats of the container.
 func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+	if containerID == "" {
+		return nil, errors.New("containerID not set")
+	}
+
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -460,6 +526,7 @@ func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.C
 	return resp.GetStats(), nil
 }
 
+// ListContainerStats returns stats of all running containers.
 func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	// Do not set timeout, because writable layer stats collection takes time.
 	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
@@ -477,6 +544,7 @@ func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerSt
 	return resp.GetStats(), nil
 }
 
+// ReopenContainerLog asks runtime to reopen the stdout/stderr log file for the container.
 func (r *RemoteRuntimeService) ReopenContainerLog(containerID string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
