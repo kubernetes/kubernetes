@@ -375,13 +375,15 @@ func TestJSONPrinter(t *testing.T) {
 
 func TestFormatResourceName(t *testing.T) {
 	tests := []struct {
-		kind, name string
-		want       string
+		kind schema.GroupKind
+		name string
+		want string
 	}{
-		{"", "", ""},
-		{"", "name", "name"},
-		{"kind", "", "kind/"}, // should not happen in practice
-		{"kind", "name", "kind/name"},
+		{schema.GroupKind{}, "", ""},
+		{schema.GroupKind{}, "name", "name"},
+		{schema.GroupKind{Kind: "Kind"}, "", "kind/"}, // should not happen in practice
+		{schema.GroupKind{Kind: "Kind"}, "name", "kind/name"},
+		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
 	}
 	for _, tt := range tests {
 		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
@@ -394,7 +396,7 @@ func PrintCustomType(obj *TestPrintType, w io.Writer, options printers.PrintOpti
 	data := obj.Data
 	kind := options.Kind
 	if options.WithKind {
-		data = kind + "/" + data
+		data = kind.String() + "/" + data
 	}
 	_, err := fmt.Fprintf(w, "%s", data)
 	return err
@@ -416,24 +418,6 @@ func TestCustomTypePrinting(t *testing.T) {
 		t.Fatalf("An error occurred printing the custom type: %#v", err)
 	}
 	expectedOutput := "DATA\ntest object"
-	if buffer.String() != expectedOutput {
-		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
-	}
-}
-
-func TestCustomTypePrintingWithKind(t *testing.T) {
-	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
-	printer.Handler(columns, nil, PrintCustomType)
-	printer.EnsurePrintWithKind("test")
-
-	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
-	if err != nil {
-		t.Fatalf("An error occurred printing the custom type: %#v", err)
-	}
-	expectedOutput := "DATA\ntest/test object"
 	if buffer.String() != expectedOutput {
 		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
 	}
@@ -1582,8 +1566,8 @@ func TestPrintPodTable(t *testing.T) {
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest1\t1/2\tRunning\t6\t<unknown>\n",
 		},
 		{
-			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: "pods"},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npods/test1\t1/2\tRunning\t6\t<unknown>\n",
+			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
+			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npod/test1\t1/2\tRunning\t6\t<unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{ShowLabels: true},
@@ -3058,6 +3042,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							Controller: boolP(true),
+							APIVersion: "apps/v1",
 							Kind:       "DaemonSet",
 							Name:       "foo",
 						},
@@ -3065,7 +3050,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 1,
 			},
-			"test1\tDaemonSet/foo\t1\t0s\n",
+			"test1\tdaemonset.apps/foo\t1\t0s\n",
 		},
 		{
 			apps.ControllerRevision{
