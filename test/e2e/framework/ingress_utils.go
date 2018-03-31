@@ -119,6 +119,16 @@ const (
 	// GCE only allows names < 64 characters, and the loadbalancer controller inserts
 	// a single character of padding.
 	nameLenLimit = 62
+
+	NEGAnnotation    = "alpha.cloud.google.com/load-balancer-neg"
+	NEGUpdateTimeout = 2 * time.Minute
+
+	InstanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
+
+	// Prefix for annotation keys used by the ingress controller to specify the
+	// names of GCP resources such as forwarding rules, url maps, target proxies, etc
+	// that it created for the corresponding ingress.
+	StatusPrefix = "ingress.kubernetes.io"
 )
 
 type TestLogger interface {

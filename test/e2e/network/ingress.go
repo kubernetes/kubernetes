@@ -41,12 +41,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	NEGAnnotation           = "alpha.cloud.google.com/load-balancer-neg"
-	NEGUpdateTimeout        = 2 * time.Minute
-	instanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
-)
-
 var _ = SIGDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
@@ -334,20 +328,68 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				framework.IngressClassKey: framework.MulticlusterIngressClassValue,
 			}, map[string]string{})
 
-			By(fmt.Sprintf("waiting for Ingress %s to come up", name))
+			By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
 			pollErr := wait.Poll(2*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				ing, err := f.ClientSet.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
-				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
-					framework.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
+				if annotations == nil || annotations[framework.InstanceGroupAnnotation] == "" {
+					framework.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", framework.InstanceGroupAnnotation, annotations)
 					return false, nil
 				}
 				return true, nil
 			})
 			if pollErr != nil {
-				framework.ExpectNoError(fmt.Errorf("Timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation))
+				framework.ExpectNoError(fmt.Errorf("Timed out waiting for ingress %s to get %s annotation", name, framework.InstanceGroupAnnotation))
 			}
+
+			// Verify that the ingress does not get other annotations like url-map, target-proxy, backends, etc.
+			// Note: All resources except the firewall rule have an annotation.
+			umKey := framework.StatusPrefix + "/url-map"
+			fwKey := framework.StatusPrefix + "/forwarding-rule"
+			tpKey := framework.StatusPrefix + "/target-proxy"
+			fwsKey := framework.StatusPrefix + "/https-forwarding-rule"
+			tpsKey := framework.StatusPrefix + "/https-target-proxy"
+			scKey := framework.StatusPrefix + "/ssl-cert"
+			beKey := framework.StatusPrefix + "/backends"
+			wait.Poll(2*time.Second, time.Minute, func() (bool, error) {
+				ing, err := f.ClientSet.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				annotations := ing.Annotations
+				if annotations != nil && (annotations[umKey] != "" || annotations[fwKey] != "" ||
+					annotations[tpKey] != "" || annotations[fwsKey] != "" || annotations[tpsKey] != "" ||
+					annotations[scKey] != "" || annotations[beKey] != "") {
+					framework.Failf("unexpected annotations. Expected to not have annotations for urlmap, forwarding rule, target proxy, ssl cert and backends, got: %v", annotations)
+					return true, nil
+				}
+				return false, nil
+			})
+
+			// Verify that the controller does not create any other resource except instance group.
+			// TODO(59778): Check GCE resources specific to this ingress instead of listing all resources.
+			if len(gceController.ListUrlMaps()) != 0 {
+				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListUrlMaps())
+			}
+			if len(gceController.ListGlobalForwardingRules()) != 0 {
+				framework.Failf("unexpected forwarding rules, expected none, got: %v", gceController.ListGlobalForwardingRules())
+			}
+			if len(gceController.ListTargetHttpProxies()) != 0 {
+				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHttpProxies())
+			}
+			if len(gceController.ListTargetHttpsProxies()) != 0 {
+				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHttpProxies())
+			}
+			if len(gceController.ListSslCertificates()) != 0 {
+				framework.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
+			}
+			if len(gceController.ListGlobalBackendServices()) != 0 {
+				framework.Failf("unexpected backend service, expected none, got: %v", gceController.ListGlobalBackendServices())
+			}
+			// Controller does not have a list command for firewall rule. We use get instead.
+			if gceController.GetFirewallRule() != nil {
+				framework.Failf("unexpected firewall rule, expected none got: %v", gceController.GetFirewallRule())
+			}
+
 			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
 		})
 
@@ -390,7 +432,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("should conform to Ingress spec", func() {
 			jig.PollInterval = 5 * time.Second
 			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
-				NEGAnnotation: "true",
+				framework.NEGAnnotation: "true",
 			})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
@@ -416,7 +458,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, svc := range svcList.Items {
-				svc.Annotations[NEGAnnotation] = "false"
+				svc.Annotations[framework.NEGAnnotation] = "false"
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -429,7 +471,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, svc := range svcList.Items {
-				svc.Annotations[NEGAnnotation] = "true"
+				svc.Annotations[framework.NEGAnnotation] = "true"
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -449,7 +491,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
 					Expect(err).NotTo(HaveOccurred())
 				}
-				wait.Poll(10*time.Second, NEGUpdateTimeout, func() (bool, error) {
+				wait.Poll(10*time.Second, framework.NEGUpdateTimeout, func() (bool, error) {
 					res, err := jig.GetDistinctResponseFromIngress()
 					if err != nil {
 						return false, nil
