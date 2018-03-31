@@ -984,73 +984,63 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 	allErrs := field.ErrorList{}
 	allPaths := sets.String{}
 
-	for _, source := range projection.Sources {
+	for i, source := range projection.Sources {
 		numSources := 0
-		if source.Secret != nil {
-			if numSources > 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("secret"), "may not specify more than 1 volume type"))
-			} else {
-				numSources++
-				if len(source.Secret.Name) == 0 {
-					allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-				}
-				itemsPath := fldPath.Child("items")
-				for i, kp := range source.Secret.Items {
-					itemPath := itemsPath.Index(i)
-					allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
-					if len(kp.Path) > 0 {
-						curPath := kp.Path
-						if !allPaths.Has(curPath) {
-							allPaths.Insert(curPath)
-						} else {
-							allErrs = append(allErrs, field.Invalid(fldPath, source.Secret.Name, "conflicting duplicate paths"))
-						}
+		srcPath := fldPath.Child("sources").Index(i)
+		if projPath := srcPath.Child("secret"); source.Secret != nil {
+			numSources++
+			if len(source.Secret.Name) == 0 {
+				allErrs = append(allErrs, field.Required(projPath.Child("name"), ""))
+			}
+			itemsPath := projPath.Child("items")
+			for i, kp := range source.Secret.Items {
+				itemPath := itemsPath.Index(i)
+				allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+				if len(kp.Path) > 0 {
+					curPath := kp.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath, source.Secret.Name, "conflicting duplicate paths"))
 					}
 				}
 			}
 		}
-		if source.ConfigMap != nil {
-			if numSources > 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("configMap"), "may not specify more than 1 volume type"))
-			} else {
-				numSources++
-				if len(source.ConfigMap.Name) == 0 {
-					allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-				}
-				itemsPath := fldPath.Child("items")
-				for i, kp := range source.ConfigMap.Items {
-					itemPath := itemsPath.Index(i)
-					allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
-					if len(kp.Path) > 0 {
-						curPath := kp.Path
-						if !allPaths.Has(curPath) {
-							allPaths.Insert(curPath)
-						} else {
-							allErrs = append(allErrs, field.Invalid(fldPath, source.ConfigMap.Name, "conflicting duplicate paths"))
-						}
-
+		if projPath := srcPath.Child("configMap"); source.ConfigMap != nil {
+			numSources++
+			if len(source.ConfigMap.Name) == 0 {
+				allErrs = append(allErrs, field.Required(projPath.Child("name"), ""))
+			}
+			itemsPath := projPath.Child("items")
+			for i, kp := range source.ConfigMap.Items {
+				itemPath := itemsPath.Index(i)
+				allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+				if len(kp.Path) > 0 {
+					curPath := kp.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath, source.ConfigMap.Name, "conflicting duplicate paths"))
 					}
 				}
 			}
 		}
-		if source.DownwardAPI != nil {
-			if numSources > 0 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("downwardAPI"), "may not specify more than 1 volume type"))
-			} else {
-				numSources++
-				for _, file := range source.DownwardAPI.Items {
-					allErrs = append(allErrs, validateDownwardAPIVolumeFile(&file, fldPath.Child("downwardAPI"))...)
-					if len(file.Path) > 0 {
-						curPath := file.Path
-						if !allPaths.Has(curPath) {
-							allPaths.Insert(curPath)
-						} else {
-							allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
-						}
-
+		if projPath := srcPath.Child("downwardAPI"); source.DownwardAPI != nil {
+			numSources++
+			for _, file := range source.DownwardAPI.Items {
+				allErrs = append(allErrs, validateDownwardAPIVolumeFile(&file, projPath)...)
+				if len(file.Path) > 0 {
+					curPath := file.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
 					}
 				}
 			}
+		}
+		if numSources > 1 {
+			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type"))
 		}
 	}
 	return allErrs

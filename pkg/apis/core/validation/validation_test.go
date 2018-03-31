@@ -3542,6 +3542,71 @@ func TestValidateVolumes(t *testing.T) {
 				field: "scaleIO.system",
 			}},
 		},
+		// ProjectedVolumeSource
+		{
+			name: "ProjectedVolumeSource more than one projection in a source",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								Secret: &core.SecretProjection{
+									LocalObjectReference: core.LocalObjectReference{
+										Name: "foo",
+									},
+								},
+							},
+							{
+								Secret: &core.SecretProjection{
+									LocalObjectReference: core.LocalObjectReference{
+										Name: "foo",
+									},
+								},
+								DownwardAPI: &core.DownwardAPIProjection{},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeForbidden,
+				field: "projected.sources[1]",
+			}},
+		},
+		{
+			name: "ProjectedVolumeSource more than one projection in a source",
+			vol: core.Volume{
+				Name: "projected-volume",
+				VolumeSource: core.VolumeSource{
+					Projected: &core.ProjectedVolumeSource{
+						Sources: []core.VolumeProjection{
+							{
+								Secret: &core.SecretProjection{},
+							},
+							{
+								Secret:      &core.SecretProjection{},
+								DownwardAPI: &core.DownwardAPIProjection{},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{
+				{
+					etype: field.ErrorTypeRequired,
+					field: "projected.sources[0].secret.name",
+				},
+				{
+					etype: field.ErrorTypeRequired,
+					field: "projected.sources[1].secret.name",
+				},
+				{
+					etype: field.ErrorTypeForbidden,
+					field: "projected.sources[1]",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
