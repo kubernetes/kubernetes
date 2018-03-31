@@ -225,11 +225,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 	watcher := eventBroadcaster.Watch()
 	go func() {
 		defer utilruntime.HandleCrash()
-		for {
-			watchEvent, open := <-watcher.ResultChan()
-			if !open {
-				return
-			}
+		for watchEvent := range watcher.ResultChan() {
 			event, ok := watchEvent.Object.(*v1.Event)
 			if !ok {
 				// This is all local, so there's no reason this should
