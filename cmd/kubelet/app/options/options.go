@@ -32,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
@@ -253,10 +252,6 @@ func NewKubeletFlags() *KubeletFlags {
 }
 
 func ValidateKubeletFlags(f *KubeletFlags) error {
-	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
-	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
-	}
 	if f.CAdvisorPort != 0 && utilvalidation.IsValidPortNum(int(f.CAdvisorPort)) != nil {
 		return fmt.Errorf("invalid configuration: CAdvisorPort (--cadvisor-port) %v must be between 0 and 65535, inclusive", f.CAdvisorPort)
 	}
@@ -366,7 +361,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
-	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration. Presently, you must also enable the DynamicKubeletConfig feature gate to pass this flag.")
+	fs.Var(&f.DynamicConfigDir, "dynamic-config-dir", "The Kubelet will use this directory for checkpointing downloaded configurations and tracking configuration health. The Kubelet will create this directory if it does not already exist. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Providing this flag enables dynamic Kubelet configuration.")
 
 	fs.BoolVar(&f.RegisterNode, "register-node", f.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with. Default=true.")
 	fs.Var(utiltaints.NewTaintsVar(&f.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
