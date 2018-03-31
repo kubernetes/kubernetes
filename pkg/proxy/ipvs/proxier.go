@@ -77,7 +77,7 @@ const (
 	// DefaultScheduler is the default ipvs scheduler algorithm - round robin.
 	DefaultScheduler = "rr"
 
-	// DefaultDummyDevice is the default dummy interface where ipvs service address will bind to it.
+	// DefaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
 	DefaultDummyDevice = "kube-ipvs0"
 )
 
@@ -152,31 +152,31 @@ type Proxier struct {
 	natRules     *bytes.Buffer
 	// Added as a member to the struct to allow injection for testing.
 	netlinkHandle NetLinkHandle
-	// loopbackSet is the ipset where stores all endpoints IP:Port,IP for solving hairpin mode purpose.
+	// loopbackSet is the ipset which stores all endpoints IP:Port,IP for solving hairpin mode purpose.
 	loopbackSet *IPSet
-	// clusterIPSet is the ipset where stores all service ClusterIP:Port
+	// clusterIPSet is the ipset which stores all service ClusterIP:Port
 	clusterIPSet *IPSet
-	// nodePortSetTCP is the bitmap:port type ipset where stores all TCP node port
+	// nodePortSetTCP is the bitmap:port type ipset which stores all TCP node port
 	nodePortSetTCP *IPSet
-	// nodePortSetTCP is the bitmap:port type ipset where stores all UDP node port
+	// nodePortSetTCP is the bitmap:port type ipset which stores all UDP node port
 	nodePortSetUDP *IPSet
-	// lbIngressLocalSet is the hash:ip type ipset where stores all service ip's with externaltrafficPolicy=local
+	// lbIngressLocalSet is the hash:ip type ipset which stores all service ip's with externaltrafficPolicy=local
 	lbIngressLocalSet *IPSet
-	// nodePortLocalSetTCP is the bitmap:port type ipset where stores all TCP nodeport's with externaltrafficPolicy=local
+	// nodePortLocalSetTCP is the bitmap:port type ipset which stores all TCP nodeport's with externaltrafficPolicy=local
 	nodePortLocalSetTCP *IPSet
-	// nodePortLocalSetUDP is the bitmap:port type ipset where stores all UDP nodeport's with externaltrafficPolicy=local
+	// nodePortLocalSetUDP is the bitmap:port type ipset which stores all UDP nodeport's with externaltrafficPolicy=local
 	nodePortLocalSetUDP *IPSet
-	// externalIPSet is the hash:ip,port type ipset where stores all service ExternalIP:Port
+	// externalIPSet is the hash:ip,port type ipset which stores all service ExternalIP:Port
 	externalIPSet *IPSet
-	// lbIngressSet is the hash:ip,port type ipset where stores all service load balancer ingress IP:Port.
+	// lbIngressSet is the hash:ip,port type ipset which stores all service load balancer ingress IP:Port.
 	lbIngressSet *IPSet
-	// lbWhiteListIPSet is the hash:ip,port,ip type ipset where stores all service load balancer ingress IP:Port,sourceIP pair, any packets
+	// lbWhiteListIPSet is the hash:ip,port,ip type ipset which stores all service load balancer ingress IP:Port,sourceIP pair, any packets
 	// with the source IP visit ingress IP:Port can pass through.
 	lbWhiteListIPSet *IPSet
-	// lbWhiteListIPSet is the hash:ip,port,net type ipset where stores all service load balancer ingress IP:Port,sourceCIDR pair, any packets
+	// lbWhiteListIPSet is the hash:ip,port,net type ipset which stores all service load balancer ingress IP:Port,sourceCIDR pair, any packets
 	// from the source CIDR visit ingress IP:Port can pass through.
 	lbWhiteListCIDRSet *IPSet
-	// Values are as a parameter to select the interfaces where nodeport works.
+	// Values are as a parameter to select the interfaces which nodeport works.
 	nodePortAddresses []string
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
