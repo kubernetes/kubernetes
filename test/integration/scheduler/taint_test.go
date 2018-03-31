@@ -19,8 +19,6 @@ package scheduler
 // This file tests the Taint feature.
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -29,23 +27,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // TestTaintNodeByCondition verifies:
@@ -53,36 +45,34 @@ import (
 //   2. NodeController taints nodes by node condition
 //   3. Scheduler allows pod to tolerate node condition taints, e.g. network unavailable
 func TestTaintNodeByCondition(t *testing.T) {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
 	// Enable TaintNodeByCondition
 	utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
 
-	// Build clientset and informers for controllers.
-	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, time.Second)
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	informers := informers.NewSharedInformerFactory(clientset, time.Second)
-
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
+
+	context := initTestMaster(t, "default", admission)
+
+	// Build clientset and informers for controllers.
+	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{
+		QPS:           -1,
+		Host:          context.httpServer.URL,
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, time.Second)
+
 	kubeadmission.WantsInternalKubeClientSet(admission).SetInternalKubeClientSet(internalClientset)
 	kubeadmission.WantsInternalKubeInformerFactory(admission).SetInternalKubeInformerFactory(internalInformers)
 
-	// Start master with admission.
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
-	defer closeFn()
-
-	nsName := "default"
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
+
+	// Apply feature gates to enable TaintNodesByCondition
+	algorithmprovider.ApplyFeatureGates()
+
+	context = initTestScheduler(t, context, controllerCh, false, nil)
+	clientset := context.clientSet
+	informers := context.informerFactory
+	nsName := context.ns.Name
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
@@ -109,42 +99,8 @@ func TestTaintNodeByCondition(t *testing.T) {
 	}
 	go nc.Run(controllerCh)
 
-	// Apply feature gates to enable TaintNodesByCondition
-	algorithmprovider.ApplyFeatureGates()
-
-	// Start scheduler
-	configurator := factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientset,
-		informers.Core().V1().Nodes(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().PersistentVolumes(),
-		informers.Core().V1().PersistentVolumeClaims(),
-		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Apps().V1beta1().StatefulSets(),
-		informers.Core().V1().Services(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
-		informers.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true, // Enable EqualCache by default.
-	)
-
-	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
-		cfg.StopEverything = controllerCh
-		cfg.Recorder = &record.FakeRecorder{}
-	})
-	if err != nil {
-		t.Errorf("Failed to create scheduler: %v.", err)
-		return
-	}
-	go sched.Run()
-
 	// Waiting for all controller sync.
-	informers.Start(controllerCh)
 	internalInformers.Start(controllerCh)
-
-	informers.WaitForCacheSync(controllerCh)
 	internalInformers.WaitForCacheSync(controllerCh)
 
 	// -------------------------------------------

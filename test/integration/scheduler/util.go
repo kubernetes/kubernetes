@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -27,16 +28,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 
@@ -54,50 +62,133 @@ type TestContext struct {
 	scheduler              *scheduler.Scheduler
 }
 
-// initTest initializes a test environment and creates a scheduler with default
-// configuration.
-func initTest(t *testing.T, nsPrefix string) *TestContext {
-	var context TestContext
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, context.httpServer, context.closeFn = framework.RunAMaster(masterConfig)
-
-	context.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), context.httpServer, t)
-
-	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL})
-	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, 0)
-	podInformer := factory.NewPodInformer(context.clientSet, 12*time.Hour, v1.DefaultSchedulerName)
-	context.schedulerConfigFactory = factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		context.clientSet,
-		context.informerFactory.Core().V1().Nodes(),
+// createConfiguratorWithPodInformer create a configurator for scheduler with given informer factory, custom name and  pod informer.
+func createConfiguratorWithPodInformer(
+	schedulerName string,
+	clientSet clientset.Interface,
+	podInformer coreinformers.PodInformer,
+	informerFactory informers.SharedInformerFactory,
+) scheduler.Configurator {
+	return factory.NewConfigFactory(
+		schedulerName,
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
 		podInformer,
-		context.informerFactory.Core().V1().PersistentVolumes(),
-		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().ReplicationControllers(),
-		context.informerFactory.Extensions().V1beta1().ReplicaSets(),
-		context.informerFactory.Apps().V1beta1().StatefulSets(),
-		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		context.informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Extensions().V1beta1().ReplicaSets(),
+		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
-		true,
+		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 	)
+}
+
+// initTestMasterAndScheduler initializes a test environment and creates a master with default
+// configuration.
+func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
+	var context TestContext
+
+	// 1. Create master
+	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		<-h.Initialized
+		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
+	}))
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+
+	if admission != nil {
+		masterConfig.GenericConfig.AdmissionControl = admission
+	}
+
+	_, context.httpServer, context.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
+
+	if nsPrefix != "default" {
+		context.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
+	} else {
+		context.ns = framework.CreateTestingNamespace("default", s, t)
+	}
+
+	// 2. Create kubeclient
+	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	return &context
+}
+
+// initTestScheduler initializes a test environment and creates a scheduler with default
+// configuration.
+func initTestScheduler(
+	t *testing.T,
+	context *TestContext,
+	controllerCh chan struct{},
+	setPodInformer bool,
+	policy *schedulerapi.Policy,
+) *TestContext {
+	// Enable EnableEquivalenceClassCache for all integration tests.
+	defer utilfeaturetesting.SetFeatureGateDuringTest(
+		t,
+		utilfeature.DefaultFeatureGate,
+		features.EnableEquivalenceClassCache, true)()
+
+	// 1. Create scheduler
+	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, time.Second)
+
+	var podInformer coreinformers.PodInformer
+
+	// create independent pod informer if required
+	if setPodInformer {
+		podInformer = factory.NewPodInformer(context.clientSet, 12*time.Hour, v1.DefaultSchedulerName)
+	} else {
+		podInformer = context.informerFactory.Core().V1().Pods()
+	}
+
+	context.schedulerConfigFactory = createConfiguratorWithPodInformer(
+		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory)
+
 	var err error
-	context.schedulerConfig, err = context.schedulerConfigFactory.Create()
+
+	if policy != nil {
+		context.schedulerConfig, err = context.schedulerConfigFactory.CreateFromConfig(*policy)
+	} else {
+		context.schedulerConfig, err = context.schedulerConfigFactory.Create()
+	}
+
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
 	}
+
+	// set controllerCh if provided.
+	if controllerCh != nil {
+		context.schedulerConfig.StopEverything = controllerCh
+	}
+
+	// set setPodInformer if provided.
+	if setPodInformer {
+		go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
+	}
+
 	eventBroadcaster := record.NewBroadcaster()
 	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(context.clientSet.CoreV1().RESTClient()).Events("")})
-	go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
+
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
+	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
+
 	context.scheduler, err = scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: context.schedulerConfig}, nil...)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 	context.scheduler.Run()
-	return &context
+	return context
+}
+
+// initTest initializes a test environment and creates master and scheduler with default
+// configuration.
+func initTest(t *testing.T, nsPrefix string) *TestContext {
+	return initTestScheduler(t, initTestMaster(t, nsPrefix, nil), nil, true, nil)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
