@@ -458,10 +458,6 @@ const (
 
 	// MountOptionAnnotation defines mount option annotation used in PVs
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
-
-	// AlphaStorageNodeAffinityAnnotation defines node affinity policies for a PersistentVolume.
-	// Value is a string of the json representation of type NodeAffinity
-	AlphaStorageNodeAffinityAnnotation = "volume.alpha.kubernetes.io/node-affinity"
 )
 
 // +genclient

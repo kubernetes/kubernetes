@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -57,24 +56,6 @@ func testVolume(name string, namespace string, spec core.PersistentVolumeSpec) *
 	objMeta := metav1.ObjectMeta{Name: name}
 	if namespace != "" {
 		objMeta.Namespace = namespace
-	}
-
-	return &core.PersistentVolume{
-		ObjectMeta: objMeta,
-		Spec:       spec,
-	}
-}
-
-func testVolumeWithAlphaNodeAffinity(t *testing.T, name string, namespace string, affinity *core.NodeAffinity, spec core.PersistentVolumeSpec) *core.PersistentVolume {
-	objMeta := metav1.ObjectMeta{Name: name}
-	if namespace != "" {
-		objMeta.Namespace = namespace
-	}
-
-	objMeta.Annotations = map[string]string{}
-	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
-	if err != nil {
-		t.Fatalf("Failed to get node affinity annotation: %v", err)
 	}
 
 	return &core.PersistentVolume{
@@ -512,104 +493,12 @@ func TestValidateLocalVolumes(t *testing.T) {
 		isExpectedFailure bool
 		volume            *core.PersistentVolume
 	}{
-		"alpha valid local volume": {
-			isExpectedFailure: false,
-			volume: testVolumeWithAlphaNodeAffinity(
-				t,
-				"valid-local-volume",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				testLocalVolume("/foo", nil)),
-		},
 		"alpha invalid local volume nil annotations": {
 			isExpectedFailure: true,
 			volume: testVolume(
 				"invalid-local-volume-nil-annotations",
 				"",
 				testLocalVolume("/foo", nil)),
-		},
-		"alpha invalid local volume empty affinity": {
-			isExpectedFailure: true,
-			volume: testVolumeWithAlphaNodeAffinity(
-				t,
-				"invalid-local-volume-empty-affinity",
-				"",
-				&core.NodeAffinity{},
-				testLocalVolume("/foo", nil)),
-		},
-		"alpha invalid local volume preferred affinity": {
-			isExpectedFailure: true,
-			volume: testVolumeWithAlphaNodeAffinity(
-				t,
-				"invalid-local-volume-preferred-affinity",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{
-						{
-							Weight: 10,
-							Preference: core.NodeSelectorTerm{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				testLocalVolume("/foo", nil)),
-		},
-		"alpha and beta local volume": {
-			isExpectedFailure: true,
-			volume: testVolumeWithAlphaNodeAffinity(
-				t,
-				"invalid-alpha-beta-local-volume",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				testLocalVolume("/foo", simpleVolumeNodeAffinity("foo", "bar"))),
 		},
 		"valid local volume": {
 			isExpectedFailure: false,
@@ -654,29 +543,6 @@ func TestValidateLocalVolumesDisabled(t *testing.T) {
 		isExpectedFailure bool
 		volume            *core.PersistentVolume
 	}{
-		"alpha disabled valid local volume": {
-			isExpectedFailure: true,
-			volume: testVolumeWithAlphaNodeAffinity(
-				t,
-				"valid-local-volume",
-				"",
-				&core.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{
-							{
-								MatchExpressions: []core.NodeSelectorRequirement{
-									{
-										Key:      "test-label-key",
-										Operator: core.NodeSelectorOpIn,
-										Values:   []string{"test-label-value"},
-									},
-								},
-							},
-						},
-					},
-				},
-				testLocalVolume("/foo", nil)),
-		},
 		"feature disabled valid local volume": {
 			isExpectedFailure: true,
 			volume: testVolume("valid-local-volume", "",
