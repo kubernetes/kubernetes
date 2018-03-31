@@ -274,6 +274,14 @@ const (
 	// Allow mounting a subpath of a volume in a container
 	// Do not remove this feature gate even though it's GA
 	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
+
+	// owner: @ravig
+	// alpha: v1.11
+	//
+	// Include volume count on node to be considered for balanced resource allocation while scheduling.
+	// A node which has closer cpu,memory utilization and volume count is favoured by scheduler
+	// while making decisions.
+	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
 )
 
 func init() {
@@ -321,6 +329,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
+	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
