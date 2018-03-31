@@ -1627,6 +1627,9 @@ func (j *IngressTestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, names
 	}
 	ingToCreate := generateBacksideHTTPSIngressSpec(namespace)
 	if staticIPName != "" {
+		if ingToCreate.Annotations == nil {
+			ingToCreate.Annotations = map[string]string{}
+		}
 		ingToCreate.Annotations[IngressStaticIPKey] = staticIPName
 	}
 	ingCreated, err := j.runCreate(ingToCreate)
