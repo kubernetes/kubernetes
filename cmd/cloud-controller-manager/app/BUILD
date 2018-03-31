@@ -26,7 +26,6 @@ go_library(
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//vendor/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
-        "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
 
