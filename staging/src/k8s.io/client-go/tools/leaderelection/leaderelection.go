@@ -96,6 +96,10 @@ type LeaderElectionConfig struct {
 	// Lock is the resource that will be used for locking
 	Lock rl.Interface
 
+	// StopCh is used to control the client graceful exit, it can be set by outside caller
+	// or automatically in this pkg if not set.
+	StopCh <-chan struct{}
+
 	// LeaseDuration is the duration that non-leader candidates will
 	// wait to force acquire leadership. This is measured against time of
 	// last observed ack.
@@ -151,10 +155,11 @@ func (le *LeaderElector) Run() {
 		le.config.Callbacks.OnStoppedLeading()
 	}()
 	le.acquire()
-	stop := make(chan struct{})
-	go le.config.Callbacks.OnStartedLeading(stop)
+	if le.config.StopCh == nil {
+		le.config.StopCh = make(chan struct{})
+	}
+	go le.config.Callbacks.OnStartedLeading(le.config.StopCh)
 	le.renew()
-	close(stop)
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
@@ -200,6 +205,13 @@ func (le *LeaderElector) acquire() {
 func (le *LeaderElector) renew() {
 	stop := make(chan struct{})
 	wait.Until(func() {
+		select {
+		case <-le.config.StopCh:
+			glog.Infof("leaderelection is shutting down")
+			close(stop)
+			return
+		default:
+		}
 		err := wait.Poll(le.config.RetryPeriod, le.config.RenewDeadline, func() (bool, error) {
 			return le.tryAcquireOrRenew(), nil
 		})
