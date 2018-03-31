@@ -372,7 +372,7 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 	}
 
 	if e.queue.NumRequeues(key) < maxRetries {
-		glog.V(2).Infof("Error syncing endpoints for service %q: %v", key, err)
+		glog.V(2).Infof("Error syncing endpoints for service %q, retrying. Error: %v", key, err)
 		e.queue.AddRateLimited(key)
 		return
 	}
