@@ -23,7 +23,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const logFlushFreqFlagName = "log-flush-frequency"
@@ -54,8 +53,6 @@ func (writer GlogWriter) Write(data []byte) (n int, err error) {
 func InitLogs() {
 	log.SetOutput(GlogWriter{})
 	log.SetFlags(0)
-	// The default glog flush interval is 5 seconds.
-	go wait.Forever(glog.Flush, *logFlushFreq)
 }
 
 // FlushLogs flushes logs immediately.
