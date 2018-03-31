@@ -76,33 +76,33 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v9.9.0",
-			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
+			"Comment": "v10.4.0-1-gd76573e",
+			"Rev": "d76573ed104b3ed06b95d47ec1b4e3474c9dfc48"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Comment": "v9.9.0",
-			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
+			"Comment": "v10.4.0-1-gd76573e",
+			"Rev": "d76573ed104b3ed06b95d47ec1b4e3474c9dfc48"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v9.9.0",
-			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
+			"Comment": "v10.4.0-1-gd76573e",
+			"Rev": "d76573ed104b3ed06b95d47ec1b4e3474c9dfc48"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v9.9.0",
-			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
+			"Comment": "v10.4.0-1-gd76573e",
+			"Rev": "d76573ed104b3ed06b95d47ec1b4e3474c9dfc48"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v9.9.0",
-			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
+			"Comment": "v10.4.0-1-gd76573e",
+			"Rev": "d76573ed104b3ed06b95d47ec1b4e3474c9dfc48"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
-			"Comment": "v9.9.0",
-			"Rev": "d4e6b95c12a08b4de2d48b45d5b4d594e5d32fab"
+			"Comment": "v10.4.0-1-gd76573e",
+			"Rev": "d76573ed104b3ed06b95d47ec1b4e3474c9dfc48"
 		},
 		{
 			"ImportPath": "github.com/JeffAshton/win_pdh",
