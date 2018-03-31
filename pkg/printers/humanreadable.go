@@ -101,19 +101,6 @@ func (a *HumanReadablePrinter) With(fns ...func(PrintHandler)) *HumanReadablePri
 	return a
 }
 
-// GetResourceKind returns the type currently set for a resource
-func (h *HumanReadablePrinter) GetResourceKind() string {
-	return h.options.Kind
-}
-
-// EnsurePrintWithKind sets HumanReadablePrinter options "WithKind" to true
-// and "Kind" to the string arg it receives, pre-pending this string
-// to the "NAME" column in an output of resources.
-func (h *HumanReadablePrinter) EnsurePrintWithKind(kind string) {
-	h.options.WithKind = true
-	h.options.Kind = kind
-}
-
 // EnsurePrintHeaders sets the HumanReadablePrinter option "NoHeaders" to false
 // and removes the .lastType that was printed, which forces headers to be
 // printed in cases where multiple lists of the same resource are printed
@@ -414,7 +401,7 @@ func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	columns := table.ColumnDefinitions
 
 	nameColumn := -1
-	if options.WithKind && len(options.Kind) > 0 {
+	if options.WithKind && !options.Kind.Empty() {
 		for i := range columns {
 			if columns[i].Format == "name" && columns[i].Type == "string" {
 				nameColumn = i
@@ -454,7 +441,7 @@ func DecorateTable(table *metav1beta1.Table, options PrintOptions) error {
 			row := rows[i]
 
 			if nameColumn != -1 {
-				row.Cells[nameColumn] = fmt.Sprintf("%s/%s", options.Kind, row.Cells[nameColumn])
+				row.Cells[nameColumn] = fmt.Sprintf("%s/%s", strings.ToLower(options.Kind.String()), row.Cells[nameColumn])
 			}
 
 			var m metav1.Object
@@ -610,8 +597,8 @@ func printRows(output io.Writer, rows []metav1beta1.TableRow, options PrintOptio
 				fmt.Fprint(output, "\t")
 			} else {
 				// TODO: remove this once we drop the legacy printers
-				if options.WithKind && len(options.Kind) > 0 {
-					fmt.Fprintf(output, "%s/%s", options.Kind, cell)
+				if options.WithKind && !options.Kind.Empty() {
+					fmt.Fprintf(output, "%s/%s", strings.ToLower(options.Kind.String()), cell)
 					continue
 				}
 			}
@@ -788,12 +775,12 @@ func appendLabelCells(values []interface{}, itemLabels map[string]string, opts P
 
 // FormatResourceName receives a resource kind, name, and boolean specifying
 // whether or not to update the current name to "kind/name"
-func FormatResourceName(kind, name string, withKind bool) string {
-	if !withKind || kind == "" {
+func FormatResourceName(kind schema.GroupKind, name string, withKind bool) string {
+	if !withKind || kind.Empty() {
 		return name
 	}
 
-	return kind + "/" + name
+	return strings.ToLower(kind.String()) + "/" + name
 }
 
 func AppendLabels(itemLabels map[string]string, columnLabels []string) string {

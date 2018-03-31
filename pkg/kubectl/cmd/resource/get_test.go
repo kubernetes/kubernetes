@@ -756,10 +756,10 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
+pod/foo   0/0                 0          <unknown>
+pod/bar   0/0                 0          <unknown>
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -904,10 +904,10 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
+pod/foo   0/0                 0          <unknown>
+pod/bar   0/0                 0          <unknown>
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -949,10 +949,10 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
+pod/foo   0/0                 0          <unknown>
+pod/bar   0/0                 0          <unknown>
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -997,10 +997,10 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
 
-	expected := `NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
-NAME      STATUS    ROLES     AGE         VERSION
-foo       Unknown   <none>    <unknown>   
+	expected := `NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
+NAME       STATUS    ROLES     AGE         VERSION
+node/foo   Unknown   <none>    <unknown>   
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)

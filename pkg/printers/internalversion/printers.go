@@ -40,6 +40,7 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -1747,7 +1748,12 @@ func printControllerRevision(obj *apps.ControllerRevision, options printers.Prin
 	controllerName := "<none>"
 	if controllerRef != nil {
 		withKind := true
-		controllerName = printers.FormatResourceName(controllerRef.Kind, controllerRef.Name, withKind)
+		gv, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+		if err != nil {
+			return nil, err
+		}
+		gvk := gv.WithKind(controllerRef.Kind)
+		controllerName = printers.FormatResourceName(gvk.GroupKind(), controllerRef.Name, withKind)
 	}
 	revision := obj.Revision
 	age := translateTimestamp(obj.CreationTimestamp)
