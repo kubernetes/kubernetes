@@ -431,13 +431,15 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods []*v1.Pod) {
 	timeout := m.clock.NewTimer(podCleanupTimeout)
-	tick := m.clock.Tick(podCleanupPollFreq)
+	defer timeout.Stop()
+	ticker := m.clock.NewTicker(podCleanupPollFreq)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-timeout.C():
 			glog.Warningf("eviction manager: timed out waiting for pods %s to be cleaned up", format.Pods(pods))
 			return
-		case <-tick:
+		case <-ticker.C():
 			for i, pod := range pods {
 				if !podCleanedUpFunc(pod) {
 					break
