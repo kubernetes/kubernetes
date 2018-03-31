@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
@@ -90,8 +91,8 @@ controller, and serviceaccounts controller.`,
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
-
-			if err := Run(c.Complete()); err != nil {
+			stopCh := genericapiserver.SetupSignalHandler()
+			if err := Run(c.Complete(), stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -113,7 +114,7 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 }
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
-func Run(c *config.CompletedConfig) error {
+func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
@@ -124,7 +125,6 @@ func Run(c *config.CompletedConfig) error {
 	}
 
 	// Start the controller manager HTTP server
-	stopCh := make(chan struct{})
 	if c.SecureServing != nil {
 		handler := genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
 		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Authorization, &c.Authentication)
@@ -140,7 +140,7 @@ func Run(c *config.CompletedConfig) error {
 		}
 	}
 
-	run := func(stop <-chan struct{}) {
+	run := func(stopCh <-chan struct{}) {
 		rootClientBuilder := controller.SimpleControllerClientBuilder{
 			ClientConfig: c.Kubeconfig,
 		}
@@ -160,7 +160,7 @@ func Run(c *config.CompletedConfig) error {
 		} else {
 			clientBuilder = rootClientBuilder
 		}
-		ctx, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, stop)
+		ctx, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, stopCh)
 		if err != nil {
 			glog.Fatalf("error building controller context: %v", err)
 		}
@@ -177,7 +177,7 @@ func Run(c *config.CompletedConfig) error {
 	}
 
 	if !c.ComponentConfig.GenericComponent.LeaderElection.LeaderElect {
-		run(wait.NeverStop)
+		run(stopCh)
 		panic("unreachable")
 	}
 
@@ -202,12 +202,15 @@ func Run(c *config.CompletedConfig) error {
 
 	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
 		Lock:          rl,
+		StopCh:        stopCh,
 		LeaseDuration: c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.GenericComponent.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   c.ComponentConfig.GenericComponent.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
+				// wait for LeaseDuration before exit to let controllers handling cached resources
+				time.Sleep(c.ComponentConfig.GenericComponent.LeaderElection.LeaseDuration.Duration)
 				glog.Fatalf("leaderelection lost")
 			},
 		},
