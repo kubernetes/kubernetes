@@ -226,7 +226,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *v1.Contai
 	}
 
 	// set platform specific configurations.
-	if err := m.applyPlatformSpecificContainerConfig(config, container, pod, uid, username); err != nil {
+	if err := m.applyPlatformSpecificContainerConfig(config, container, pod); err != nil {
 		return nil, cleanupAction, err
 	}
 

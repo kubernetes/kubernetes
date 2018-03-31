@@ -27,14 +27,14 @@ import (
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string) error {
-	config.Windows = m.generateWindowsContainerConfig(container, pod, uid, username)
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod) error {
+	config.Windows = m.generateWindowsContainerConfig(container, pod)
 	return nil
 }
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
 // Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
-func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) *runtimeapi.WindowsContainerConfig {
+func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod) *runtimeapi.WindowsContainerConfig {
 	wc := &runtimeapi.WindowsContainerConfig{
 		Resources: &runtimeapi.WindowsContainerResources{},
 	}
