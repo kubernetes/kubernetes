@@ -166,7 +166,7 @@ func TestTimeProto(t *testing.T) {
 		if err := time.Unmarshal(data); err != nil {
 			t.Fatalf("Failed to unmarshal output: '%v': %v", input, err)
 		}
-		if !reflect.DeepEqual(input, time) {
+		if input.Equal(&time) {
 			t.Errorf("Marshal->Unmarshal is not idempotent: '%v' vs '%v'", input, time)
 		}
 	}
