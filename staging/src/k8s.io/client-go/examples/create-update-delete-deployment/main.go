@@ -24,7 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -53,13 +53,13 @@ func main() {
 		panic(err)
 	}
 
-	deploymentsClient := clientset.AppsV1beta1().Deployments(apiv1.NamespaceDefault)
+	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
 
-	deployment := &appsv1beta1.Deployment{
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "demo-deployment",
 		},
-		Spec: appsv1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -127,27 +127,6 @@ func main() {
 		panic(fmt.Errorf("Update failed: %v", retryErr))
 	}
 	fmt.Println("Updated deployment...")
-
-	// Rollback Deployment
-	prompt()
-	fmt.Println("Rolling back deployment...")
-	// Once again use RetryOnConflict to avoid update conflicts
-	retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
-		if getErr != nil {
-			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
-		}
-
-		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
-			Revision: 0, // can be specific revision number, or 0 for last revision
-		}
-		_, updateErr := deploymentsClient.Update(result)
-		return updateErr
-	})
-	if retryErr != nil {
-		panic(fmt.Errorf("Rollback failed: %v", retryErr))
-	}
-	fmt.Println("Rolled back deployment...")
 
 	// List Deployments
 	prompt()
