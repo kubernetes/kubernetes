@@ -33,6 +33,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+const maxCellContentLen = 80
+
 type TablePrinter interface {
 	PrintTable(obj runtime.Object, options PrintOptions) (*metav1beta1.Table, error)
 }
@@ -387,12 +389,31 @@ func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions
 				fmt.Fprint(output, "\t")
 			}
 			if cell != nil {
-				fmt.Fprint(output, cell)
+				trimmed := trimCellContent(cell)
+
+				fmt.Fprint(output, trimmed)
 			}
 		}
 		fmt.Fprintln(output)
 	}
 	return nil
+}
+
+func trimCellContent(cell interface{}) interface{} {
+	trimmed, ok := cell.(string)
+	if !ok {
+		return cell
+	}
+
+	// only print the first line (if more than one line)
+	if lines := strings.SplitN(trimmed, "\n", 2); len(lines) > 1 {
+		trimmed = lines[0] + "..."
+	}
+	if len(trimmed) > maxCellContentLen {
+		trimmed = strings.TrimSpace(trimmed[:maxCellContentLen-3]) + "..."
+	}
+
+	return trimmed
 }
 
 // DecorateTable takes a table and attempts to add label columns and the
@@ -603,16 +624,18 @@ func printRows(output io.Writer, rows []metav1beta1.TableRow, options PrintOptio
 		}
 
 		for i, cell := range row.Cells {
+			trimmed := trimCellContent(cell)
+
 			if i != 0 {
 				fmt.Fprint(output, "\t")
 			} else {
 				// TODO: remove this once we drop the legacy printers
 				if options.WithKind && len(options.Kind) > 0 {
-					fmt.Fprintf(output, "%s/%s", options.Kind, cell)
+					fmt.Fprintf(output, "%s/%s", options.Kind, trimmed)
 					continue
 				}
 			}
-			fmt.Fprint(output, cell)
+			fmt.Fprint(output, trimmed)
 		}
 
 		hasLabels := len(options.ColumnLabels) > 0
@@ -727,7 +750,7 @@ func printUnstructured(unstructured runtime.Unstructured, w io.Writer, additiona
 			default:
 				formattedValue = fmt.Sprintf("%v", value)
 			}
-			if _, err := fmt.Fprintf(w, "\t%s", formattedValue); err != nil {
+			if _, err := fmt.Fprintf(w, "\t%s", trimCellContent(formattedValue)); err != nil {
 				return err
 			}
 		}
