@@ -1,3 +1,16 @@
+- [IPVS](#ipvs)
+  - [What is IPVS](#what-is-ipvs)
+  - [IPVS vs. IPTABLES](#ipvs-vs-iptables)
+    - [When ipvs falls back to iptables](#when-ipvs-falls-back-to-iptables)
+  - [Run kube-proxy in ipvs mode](#run-kube-proxy-in-ipvs-mode)
+    - [Prerequisite](#prerequisite)
+    - [Local UP Cluster](#local-up-cluster)
+    - [GCE Cluster](#gce-cluster)
+    - [Cluster Created by Kubeadm](#cluster-created-by-kubeadm)
+  - [Debug](#debug)
+    - [Check IPVS proxy rules](#check-ipvs-proxy-rules)
+    - [Why kube-proxy can't start IPVS mode](#why-kube-proxy-cant-start-ipvs-mode)
+
 # IPVS
 
 This document intends to show users
@@ -17,24 +30,11 @@ and UDP-based services to the real servers, and make services of real servers ap
 IPVS mode was introduced in Kubernetes v1.8 and goes beta in v1.9. IPTABLES mode was added in v1.1 and become the default operating mode since v1.2. Both IPVS and IPTABLES are based on `netfilter`.
 Differences between IPVS mode and IPTABLES mode are as follows:
 
-- [IPVS](#ipvs)
-  - [What is IPVS](#what-is-ipvs)
-  - [IPVS vs. IPTABLES](#ipvs-vs-iptables)
-    - [When ipvs falls back to iptables](#when-ipvs-falls-back-to-iptables)
-  - [Run kube-proxy in ipvs mode](#run-kube-proxy-in-ipvs-mode)
-    - [Prerequisite](#prerequisite)
-    - [Local UP Cluster](#local-up-cluster)
-    - [GCE Cluster](#gce-cluster)
-    - [Cluster Created by Kubeadm](#cluster-created-by-kubeadm)
-  - [Debug](#debug)
-    - [Check IPVS proxy rules](#check-ipvs-proxy-rules)
-    - [Why kube-proxy can't start IPVS mode](#why-kube-proxy-cant-start-ipvs-mode)
+1. IPVS provides better scalability and performance for large clusters. 
 
-2. IPVS provides better scalability and performance for large clusters. 
+2. IPVS supports more sophisticated load balancing algorithms than iptables (least load, least connections, locality, weighted, etc.).  
 
-3. IPVS supports more sophisticated load balancing algorithms than iptables (least load, least connections, locality, weighted, etc.).  
-
-4. IPVS supports server health checking and connection retries, etc.
+3. IPVS supports server health checking and connection retries, etc.
  
 ### When ipvs falls back to iptables
 IPVS proxier will employ iptables in doing packet filtering, SNAT and supporting NodePort type service. Specifically, ipvs proxier will fall back on iptables in the following 4 scenarios.
