@@ -154,9 +154,10 @@ func PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter
 
 	printer = maybeWrapSortingPrinter(printer, *options)
 
-	// wrap the printer in a versioning printer that understands when to convert and when not to convert
-	printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, kubectlscheme.Versions...)
-
+	// wrap the printer in a versioning printer that understands when to convert and when not to convert, if it is generic
+	if printer.IsGeneric() {
+		printer = printers.NewVersionedPrinter(printer, legacyscheme.Scheme, legacyscheme.Scheme, kubectlscheme.Versions...)
+	}
 	return printer, nil
 }
 
