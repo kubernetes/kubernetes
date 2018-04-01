@@ -34,13 +34,13 @@ func TestJSONSchemaPropsOrBoolUnmarshalJSON(t *testing.T) {
 	}{
 		{`{}`, JSONSchemaPropsOrBoolHolder{}},
 
-		{`{"val1": {}}`, JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{}}}},
-		{`{"val1": {"type":"string"}}`, JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{Type: "string"}}}},
+		{`{"val1": {}}`, JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{}, Allows: true}}},
+		{`{"val1": {"type":"string"}}`, JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{Type: "string"}, Allows: true}}},
 		{`{"val1": false}`, JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{}}},
 		{`{"val1": true}`, JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Allows: true}}},
 
-		{`{"val2": {}}`, JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{}}}},
-		{`{"val2": {"type":"string"}}`, JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{Type: "string"}}}},
+		{`{"val2": {}}`, JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{}, Allows: true}}},
+		{`{"val2": {"type":"string"}}`, JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{Type: "string"}, Allows: true}}},
 		{`{"val2": false}`, JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{}}},
 		{`{"val2": true}`, JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Allows: true}}},
 	}

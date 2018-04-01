@@ -46,6 +46,7 @@ func (s *JSONSchemaPropsOrBool) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		nw.Schema = &sch
+		nw.Allows = true
 	case len(data) == 4 && string(data) == "true":
 		nw.Allows = true
 	case len(data) == 5 && string(data) == "false":
