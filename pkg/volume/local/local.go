@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/golang/glog"
 
@@ -296,11 +297,13 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
-		return err
+	if runtime.GOOS != "windows" {
+		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+			return err
+		}
 	}
-
 	// Perform a bind mount to the full path to allow duplicate mounts of the same volume.
 	options := []string{"bind"}
 	if m.readOnly {
