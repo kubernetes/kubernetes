@@ -31,9 +31,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -133,7 +133,28 @@ func (fLBC *fakeAzureLBClient) Get(resourceGroupName string, loadBalancerName st
 	}
 }
 
-func (fLBC *fakeAzureLBClient) List(resourceGroupName string) (result network.LoadBalancerListResult, err error) {
+type fakeLoadBalancerListResultPage struct {
+	next   LoadBalancerListResultPage
+	value  network.LoadBalancerListResult
+	values []network.LoadBalancer
+	err    error
+}
+
+func (pg *fakeLoadBalancerListResultPage) Next() error {
+	return nil
+}
+func (pg *fakeLoadBalancerListResultPage) NotDone() bool {
+	return pg.next != nil
+}
+
+func (pg *fakeLoadBalancerListResultPage) Response() network.LoadBalancerListResult {
+	return pg.value
+}
+func (pg *fakeLoadBalancerListResultPage) Values() []network.LoadBalancer {
+	return pg.values
+}
+
+func (fLBC *fakeAzureLBClient) List(resourceGroupName string) (result LoadBalancerListResultPage, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
 	var value []network.LoadBalancer
@@ -142,23 +163,18 @@ func (fLBC *fakeAzureLBClient) List(resourceGroupName string) (result network.Lo
 			value = append(value, v)
 		}
 	}
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	result.NextLink = nil
-	result.Value = &value
-	return result, nil
+	return &fakeLoadBalancerListResultPage{
+		value: network.LoadBalancerListResult{
+			Value: &value,
+		},
+		values: value,
+	}, nil
 }
 
-func (fLBC *fakeAzureLBClient) ListNextResults(resourceGroupName string, lastResult network.LoadBalancerListResult) (result network.LoadBalancerListResult, err error) {
+func (fLBC *fakeAzureLBClient) ListNextResults(resourceGroupName string, lastResult LoadBalancerListResultPage) (result LoadBalancerListResultPage, err error) {
 	fLBC.mutex.Lock()
 	defer fLBC.mutex.Unlock()
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	result.NextLink = nil
-	result.Value = nil
-	return result, nil
+	return &fakeLoadBalancerListResultPage{}, nil
 }
 
 type fakeAzurePIPClient struct {
@@ -270,13 +286,34 @@ func (fAPC *fakeAzurePIPClient) Get(resourceGroupName string, publicIPAddressNam
 	}
 }
 
-func (fAPC *fakeAzurePIPClient) ListNextResults(resourceGroupName string, lastResults network.PublicIPAddressListResult) (result network.PublicIPAddressListResult, err error) {
-	fAPC.mutex.Lock()
-	defer fAPC.mutex.Unlock()
-	return network.PublicIPAddressListResult{}, nil
+type fakePublicIPAddressListResultPage struct {
+	next   PublicIPAddressListResultPage
+	value  network.PublicIPAddressListResult
+	values []network.PublicIPAddress
+	err    error
 }
 
-func (fAPC *fakeAzurePIPClient) List(resourceGroupName string) (result network.PublicIPAddressListResult, err error) {
+func (pg *fakePublicIPAddressListResultPage) Next() error {
+	return nil
+}
+func (pg *fakePublicIPAddressListResultPage) NotDone() bool {
+	return pg.next != nil
+}
+
+func (pg *fakePublicIPAddressListResultPage) Response() network.PublicIPAddressListResult {
+	return pg.value
+}
+func (pg *fakePublicIPAddressListResultPage) Values() []network.PublicIPAddress {
+	return pg.values
+}
+
+func (fAPC *fakeAzurePIPClient) ListNextResults(resourceGroupName string, lastResults PublicIPAddressListResultPage) (result PublicIPAddressListResultPage, err error) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+	return &fakePublicIPAddressListResultPage{}, nil
+}
+
+func (fAPC *fakeAzurePIPClient) List(resourceGroupName string) (result PublicIPAddressListResultPage, err error) {
 	fAPC.mutex.Lock()
 	defer fAPC.mutex.Unlock()
 	var value []network.PublicIPAddress
@@ -285,11 +322,12 @@ func (fAPC *fakeAzurePIPClient) List(resourceGroupName string) (result network.P
 			value = append(value, v)
 		}
 	}
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
+	result = &fakePublicIPAddressListResultPage{
+		value: network.PublicIPAddressListResult{
+			Value: &value,
+		},
+		values: value,
 	}
-	result.NextLink = nil
-	result.Value = &value
 	return result, nil
 }
 
@@ -509,7 +547,29 @@ func (fASC *fakeAzureSubnetsClient) Get(resourceGroupName string, virtualNetwork
 		Message:    "Not such Subnet",
 	}
 }
-func (fASC *fakeAzureSubnetsClient) List(resourceGroupName string, virtualNetworkName string) (result network.SubnetListResult, err error) {
+
+type fakeSubnetListResultPage struct {
+	next   SubnetListResultPage
+	value  network.SubnetListResult
+	values []network.Subnet
+	err    error
+}
+
+func (pg *fakeSubnetListResultPage) Next() error {
+	return nil
+}
+func (pg *fakeSubnetListResultPage) NotDone() bool {
+	return pg.next != nil
+}
+
+func (pg *fakeSubnetListResultPage) Response() network.SubnetListResult {
+	return pg.value
+}
+func (pg *fakeSubnetListResultPage) Values() []network.Subnet {
+	return pg.values
+}
+
+func (fASC *fakeAzureSubnetsClient) List(resourceGroupName string, virtualNetworkName string) (result SubnetListResultPage, err error) {
 	fASC.mutex.Lock()
 	defer fASC.mutex.Unlock()
 	rgVnet := strings.Join([]string{resourceGroupName, virtualNetworkName}, "AND")
@@ -519,12 +579,12 @@ func (fASC *fakeAzureSubnetsClient) List(resourceGroupName string, virtualNetwor
 			value = append(value, v)
 		}
 	}
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
-	}
-	result.NextLink = nil
-	result.Value = &value
-	return result, nil
+	return &fakeSubnetListResultPage{
+		value: network.SubnetListResult{
+			Value: &value,
+		},
+		values: value,
+	}, nil
 }
 
 type fakeAzureNSGClient struct {
@@ -611,7 +671,28 @@ func (fNSG *fakeAzureNSGClient) Get(resourceGroupName string, networkSecurityGro
 	}
 }
 
-func (fNSG *fakeAzureNSGClient) List(resourceGroupName string) (result network.SecurityGroupListResult, err error) {
+type fakeSecurityGroupListResultPage struct {
+	next   SecurityGroupListResultPage
+	value  network.SecurityGroupListResult
+	values []network.SecurityGroup
+	err    error
+}
+
+func (pg *fakeSecurityGroupListResultPage) Next() error {
+	return nil
+}
+func (pg *fakeSecurityGroupListResultPage) NotDone() bool {
+	return pg.next != nil
+}
+
+func (pg *fakeSecurityGroupListResultPage) Response() network.SecurityGroupListResult {
+	return pg.value
+}
+func (pg *fakeSecurityGroupListResultPage) Values() []network.SecurityGroup {
+	return pg.values
+}
+
+func (fNSG *fakeAzureNSGClient) List(resourceGroupName string) (result SecurityGroupListResultPage, err error) {
 	fNSG.mutex.Lock()
 	defer fNSG.mutex.Unlock()
 	var value []network.SecurityGroup
@@ -620,11 +701,12 @@ func (fNSG *fakeAzureNSGClient) List(resourceGroupName string) (result network.S
 			value = append(value, v)
 		}
 	}
-	result.Response.Response = &http.Response{
-		StatusCode: http.StatusOK,
+	result = &fakeSecurityGroupListResultPage{
+		value: network.SecurityGroupListResult{
+			Value: &value,
+		},
+		values: value,
 	}
-	result.NextLink = nil
-	result.Value = &value
 	return result, nil
 }
 
