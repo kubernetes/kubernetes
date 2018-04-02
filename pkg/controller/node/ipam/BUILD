@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cloud_cidr_allocator_test.go",
         "controller_test.go",
         "range_allocator_test.go",
         "timeout_test.go",
@@ -50,6 +51,8 @@ go_library(
         "//pkg/controller/node/ipam/sync:go_default_library",
         "//pkg/controller/node/util:go_default_library",
         "//pkg/util/node:go_default_library",
+        "//pkg/util/taints:go_default_library",
+        "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
