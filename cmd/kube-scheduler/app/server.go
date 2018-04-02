@@ -115,8 +115,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.policyConfigFile, "policy-config-file", o.policyConfigFile, "File with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config==true")
 	usage := fmt.Sprintf("Name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config==false. The config must be provided as the value of an element in 'Data' map with the key='%v'", componentconfig.SchedulerPolicyConfigMapKey)
 	fs.StringVar(&o.policyConfigMapName, "policy-configmap", o.policyConfigMapName, usage)
-	fs.StringVar(&o.policyConfigMapNamespace, "policy-configmap-namespace", o.policyConfigMapNamespace, "The namespace where policy ConfigMap is located. The system namespace will be used if this is not provided or is empty.")
-	fs.BoolVar(&o.useLegacyPolicyConfig, "use-legacy-policy-config", false, "When set to true, scheduler will ignore policy ConfigMap and uses policy config file")
+	fs.StringVar(&o.policyConfigMapNamespace, "policy-configmap-namespace", o.policyConfigMapNamespace, "The namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty.")
+	fs.BoolVar(&o.useLegacyPolicyConfig, "use-legacy-policy-config", o.useLegacyPolicyConfig, "When set to true, scheduler will ignore policy ConfigMap and uses policy config file")
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.BoolVar(&o.config.EnableContentionProfiling, "contention-profiling", o.config.EnableContentionProfiling, "Enable lock contention profiling, if profiling is enabled")
 	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
@@ -139,7 +139,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 func NewOptions() (*Options, error) {
 	o := &Options{
-		config: new(componentconfig.KubeSchedulerConfiguration),
+		config:                   new(componentconfig.KubeSchedulerConfiguration),
+		useLegacyPolicyConfig:    false,
+		policyConfigMapNamespace: metav1.NamespaceSystem,
 	}
 
 	o.scheme = runtime.NewScheme()
