@@ -638,6 +638,10 @@ def kick_api_server(tls):
 def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
+    load_gpu_plugin = hookenv.config('enable-nvidia-plugin').lower()
+    gpuEnable = (get_version('kube-apiserver') >= (1, 9) and
+                 load_gpu_plugin == "auto" and
+                 is_state('kubernetes-master.gpu.enabled'))
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     metricsEnabled = str(hookenv.config('enable-metrics')).lower()
@@ -647,7 +651,8 @@ def configure_cdk_addons():
         'dns-domain=' + hookenv.config('dns_domain'),
         'enable-dashboard=' + dbEnabled,
         'enable-kube-dns=' + dnsEnabled,
-        'enable-metrics=' + metricsEnabled
+        'enable-metrics=' + metricsEnabled,
+        'enable-gpu=' + str(gpuEnable).lower()
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -887,8 +892,10 @@ def on_gpu_available(kube_control):
     We need to run in privileged mode.
 
     """
+    kube_version = get_version('kube-apiserver')
     config = hookenv.config()
-    if config['allow-privileged'].lower() == "false":
+    if (config['allow-privileged'].lower() == "false" and
+            kube_version < (1, 9)):
         hookenv.status_set(
             'active',
             'GPUs available. Set allow-privileged="auto" to enable.'
@@ -900,10 +907,24 @@ def on_gpu_available(kube_control):
 
 
 @when('kubernetes-master.gpu.enabled')
+@when('kubernetes-master.components.started')
 @when_not('kubernetes-master.privileged')
-def disable_gpu_mode():
+def gpu_with_no_privileged():
     """We were in gpu mode, but the operator has set allow-privileged="false",
     so we can't run in gpu mode anymore.
+
+    """
+    if get_version('kube-apiserver') < (1, 9):
+        remove_state('kubernetes-master.gpu.enabled')
+
+
+@when('kube-control.connected')
+@when_not('kube-control.gpu.available')
+@when('kubernetes-master.gpu.enabled')
+@when('kubernetes-master.components.started')
+def gpu_departed(kube_control):
+    """We were in gpu mode, but the workers informed us there is
+    no gpu support anymore.
 
     """
     remove_state('kubernetes-master.gpu.enabled')
@@ -1185,7 +1206,7 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     else:
         api_opts['admission-control'] = ','.join(admission_control)
 
-    if get_version('kube-apiserver') > (1, 6) and \
+    if kube_version > (1, 6) and \
        hookenv.config('enable-metrics'):
         api_opts['requestheader-client-ca-file'] = ca_cert_path
         api_opts['requestheader-allowed-names'] = 'client'
