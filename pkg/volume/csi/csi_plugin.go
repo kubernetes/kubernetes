@@ -29,19 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-const (
-	csiPluginName = "kubernetes.io/csi"
-
-	// TODO (vladimirvivien) implement a more dynamic way to discover
-	// the unix domain socket path for each installed csi driver.
-	// TODO (vladimirvivien) would be nice to name socket with a .sock extension
-	// for consistency.
-	csiAddrTemplate = "/var/lib/kubelet/plugins/%v/csi.sock"
-	csiTimeout      = 15 * time.Second
-	volNameSep      = "^"
-	volDataFileName = "vol_data.json"
-)
-
 type csiPlugin struct {
 	host volume.VolumeHost
 }
@@ -104,9 +91,7 @@ func (p *csiPlugin) NewMounter(
 	}
 
 	// before it is used in any paths such as socket etc
-	addr := fmt.Sprintf(csiAddrTemplate, pvSource.Driver)
-	glog.V(4).Infof(log("setting up mounter for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client := newCsiDriverClient("unix", addr)
+	client := getCSIClient(pvSource.Driver)
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -213,15 +198,6 @@ func (p *csiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error)
 	return mount.GetMountRefs(m, deviceMountPath)
 }
 
-func getCSISourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, error) {
-	if spec.PersistentVolume != nil &&
-		spec.PersistentVolume.Spec.CSI != nil {
-		return spec.PersistentVolume.Spec.CSI, nil
-	}
-
-	return nil, fmt.Errorf("CSIPersistentVolumeSource not defined in spec")
-}
-
 func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
 	if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.CSI != nil {
@@ -229,9 +205,4 @@ func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
 	}
 
 	return false, fmt.Errorf("CSIPersistentVolumeSource not defined in spec")
-}
-
-// log prepends log string with `kubernetes.io/csi`
-func log(msg string, parts ...interface{}) string {
-	return fmt.Sprintf(fmt.Sprintf("%s: %s", csiPluginName, msg), parts...)
 }
