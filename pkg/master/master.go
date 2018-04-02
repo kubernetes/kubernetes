@@ -103,7 +103,6 @@ type ExtraConfig struct {
 
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
 	StorageFactory           serverstorage.StorageFactory
-	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	EventTTL                 time.Duration
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
@@ -368,13 +367,11 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 		glog.Fatalf("Error building core storage: %v", err)
 	}
 
-	if c.ExtraConfig.EnableCoreControllers {
-		controllerName := "bootstrap-controller"
-		coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
-		m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
-		m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
-	}
+	controllerName := "bootstrap-controller"
+	coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
+	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
+	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)

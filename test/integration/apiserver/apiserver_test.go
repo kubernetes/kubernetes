@@ -46,7 +46,6 @@ import (
 
 func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.ExtraConfig.EnableCoreControllers = false
 	if len(groupVersions) > 0 {
 		resourceConfig := master.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
