@@ -960,32 +960,55 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.NodePort != 0 {
 			// Hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			lp := utilproxy.LocalPort{
-				Description: "nodePort for " + svcNameString,
-				IP:          "",
-				Port:        svcInfo.NodePort,
-				Protocol:    protocol,
+			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+			if err != nil {
+				glog.Errorf("Failed to get node ip address matching nodeport cidr")
+				continue
 			}
-			if proxier.portsMap[lp] != nil {
-				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
-				replacementPortsMap[lp] = proxier.portsMap[lp]
-			} else {
-				socket, err := proxier.portMapper.OpenLocalPort(&lp)
-				if err != nil {
-					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
-					continue
-				}
-				if lp.Protocol == "udp" {
-					// TODO: We might have multiple services using the same port, and this will clear conntrack for all of them.
-					// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
-					// This only affects UDP connections, which are not common.
-					// See issue: https://github.com/kubernetes/kubernetes/issues/49881
-					err := conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
-					if err != nil {
-						glog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.Port, err)
+
+			lps := make([]utilproxy.LocalPort, 0)
+			for address := range addresses {
+				if utilproxy.IsZeroCIDR(address) {
+					lp := utilproxy.LocalPort{
+						Description: "nodePort for " + svcNameString,
+						IP:          "",
+						Port:        svcInfo.NodePort,
+						Protocol:    protocol,
 					}
+					lps = append(lps, lp)
+					break
 				}
-				replacementPortsMap[lp] = socket
+				lp := utilproxy.LocalPort{
+					Description: "nodePort for " + svcNameString,
+					IP:          address,
+					Port:        svcInfo.NodePort,
+					Protocol:    protocol,
+				}
+				lps = append(lps, lp)
+			}
+
+			for _, lp := range lps {
+				if proxier.portsMap[lp] != nil {
+					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
+					replacementPortsMap[lp] = proxier.portsMap[lp]
+				} else {
+					socket, err := proxier.portMapper.OpenLocalPort(&lp)
+					if err != nil {
+						glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
+						continue
+					}
+					if lp.Protocol == "udp" {
+						// TODO: We might have multiple services using the same port, and this will clear conntrack for all of them.
+						// This is very low impact. The NodePort range is intentionally obscure, and unlikely to actually collide with real Services.
+						// This only affects UDP connections, which are not common.
+						// See issue: https://github.com/kubernetes/kubernetes/issues/49881
+						err := conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
+						if err != nil {
+							glog.Errorf("Failed to clear udp conntrack for port %d, error: %v", lp.Port, err)
+						}
+					}
+					replacementPortsMap[lp] = socket
+				}
 			}
 
 			if hasEndpoints {
