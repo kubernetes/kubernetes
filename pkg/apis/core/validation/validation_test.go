@@ -631,8 +631,8 @@ func TestValidateLocalVolumes(t *testing.T) {
 			volume: testVolume("foo", "",
 				testLocalVolume("/foo/..", simpleVolumeNodeAffinity("foo", "bar"))),
 		},
-		"invalid-local-volume-relative-path": {
-			isExpectedFailure: true,
+		"valid-local-volume-relative-path": {
+			isExpectedFailure: false,
 			volume: testVolume("foo", "",
 				testLocalVolume("foo", simpleVolumeNodeAffinity("foo", "bar"))),
 		},
