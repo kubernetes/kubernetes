@@ -68,7 +68,13 @@ const (
 	cidrUpdateQueueSize = 5000
 
 	// cidrUpdateRetries is the no. of times a NodeSpec update will be retried before dropping it.
-	cidrUpdateRetries = 10
+	cidrUpdateRetries = 3
+
+	// updateRetryTimeout is the time to wait before requeing a failed node for retry
+	updateRetryTimeout = 100 * time.Millisecond
+
+	// updateMaxRetries is the max retries for a failed node
+	updateMaxRetries = 10
 )
 
 // CIDRAllocator is an interface implemented by things that know how
@@ -80,12 +86,12 @@ type CIDRAllocator interface {
 	AllocateOrOccupyCIDR(node *v1.Node) error
 	// ReleaseCIDR releases the CIDR of the removed node
 	ReleaseCIDR(node *v1.Node) error
-	// Register allocator with the nodeInformer for updates.
-	Register(nodeInformer informers.NodeInformer)
+	// Run starts all the working logic of the allocator.
+	Run(stopCh <-chan struct{})
 }
 
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, allocatorType CIDRAllocatorType, clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -93,9 +99,9 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, allocato
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
 	case CloudAllocatorType:
-		return NewCloudCIDRAllocator(kubeClient, cloud)
+		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:
 		return nil, fmt.Errorf("Invalid CIDR allocator type: %v", allocatorType)
 	}
@@ -107,7 +113,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 	// controller manager to restart.
 	if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
 		var err error
-		nodeList, err = kubeClient.Core().Nodes().List(metav1.ListOptions{
+		nodeList, err = kubeClient.CoreV1().Nodes().List(metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),
 			LabelSelector: labels.Everything().String(),
 		})
