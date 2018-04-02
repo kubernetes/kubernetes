@@ -1265,3 +1265,77 @@ func TestAnnotationUtils(t *testing.T) {
 	})
 	//Tear Down
 }
+
+func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
+
+	desiredReplicas := fmt.Sprintf("%d", int32(10))
+	maxReplicas := fmt.Sprintf("%d", int32(20))
+
+	tests := []struct {
+		name       string
+		replicaSet *extensions.ReplicaSet
+		expected   bool
+	}{
+		{
+			name: "test Annotations nil",
+			replicaSet: &extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
+				Spec: extensions.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "test desiredReplicas update",
+			replicaSet: &extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "8", MaxReplicasAnnotation: maxReplicas},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "test maxReplicas update",
+			replicaSet: &extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: "16"},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "test needn't update",
+			replicaSet: &extensions.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+				},
+				Spec: extensions.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := ReplicasAnnotationsNeedUpdate(test.replicaSet, 10, 20)
+			if result != test.expected {
+				t.Errorf("case[%d]:%s Expected %v, Got: %v", i, test.name, test.expected, result)
+			}
+		})
+	}
+}
