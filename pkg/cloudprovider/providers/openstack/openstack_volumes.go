@@ -17,6 +17,7 @@ limitations under the License.
 package openstack
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -25,7 +26,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	k8s_volume "k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -318,7 +321,17 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
 		}
-		return "", fmt.Errorf("disk %s is attached to a different instance (%s)", volumeID, volume.AttachedServerId)
+		nodeName, err := os.GetNodeNameByID(volume.AttachedServerId)
+		attachErr := fmt.Sprintf("disk %s path %s is attached to a different instance (%s)", volumeID, volume.AttachedDevice, volume.AttachedServerId)
+		if err != nil {
+			glog.Error(attachErr)
+			return "", errors.New(attachErr)
+		}
+		// using volume.AttachedDevice may cause problems because cinder does not report device path correctly see issue #33128
+		devicePath := volume.AttachedDevice
+		danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+		glog.V(2).Infof("Found dangling volume %s attached to node %s", volumeID, nodeName)
+		return "", danglingErr
 	}
 
 	startTime := time.Now()
@@ -578,12 +591,38 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 
 // DiskIsAttached queries if a volume is attached to a compute instance
 func (os *OpenStack) DiskIsAttached(instanceID, volumeID string) (bool, error) {
+	if instanceID == "" {
+		glog.Warningf("calling DiskIsAttached with empty instanceid: %s %s", instanceID, volumeID)
+	}
 	volume, err := os.getVolume(volumeID)
 	if err != nil {
 		return false, err
 	}
 
 	return instanceID == volume.AttachedServerId, nil
+}
+
+// DiskIsAttachedByName queries if a volume is attached to a compute instance by name
+func (os *OpenStack) DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error) {
+	cClient, err := os.NewComputeV2()
+	if err != nil {
+		return false, "", err
+	}
+	srv, err := getServerByName(cClient, nodeName, false)
+	if err != nil {
+		if err == ErrNotFound {
+			// instance not found anymore in cloudprovider, assume that cinder is detached
+			return false, "", nil
+		} else {
+			return false, "", err
+		}
+	}
+	instanceID := "/" + srv.ID
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
+	}
+	attached, err := os.DiskIsAttached(instanceID, volumeID)
+	return attached, instanceID, err
 }
 
 // DisksAreAttached queries if a list of volumes are attached to a compute instance
@@ -594,6 +633,32 @@ func (os *OpenStack) DisksAreAttached(instanceID string, volumeIDs []string) (ma
 		attached[volumeID] = isAttached
 	}
 	return attached, nil
+}
+
+// DisksAreAttachedByName queries if a list of volumes are attached to a compute instance by name
+func (os *OpenStack) DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error) {
+	attached := make(map[string]bool)
+	cClient, err := os.NewComputeV2()
+	if err != nil {
+		return attached, err
+	}
+	srv, err := getServerByName(cClient, nodeName, false)
+	if err != nil {
+		if err == ErrNotFound {
+			// instance not found anymore, mark all volumes as detached
+			for _, volumeID := range volumeIDs {
+				attached[volumeID] = false
+			}
+			return attached, nil
+		} else {
+			return attached, err
+		}
+	}
+	instanceID := "/" + srv.ID
+	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
+		instanceID = instanceID[(ind + 1):]
+	}
+	return os.DisksAreAttached(instanceID, volumeIDs)
 }
 
 // diskIsUsed returns true a disk is attached to any node.
