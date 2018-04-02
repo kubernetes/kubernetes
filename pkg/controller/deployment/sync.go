@@ -402,18 +402,17 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 }
 
 func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (bool, *extensions.ReplicaSet, error) {
-	rsCopy := rs.DeepCopy()
 
-	sizeNeedsUpdate := *(rsCopy.Spec.Replicas) != newScale
-	// TODO: Do not mutate the replica set here, instead simply compare the annotation and if they mismatch
-	// call SetReplicasAnnotations inside the following if clause. Then we can also move the deep-copy from
-	// above inside the if too.
-	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
+	sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
+
+	annotationsNeedUpdate := deploymentutil.ReplicasAnnotationsNeedUpdate(rs, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
 	scaled := false
 	var err error
 	if sizeNeedsUpdate || annotationsNeedUpdate {
+		rsCopy := rs.DeepCopy()
 		*(rsCopy.Spec.Replicas) = newScale
+		deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 		rs, err = dc.client.ExtensionsV1beta1().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
 		if err == nil && sizeNeedsUpdate {
 			scaled = true
