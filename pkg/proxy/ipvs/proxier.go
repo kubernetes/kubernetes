@@ -1051,27 +1051,50 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.NodePort != 0 {
-			lp := utilproxy.LocalPort{
-				Description: "nodePort for " + svcNameString,
-				IP:          "",
-				Port:        svcInfo.NodePort,
-				Protocol:    protocol,
+			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+			if err != nil {
+				glog.Errorf("Failed to get node ip address matching nodeport cidr")
+				continue
 			}
-			if proxier.portsMap[lp] != nil {
-				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
-				replacementPortsMap[lp] = proxier.portsMap[lp]
-			} else {
-				socket, err := proxier.portMapper.OpenLocalPort(&lp)
-				if err != nil {
-					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
-					continue
+
+			lps := make([]utilproxy.LocalPort, 0)
+			for address := range addresses {
+				if utilproxy.IsZeroCIDR(address) {
+					lp := utilproxy.LocalPort{
+						Description: "nodePort for " + svcNameString,
+						IP:          "",
+						Port:        svcInfo.NodePort,
+						Protocol:    protocol,
+					}
+					lps = append(lps, lp)
+					break
 				}
-				if lp.Protocol == "udp" {
-					isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP)
-					conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, clientv1.ProtocolUDP)
+				lp := utilproxy.LocalPort{
+					Description: "nodePort for " + svcNameString,
+					IP:          address,
+					Port:        svcInfo.NodePort,
+					Protocol:    protocol,
 				}
-				replacementPortsMap[lp] = socket
-			} // We're holding the port, so it's OK to install ipvs rules.
+				lps = append(lps, lp)
+			}
+
+			for _, lp := range lps {
+				if proxier.portsMap[lp] != nil {
+					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
+					replacementPortsMap[lp] = proxier.portsMap[lp]
+				} else {
+					socket, err := proxier.portMapper.OpenLocalPort(&lp)
+					if err != nil {
+						glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
+						continue
+					}
+					if lp.Protocol == "udp" {
+						isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP)
+						conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, clientv1.ProtocolUDP)
+					}
+					replacementPortsMap[lp] = socket
+				} // We're holding the port, so it's OK to install ipvs rules.
+			}
 
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
@@ -1122,11 +1145,6 @@ func (proxier *Proxier) syncProxyRules() {
 
 			// Build ipvs kernel routes for each node ip address
 			nodeIPs := make([]net.IP, 0)
-			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-			if err != nil {
-				glog.Errorf("Failed to get node ip address matching nodeport cidr")
-				continue
-			}
 			for address := range addresses {
 				if !utilproxy.IsZeroCIDR(address) {
 					nodeIPs = append(nodeIPs, net.ParseIP(address))
