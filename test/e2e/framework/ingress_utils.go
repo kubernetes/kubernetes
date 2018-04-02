@@ -864,12 +864,22 @@ func (cont *GCEIngressController) GetFirewallRuleName() string {
 }
 
 // GetFirewallRule returns the firewall used by the GCEIngressController.
+// Causes a fatal error incase of an error.
+// TODO: Rename this to GetFirewallRuleOrDie and similarly rename all other
+// methods here to be consistent with rest of the code in this repo.
 func (cont *GCEIngressController) GetFirewallRule() *compute.Firewall {
-	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
-	fwName := cont.GetFirewallRuleName()
-	fw, err := gceCloud.GetFirewall(fwName)
+	fw, err := cont.GetFirewallRuleOrError()
 	Expect(err).NotTo(HaveOccurred())
 	return fw
+}
+
+// GetFirewallRule returns the firewall used by the GCEIngressController.
+// Returns an error if that fails.
+// TODO: Rename this to GetFirewallRule when the above method with that name is renamed.
+func (cont *GCEIngressController) GetFirewallRuleOrError() (*compute.Firewall, error) {
+	gceCloud := cont.Cloud.Provider.(*gcecloud.GCECloud)
+	fwName := cont.GetFirewallRuleName()
+	return gceCloud.GetFirewall(fwName)
 }
 
 func (cont *GCEIngressController) deleteFirewallRule(del bool) (msg string) {
