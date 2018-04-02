@@ -400,6 +400,22 @@ func SetReplicasAnnotations(rs *extensions.ReplicaSet, desiredReplicas, maxRepli
 	return updated
 }
 
+// AnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
+func ReplicasAnnotationsNeedUpdate(rs *extensions.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
+	if rs.Annotations == nil {
+		return true
+	}
+	desiredString := fmt.Sprintf("%d", desiredReplicas)
+	if hasString := rs.Annotations[DesiredReplicasAnnotation]; hasString != desiredString {
+		return true
+	}
+	maxString := fmt.Sprintf("%d", maxReplicas)
+	if hasString := rs.Annotations[MaxReplicasAnnotation]; hasString != maxString {
+		return true
+	}
+	return false
+}
+
 // MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
 func MaxUnavailable(deployment extensions.Deployment) int32 {
 	if !IsRollingUpdate(&deployment) || *(deployment.Spec.Replicas) == 0 {
