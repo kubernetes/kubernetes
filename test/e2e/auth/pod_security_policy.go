@@ -325,7 +325,7 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 				Image: framework.GetPauseImageName(f.ClientSet),
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
-					RunAsUser:                intPtr(65534),
+					RunAsUser:                utilpointer.Int64Ptr(65534),
 				},
 			}},
 		},
@@ -479,8 +479,4 @@ func restrictedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 
 func boolPtr(b bool) *bool {
 	return &b
-}
-
-func intPtr(i int64) *int64 {
-	return &i
 }
