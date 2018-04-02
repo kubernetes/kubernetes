@@ -86,3 +86,8 @@ options:
     description: |
       The storage backend for kube-apiserver persistence. Can be "etcd2", "etcd3", or
       "auto". Auto mode will select etcd3 on new installations, or etcd2 on upgrades.
+  enable-metrics:
+    type: boolean
+    default: true
+    description: |
+      If true the metrics server for Kubernetes will be deployed onto the cluster.
