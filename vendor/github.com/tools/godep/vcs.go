@@ -79,19 +79,6 @@ func VCSFromDir(dir, srcRoot string) (*VCS, string, error) {
 	return vcsext, reporoot, nil
 }
 
-// VCSForImportPath returns a VCS value for an import path.
-func VCSForImportPath(importPath string) (*VCS, error) {
-	rr, err := vcs.RepoRootForImportPath(importPath, debug)
-	if err != nil {
-		return nil, err
-	}
-	vcs := cmd[rr.VCS]
-	if vcs == nil {
-		return nil, fmt.Errorf("%s is unsupported: %s", rr.VCS.Name, importPath)
-	}
-	return vcs, nil
-}
-
 func (v *VCS) identify(dir string) (string, error) {
 	out, err := v.runOutput(dir, v.IdentifyCmd)
 	return string(bytes.TrimSpace(out)), err
@@ -258,22 +245,6 @@ func expand(m map[string]string, s string) string {
 		s = strings.Replace(s, "{"+k+"}", v, -1)
 	}
 	return s
-}
-
-// Mercurial has no command equivalent to git remote add.
-// We handle it as a special case in process.
-func hgLink(dir, remote, url string) error {
-	hgdir := filepath.Join(dir, ".hg")
-	if err := os.MkdirAll(hgdir, 0777); err != nil {
-		return err
-	}
-	path := filepath.Join(hgdir, "hgrc")
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintf(f, "[paths]\n%s = %s\n", remote, url)
-	return f.Close()
 }
 
 func gitDetached(r string) (bool, error) {
