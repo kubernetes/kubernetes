@@ -39,6 +39,7 @@ const (
 	defaultNodeAllocatableCgroupName = "kubepods"
 )
 
+//createNodeAllocatableCgroups creates Node Allocatable Cgroup when CgroupsPerQOS flag is specified as true
 func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
 		Name: CgroupName(cm.cgroupRoot),
@@ -83,7 +84,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 
 	// If Node Allocatable is enforced on a node that has not been drained or is updated on an existing node to a lower value,
-	// existing memory usage across pods might be higher that current Node Allocatable Memory Limits.
+	// existing memory usage across pods might be higher than current Node Allocatable Memory Limits.
 	// Pod Evictions are expected to bring down memory usage to below Node Allocatable limits.
 	// Until evictions happen retry cgroup updates.
 	// Update limits on non root cgroup-root to be safe since the default limits for CPU can be too low.
