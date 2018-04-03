@@ -52,15 +52,16 @@ const (
 	roleBindingName = "webhook-auth-reader"
 
 	// The webhook configuration names should not be reused between test instances.
-	crdWebhookConfigName         = "e2e-test-webhook-config-crd"
+	crWebhookConfigName          = "e2e-test-webhook-config-cr"
 	webhookConfigName            = "e2e-test-webhook-config"
 	mutatingWebhookConfigName    = "e2e-test-mutating-webhook-config"
 	podMutatingWebhookConfigName = "e2e-test-mutating-webhook-pod"
-	crdMutatingWebhookConfigName = "e2e-test-mutating-webhook-config-crd"
+	crMutatingWebhookConfigName  = "e2e-test-mutating-webhook-config-cr"
 	webhookFailClosedConfigName  = "e2e-test-webhook-fail-closed"
 	webhookForWebhooksConfigName = "e2e-test-webhook-for-webhooks-config"
 	removableValidatingHookName  = "e2e-test-should-be-removable-validating-webhook-config"
 	removableMutatingHookName    = "e2e-test-should-be-removable-mutating-webhook-config"
+	crdWebhookConfigName         = "e2e-test-webhook-config-crd"
 
 	skipNamespaceLabelKey   = "skip-webhook-admission"
 	skipNamespaceLabelValue = "yes"
@@ -72,6 +73,8 @@ const (
 	failNamespaceLabelKey   = "fail-closed-webhook"
 	failNamespaceLabelValue = "yes"
 	failNamespaceName       = "fail-closed-namesapce"
+	disallowedCrdLabelKey   = "disallowed-crd"
+	disallowedCrdLabelValue = "yes"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -122,9 +125,9 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 			return
 		}
 		defer testcrd.CleanUp()
-		webhookCleanup := registerWebhookForCRD(f, context, testcrd)
+		webhookCleanup := registerWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testCRDWebhook(f, testcrd.Crd, testcrd.DynamicClient)
+		testCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient)
 	})
 
 	It("Should unconditionally reject operations on fail closed webhook", func() {
@@ -151,15 +154,15 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testWebhookForWebhookConfigurations(f)
 	})
 
-	It("Should mutate crd", func() {
+	It("Should mutate custom resource", func() {
 		testcrd, err := framework.CreateTestCRD(f)
 		if err != nil {
 			return
 		}
 		defer testcrd.CleanUp()
-		webhookCleanup := registerMutatingWebhookForCRD(f, context, testcrd)
+		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testMutatingCRDWebhook(f, testcrd.Crd, testcrd.DynamicClient)
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClient)
 	})
 
 	It("Should deny crd creation", func() {
@@ -980,19 +983,19 @@ func cleanWebhookTest(client clientset.Interface, namespaceName string) {
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete(roleBindingName, nil)
 }
 
-func registerWebhookForCRD(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
+func registerWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
 	client := f.ClientSet
-	By("Registering the crd webhook via the AdmissionRegistration API")
+	By("Registering the custom resource webhook via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
-	configName := crdWebhookConfigName
+	configName := crWebhookConfigName
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "deny-unwanted-crd-data.k8s.io",
+				Name: "deny-unwanted-custom-resource-data.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -1005,14 +1008,14 @@ func registerWebhookForCRD(f *framework.Framework, context *certContext, testcrd
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/crd"),
+						Path:      strPtr("/custom-resource"),
 					},
 					CABundle: context.signingCert,
 				},
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", configName, namespace)
+	framework.ExpectNoError(err, "registering custom resource webhook config %s with namespace %s", configName, namespace)
 
 	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
@@ -1021,19 +1024,19 @@ func registerWebhookForCRD(f *framework.Framework, context *certContext, testcrd
 	}
 }
 
-func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
+func registerMutatingWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *framework.TestCrd) func() {
 	client := f.ClientSet
-	By("Registering the mutating webhook for crd via the AdmissionRegistration API")
+	By("Registering the mutating webhook for a custom resource via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
-	configName := crdMutatingWebhookConfigName
+	configName := crMutatingWebhookConfigName
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "mutate-crd-data-stage-1.k8s.io",
+				Name: "mutate-custom-resource-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -1046,13 +1049,13 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext,
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/mutating-crd"),
+						Path:      strPtr("/mutating-custom-resource"),
 					},
 					CABundle: context.signingCert,
 				},
 			},
 			{
-				Name: "mutate-crd-data-stage-2.k8s.io",
+				Name: "mutate-custom-resource-data-stage-2.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -1065,14 +1068,14 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext,
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/mutating-crd"),
+						Path:      strPtr("/mutating-custom-resource"),
 					},
 					CABundle: context.signingCert,
 				},
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering crd webhook config %s with namespace %s", configName, namespace)
+	framework.ExpectNoError(err, "registering custom resource webhook config %s with namespace %s", configName, namespace)
 
 	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
@@ -1080,7 +1083,7 @@ func registerMutatingWebhookForCRD(f *framework.Framework, context *certContext,
 	return func() { client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil) }
 }
 
-func testCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, crdClient dynamic.ResourceInterface) {
+func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be denied by the webhook")
 	crInstance := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -1095,7 +1098,7 @@ func testCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomReso
 			},
 		},
 	}
-	_, err := crdClient.Create(crInstance)
+	_, err := customResourceClient.Create(crInstance)
 	Expect(err).NotTo(BeNil())
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
@@ -1103,7 +1106,7 @@ func testCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomReso
 	}
 }
 
-func testMutatingCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, crdClient dynamic.ResourceInterface) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	By("Creating a custom resource that should be mutated by the webhook")
 	cr := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -1118,7 +1121,7 @@ func testMutatingCRDWebhook(f *framework.Framework, crd *apiextensionsv1beta1.Cu
 			},
 		},
 	}
-	mutatedCR, err := crdClient.Create(cr)
+	mutatedCR, err := customResourceClient.Create(cr)
 	Expect(err).To(BeNil())
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
@@ -1135,7 +1138,7 @@ func registerValidatingWebhookForCRD(f *framework.Framework, context *certContex
 	By("Registering the crd webhook via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
-	configName := webhookConfigName
+	configName := crdWebhookConfigName
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
@@ -1151,6 +1154,15 @@ func registerValidatingWebhookForCRD(f *framework.Framework, context *certContex
 						Resources:   []string{"customresourcedefinitions"},
 					},
 				}},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      disallowedCrdLabelKey,
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{disallowedCrdLabelValue},
+						},
+					},
+				},
 				ClientConfig: v1beta1.WebhookClientConfig{
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
@@ -1196,7 +1208,10 @@ func testCRDDenyWebhook(f *framework.Framework) {
 		return
 	}
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: testcrd.GetMetaName()},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   testcrd.GetMetaName(),
+			Labels: map[string]string{disallowedCrdLabelKey: disallowedCrdLabelValue},
+		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   testcrd.ApiGroup,
 			Version: testcrd.ApiVersion,
