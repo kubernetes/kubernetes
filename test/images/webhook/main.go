@@ -204,8 +204,8 @@ func mutateConfigmaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("mutating crd")
+func mutateCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("mutating custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -232,8 +232,8 @@ func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func admitCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("admitting crd")
+func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("admitting custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -324,12 +324,12 @@ func serveMutateConfigmaps(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, mutateConfigmaps)
 }
 
-func serveCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitCRD)
+func serveCustomResource(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitCustomResource)
 }
 
-func serveMutateCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, mutateCRD)
+func serveMutateCustomResource(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, mutateCustomResource)
 }
 
 func main() {
@@ -342,8 +342,8 @@ func main() {
 	http.HandleFunc("/mutating-pods", serveMutatePods)
 	http.HandleFunc("/configmaps", serveConfigmaps)
 	http.HandleFunc("/mutating-configmaps", serveMutateConfigmaps)
-	http.HandleFunc("/crd", serveCRD)
-	http.HandleFunc("/mutating-crd", serveMutateCRD)
+	http.HandleFunc("/custom-resource", serveCustomResource)
+	http.HandleFunc("/mutating-custom-resource", serveMutateCustomResource)
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",
