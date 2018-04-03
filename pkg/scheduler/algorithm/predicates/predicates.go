@@ -682,10 +682,6 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
 					result.MilliCPU = cpu
 				}
-			case v1.ResourceNvidiaGPU:
-				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
-					result.NvidiaGPU = gpu
-				}
 			default:
 				if v1helper.IsScalarResourceName(rName) {
 					value := rQuantity.Value()
@@ -734,7 +730,6 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 	if podRequest.MilliCPU == 0 &&
 		podRequest.Memory == 0 &&
-		podRequest.NvidiaGPU == 0 &&
 		podRequest.EphemeralStorage == 0 &&
 		len(podRequest.ScalarResources) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
@@ -747,10 +742,6 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceMemory, podRequest.Memory, nodeInfo.RequestedResource().Memory, allocatable.Memory))
 	}
-	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
-	}
-
 	if allocatable.EphemeralStorage < podRequest.EphemeralStorage+nodeInfo.RequestedResource().EphemeralStorage {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceEphemeralStorage, podRequest.EphemeralStorage, nodeInfo.RequestedResource().EphemeralStorage, allocatable.EphemeralStorage))
 	}

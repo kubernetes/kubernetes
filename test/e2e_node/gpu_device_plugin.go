@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -131,6 +132,16 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 	})
 })
+
+func checkIfNvidiaGPUsExistOnNode() bool {
+	// Cannot use `lspci` because it is not installed on all distros by default.
+	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
+	if err != nil {
+		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
+		return false
+	}
+	return true
+}
 
 func logDevicePluginMetrics() {
 	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")

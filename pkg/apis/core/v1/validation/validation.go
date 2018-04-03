@@ -61,8 +61,6 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 			} else if quantity.Cmp(limitQuantity) > 0 {
 				allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be less than or equal to %s limit", resourceName)))
 			}
-		} else if resourceName == v1.ResourceNvidiaGPU {
-			allErrs = append(allErrs, field.Invalid(reqPath, quantity.String(), fmt.Sprintf("must be equal to %s request", v1.ResourceNvidiaGPU)))
 		}
 	}
 

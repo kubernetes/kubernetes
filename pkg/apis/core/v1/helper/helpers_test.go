@@ -126,10 +126,6 @@ func TestIsOvercommitAllowed(t *testing.T) {
 			expectVal:    true,
 		},
 		{
-			resourceName: "alpha.kubernetes.io/nvidia-gpu",
-			expectVal:    false,
-		},
-		{
 			resourceName: "hugepages-100m",
 			expectVal:    false,
 		},

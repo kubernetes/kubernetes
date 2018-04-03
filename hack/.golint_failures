@@ -173,7 +173,6 @@ pkg/kubelet/dockershim/cm
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/testing
 pkg/kubelet/events
-pkg/kubelet/gpu
 pkg/kubelet/images
 pkg/kubelet/kuberuntime
 pkg/kubelet/leaky

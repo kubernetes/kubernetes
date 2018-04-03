@@ -69,8 +69,6 @@ import (
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	"k8s.io/kubernetes/pkg/kubelet/gpu"
-	"k8s.io/kubernetes/pkg/kubelet/gpu/nvidia"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
@@ -866,20 +864,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
-	if utilfeature.DefaultFeatureGate.Enabled(features.Accelerators) {
-		if containerRuntime == kubetypes.DockerContainerRuntime {
-			glog.Warningln("Accelerators feature is deprecated and will be removed in v1.11. Please use device plugins instead. They can be enabled using the DevicePlugins feature gate.")
-			if klet.gpuManager, err = nvidia.NewNvidiaGPUManager(klet, kubeDeps.DockerClientConfig); err != nil {
-				return nil, err
-			}
-		} else {
-			glog.Errorf("Accelerators feature is supported with docker runtime only. Disabling this feature internally.")
-		}
-	}
-	// Set GPU manager to a stub implementation if it is not enabled or cannot be supported.
-	if klet.gpuManager == nil {
-		klet.gpuManager = gpu.NewGPUManagerStub()
-	}
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
@@ -1152,9 +1136,6 @@ type Kubelet struct {
 	// experimental behavior is desired.
 	experimentalHostUserNamespaceDefaulting bool
 
-	// GPU Manager
-	gpuManager gpu.GPUManager
-
 	// dockerLegacyService contains some legacy methods for backward compatibility.
 	// It should be set only when docker is using non json-file logging driver.
 	dockerLegacyService dockershim.DockerLegacyService
@@ -1290,11 +1271,6 @@ func (kl *Kubelet) initializeModules() error {
 	// Start out of memory watcher.
 	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
 		return fmt.Errorf("Failed to start OOM watcher %v", err)
-	}
-
-	// Initialize GPUs
-	if err := kl.gpuManager.Start(); err != nil {
-		glog.Errorf("Failed to start gpuManager %v", err)
 	}
 
 	// Start resource analyzer

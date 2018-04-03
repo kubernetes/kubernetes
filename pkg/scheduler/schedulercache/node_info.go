@@ -114,7 +114,6 @@ func (transientSchedInfo *transientSchedulerInfo) resetTransientSchedulerInfo() 
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64
-	NvidiaGPU        int64
 	EphemeralStorage int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
@@ -142,8 +141,6 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			r.MilliCPU += rQuant.MilliValue()
 		case v1.ResourceMemory:
 			r.Memory += rQuant.Value()
-		case v1.ResourceNvidiaGPU:
-			r.NvidiaGPU += rQuant.Value()
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
@@ -161,7 +158,6 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
 		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
-		v1.ResourceNvidiaGPU:        *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
 		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
 	}
@@ -180,7 +176,6 @@ func (r *Resource) Clone() *Resource {
 	res := &Resource{
 		MilliCPU:         r.MilliCPU,
 		Memory:           r.Memory,
-		NvidiaGPU:        r.NvidiaGPU,
 		AllowedPodNumber: r.AllowedPodNumber,
 		EphemeralStorage: r.EphemeralStorage,
 	}
@@ -369,7 +364,6 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	res, non0CPU, non0Mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
-	n.requestedResource.NvidiaGPU += res.NvidiaGPU
 	n.requestedResource.EphemeralStorage += res.EphemeralStorage
 	if n.requestedResource.ScalarResources == nil && len(res.ScalarResources) > 0 {
 		n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
@@ -425,7 +419,6 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
-			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
 			n.requestedResource.EphemeralStorage -= res.EphemeralStorage
 			if len(res.ScalarResources) > 0 && n.requestedResource.ScalarResources == nil {
 				n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}

@@ -5042,25 +5042,7 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
-			Name:  "resources-test-with-gpu-with-request",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Requests: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-					core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-				},
-				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-					core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-				},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
-			Name:  "resources-test-with-gpu-without-request",
+			Name:  "resources-test-with-request-and-limit",
 			Image: "image",
 			Resources: core.ResourceRequirements{
 				Requests: core.ResourceList{
@@ -5068,9 +5050,8 @@ func TestValidateContainers(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
 				Limits: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-					core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -5357,41 +5338,6 @@ func TestValidateContainers(t *testing.T) {
 				},
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
-			},
-		},
-		"Resource GPU limit must match request": {
-			{
-				Name:  "gpu-resource-request-limit",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Requests: core.ResourceList{
-						core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-						core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-						core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("0"),
-					},
-					Limits: core.ResourceList{
-						core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-						core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-						core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-					},
-				},
-				TerminationMessagePolicy: "File",
-				ImagePullPolicy:          "IfNotPresent",
-			},
-		},
-		"Resource GPU invalid setting only request": {
-			{
-				Name:  "gpu-resource-request-limit",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Requests: core.ResourceList{
-						core.ResourceName(core.ResourceCPU):       resource.MustParse("10"),
-						core.ResourceName(core.ResourceMemory):    resource.MustParse("10G"),
-						core.ResourceName(core.ResourceNvidiaGPU): resource.MustParse("1"),
-					},
-				},
-				TerminationMessagePolicy: "File",
-				ImagePullPolicy:          "IfNotPresent",
 			},
 		},
 		"Request limit simple invalid": {
