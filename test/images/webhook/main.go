@@ -67,6 +67,15 @@ func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {
 	}
 }
 
+// Deny all requests made to this function.
+func alwaysDeny(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("calling always-deny")
+	reviewResponse := v1beta1.AdmissionResponse{}
+	reviewResponse.Allowed = false
+	reviewResponse.Result = &metav1.Status{Message: "this webhook denies all requests"}
+	return &reviewResponse
+}
+
 // only allow pods to pull images from specific registry.
 func admitPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	glog.V(2).Info("admitting pods")
@@ -88,10 +97,15 @@ func admitPods(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	reviewResponse.Allowed = true
 
 	var msg string
-	for k, v := range pod.Labels {
-		if k == "webhook-e2e-test" && v == "webhook-disallow" {
+	if v, ok := pod.Labels["webhook-e2e-test"]; ok {
+		if v == "webhook-disallow" {
 			reviewResponse.Allowed = false
 			msg = msg + "the pod contains unwanted label; "
+		}
+		if v == "wait-forever" {
+			reviewResponse.Allowed = false
+			msg = msg + "the pod response should not be sent; "
+			<-make(chan int) // Sleep forever - no one sends to this channel
 		}
 	}
 	for _, container := range pod.Spec.Containers {
@@ -190,8 +204,8 @@ func mutateConfigmaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("mutating crd")
+func mutateCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("mutating custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -218,8 +232,8 @@ func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func admitCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("admitting crd")
+func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("admitting custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -290,6 +304,10 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	}
 }
 
+func serveAlwaysDeny(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, alwaysDeny)
+}
+
 func servePods(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, admitPods)
 }
@@ -306,12 +324,12 @@ func serveMutateConfigmaps(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, mutateConfigmaps)
 }
 
-func serveCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitCRD)
+func serveCustomResource(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitCustomResource)
 }
 
-func serveMutateCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, mutateCRD)
+func serveMutateCustomResource(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, mutateCustomResource)
 }
 
 func main() {
@@ -319,12 +337,13 @@ func main() {
 	config.addFlags()
 	flag.Parse()
 
+	http.HandleFunc("/always-deny", serveAlwaysDeny)
 	http.HandleFunc("/pods", servePods)
 	http.HandleFunc("/mutating-pods", serveMutatePods)
 	http.HandleFunc("/configmaps", serveConfigmaps)
 	http.HandleFunc("/mutating-configmaps", serveMutateConfigmaps)
-	http.HandleFunc("/crd", serveCRD)
-	http.HandleFunc("/mutating-crd", serveMutateCRD)
+	http.HandleFunc("/custom-resource", serveCustomResource)
+	http.HandleFunc("/mutating-custom-resource", serveMutateCustomResource)
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",
