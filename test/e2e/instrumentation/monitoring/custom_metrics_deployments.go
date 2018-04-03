@@ -19,12 +19,17 @@ package monitoring
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
+	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"os/exec"
 )
@@ -35,6 +40,7 @@ var (
 	CustomMetricValue   = int64(448)
 	UnusedMetricValue   = int64(446)
 	StackdriverExporter = "stackdriver-exporter"
+	DummyContainer      = "dummy-container"
 	// HPAPermissions is a ClusterRoleBinding that grants unauthenticated user permissions granted for
 	// HPA for testing purposes, i.e. it should grant permission to read custom metrics.
 	HPAPermissions = &rbac.ClusterRoleBinding{
@@ -54,11 +60,13 @@ var (
 			},
 		},
 	}
-	StagingDeploymentsLocation = "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/staging/"
-	AdapterForOldResourceModel = "adapter_old_resource_model.yaml"
-	AdapterForNewResourceModel = "adapter_new_resource_model.yaml"
-	AdapterDefault             = AdapterForOldResourceModel
-	ClusterAdminBinding        = "e2e-test-cluster-admin-binding"
+	StackdriverStagingDeploymentsLocation = "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/staging/"
+	CustomStagingDeploymentsLocation      = "https://raw.githubusercontent.com/damemi/k8s-e2e-adapter/master/deploy/manifests/"
+	AdapterForCustomMetrics               = "k8s-e2e-adapter.yaml"
+	AdapterForOldResourceModel            = "adapter_old_resource_model.yaml"
+	AdapterForNewResourceModel            = "adapter_new_resource_model.yaml"
+	StackdriverAdapterDefault             = AdapterForOldResourceModel
+	ClusterAdminBinding                   = "e2e-test-cluster-admin-binding"
 )
 
 // CustomMetricContainerSpec allows to specify a config for StackdriverExporterDeployment
@@ -67,6 +75,57 @@ type CustomMetricContainerSpec struct {
 	Name        string
 	MetricName  string
 	MetricValue int64
+}
+
+// SimpleDummyStatefulSet is a StatefulSet of just the `k8s.gcr.io/pause:2.0` container for basic testing
+func SimpleDummyStatefulSet(name, namespace string, replicas int32) *appsv1.StatefulSet {
+	return DummyStatefulSet(name, namespace, replicas,
+		[]CustomMetricContainerSpec{
+			{Name: DummyContainer},
+		})
+}
+
+// DummyDeployment is a simple deployment for basic testing
+func DummyStatefulSet(name, namespace string, replicas int32, containers []CustomMetricContainerSpec) *appsv1.StatefulSet {
+	podSpec := corev1.PodSpec{Containers: []corev1.Container{}}
+	for _, containerSpec := range containers {
+		podSpec.Containers = append(podSpec.Containers, dummyContainerSpec(containerSpec.Name))
+	}
+	return &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"name": name},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": name,
+					},
+				},
+				Spec: podSpec,
+			},
+			Replicas: &replicas,
+		},
+	}
+}
+
+// DummyPod is a simple pod for DummyDeployments
+func DummyPod(podName, namespace, podLabel, metricName string, metricValue int64) *corev1.Pod {
+	containerSpec := []corev1.Container{dummyContainerSpec(DummyContainer)}
+	return CustomMetricsPod(podName, namespace, podLabel, containerSpec)
+}
+
+func dummyContainerSpec(name string) corev1.Container {
+	return corev1.Container{
+		Name:            name,
+		Image:           "k8s.gcr.io/pause:2.0",
+		ImagePullPolicy: corev1.PullPolicy("Always"),
+		Ports:           []corev1.ContainerPort{{ContainerPort: 80}},
+	}
 }
 
 // SimpleStackdriverExporterDeployment is a Deployment of simple application that exports a metric of
@@ -91,7 +150,6 @@ func StackdriverExporterDeployment(name, namespace string, replicas int32, conta
 	for _, containerSpec := range containers {
 		podSpec.Containers = append(podSpec.Containers, stackdriverExporterContainerSpec(containerSpec.Name, namespace, containerSpec.MetricName, containerSpec.MetricValue))
 	}
-
 	return &extensions.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -117,6 +175,12 @@ func StackdriverExporterDeployment(name, namespace string, replicas int32, conta
 // StackdriverExporterPod is a Pod of simple application that exports a metric of fixed value to
 // Stackdriver in a loop.
 func StackdriverExporterPod(podName, namespace, podLabel, metricName string, metricValue int64) *corev1.Pod {
+	containerSpec := []corev1.Container{stackdriverExporterContainerSpec(StackdriverExporter, namespace, metricName, metricValue)}
+	return CustomMetricsPod(podName, namespace, podLabel, containerSpec)
+}
+
+// CustomMetricsPod is a Pod with the given containerSpec
+func CustomMetricsPod(podName, namespace, podLabel string, containerSpec []corev1.Container) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -126,7 +190,7 @@ func StackdriverExporterPod(podName, namespace, podLabel, metricName string, met
 			},
 		},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{stackdriverExporterContainerSpec(StackdriverExporter, namespace, metricName, metricValue)},
+			Containers: containerSpec,
 		},
 	}
 }
@@ -238,9 +302,54 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 	}
 }
 
-// CreateAdapter creates Custom Metrics - Stackdriver adapter
+// CreateCustomAdapter creates Custom Metrics API adapter
+// TODO the location needs to be updated -- also should download file locally like with StackDriverAdapter
+func CreateCustomAdapter(adapterDeploymentFile string) error {
+	adapterURL := CustomStagingDeploymentsLocation + adapterDeploymentFile
+	err := exec.Command("wget", adapterURL).Run()
+	if err != nil {
+		return err
+	}
+	stat, err := framework.RunKubectl("create", "-f", adapterURL)
+	framework.Logf(stat)
+	return err
+}
+
+// CleanupCustomAdapter deletes Custom Metrics API adapter deployments.
+// TODO the location needs to be updated
+func CleanupCustomAdapter(adapterDeploymentFile, adapterNamespace string, cs clientset.Interface, timeout time.Duration) {
+	stat, err := framework.RunKubectl("delete", "-f", adapterDeploymentFile)
+	framework.Logf(stat)
+	if err != nil {
+		framework.Logf("Failed to delete adapter deployments: %s", err)
+	}
+	err = exec.Command("rm", adapterDeploymentFile).Run()
+	if err != nil {
+		framework.Logf("Failed to delete adapter deployment file: %s", err)
+	}
+
+	// Wait for namespace to be fully terminated before proceeding
+	interval := 20 * time.Second
+	err = wait.PollImmediate(interval, timeout, func() (bool, error) {
+		_, err := cs.Core().Namespaces().Get(adapterNamespace, metav1.GetOptions{})
+		if err != nil {
+			if apierr.IsNotFound(err) {
+				return true, nil
+			} else {
+				framework.Failf("Failed waiting to terminate adapter namespace %s: %v", adapterNamespace, err)
+			}
+		}
+		framework.Logf("waiting for custom-metrics adapter namespace to terminate...")
+		return false, nil
+	})
+	if err != nil {
+		framework.Failf("Timeout waiting %v for adapter namespace %v to be deleted", timeout, adapterNamespace)
+	}
+}
+
+// CreateStackdriverAdapter creates Custom Metrics - Stackdriver adapter
 // adapterDeploymentFile should be a filename for adapter deployment located in StagingDeploymentLocation
-func CreateAdapter(adapterDeploymentFile string) error {
+func CreateStackdriverAdapter(adapterDeploymentFile string) error {
 	// A workaround to make the work on GKE. GKE doesn't normally allow to create cluster roles,
 	// which the adapter deployment does. The solution is to create cluster role binding for
 	// cluster-admin role and currently used service account.
@@ -248,7 +357,7 @@ func CreateAdapter(adapterDeploymentFile string) error {
 	if err != nil {
 		return err
 	}
-	adapterURL := StagingDeploymentsLocation + adapterDeploymentFile
+	adapterURL := StackdriverStagingDeploymentsLocation + adapterDeploymentFile
 	err = exec.Command("wget", adapterURL).Run()
 	if err != nil {
 		return err
@@ -304,8 +413,8 @@ func CleanupDescriptors(service *gcm.Service, projectId string) {
 	}
 }
 
-// CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
-func CleanupAdapter(adapterDeploymentFile string) {
+// CleanupStackdriverAdapter deletes Custom Metrics - Stackdriver adapter deployments.
+func CleanupStackdriverAdapter(adapterDeploymentFile string) {
 	stat, err := framework.RunKubectl("delete", "-f", adapterDeploymentFile)
 	framework.Logf(stat)
 	if err != nil {

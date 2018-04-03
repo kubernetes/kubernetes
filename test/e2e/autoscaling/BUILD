@@ -11,6 +11,8 @@ go_library(
         "autoscaling_timer.go",
         "cluster_autoscaler_scalability.go",
         "cluster_size_autoscaling.go",
+        "custom_metrics_adapter_autoscaling.go",
+        "custom_metrics_autoscaling_utils.go",
         "custom_metrics_stackdriver_autoscaling.go",
         "dns_autoscaling.go",
         "framework.go",
@@ -19,6 +21,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/autoscaling",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
