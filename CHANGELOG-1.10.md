@@ -199,6 +199,8 @@ In terms of networking, Kubernetes 1.10 is about control. Users now have beta su
 
 ## Before Upgrading
 
+* If you need to downgrade from 1.10 to 1.9.x, downgrade to v1.9.6 to ensure PV and PVC objects can be deleted properly.
+
 * In-place node upgrades to this release from versions 1.7.14, 1.8.9, and 1.9.4 are not supported if using subpath volumes with PVCs.  Such pods should be drained from the node first.
 
 * The minimum supported version of Docker is now 1.11; if you are using Docker 1.10 or below, be sure to upgrade Docker before upgrading Kubernetes. ([#57845](https://github.com/kubernetes/kubernetes/pull/57845), [@yujuhong](https://github.com/yujuhong))
@@ -289,6 +291,8 @@ kind: KubeProxyConfiguration
 * MountPropagation feature is now beta. As a consequence, all volume mounts in containers are now `rslave` on Linux by default. To make this default work in all Linux environments the entire mount tree should be marked as shareable, e.g. via `mount --make-rshared /`. All Linux distributions that use systemd already have the root directory mounted as rshared and hence they need not do anything. In Linux environments without systemd we recommend running `mount --make-rshared /` during boot before docker is started, ([@jsafrane](https://github.com/jsafrane))
 
 ## Known Issues
+
+* If you need to downgrade from 1.10 to 1.9.x, downgrade to v1.9.6 to ensure PV and PVC objects can be deleted properly.
 
 * Use of subPath module with hostPath volumes can cause issues during reconstruction ([#61446](https://github.com/kubernetes/kubernetes/issues/61446)) and with containerized kubelets ([#61456](https://github.com/kubernetes/kubernetes/issues/61456)). The workaround for this issue is to specify the complete path in the hostPath volume. Use of subPathmounts nested within atomic writer volumes (configmap, secret, downwardAPI, projected) does not work ([#61545](https://github.com/kubernetes/kubernetes/issues/61545)), and socket files cannot be loaded from a subPath ([#62377](https://github.com/kubernetes/kubernetes/issues/61377)). Work on these issues is ongoing.
 
