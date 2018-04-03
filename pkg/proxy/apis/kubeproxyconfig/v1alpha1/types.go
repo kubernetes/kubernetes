@@ -63,6 +63,9 @@ type KubeProxyIPVSConfiguration struct {
 	MinSyncPeriod metav1.Duration `json:"minSyncPeriod"`
 	// ipvs scheduler
 	Scheduler string `json:"scheduler"`
+	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
+	// when cleaning up ipvs services.
+	ExcludeCIDRs []string
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for

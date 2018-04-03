@@ -54,7 +54,7 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 	}
 	out.ClientConnection = in.ClientConnection
 	in.IPTables.DeepCopyInto(&out.IPTables)
-	out.IPVS = in.IPVS
+	in.IPVS.DeepCopyInto(&out.IPVS)
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
 		if *in == nil {
@@ -186,6 +186,11 @@ func (in *KubeProxyIPVSConfiguration) DeepCopyInto(out *KubeProxyIPVSConfigurati
 	*out = *in
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	if in.ExcludeCIDRs != nil {
+		in, out := &in.ExcludeCIDRs, &out.ExcludeCIDRs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
