@@ -75,7 +75,7 @@ func SplitDirs(dirs string) []string {
 
 func ProbeNetworkPlugins(confDir string, binDirs []string) []network.NetworkPlugin {
 	old := binDirs
-	binDirs = make([]string, len(binDirs))
+	binDirs = make([]string, 0, len(binDirs))
 	for _, dir := range old {
 		if dir != "" {
 			binDirs = append(binDirs, dir)
