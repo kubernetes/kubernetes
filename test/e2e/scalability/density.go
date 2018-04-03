@@ -386,7 +386,6 @@ var _ = SIGDescribe("Density", func() {
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, metrics)
-			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 		}
 
 		// Verify scheduler metrics.
@@ -401,6 +400,8 @@ var _ = SIGDescribe("Density", func() {
 
 		framework.PrintSummaries(summaries, testCaseBaseName)
 
+		// Fail if there were some high-latency requests.
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 		// Fail if more than the allowed threshold of measurements were missing in the latencyTest.
 		Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(Equal(true))
 	})
