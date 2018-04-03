@@ -257,7 +257,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-		"--allow-privileged", "true",
+		"--allow-privileged=true",
 	)
 
 	// Apply test framework feature gates by default. This could also be overridden
@@ -347,7 +347,7 @@ func addKubeletConfigFlags(cmdArgs *[]string, kc *kubeletconfig.KubeletConfigura
 	fs := pflag.NewFlagSet("kubelet", pflag.ExitOnError)
 	options.AddKubeletConfigFlags(fs, kc)
 	for _, name := range flags {
-		*cmdArgs = append(*cmdArgs, "--"+name, fs.Lookup(name).Value.String())
+		*cmdArgs = append(*cmdArgs, fmt.Sprintf("--%s=%s", name, fs.Lookup(name).Value.String()))
 	}
 }
 
