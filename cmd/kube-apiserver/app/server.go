@@ -767,6 +767,19 @@ func defaultOptions(s *options.ServerRunOptions) error {
 		}
 	}
 
+	// TODO: remove when we stop supporting the legacy group version.
+	if s.APIEnablement.RuntimeConfig != nil {
+		for key, value := range s.APIEnablement.RuntimeConfig {
+			if key == "v1" || strings.HasPrefix(key, "v1/") ||
+				key == "api/v1" || strings.HasPrefix(key, "api/v1/") {
+				delete(s.APIEnablement.RuntimeConfig, key)
+				s.APIEnablement.RuntimeConfig["/v1"] = value
+			}
+			if key == "api/legacy" {
+				delete(s.APIEnablement.RuntimeConfig, key)
+			}
+		}
+	}
 	return nil
 }
 
