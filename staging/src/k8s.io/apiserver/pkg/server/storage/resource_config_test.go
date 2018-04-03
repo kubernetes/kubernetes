@@ -59,23 +59,14 @@ func TestDisabledVersion(t *testing.T) {
 		}
 	}
 
-	if e, a := false, config.AnyResourcesForVersionEnabled(g1v1); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+	if config.AnyResourcesForVersionEnabled(g1v1) {
+		t.Errorf("expected disabled for %v, from %v", g1v1, config)
 	}
-	if e, a := false, config.AllResourcesForVersionEnabled(g1v1); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+	if !config.AnyResourcesForVersionEnabled(g1v2) {
+		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
-	if e, a := true, config.AnyResourcesForVersionEnabled(g1v2); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := false, config.AllResourcesForVersionEnabled(g1v2); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := true, config.AnyResourcesForVersionEnabled(g3v1); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-	if e, a := true, config.AllResourcesForVersionEnabled(g3v1); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+	if !config.AnyResourcesForVersionEnabled(g2v1) {
+		t.Errorf("expected enabled for %v, from %v", g1v1, config)
 	}
 
 	expectedEnabledAnyVersionResources := []schema.GroupResource{

@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -189,6 +190,13 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	v1beta1storage["apiservices"] = apiServiceREST
 	v1beta1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
 	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
+
+	apiGroupInfo.GroupMeta.GroupVersion = v1.SchemeGroupVersion
+	storage := map[string]rest.Storage{}
+	v1apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+	storage["apiservices"] = v1apiServiceREST
+	storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, v1apiServiceREST)
+	apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
