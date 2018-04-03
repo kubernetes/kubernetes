@@ -219,7 +219,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 // Returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
-	masterConfig.ExtraConfig.EnableCoreControllers = true
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
@@ -298,7 +297,6 @@ func NewMasterConfig() *master.Config {
 		ExtraConfig: master.ExtraConfig{
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			StorageFactory:          storageFactory,
-			EnableCoreControllers:   true,
 			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 			APIServerServicePort:    443,
 			MasterCount:             1,

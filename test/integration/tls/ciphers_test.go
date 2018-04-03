@@ -70,7 +70,6 @@ func runBasicSecureAPIServer(t *testing.T, ciphers []string) (uint32, error) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		kubeAPIServerConfig.ExtraConfig.EnableCoreControllers = false
 		kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
 
 		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
