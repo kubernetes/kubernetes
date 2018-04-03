@@ -178,7 +178,6 @@ var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
 // namespace and not blacklisted.
 func IsOvercommitAllowed(name core.ResourceName) bool {
 	return IsDefaultNamespaceResource(name) &&
-		!IsHugePageResourceName(name) &&
 		!overcommitBlacklist.Has(string(name))
 }
 
