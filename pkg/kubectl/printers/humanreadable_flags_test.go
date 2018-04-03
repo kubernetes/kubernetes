@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	flags "k8s.io/kubernetes/pkg/kubectl/printers"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -93,7 +94,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.HumanPrintFlags{
+			printFlags := flags.HumanPrintFlags{
 				ShowKind:     &tc.showKind,
 				ShowLabels:   &tc.showLabels,
 				SortBy:       &tc.sortBy,

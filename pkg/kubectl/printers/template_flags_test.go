@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
+	flags "k8s.io/kubernetes/pkg/kubectl/printers"
 )
 
 func TestPrinterSupportsExpectedTemplateFormats(t *testing.T) {
@@ -99,7 +99,7 @@ func TestPrinterSupportsExpectedTemplateFormats(t *testing.T) {
 				templateArg = nil
 			}
 
-			printFlags := printers.GoTemplatePrintFlags{
+			printFlags := flags.GoTemplatePrintFlags{
 				TemplateArgument: templateArg,
 			}
 
@@ -171,7 +171,7 @@ func TestTemplatePrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.GoTemplatePrintFlags{
+			printFlags := flags.GoTemplatePrintFlags{
 				TemplateArgument: &tc.templateArg,
 				AllowMissingKeys: tc.allowMissingKeys,
 			}

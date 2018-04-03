@@ -27,94 +27,10 @@ import (
 // send arguments to PrintObj in the version you wish them to be shown using a
 // VersionedPrinter (typically when generic is true).
 func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, decoders []runtime.Decoder, options PrintOptions) (ResourcePrinter, error) {
-	format, formatArgument, allowMissingTemplateKeys := options.OutputFormatType, options.OutputFormatArgument, options.AllowMissingKeys
+	format, _, _ := options.OutputFormatType, options.OutputFormatArgument, options.AllowMissingKeys
 
 	var printer ResourcePrinter
 	switch format {
-
-	case "json", "yaml":
-		jsonYamlFlags := NewJSONYamlPrintFlags()
-		p, matched, err := jsonYamlFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a printer to handle current print options")
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		printer = p
-
-	case "name":
-		nameFlags := NewNamePrintFlags("", false)
-		namePrinter, matched, err := nameFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a name printer to handle current print options")
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		printer = namePrinter
-
-	case "template", "go-template", "jsonpath", "templatefile", "go-template-file", "jsonpath-file":
-		// TODO: construct and bind this separately (at the command level)
-		kubeTemplateFlags := KubeTemplatePrintFlags{
-			GoTemplatePrintFlags: &GoTemplatePrintFlags{
-				AllowMissingKeys: &allowMissingTemplateKeys,
-				TemplateArgument: &formatArgument,
-			},
-			JSONPathPrintFlags: &JSONPathPrintFlags{
-				AllowMissingKeys: &allowMissingTemplateKeys,
-				TemplateArgument: &formatArgument,
-			},
-		}
-
-		kubeTemplatePrinter, matched, err := kubeTemplateFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a template printer to handle current print options")
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		printer = kubeTemplatePrinter
-
-	case "custom-columns", "custom-columns-file":
-		customColumnsFlags := &CustomColumnsPrintFlags{
-			NoHeaders:        options.NoHeaders,
-			TemplateArgument: formatArgument,
-		}
-		customColumnsPrinter, matched, err := customColumnsFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a name printer to handle current print options")
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		printer = customColumnsPrinter
-
-	case "wide":
-		fallthrough
-	case "":
-		humanPrintFlags := NewHumanPrintFlags(options.Kind, options.NoHeaders, options.WithNamespace, options.AbsoluteTimestamps)
-
-		// TODO: these should be bound through a call to humanPrintFlags#AddFlags(cmd) once we instantiate PrintFlags at the command level
-		humanPrintFlags.ShowKind = &options.WithKind
-		humanPrintFlags.ShowLabels = &options.ShowLabels
-		humanPrintFlags.ColumnLabels = &options.ColumnLabels
-		humanPrintFlags.SortBy = &options.SortBy
-
-		humanPrinter, matches, err := humanPrintFlags.ToPrinter(format)
-		if !matches {
-			return nil, fmt.Errorf("unable to match a printer to handle current print options")
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		printer = humanPrinter
-
 	default:
 		return nil, fmt.Errorf("output format %q not recognized", format)
 	}

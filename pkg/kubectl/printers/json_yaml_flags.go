@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
@@ -32,13 +33,13 @@ type JSONYamlPrintFlags struct{}
 // handling --output=(yaml|json) printing.
 // Returns false if the specified outputFormat does not match a supported format.
 // Supported Format types can be found in pkg/printers/printers.go
-func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, bool, error) {
 	outputFormat = strings.ToLower(outputFormat)
 	switch outputFormat {
 	case "json":
-		return &JSONPrinter{}, true, nil
+		return &printers.JSONPrinter{}, true, nil
 	case "yaml":
-		return &YAMLPrinter{}, true, nil
+		return &printers.YAMLPrinter{}, true, nil
 	case "":
 		return nil, false, fmt.Errorf("missing output format")
 	default:

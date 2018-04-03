@@ -21,6 +21,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 // HumanPrintFlags provides default flags necessary for printing.
@@ -32,17 +34,25 @@ type HumanPrintFlags struct {
 	SortBy       *string
 	ColumnLabels *[]string
 
-	// get.go-specific values
-	NoHeaders bool
+	// printer-specific values
+	Kind schema.GroupKind
 
-	Kind               schema.GroupKind
-	AbsoluteTimestamps bool
+	// must be set through the Complete method, or
+	// while instantiating this struct.
+	NoHeaders          bool
 	WithNamespace      bool
+	AbsoluteTimestamps bool
+}
+
+func (f *HumanPrintFlags) Complete(noHeaders, withNamespace, absoluteTimestamps bool) {
+	f.NoHeaders = noHeaders
+	f.WithNamespace = withNamespace
+	f.AbsoluteTimestamps = absoluteTimestamps
 }
 
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling human-readable output.
-func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, bool, error) {
 	if len(outputFormat) > 0 && outputFormat != "wide" {
 		return nil, false, nil
 	}
@@ -65,7 +75,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool,
 		columnLabels = *f.ColumnLabels
 	}
 
-	p := NewHumanReadablePrinter(encoder, decoder, PrintOptions{
+	p := printers.NewHumanReadablePrinter(encoder, decoder, printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
 		NoHeaders:     f.NoHeaders,
@@ -75,9 +85,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool,
 		ShowLabels:    showLabels,
 	})
 
-	// TODO(juanvallejo): enable this here once we wire commands to instantiate PrintFlags directly.
-	// PrintHandlers are currently added through cmd/util/printing.go#PrinterForOptions
-	//printersinternal.AddHandlers(p)
+	printersinternal.AddHandlers(p)
 
 	// TODO(juanvallejo): handle sorting here
 

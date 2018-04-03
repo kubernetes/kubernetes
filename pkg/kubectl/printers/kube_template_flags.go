@@ -16,7 +16,11 @@ limitations under the License.
 
 package printers
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+
+	"k8s.io/kubernetes/pkg/printers"
+)
 
 // KubeTemplatePrintFlags composes print flags that provide both a JSONPath and a go-template printer.
 // This is necessary if dealing with cases that require support both both printers, since both sets of flags
@@ -25,11 +29,19 @@ type KubeTemplatePrintFlags struct {
 	*GoTemplatePrintFlags
 	*JSONPathPrintFlags
 
+	// printer-specific values
 	AllowMissingKeys *bool
-	TemplateArgument *string
+
+	// must be set through the Complete method, or
+	// while instantiating this struct.
+	TemplateArgument string
 }
 
-func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *KubeTemplatePrintFlags) Complete(templateValue string) {
+	f.TemplateArgument = templateValue
+}
+
+func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, bool, error) {
 	if p, match, err := f.JSONPathPrintFlags.ToPrinter(outputFormat); match {
 		return p, match, err
 	}
@@ -39,10 +51,6 @@ func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter
 // AddFlags receives a *cobra.Command reference and binds
 // flags related to template printing to it
 func (f *KubeTemplatePrintFlags) AddFlags(c *cobra.Command) {
-	if f.TemplateArgument != nil {
-		c.Flags().StringVar(f.TemplateArgument, "template", *f.TemplateArgument, "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
-		c.MarkFlagFilename("template")
-	}
 	if f.AllowMissingKeys != nil {
 		c.Flags().BoolVar(f.AllowMissingKeys, "allow-missing-template-keys", *f.AllowMissingKeys, "If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats.")
 	}
@@ -50,21 +58,20 @@ func (f *KubeTemplatePrintFlags) AddFlags(c *cobra.Command) {
 
 // NewKubeTemplatePrintFlags returns flags associated with
 // --template printing, with default values set.
-func NewKubeTemplatePrintFlags() *KubeTemplatePrintFlags {
+func NewKubeTemplatePrintFlags(templateValue string) *KubeTemplatePrintFlags {
 	allowMissingKeysPtr := true
-	templateArgPtr := ""
 
 	return &KubeTemplatePrintFlags{
 		GoTemplatePrintFlags: &GoTemplatePrintFlags{
-			TemplateArgument: &templateArgPtr,
+			TemplateArgument: &templateValue,
 			AllowMissingKeys: &allowMissingKeysPtr,
 		},
 		JSONPathPrintFlags: &JSONPathPrintFlags{
-			TemplateArgument: &templateArgPtr,
+			TemplateArgument: &templateValue,
 			AllowMissingKeys: &allowMissingKeysPtr,
 		},
 
-		TemplateArgument: &templateArgPtr,
+		TemplateArgument: templateValue,
 		AllowMissingKeys: &allowMissingKeysPtr,
 	}
 }

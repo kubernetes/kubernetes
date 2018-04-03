@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // NamePrintFlags provides default flags necessary for printing
@@ -46,9 +47,9 @@ type NamePrintFlags struct {
 // handling --output=name printing.
 // Returns false if the specified outputFormat does not match a supported format.
 // Supported format types can be found in pkg/printers/printers.go
-func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *NamePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, bool, error) {
 	decoders := []runtime.Decoder{scheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}
-	namePrinter := &NamePrinter{
+	namePrinter := &printers.NamePrinter{
 		Operation: f.Operation,
 		DryRun:    f.DryRun,
 		Typer:     scheme.Scheme,
