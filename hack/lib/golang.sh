@@ -417,29 +417,6 @@ kube::golang::place_bins() {
   done
 }
 
-kube::golang::fallback_if_stdlib_not_installable() {
-  local go_root_dir=$(go env GOROOT);
-  local go_host_os=$(go env GOHOSTOS);
-  local go_host_arch=$(go env GOHOSTARCH);
-  local cgo_pkg_dir=${go_root_dir}/pkg/${go_host_os}_${go_host_arch}_cgo;
-
-  if [ -e ${cgo_pkg_dir} ]; then
-    return 0;
-  fi
-
-  if [ -w ${go_root_dir}/pkg ]; then
-    return 0;
-  fi
-
-  kube::log::status "+++ Warning: stdlib pkg with cgo flag not found.";
-  kube::log::status "+++ Warning: stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`";
-  kube::log::status "+++ Warning: Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
-  kube::log::status "+++ Warning: Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a -installsuffix cgo std'";
-  kube::log::status "+++ Falling back to go build, which is slower";
-
-  use_go_build=true
-}
-
 # Builds the toolchain necessary for building kube. This needs to be
 # built only on the host platform.
 # TODO: Find this a proper home.
@@ -496,44 +473,37 @@ kube::golang::build_binaries_for_platform() {
     fi
   done
 
-  if [[ "${#statics[@]}" != 0 ]]; then
-      kube::golang::fallback_if_stdlib_not_installable;
-  fi
-
   if [[ -n ${use_go_build:-} ]]; then
-    kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
+      kube::log::info "  go build ${binary}"
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=0 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${binary}"
-      kube::log::progress "*"
     done
     for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
+      kube::log::info "  go build ${binary}"
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${binary}"
-      kube::log::progress "*"
     done
-    kube::log::progress "\n"
-  else
-    # Use go install.
+  else # Use go install.
+    if [[ "${#statics[@]}" != 0 ]]; then
+      CGO_ENABLED=0 go install -installsuffix static "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
+        -ldflags "${goldflags}" \
+        "${statics[@]:+${statics[@]}}"
+    fi
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       go install "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${nonstatics[@]:+${nonstatics[@]}}"
-    fi
-    if [[ "${#statics[@]}" != 0 ]]; then
-      CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${statics[@]:+${statics[@]}}"
     fi
   fi
 
