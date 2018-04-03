@@ -4884,6 +4884,8 @@ runTests() {
   # Cluster Role #
   ################
 
+  kubectl "${kube_flags[@]}" api-resources
+
   if kube::test::if_supports_resource "${clusterroles}" ; then
     record_command run_clusterroles_tests
   fi
