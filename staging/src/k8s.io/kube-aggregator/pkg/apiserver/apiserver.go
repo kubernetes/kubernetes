@@ -23,13 +23,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/apis/audit/install"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
@@ -37,10 +41,19 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
-	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
+	apiservicestorage "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd"
+)
+
+var (
+	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
+	registry             = registered.NewOrDie("")
+	Scheme               = runtime.NewScheme()
+	Codecs               = serializer.NewCodecFactory(Scheme)
 )
 
 func init() {
+	install.Install(groupFactoryRegistry, registry, Scheme)
+
 	// we need to add the options (like ListOptions) to empty v1
 	metav1.AddToGroupVersion(aggregatorscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
@@ -169,7 +182,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}
 
-	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
+	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
+	v1beta1storage := map[string]rest.Storage{}
+	apiServiceREST := apiservicestorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+	v1beta1storage["apiservices"] = apiServiceREST
+	v1beta1storage["apiservices/status"] = apiservicestorage.NewStatusREST(Scheme, apiServiceREST)
+	apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = v1beta1storage
+
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
@@ -310,15 +330,4 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 
 	// TODO unregister group level discovery when there are no more versions for the group
 	// We don't need this right away because the handler properly delegates when no versions are present
-}
-
-func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
-	ret := serverstorage.NewResourceConfig()
-	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
-	ret.EnableVersions(
-		v1.SchemeGroupVersion,
-		v1beta1.SchemeGroupVersion,
-	)
-
-	return ret
 }

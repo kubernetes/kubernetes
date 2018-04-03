@@ -155,7 +155,6 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	if err != nil {
 		return nil, err
 	}
-
 	kubeAPIServerConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions, nodeTunneler, proxyTransport)
 	if err != nil {
 		return nil, err
@@ -319,7 +318,11 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
+<<<<<<< HEAD
 	storageFactory, lastErr := BuildStorageFactory(s.ServerRunOptions, genericConfig.MergedResourceConfig)
+=======
+	storageFactory, lastErr := BuildStorageFactory(s)
+>>>>>>> Revert "pass APIEnablement through apiserver chain"
 	if lastErr != nil {
 		return
 	}
@@ -435,9 +438,6 @@ func BuildGenericConfig(
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Registry); lastErr != nil {
-		return
-	}
 
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, legacyscheme.Scheme)
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
@@ -451,7 +451,7 @@ func BuildGenericConfig(
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 
-	storageFactory, lastErr := BuildStorageFactory(s, genericConfig.MergedResourceConfig)
+	storageFactory, err := BuildStorageFactory(s)
 	if lastErr != nil {
 		return
 	}
@@ -617,7 +617,7 @@ func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.Shar
 
 // BuildStorageFactory constructs the storage factory. If encryption at rest is used, it expects
 // all supported KMS plugins to be registered in the KMS plugin registry before being called.
-func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *serverstorage.ResourceConfig) (*serverstorage.DefaultStorageFactory, error) {
+func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultStorageFactory, error) {
 	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return nil, fmt.Errorf("error generating storage version map: %s", err)
@@ -633,7 +633,7 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
-		apiResourceConfig)
+		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}
@@ -761,6 +761,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		}
 	}
 
+<<<<<<< HEAD
 	// TODO: remove when we stop supporting the legacy group version.
 	if s.APIEnablement.RuntimeConfig != nil {
 		for key, value := range s.APIEnablement.RuntimeConfig {
@@ -776,6 +777,9 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 	options.ServerRunOptions = s
 	return options, nil
+=======
+	return nil
+>>>>>>> Revert "pass APIEnablement through apiserver chain"
 }
 
 func readCAorNil(file string) ([]byte, error) {
