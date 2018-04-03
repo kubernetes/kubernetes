@@ -161,6 +161,9 @@ func TestGenerationNumber(t *testing.T) {
 	modifiedSno.Status.ObservedGeneration = 10
 	ctx := genericapirequest.NewDefaultContext()
 	rc, err := createController(storage.Controller, modifiedSno, t)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	ctrl, err := storage.Controller.Get(ctx, rc.Name, &metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -168,7 +171,7 @@ func TestGenerationNumber(t *testing.T) {
 	controller, _ := ctrl.(*api.ReplicationController)
 
 	// Generation initialization
-	if controller.Generation != 1 && controller.Status.ObservedGeneration != 0 {
+	if controller.Generation != 1 || controller.Status.ObservedGeneration != 0 {
 		t.Fatalf("Unexpected generation number %v, status generation %v", controller.Generation, controller.Status.ObservedGeneration)
 	}
 
