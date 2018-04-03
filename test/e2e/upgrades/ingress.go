@@ -100,7 +100,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	t.jig.AddHTTPS("tls-secret", "ingress.test.com")
 
 	By("waiting for Ingress to come up with ip: " + t.ip)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false, false))
 
 	By("keeping track of GCP resources created by Ingress")
 	t.resourceStore = &GCPResourceStore{}
@@ -146,17 +146,25 @@ func (t *IngressUpgradeTest) Teardown(f *framework.Framework) {
 }
 
 func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
+	// We set the last boolean in PollUrl to true because there should be no downtime to existing paths during or after the upgrade.
 	if testDuringDisruption {
-		By("continuously hitting the Ingress IP")
+		By("continuously hitting the Ingress IP during upgrade")
 		wait.Until(func() {
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
-		}, t.jig.PollInterval, done)
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, framework.LoadBalancerQuickPollInterval, t.httpClient, false, true))
+		}, framework.LoadBalancerQuickPollInterval, done)
 	} else {
 		By("waiting for upgrade to finish without checking if Ingress remains up")
 		<-done
 	}
-	By("hitting the Ingress IP " + t.ip)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
+
+	// Spawn a goroutine to continuously ping the ingress while we manually trigger a sync
+	continuousPing := make(chan struct{})
+	go func() {
+		By("Repeatedly hitting the Ingress IP " + t.ip + " until test is over")
+		wait.Until(func() {
+			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, framework.LoadBalancerQuickPollInterval, t.httpClient, false, true))
+		}, framework.LoadBalancerQuickPollInterval, continuousPing)
+	}()
 
 	// We want to manually trigger a sync because then we can easily verify
 	// a correct sync completed after update.
@@ -173,6 +181,8 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	// WaitForIngress() tests that all paths are pinged, which is how we know
 	// everything is synced with the cloud.
 	t.jig.WaitForIngress(false)
+	// Stop performing the continuous ping we started earlier since the updated controller is fully synced.
+	close(continuousPing)
 	By("comparing GCP resources post-upgrade")
 	postUpgradeResourceStore := &GCPResourceStore{}
 	t.populateGCPResourceStore(postUpgradeResourceStore)
