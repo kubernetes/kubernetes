@@ -355,6 +355,7 @@ kube::golang::setup_env() {
   kube::golang::create_gopath_tree
 
   export GOPATH="${KUBE_GOPATH}"
+  export GOCACHE="${KUBE_GOPATH}/cache"
 
   # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
   if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
