@@ -155,7 +155,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	if err != nil {
 		return nil, err
 	}
-	
+
 	kubeAPIServerConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions, nodeTunneler, proxyTransport)
 	if err != nil {
 		return nil, err
@@ -319,11 +319,7 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-<<<<<<< HEAD
-	storageFactory, lastErr := BuildStorageFactory(s.ServerRunOptions, genericConfig.MergedResourceConfig)
-=======
-	storageFactory, lastErr := BuildStorageFactory(s)
->>>>>>> Revert "pass APIEnablement through apiserver chain"
+	storageFactory, lastErr := BuildStorageFactory(s.ServerRunOptions)
 	if lastErr != nil {
 		return
 	}
@@ -762,7 +758,6 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		}
 	}
 
-<<<<<<< HEAD
 	// TODO: remove when we stop supporting the legacy group version.
 	if s.APIEnablement.RuntimeConfig != nil {
 		for key, value := range s.APIEnablement.RuntimeConfig {
@@ -778,9 +773,6 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 	options.ServerRunOptions = s
 	return options, nil
-=======
-	return nil
->>>>>>> Revert "pass APIEnablement through apiserver chain"
 }
 
 func readCAorNil(file string) ([]byte, error) {
