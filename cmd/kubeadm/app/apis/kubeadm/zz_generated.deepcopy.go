@@ -309,6 +309,15 @@ func (in *NodeConfiguration) DeepCopyInto(out *NodeConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DiscoveryTimeout != nil {
+		in, out := &in.DiscoveryTimeout, &out.DiscoveryTimeout
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
+	}
 	if in.DiscoveryTokenCACertHashes != nil {
 		in, out := &in.DiscoveryTokenCACertHashes, &out.DiscoveryTokenCACertHashes
 		*out = make([]string, len(*in))

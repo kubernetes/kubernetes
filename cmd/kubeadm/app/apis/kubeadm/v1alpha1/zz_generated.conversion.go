@@ -347,6 +347,7 @@ func autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
+	out.DiscoveryTimeout = (*v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
 	out.NodeName = in.NodeName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
@@ -367,6 +368,7 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kub
 	out.DiscoveryFile = in.DiscoveryFile
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
+	out.DiscoveryTimeout = (*v1.Duration)(unsafe.Pointer(in.DiscoveryTimeout))
 	out.NodeName = in.NodeName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token

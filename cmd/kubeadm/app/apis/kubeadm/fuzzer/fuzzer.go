@@ -128,6 +128,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryFile = "foo"
 			obj.DiscoveryToken = "foo"
 			obj.DiscoveryTokenAPIServers = []string{"foo"}
+			obj.DiscoveryTimeout = &metav1.Duration{Duration: 1}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
 			obj.CRISocket = "foo"

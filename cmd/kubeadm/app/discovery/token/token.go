@@ -22,6 +22,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,7 @@ import (
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
@@ -40,24 +42,24 @@ import (
 const BootstrapUser = "token-bootstrap-client"
 
 // RetrieveValidatedClusterInfo connects to the API Server and tries to fetch the cluster-info ConfigMap
-// It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if rootCAPubKeys is not empty)
+// It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if cfg.DiscoveryTokenCACertHashes is not empty)
 // validating the cluster CA against a set of pinned public keys
-func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCAPubKeys []string) (*clientcmdapi.Cluster, error) {
-	tokenID, tokenSecret, err := tokenutil.ParseToken(discoveryToken)
+func RetrieveValidatedClusterInfo(cfg *kubeadmapi.NodeConfiguration) (*clientcmdapi.Cluster, error) {
+	tokenID, tokenSecret, err := tokenutil.ParseToken(cfg.DiscoveryToken)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load the cfg.DiscoveryTokenCACertHashes into a pubkeypin.Set
 	pubKeyPins := pubkeypin.NewSet()
-	err = pubKeyPins.Allow(rootCAPubKeys...)
+	err = pubKeyPins.Allow(cfg.DiscoveryTokenCACertHashes...)
 	if err != nil {
 		return nil, err
 	}
 
 	// The function below runs for every endpoint, and all endpoints races with each other.
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
-	baseKubeConfig := runForEndpointsAndReturnFirst(tokenAPIServers, func(endpoint string) (*clientcmdapi.Config, error) {
+	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.DiscoveryTokenAPIServers, cfg.DiscoveryTimeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
 		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
@@ -158,6 +160,9 @@ func RetrieveValidatedClusterInfo(discoveryToken string, tokenAPIServers, rootCA
 		fmt.Printf("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server %q\n", endpoint)
 		return secureKubeconfig, nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return kubeconfigutil.GetClusterFromKubeConfig(baseKubeConfig), nil
 }
@@ -179,7 +184,7 @@ func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte) *clientcmdap
 }
 
 // runForEndpointsAndReturnFirst loops the endpoints slice and let's the endpoints race for connecting to the master
-func runForEndpointsAndReturnFirst(endpoints []string, fetchKubeConfigFunc func(string) (*clientcmdapi.Config, error)) *clientcmdapi.Config {
+func runForEndpointsAndReturnFirst(endpoints []string, discoveryTimeout time.Duration, fetchKubeConfigFunc func(string) (*clientcmdapi.Config, error)) (*clientcmdapi.Config, error) {
 	stopChan := make(chan struct{})
 	var resultingKubeConfig *clientcmdapi.Config
 	var once sync.Once
@@ -205,8 +210,17 @@ func runForEndpointsAndReturnFirst(endpoints []string, fetchKubeConfigFunc func(
 			}, constants.DiscoveryRetryInterval, stopChan)
 		}(endpoint)
 	}
-	wg.Wait()
-	return resultingKubeConfig
+	select {
+	case <-time.After(discoveryTimeout):
+		close(stopChan)
+		err := fmt.Errorf("abort connecting to API servers after timeout of %v", discoveryTimeout)
+		fmt.Printf("[discovery] %v\n", err)
+		wg.Wait()
+		return nil, err
+	case <-stopChan:
+		wg.Wait()
+		return resultingKubeConfig, nil
+	}
 }
 
 // parsePEMCert decodes a PEM-formatted certificate and returns it as an x509.Certificate
