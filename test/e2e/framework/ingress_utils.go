@@ -1170,7 +1170,7 @@ func (j *IngressTestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := runKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return ing, err
 }
 
@@ -1185,7 +1185,7 @@ func (j *IngressTestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return nil, err
 	}
-	_, err := runKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
+	_, err := RunKubemciWithKubeconfig("create", ing.Name, fmt.Sprintf("--ingress=%s", filePath), "--force")
 	return ing, err
 }
 
@@ -1273,7 +1273,7 @@ func (j *IngressTestJig) runDelete(ing *extensions.Ingress) error {
 	if err := manifest.IngressToManifest(ing, filePath); err != nil {
 		return err
 	}
-	_, err := runKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
+	_, err := RunKubemciWithKubeconfig("delete", ing.Name, fmt.Sprintf("--ingress=%s", filePath))
 	return err
 }
 
@@ -1281,7 +1281,7 @@ func (j *IngressTestJig) runDelete(ing *extensions.Ingress) error {
 // TODO(nikhiljindal): Update this to be able to return hostname as well.
 func getIngressAddressFromKubemci(name string) ([]string, error) {
 	var addresses []string
-	out, err := runKubemciCmd("get-status", name)
+	out, err := RunKubemciCmd("get-status", name)
 	if err != nil {
 		return addresses, err
 	}

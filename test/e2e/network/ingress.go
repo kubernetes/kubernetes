@@ -630,6 +630,23 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			executeStaticIPHttpsOnlyTest(f, jig, ipName, ipAddress)
 		})
 
+		It("should remove clusters as expected", func() {
+			ingAnnotations := map[string]string{
+				framework.IngressStaticIPKey: ipName,
+			}
+			ingFilePath := filepath.Join(framework.IngressManifestPath, "http")
+			jig.CreateIngress(ingFilePath, ns, ingAnnotations, map[string]string{})
+			jig.WaitForIngress(false /*waitForNodePort*/)
+			name := jig.Ingress.Name
+			// Verify that the ingress is spread to 1 cluster as expected.
+			verifyKubemciStatusHas(name, "is spread across 1 cluster")
+			// Reuse the ingress file created while creating the ingress.
+			filePath := filepath.Join(framework.TestContext.OutputDir, "mci.yaml")
+			if _, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath); err != nil {
+				framework.Failf("unexpected error in running kubemci remove-clusters: %s", err)
+			}
+			verifyKubemciStatusHas(name, "is spread across 0 cluster")
+		})
 	})
 
 	// Time: borderline 5m, slow by design
@@ -683,6 +700,17 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 	})
 })
+
+// verifyKubemciStatusHas fails if kubemci get-status output for the given mci does not have the given expectedSubStr.
+func verifyKubemciStatusHas(name, expectedSubStr string) {
+	statusStr, err := framework.RunKubemciCmd("get-status", name)
+	if err != nil {
+		framework.Failf("unexpected error in running kubemci get-status %s: %s", name, err)
+	}
+	if !strings.Contains(statusStr, expectedSubStr) {
+		framework.Failf("expected status to have sub string %s, actual status: %s", expectedSubStr, statusStr)
+	}
+}
 
 func executePresharedCertTest(f *framework.Framework, jig *framework.IngressTestJig, staticIPName string) {
 	preSharedCertName := "test-pre-shared-cert"

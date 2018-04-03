@@ -2251,17 +2251,17 @@ func RunKubectlOrDieInput(data string, args ...string) string {
 	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
 }
 
-// runKubemciWithKubeconfig is a convenience wrapper over runKubemciCmd
-func runKubemciWithKubeconfig(args ...string) (string, error) {
+// RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
+func RunKubemciWithKubeconfig(args ...string) (string, error) {
 	if TestContext.KubeConfig != "" {
 		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
 	}
-	return runKubemciCmd(args...)
+	return RunKubemciCmd(args...)
 }
 
-// runKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
+// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
 // It assumes that kubemci exists in PATH.
-func runKubemciCmd(args ...string) (string, error) {
+func RunKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
 	b := new(kubectlBuilder)
