@@ -134,7 +134,7 @@ type ImageConfig struct {
 
 type Accelerator struct {
 	Type  string `json:"type,omitempty"`
-	Count int64  `json:"count, omitempty"`
+	Count int64  `json:"count,omitempty"`
 }
 
 type Resources struct {
@@ -142,19 +142,19 @@ type Resources struct {
 }
 
 type GCEImage struct {
-	Image      string `json:"image, omitempty"`
-	ImageDesc  string `json:"image_description, omitempty"`
+	Image      string `json:"image,omitempty"`
+	ImageDesc  string `json:"image_description,omitempty"`
 	Project    string `json:"project"`
 	Metadata   string `json:"metadata"`
-	ImageRegex string `json:"image_regex, omitempty"`
+	ImageRegex string `json:"image_regex,omitempty"`
 	// Defaults to using only the latest image. Acceptable values are [0, # of images that match the regex).
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
-	PreviousImages int `json:"previous_images, omitempty"`
+	PreviousImages int `json:"previous_images,omitempty"`
 
-	Machine   string    `json:"machine, omitempty"`
-	Resources Resources `json:"resources, omitempty"`
+	Machine   string    `json:"machine,omitempty"`
+	Resources Resources `json:"resources,omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
-	Tests []string `json:"tests, omitempty"`
+	Tests []string `json:"tests,omitempty"`
 }
 
 type internalImageConfig struct {
