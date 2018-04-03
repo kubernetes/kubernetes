@@ -179,23 +179,28 @@ func updatePod(f *framework.Framework, name string, update updatePodFunc) (*v1.P
 }
 
 func expectEvent(w watch.Interface, eventType watch.EventType, object runtime.Object) {
-	if event, ok := waitForEvent(w, eventType, object); !ok {
+	if event, ok := waitForEvent(w, eventType, object, 1*time.Minute); !ok {
 		framework.Failf("Timed out waiting for expected event: %v", event)
 	}
 }
 
 func expectNoEvent(w watch.Interface, eventType watch.EventType, object runtime.Object) {
-	if event, ok := waitForEvent(w, eventType, object); ok {
+	if event, ok := waitForEvent(w, eventType, object, 10*time.Second); ok {
 		framework.Failf("Unexpected event occurred: %v", event)
 	}
 }
 
-func waitForEvent(w watch.Interface, expectType watch.EventType, expectObject runtime.Object) (watch.Event, bool) {
-	stopTimer := time.NewTimer(1 * time.Minute)
+func waitForEvent(w watch.Interface, expectType watch.EventType, expectObject runtime.Object, duration time.Duration) (watch.Event, bool) {
+	stopTimer := time.NewTimer(duration)
 	defer stopTimer.Stop()
 	for {
 		select {
-		case actual := <-w.ResultChan():
+		case actual, ok := <-w.ResultChan():
+			if ok {
+				framework.Logf("Got : %v %v", actual.Type, actual.Object)
+			} else {
+				framework.Failf("Watch closed unexpectedly")
+			}
 			if expectType == actual.Type && (expectObject == nil || apiequality.Semantic.DeepEqual(expectObject, actual.Object)) {
 				return actual, true
 			}
