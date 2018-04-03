@@ -37,9 +37,11 @@ import (
 )
 
 var (
-	extendedResourceA = v1.ResourceName("example.com/aaa")
-	extendedResourceB = v1.ResourceName("example.com/bbb")
-	hugePageResourceA = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	extendedResourceA     = v1.ResourceName("example.com/aaa")
+	extendedResourceB     = v1.ResourceName("example.com/bbb")
+	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
+	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
+	hugePageResourceA     = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
 func makeResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
@@ -296,6 +298,24 @@ func TestPodFitsResources(t *testing.T) {
 			fits:    false,
 			test:    "extended resource allocatable enforced for unknown resource for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(extendedResourceB, 1, 0, 0)},
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "kubernetes.io resource capacity enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceA, 10, 0, 0)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "kubernetes.io resource capacity enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceB, 10, 0, 0)},
 		},
 		{
 			pod: newResourcePod(

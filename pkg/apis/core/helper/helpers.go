@@ -153,7 +153,7 @@ func IsStandardContainerResourceName(str string) bool {
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name core.ResourceName) bool {
-	if IsDefaultNamespaceResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
+	if IsNativeResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
 		return false
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
@@ -164,10 +164,10 @@ func IsExtendedResourceName(name core.ResourceName) bool {
 	return true
 }
 
-// IsDefaultNamespaceResource returns true if the resource name is in the
+// IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
-func IsDefaultNamespaceResource(name core.ResourceName) bool {
+func IsNativeResource(name core.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
 		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
@@ -177,7 +177,7 @@ var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and not blacklisted.
 func IsOvercommitAllowed(name core.ResourceName) bool {
-	return IsDefaultNamespaceResource(name) &&
+	return IsNativeResource(name) &&
 		!IsHugePageResourceName(name) &&
 		!overcommitBlacklist.Has(string(name))
 }
