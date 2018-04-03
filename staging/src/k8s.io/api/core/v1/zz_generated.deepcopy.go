@@ -4269,6 +4269,11 @@ func (in *PreferredSchedulingTerm) DeepCopy() *PreferredSchedulingTerm {
 func (in *Probe) DeepCopyInto(out *Probe) {
 	*out = *in
 	in.Handler.DeepCopyInto(&out.Handler)
+	if in.MonitoredContainers != nil {
+		in, out := &in.MonitoredContainers, &out.MonitoredContainers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

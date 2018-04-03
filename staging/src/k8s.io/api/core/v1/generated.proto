@@ -3401,6 +3401,10 @@ message Probe {
   // Defaults to 3. Minimum value is 1.
   // +optional
   optional int32 failureThreshold = 6;
+
+  // The list of a container(s) which is(are) restarted when Liveness probe detects a failure of the monitored resource.
+  // +optional
+  repeated string monitoredContainers = 7;
 }
 
 // Represents a projected volume source

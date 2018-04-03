@@ -8150,6 +8150,13 @@
       "type": "integer",
       "format": "int32",
       "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1."
+     },
+     "monitoredContainers": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "The list of a container(s) which is(are) restarted when Liveness probe detects a failure of the monitored resource."
      }
     }
    },
