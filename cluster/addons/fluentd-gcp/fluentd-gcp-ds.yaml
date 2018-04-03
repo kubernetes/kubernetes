@@ -37,6 +37,14 @@ spec:
           readOnly: true
         - name: config-volume
           mountPath: /etc/google-fluentd/config.d
+        env:
+        - name: STACKDRIVER_METADATA_AGENT_URL
+          value: {{ stackdriver_metadata_agent_url }}
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
         # Liveness probe is aimed to help in situarions where fluentd
         # silently hangs for no apparent reasons until manual restart.
         # The idea of this probe is that if fluentd is not queueing or
@@ -108,4 +116,4 @@ spec:
           path: /var/lib/docker/containers
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.2.4
+          name: {{ fluentd_gcp_configmap_name }}-v1.2.5
