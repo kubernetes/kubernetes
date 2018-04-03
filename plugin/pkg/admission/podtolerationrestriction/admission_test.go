@@ -97,6 +97,20 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 
+	hostNetworkPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "test",
+				},
+			},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+		},
+	}
+
 	if err := utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=true"); err != nil {
 		t.Errorf("Failed to enable TaintByCondition feature: %v.", err)
 	}
@@ -227,6 +241,19 @@ func TestPodAdmission(t *testing.T) {
 			},
 			admit:    true,
 			testName: "added memoryPressure/DiskPressure for Guaranteed pod",
+		},
+		{
+			pod: hostNetworkPod,
+			defaultClusterTolerations: []api.Toleration{},
+			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
+			whitelist:                 []api.Toleration{},
+			podTolerations:            []api.Toleration{},
+			mergedTolerations: []api.Toleration{
+				{Key: algorithm.TaintNodeNetworkUnavailable, Operator: api.TolerationOpExists, Effect: api.TaintEffectNoSchedule, TolerationSeconds: nil},
+				{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil},
+			},
+			admit:    true,
+			testName: "added networkUnavailable for pod using host network",
 		},
 	}
 	for _, test := range tests {
