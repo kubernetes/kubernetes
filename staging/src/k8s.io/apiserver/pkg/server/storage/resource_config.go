@@ -25,7 +25,6 @@ import (
 type APIResourceConfigSource interface {
 	AnyVersionOfResourceEnabled(resource schema.GroupResource) bool
 	ResourceEnabled(resource schema.GroupVersionResource) bool
-	AllResourcesForVersionEnabled(version schema.GroupVersion) bool
 	AnyResourcesForVersionEnabled(version schema.GroupVersion) bool
 	AnyResourcesForGroupEnabled(group string) bool
 }
@@ -145,22 +144,6 @@ func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) b
 	}
 
 	return true
-}
-
-func (o *ResourceConfig) AllResourcesForVersionEnabled(version schema.GroupVersion) bool {
-	versionOverride, versionExists := o.GroupVersionResourceConfigs[version]
-	if !versionExists {
-		return false
-	}
-	if !versionOverride.Enable {
-		return false
-	}
-
-	if len(versionOverride.EnabledResources) == 0 && len(versionOverride.DisabledResources) == 0 {
-		return true
-	}
-
-	return false
 }
 
 func (o *ResourceConfig) AnyResourcesForVersionEnabled(version schema.GroupVersion) bool {
