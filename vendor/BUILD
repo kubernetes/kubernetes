@@ -271,7 +271,6 @@ filegroup(
         "//vendor/github.com/heketi/heketi/client/api/go-client:all-srcs",
         "//vendor/github.com/heketi/heketi/pkg/glusterfs/api:all-srcs",
         "//vendor/github.com/heketi/heketi/pkg/utils:all-srcs",
-        "//vendor/github.com/howeyc/gopass:all-srcs",
         "//vendor/github.com/imdario/mergo:all-srcs",
         "//vendor/github.com/inconshreveable/mousetrap:all-srcs",
         "//vendor/github.com/influxdata/influxdb/client:all-srcs",
