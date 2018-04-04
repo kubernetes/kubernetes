@@ -99,14 +99,6 @@ func newEtcdHelper(client etcd.Client, codec runtime.Codec, prefix string) etcdH
 	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, prefixTransformer{prefix: "test!"}).(*etcdHelper)
 }
 
-// Returns an encoded version of example.Pod with the given name.
-func getEncodedPod(name string, codec runtime.Codec) string {
-	pod, _ := runtime.Encode(codec, &examplev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-	})
-	return string(pod)
-}
-
 func createObj(t *testing.T, helper etcdHelper, name string, obj, out runtime.Object, ttl uint64) error {
 	err := helper.Create(context.TODO(), name, obj, out, ttl)
 	if err != nil {
