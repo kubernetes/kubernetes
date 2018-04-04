@@ -57,11 +57,8 @@ func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
 func (u *UnstructuredList) UnstructuredContent() map[string]interface{} {
 	out := make(map[string]interface{}, len(u.Object)+1)
 
-	// shallow copy every property but items
+	// shallow copy every property
 	for k, v := range u.Object {
-		if k == "items" {
-			continue
-		}
 		out[k] = v
 	}
 
