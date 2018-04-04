@@ -120,18 +120,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
 			ip := gceController.CreateStaticIP(ns)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ns, ip))
-
-			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), ns, map[string]string{
-				framework.IngressStaticIPKey:  ns,
-				framework.IngressAllowHTTPKey: "false",
-			}, map[string]string{})
-
-			By("waiting for Ingress to come up with ip: " + ip)
-			httpClient := framework.BuildInsecureClient(framework.IngressReqTimeout)
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
-
-			By("should reject HTTP traffic")
-			framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%v/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+			executeStaticIPHttpsOnlyTest(f, jig, ns, ip)
 
 			By("should have correct firewall rule for ingress")
 			fw := gceController.GetFirewallRule()
@@ -577,7 +566,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 	Describe("GCE [Slow] [Feature:kubemci]", func() {
 		var gceController *framework.GCEIngressController
-		var ipName string
+		var ipName, ipAddress string
 
 		// Platform specific setup
 		BeforeEach(func() {
@@ -597,7 +586,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Kubemci should reserve a static ip if user has not specified one.
 			ipName = "kubemci-" + string(uuid.NewUUID())
 			// ip released when the rest of lb resources are deleted in CleanupGCEIngressController
-			ipAddress := gceController.CreateStaticIP(ipName)
+			ipAddress = gceController.CreateStaticIP(ipName)
 			By(fmt.Sprintf("allocated static ip %v: %v through the GCE cloud provider", ipName, ipAddress))
 		})
 
@@ -636,6 +625,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		It("should create ingress with backend HTTPS", func() {
 			executeBacksideBacksideHTTPSTest(f, jig, ipName)
 		})
+
+		It("should support https-only annotation", func() {
+			executeStaticIPHttpsOnlyTest(f, jig, ipName, ipAddress)
+		})
+
 	})
 
 	// Time: borderline 5m, slow by design
@@ -739,6 +733,20 @@ func executePresharedCertTest(f *framework.Framework, jig *framework.IngressTest
 	By("Test that ingress works with the pre-shared certificate")
 	err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
+}
+
+func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *framework.IngressTestJig, ipName, ip string) {
+	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), f.Namespace.Name, map[string]string{
+		framework.IngressStaticIPKey:  ipName,
+		framework.IngressAllowHTTPKey: "false",
+	}, map[string]string{})
+
+	By("waiting for Ingress to come up with ip: " + ip)
+	httpClient := framework.BuildInsecureClient(framework.IngressReqTimeout)
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%s/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+
+	By("should reject HTTP traffic")
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%s/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
 }
 
 func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *framework.IngressTestJig, staticIPName string) {
