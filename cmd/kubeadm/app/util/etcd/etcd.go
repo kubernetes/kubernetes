@@ -30,22 +30,23 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
-// Client is an interface to get etcd cluster related information
-type Client interface {
+// ClusterInterrogator is an interface to get etcd cluster related information
+type ClusterInterrogator interface {
 	GetStatus() (*clientv3.StatusResponse, error)
 	WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error)
 	HasTLS() bool
+	GetClusterStatus() ([]*clientv3.StatusResponse, error)
 }
 
-// GenericClient is a common etcd client for supported etcd servers
-type GenericClient struct {
+// Client provides connection parameters for an etcd cluster
+type Client struct {
 	Endpoints []string
-	TLSConfig *tls.Config
+	TLS       *tls.Config
 }
 
 // HasTLS returns true if etcd is configured for TLS
-func (c GenericClient) HasTLS() bool {
-	return c.TLSConfig != nil
+func (c Client) HasTLS() bool {
+	return c.TLS != nil
 }
 
 // PodManifestsHaveTLS reads the etcd staticpod manifest from disk and returns false if the TLS flags
@@ -84,12 +85,12 @@ FlagLoop:
 }
 
 // GetStatus gets server status
-func (c GenericClient) GetStatus() (*clientv3.StatusResponse, error) {
+func (c Client) GetStatus() (*clientv3.StatusResponse, error) {
 	const dialTimeout = 5 * time.Second
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
 		DialTimeout: dialTimeout,
-		TLS:         c.TLSConfig,
+		TLS:         c.TLS,
 	})
 	if err != nil {
 		return nil, err
@@ -107,7 +108,7 @@ func (c GenericClient) GetStatus() (*clientv3.StatusResponse, error) {
 }
 
 // WaitForStatus returns a StatusResponse after an initial delay and retry attempts
-func (c GenericClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+func (c Client) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
 	fmt.Printf("[util/etcd] Waiting %v for initial delay\n", delay)
 	time.Sleep(delay)
 	for i := 0; i < retries; i++ {
@@ -131,39 +132,63 @@ func (c GenericClient) WaitForStatus(delay time.Duration, retries int, retryInte
 	return nil, fmt.Errorf("timeout waiting for etcd cluster status")
 }
 
-// NewClient creates a new EtcdCluster client
-func NewClient(endpoints []string, caFile string, certFile string, keyFile string) (*GenericClient, error) {
-	client := GenericClient{Endpoints: endpoints}
+// New creates a new EtcdCluster client
+func New(endpoints []string, ca, cert, key string) (*Client, error) {
+	client := Client{Endpoints: endpoints}
 
-	if caFile != "" || certFile != "" || keyFile != "" {
+	if ca != "" || cert != "" || key != "" {
 		tlsInfo := transport.TLSInfo{
-			CertFile:      certFile,
-			KeyFile:       keyFile,
-			TrustedCAFile: caFile,
+			CertFile:      cert,
+			KeyFile:       key,
+			TrustedCAFile: ca,
 		}
 		tlsConfig, err := tlsInfo.ClientConfig()
 		if err != nil {
 			return nil, err
 		}
-		client.TLSConfig = tlsConfig
+		client.TLS = tlsConfig
 	}
 
 	return &client, nil
 }
 
-// NewStaticPodClient creates a GenericClient from the given endpoints, manifestDir, and certificatesDir
-func NewStaticPodClient(endpoints []string, manifestDir string, certificatesDir string) (*GenericClient, error) {
+// NewFromStaticPod creates a GenericClient from the given endpoints, manifestDir, and certificatesDir
+func NewFromStaticPod(endpoints []string, manifestDir string, certificatesDir string) (*Client, error) {
 	hasTLS, err := PodManifestsHaveTLS(manifestDir)
 	if err != nil {
 		return nil, fmt.Errorf("could not read manifests from: %s, error: %v", manifestDir, err)
 	}
 	if hasTLS {
-		return NewClient(
+		return New(
 			endpoints,
 			filepath.Join(certificatesDir, constants.EtcdCACertName),
 			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
 			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
 		)
 	}
-	return NewClient(endpoints, "", "", "")
+	return New(endpoints, "", "", "")
+}
+
+// GetClusterStatus returns nil for status Up or error for status Down
+func (c Client) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+
+	var resp []*clientv3.StatusResponse
+	for _, ep := range c.Endpoints {
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   []string{ep},
+			DialTimeout: 5 * time.Second,
+			TLS:         c.TLS,
+		})
+		if err != nil {
+			return nil, err
+		}
+		defer cli.Close()
+
+		r, err := cli.Status(context.Background(), ep)
+		if err != nil {
+			return nil, err
+		}
+		resp = append(resp, r)
+	}
+	return resp, nil
 }

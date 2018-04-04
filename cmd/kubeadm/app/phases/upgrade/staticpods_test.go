@@ -30,8 +30,7 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -216,9 +215,15 @@ func (c fakeTLSEtcdClient) HasTLS() bool {
 }
 
 func (c fakeTLSEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
-	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.12"
-	return client, nil
+	clusterStatus, err := c.GetClusterStatus()
+	return clusterStatus[0], err
+}
+
+func (c fakeTLSEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+	client := &clientv3.StatusResponse{
+		Version: "3.1.12",
+	}
+	return []*clientv3.StatusResponse{client}, nil
 }
 
 func (c fakeTLSEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
@@ -233,6 +238,11 @@ func (c fakePodManifestEtcdClient) HasTLS() bool {
 }
 
 func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
+	clusterStatus, err := c.GetClusterStatus()
+	return clusterStatus[0], err
+}
+
+func (c fakePodManifestEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -246,7 +256,7 @@ func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error)
 
 	client := &clientv3.StatusResponse{}
 	client.Version = "3.1.12"
-	return client, nil
+	return []*clientv3.StatusResponse{client}, nil
 }
 
 func (c fakePodManifestEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
@@ -485,7 +495,7 @@ func getAPIServerHash(dir string) (string, error) {
 }
 
 func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.MasterConfiguration, error) {
-	externalcfg := &kubeadmapiv1alpha1.MasterConfiguration{}
+	externalcfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version)), externalcfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %v", err)
