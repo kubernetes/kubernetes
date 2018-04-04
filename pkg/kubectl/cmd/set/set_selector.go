@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -38,6 +40,8 @@ import (
 type SelectorOptions struct {
 	fileOptions resource.FilenameOptions
 
+	PrintFlags *printers.PrintFlags
+
 	local       bool
 	dryrun      bool
 	all         bool
@@ -51,6 +55,8 @@ type SelectorOptions struct {
 	out              io.Writer
 	PrintObject      func(obj runtime.Object) error
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+
+	PrintObj func(runtime.Object) error
 
 	builder *resource.Builder
 	mapper  meta.RESTMapper
@@ -73,6 +79,8 @@ var (
 // NewCmdSelector is the "set selector" command.
 func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &SelectorOptions{
+		PrintFlags: printers.NewPrintFlags("selector updated"),
+
 		out: out,
 	}
 
@@ -88,7 +96,9 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunSelector())
 		},
 	}
-	cmdutil.AddPrinterFlags(cmd)
+
+	options.PrintFlags.AddFlags(cmd)
+
 	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().Bool("local", false, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
@@ -108,6 +118,8 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.record = cmdutil.GetRecordFlag(cmd)
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
+
+	o.PrintFlags.Complete(o.dryrun)
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -146,8 +158,13 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		}
 	}
 
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
 	o.PrintObject = func(obj runtime.Object) error {
-		return cmdutil.PrintObject(cmd, obj, o.out)
+		return printer.PrintObj(obj, o.out)
 	}
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
@@ -208,13 +225,7 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-
-		shortOutput := o.output == "name"
-		if len(o.output) > 0 && !shortOutput {
-			return o.PrintObject(patched)
-		}
-		cmdutil.PrintSuccess(shortOutput, o.out, info.Object, o.dryrun, "selector updated")
-		return nil
+		return o.PrintObject(patch.Info.AsVersioned())
 	})
 }
 
