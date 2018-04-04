@@ -559,9 +559,9 @@ def push_service_data(kube_api):
     kube_api.configure(port=6443)
 
 
-def get_ingress_address(relation):
+def get_ingress_address(relation_name):
     try:
-        network_info = hookenv.network_get(relation.relation_name)
+        network_info = hookenv.network_get(relation_name)
     except NotImplementedError:
         network_info = []
 
@@ -585,7 +585,7 @@ def send_data(tls, kube_api_endpoint):
     kubernetes_service_ip = get_kubernetes_service_ip()
 
     # Get ingress address
-    ingress_ip = get_ingress_address(kube_api_endpoint)
+    ingress_ip = get_ingress_address(kube_api_endpoint.relation_name)
 
     domain = hookenv.config('dns_domain')
     # Create SANs that the tls layer will add to the server cert.
@@ -1156,6 +1156,7 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['service-account-key-file'] = '/root/cdk/serviceaccount.key'
     api_opts['kubelet-preferred-address-types'] = \
         '[InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP]'
+    api_opts['advertise-address'] = get_ingress_address('kube-control')
 
     etcd_dir = '/root/cdk/etcd'
     etcd_ca = os.path.join(etcd_dir, 'client-ca.pem')
