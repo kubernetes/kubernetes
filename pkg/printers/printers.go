@@ -34,10 +34,7 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 
 	case "json", "yaml":
 		jsonYamlFlags := NewJSONYamlPrintFlags()
-		p, matched, err := jsonYamlFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a printer to handle current print options")
-		}
+		p, err := jsonYamlFlags.ToPrinter(format)
 		if err != nil {
 			return nil, err
 		}
@@ -46,10 +43,7 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 
 	case "name":
 		nameFlags := NewNamePrintFlags("", false)
-		namePrinter, matched, err := nameFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a name printer to handle current print options")
-		}
+		namePrinter, err := nameFlags.ToPrinter(format)
 		if err != nil {
 			return nil, err
 		}
