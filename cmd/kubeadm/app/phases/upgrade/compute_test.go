@@ -17,11 +17,13 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -62,27 +64,80 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 	}, nil
 }
 
-type fakeEtcdCluster struct{ TLS bool }
+type fakeEtcdClient struct{ TLS bool }
 
-func (f fakeEtcdCluster) HasTLS() bool { return f.TLS }
+func (f fakeEtcdClient) HasTLS() bool { return f.TLS }
 
-func (f fakeEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
-	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.12"
-	return client, nil
+func (f fakeEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
+	//	clusterStatus, err := f.GetClusterStatus()
+	//	return clusterStatus[0], err
+	return &clientv3.StatusResponse{
+		Version: "3.1.12",
+	}, nil
 }
 
-func (f fakeEtcdCluster) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+func (f fakeEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+	var responses []*clientv3.StatusResponse
+	responses = append(responses, &clientv3.StatusResponse{
+		Version: "3.1.12",
+	})
+	return responses, nil
+}
+
+func (f fakeEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+	return f.GetStatus()
+}
+
+type mismatchEtcdClient struct{}
+
+func (f mismatchEtcdClient) HasTLS() bool { return true }
+
+func (f mismatchEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
+	clusterStatus, err := f.GetClusterStatus()
+	return clusterStatus[0], err
+}
+
+func (f mismatchEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+	return []*clientv3.StatusResponse{
+		&clientv3.StatusResponse{
+			Version: "3.1.12",
+		},
+		&clientv3.StatusResponse{
+			Version: "3.2.0",
+		},
+	}, nil
+}
+
+func (f mismatchEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+	return f.GetStatus()
+}
+
+type degradedEtcdClient struct{}
+
+func (f degradedEtcdClient) HasTLS() bool { return true }
+
+func (f degradedEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
+	return nil, fmt.Errorf("Degraded etcd cluster")
+}
+
+func (f degradedEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+	var res []*clientv3.StatusResponse
+	return res, fmt.Errorf("Degraded etcd cluster")
+}
+
+func (f degradedEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
 	return f.GetStatus()
 }
 
 func TestGetAvailableUpgrades(t *testing.T) {
 	featureGates := make(map[string]bool)
+	etcdClient := fakeEtcdClient{}
 	tests := []struct {
 		vg                          *fakeVersionGetter
 		expectedUpgrades            []Upgrade
 		allowExperimental, allowRCs bool
 		errExpected                 bool
+		etcdClient                  etcdutil.ClusterInterrogator
 	}{
 		{ // no action needed, already up-to-date
 			vg: &fakeVersionGetter{
@@ -96,6 +151,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  []Upgrade{},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // simple patch version upgrade
 			vg: &fakeVersionGetter{
@@ -128,6 +184,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // minor version upgrade only
 			vg: &fakeVersionGetter{
@@ -160,6 +217,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // both minor version upgrade and patch version upgrade available
 			vg: &fakeVersionGetter{
@@ -210,6 +268,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // allow experimental upgrades, but no upgrade available
 			vg: &fakeVersionGetter{
@@ -224,6 +283,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  []Upgrade{},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // upgrade to an unstable version should be supported
 			vg: &fakeVersionGetter{
@@ -257,6 +317,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // upgrade from an unstable version to an unstable version should be supported
 			vg: &fakeVersionGetter{
@@ -290,6 +351,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // v1.X.0-alpha.0 should be ignored
 			vg: &fakeVersionGetter{
@@ -324,6 +386,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // upgrade to an RC version should be supported
 			vg: &fakeVersionGetter{
@@ -358,6 +421,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowRCs:    true,
 			errExpected: false,
+			etcdClient:  etcdClient,
 		},
 		{ // it is possible (but very uncommon) that the latest version from the previous branch is an rc and the current latest version is alpha.0. In that case, show the RC
 			vg: &fakeVersionGetter{
@@ -392,6 +456,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdClient:        etcdClient,
 		},
 		{ // upgrade to an RC version should be supported. There may also be an even newer unstable version.
 			vg: &fakeVersionGetter{
@@ -445,14 +510,42 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			allowRCs:          true,
 			allowExperimental: true,
 			errExpected:       false,
+			etcdClient:        etcdClient,
+		},
+		{
+			vg: &fakeVersionGetter{
+				clusterVersion:     "v1.9.3",
+				kubeletVersion:     "v1.9.3",
+				kubeadmVersion:     "v1.9.3",
+				stablePatchVersion: "v1.9.3",
+				stableVersion:      "v1.9.3",
+			},
+			allowRCs:          false,
+			allowExperimental: false,
+			etcdClient:        mismatchEtcdClient{},
+			expectedUpgrades:  []Upgrade{},
+			errExpected:       true,
+		},
+		{
+			vg: &fakeVersionGetter{
+				clusterVersion:     "v1.9.3",
+				kubeletVersion:     "v1.9.3",
+				kubeadmVersion:     "v1.9.3",
+				stablePatchVersion: "v1.9.3",
+				stableVersion:      "v1.9.3",
+			},
+			allowRCs:          false,
+			allowExperimental: false,
+			etcdClient:        degradedEtcdClient{},
+			expectedUpgrades:  []Upgrade{},
+			errExpected:       true,
 		},
 	}
 
 	// Instantiating a fake etcd cluster for being able to get etcd version for a corresponding
 	// kubernetes release.
-	testCluster := fakeEtcdCluster{}
 	for _, rt := range tests {
-		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, testCluster, featureGates)
+		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.etcdClient, featureGates)
 		if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 			t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 		}

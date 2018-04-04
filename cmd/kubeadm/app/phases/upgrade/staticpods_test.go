@@ -216,9 +216,15 @@ func (c fakeTLSEtcdClient) HasTLS() bool {
 }
 
 func (c fakeTLSEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
-	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.12"
-	return client, nil
+	clusterStatus, err := c.GetClusterStatus()
+	return clusterStatus[0], err
+}
+
+func (c fakeTLSEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
+	client := &clientv3.StatusResponse{
+		Version: "3.1.12",
+	}
+	return []*clientv3.StatusResponse{client}, nil
 }
 
 func (c fakeTLSEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
@@ -233,6 +239,11 @@ func (c fakePodManifestEtcdClient) HasTLS() bool {
 }
 
 func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
+	clusterStatus, err := c.GetClusterStatus()
+	return clusterStatus[0], err
+}
+
+func (c fakePodManifestEtcdClient) GetClusterStatus() ([]*clientv3.StatusResponse, error) {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -246,7 +257,7 @@ func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error)
 
 	client := &clientv3.StatusResponse{}
 	client.Version = "3.1.12"
-	return client, nil
+	return []*clientv3.StatusResponse{client}, nil
 }
 
 func (c fakePodManifestEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
