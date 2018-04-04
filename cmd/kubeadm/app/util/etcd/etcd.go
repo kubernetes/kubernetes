@@ -38,14 +38,19 @@ type EtcdCluster struct {
 
 func New(endpoints []string, ca, cert, key string) (*EtcdCluster, error) {
 
-	tlsInfo := transport.TLSInfo{
-		CertFile:      cert,
-		KeyFile:       key,
-		TrustedCAFile: ca,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
+	var tlsConfig *tls.Config
+	var err error
+
+	if ca != "" && cert != "" && key != "" {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      cert,
+			KeyFile:       key,
+			TrustedCAFile: ca,
+		}
+		tlsConfig, err = tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &EtcdCluster{
@@ -62,6 +67,7 @@ func (cluster EtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, e
 		cli, err := clientv3.New(clientv3.Config{
 			Endpoints:   []string{ep},
 			DialTimeout: 5 * time.Second,
+			TLS:         cluster.TLS,
 		})
 		if err != nil {
 			return nil, err

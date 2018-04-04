@@ -74,7 +74,7 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, cluster util.EtcdCluster, featureGates map[string]bool) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, cluster util.EtcdClusterInterrogator, featureGates map[string]bool) ([]Upgrade, error) {
 	fmt.Println("[upgrade] Fetching available versions to upgrade to")
 
 	// Collect the upgrades kubeadm can do in this list
@@ -112,13 +112,24 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		return nil, err
 	}
 
+	var etcdVersion string
+	for i, es := range etcdStatus {
+		if i == 0 {
+			etcdVersion = es.Version
+			continue
+		}
+		if etcdVersion != es.Version {
+			return nil, fmt.Errorf("etcd cluster has nodes with mismatched versions: %s != %s", etcdVersion, es.Version)
+		}
+	}
+
 	// Construct a descriptor for the current state of the world
 	beforeState := ClusterState{
 		KubeVersion:     clusterVersionStr,
 		DNSVersion:      dns.GetDNSVersion(clusterVersion, ActiveDNSAddon(featureGates)),
 		KubeadmVersion:  kubeadmVersionStr,
 		KubeletVersions: kubeletVersions,
-		EtcdVersion:     etcdStatus.Version,
+		EtcdVersion:     etcdVersion,
 	}
 
 	// Do a "dumb guess" that a new minor upgrade is available just because the latest stable version is higher than the cluster version

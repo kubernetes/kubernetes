@@ -17,7 +17,10 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
+
 	"github.com/coreos/etcd/clientv3"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"reflect"
 	"testing"
@@ -62,19 +65,41 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 
 type fakeEtcdCluster struct{}
 
-func (f fakeEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse, error) {
-	client := &clientv3.StatusResponse{}
-	client.Version = "3.1.12"
-	return client, nil
+func (f fakeEtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
+	client := &clientv3.StatusResponse{
+		Version: "3.1.12",
+	}
+	return []*clientv3.StatusResponse{client}, nil
+}
+
+type mismatchEtcdCluster struct{}
+
+func (f mismatchEtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
+	return []*clientv3.StatusResponse{
+		&clientv3.StatusResponse{
+			Version: "3.1.12",
+		},
+		&clientv3.StatusResponse{
+			Version: "3.2.0",
+		},
+	}, nil
+}
+
+type degradedEtcdCluster struct{}
+
+func (f degradedEtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
+	return nil, fmt.Errorf("Degraded etcd cluster")
 }
 
 func TestGetAvailableUpgrades(t *testing.T) {
 	featureGates := make(map[string]bool)
+	etcdCluster := fakeEtcdCluster{}
 	tests := []struct {
 		vg                          *fakeVersionGetter
 		expectedUpgrades            []Upgrade
 		allowExperimental, allowRCs bool
 		errExpected                 bool
+		etcdCluster                 kubeadmutil.EtcdClusterInterrogator
 	}{
 		{ // no action needed, already up-to-date
 			vg: &fakeVersionGetter{
@@ -88,6 +113,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  []Upgrade{},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // simple patch version upgrade
 			vg: &fakeVersionGetter{
@@ -120,6 +146,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // minor version upgrade only
 			vg: &fakeVersionGetter{
@@ -152,6 +179,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // both minor version upgrade and patch version upgrade available
 			vg: &fakeVersionGetter{
@@ -202,6 +230,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: false,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // allow experimental upgrades, but no upgrade available
 			vg: &fakeVersionGetter{
@@ -216,6 +245,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			expectedUpgrades:  []Upgrade{},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // upgrade to an unstable version should be supported
 			vg: &fakeVersionGetter{
@@ -249,6 +279,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // upgrade from an unstable version to an unstable version should be supported
 			vg: &fakeVersionGetter{
@@ -282,6 +313,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // v1.X.0-alpha.0 should be ignored
 			vg: &fakeVersionGetter{
@@ -316,6 +348,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // upgrade to an RC version should be supported
 			vg: &fakeVersionGetter{
@@ -350,6 +383,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowRCs:    true,
 			errExpected: false,
+			etcdCluster: etcdCluster,
 		},
 		{ // it is possible (but very uncommon) that the latest version from the previous branch is an rc and the current latest version is alpha.0. In that case, show the RC
 			vg: &fakeVersionGetter{
@@ -384,6 +418,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			},
 			allowExperimental: true,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
 		},
 		{ // upgrade to an RC version should be supported. There may also be an even newer unstable version.
 			vg: &fakeVersionGetter{
@@ -437,15 +472,43 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			allowRCs:          true,
 			allowExperimental: true,
 			errExpected:       false,
+			etcdCluster:       etcdCluster,
+		},
+		{
+			vg: &fakeVersionGetter{
+				clusterVersion:     "v1.9.3",
+				kubeletVersion:     "v1.9.3",
+				kubeadmVersion:     "v1.9.3",
+				stablePatchVersion: "v1.9.3",
+				stableVersion:      "v1.9.3",
+			},
+			allowRCs:          true,
+			allowExperimental: true,
+			etcdCluster:       mismatchEtcdCluster{},
+			expectedUpgrades:  []Upgrade{},
+			errExpected:       true,
+		},
+		{
+			vg: &fakeVersionGetter{
+				clusterVersion:     "v1.9.3",
+				kubeletVersion:     "v1.9.3",
+				kubeadmVersion:     "v1.9.3",
+				stablePatchVersion: "v1.9.3",
+				stableVersion:      "v1.9.3",
+			},
+			allowRCs:          true,
+			allowExperimental: true,
+			etcdCluster:       degradedEtcdCluster{},
+			expectedUpgrades:  []Upgrade{},
+			errExpected:       true,
 		},
 	}
 
 	// Instantiating a fake etcd cluster for being able to get etcd version for a corresponding
 	// kubernetes release.
-	testCluster := fakeEtcdCluster{}
 	for _, rt := range tests {
-		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, testCluster, featureGates)
-		if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
+		actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.etcdCluster, featureGates)
+		if !rt.errExpected && !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 			t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 		}
 		if (actualErr != nil) != rt.errExpected {

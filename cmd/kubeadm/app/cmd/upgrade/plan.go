@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 // NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
@@ -60,8 +61,11 @@ func RunPlan(parentFlags *cmdUpgradeFlags) error {
 		return err
 	}
 
-	// Define Local Etcd cluster to be able to retrieve information
-	etcdCluster := kubeadmutil.LocalEtcdCluster{}
+	e := upgradeVars.cfg.Etcd
+	etcdCluster, err := etcdutil.New(e.Endpoints, e.CAFile, e.CertFile, e.KeyFile)
+	if err != nil {
+		return err
+	}
 
 	// Compute which upgrade possibilities there are
 	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades, etcdCluster, upgradeVars.cfg.FeatureGates)
