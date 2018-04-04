@@ -438,7 +438,7 @@ kube::golang::build_kube_toolchain() {
 
 # Try and replicate the native binary placement of go install without
 # calling go install.
-kube::golang::output_filename_for_binary() {
+kube::golang::outfile_for_binary() {
   local binary=$1
   local platform=$2
   local output_path="${KUBE_GOPATH}/bin"
@@ -454,7 +454,6 @@ kube::golang::output_filename_for_binary() {
 
 kube::golang::build_binaries_for_platform() {
   local platform=$1
-  local use_go_build=${2-}
 
   local -a statics=()
   local -a nonstatics=()
@@ -472,48 +471,25 @@ kube::golang::build_binaries_for_platform() {
     fi
   done
 
-  if [[ -n ${use_go_build:-} ]]; then
-    for binary in "${statics[@]:+${statics[@]}}"; do
-      kube::log::info "  go build ${binary}"
-      local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      CGO_ENABLED=0 go build -o "${outfile}" \
-        "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${binary}"
-    done
-    for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
-      kube::log::info "  go build ${binary}"
-      local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      go build -o "${outfile}" \
-        "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${binary}"
-    done
-  else # Use go install.
-    if [[ "${#statics[@]}" != 0 ]]; then
-      CGO_ENABLED=0 go install -installsuffix static "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${statics[@]:+${statics[@]}}"
-    fi
-    if [[ "${#nonstatics[@]}" != 0 ]]; then
-      go install "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${nonstatics[@]:+${nonstatics[@]}}"
-    fi
+  if [[ "${#statics[@]}" != 0 ]]; then
+    CGO_ENABLED=0 go install -installsuffix static "${goflags[@]:+${goflags[@]}}" \
+      -gcflags "${gogcflags}" \
+      -ldflags "${goldflags}" \
+      "${statics[@]:+${statics[@]}}"
+  fi
+
+  if [[ "${#nonstatics[@]}" != 0 ]]; then
+    go install "${goflags[@]:+${goflags[@]}}" \
+      -gcflags "${gogcflags}" \
+      -ldflags "${goldflags}" \
+      "${nonstatics[@]:+${nonstatics[@]}}"
   fi
 
   for test in "${tests[@]:+${tests[@]}}"; do
-    local outfile=$(kube::golang::output_filename_for_binary "${test}" \
-      "${platform}")
-
+    local outfile=$(kube::golang::outfile_for_binary "${test}" "${platform}")
     local testpkg="$(dirname ${test})"
 
     mkdir -p "$(dirname ${outfile})"
-
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
@@ -575,14 +551,11 @@ kube::golang::build_binaries() {
     goldflags="${GOLDFLAGS:-} $(kube::version::ldflags)"
     gogcflags="${GOGCFLAGS:-}"
 
-    local use_go_build
     local -a targets=()
     local arg
 
     for arg; do
-      if [[ "${arg}" == "--use_go_build" ]]; then
-        use_go_build=true
-      elif [[ "${arg}" == -* ]]; then
+      if [[ "${arg}" == -* ]]; then
         # Assume arguments starting with a dash are flags to pass to go.
         goflags+=("${arg}")
       else
@@ -634,9 +607,9 @@ kube::golang::build_binaries() {
       local platform
       for platform in "${platforms[@]}"; do (
           kube::golang::set_platform_envs "${platform}"
-          kube::log::status "${platform}: go build started"
-          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
-          kube::log::status "${platform}: go build finished"
+          kube::log::status "${platform}: build started"
+          kube::golang::build_binaries_for_platform ${platform}
+          kube::log::status "${platform}: build finished"
         ) &> "/tmp//${platform//\//_}.build" &
       done
 
@@ -655,7 +628,7 @@ kube::golang::build_binaries() {
         kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
         (
           kube::golang::set_platform_envs "${platform}"
-          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+          kube::golang::build_binaries_for_platform ${platform}
         )
       done
     fi
