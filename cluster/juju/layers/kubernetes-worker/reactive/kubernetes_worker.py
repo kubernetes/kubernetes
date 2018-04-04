@@ -69,8 +69,14 @@ def upgrade_charm():
 
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
-    remove_state('kubernetes-worker.gpu.enabled')
-    disable_gpu()
+    if is_state('kubernetes-worker.gpu.enabled'):
+        remove_state('kubernetes-worker.gpu.enabled')
+        try:
+            disable_gpu()
+        except ApplyNodeLabelFailed:
+            # Removing node label failed. Probably the master is unavailable.
+            # Proceed with the upgrade in hope GPUs will still be there.
+            hookenv.log('Failed to remove GPU labels. Proceed with upgrade.')
 
     remove_state('kubernetes-worker.cni-plugins.installed')
     remove_state('kubernetes-worker.config.created')
