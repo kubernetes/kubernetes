@@ -213,11 +213,6 @@ readonly KUBE_STATIC_LIBRARIES=(
   kubectl
 )
 
-# Add any files with those //generate annotations in the array below.
-readonly KUBE_BINDATAS=(
-  test/e2e/generated/gobindata_util.go
-)
-
 kube::golang::is_statically_linked_library() {
   local e
   for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
@@ -417,25 +412,6 @@ kube::golang::place_bins() {
   done
 }
 
-# Builds the toolchain necessary for building kube. This needs to be
-# built only on the host platform.
-# TODO: Find this a proper home.
-# Ideally, not a shell script because testing shell scripts is painful.
-kube::golang::build_kube_toolchain() {
-  local targets=(
-    vendor/github.com/jteeuwen/go-bindata/go-bindata
-  )
-
-  local binaries
-  binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
-
-  kube::log::status "Building the toolchain targets:" "${binaries[@]}"
-  go install "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${binaries[@]:+${binaries[@]}}"
-}
-
 # Try and replicate the native binary placement of go install without
 # calling go install.
 kube::golang::outfile_for_binary() {
@@ -589,18 +565,6 @@ kube::golang::build_binaries() {
         parallel=false
       fi
     fi
-
-    # First build the toolchain before building any other targets
-    kube::golang::build_kube_toolchain
-
-    kube::log::status "Generating bindata:" "${KUBE_BINDATAS[@]}"
-    for bindata in "${KUBE_BINDATAS[@]}"; do
-      # Only try to generate bindata if the file exists, since in some cases
-      # one-off builds of individual directories may exclude some files.
-      if [[ -f "${KUBE_ROOT}/${bindata}" ]]; then
-        go generate "${goflags[@]:+${goflags[@]}}" "${KUBE_ROOT}/${bindata}"
-      fi
-    done
 
     if [[ "${parallel}" == "true" ]]; then
       kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
