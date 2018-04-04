@@ -647,6 +647,38 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			verifyKubemciStatusHas(name, "is spread across 0 cluster")
 		})
+
+		It("single and multi-cluster ingresses should be able to exist together", func() {
+			By("Creating a single cluster ingress first")
+			jig.Class = ""
+			singleIngFilePath := filepath.Join(framework.IngressManifestPath, "static-ip-2")
+			jig.CreateIngress(singleIngFilePath, ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(false /*waitForNodePort*/)
+			// jig.Ingress will be overwritten when we create MCI, so keep a reference.
+			singleIng := jig.Ingress
+
+			// Create the multi-cluster ingress next.
+			By("Creating a multi-cluster ingress next")
+			jig.Class = framework.MulticlusterIngressClassValue
+			ingAnnotations := map[string]string{
+				framework.IngressStaticIPKey: ipName,
+			}
+			multiIngFilePath := filepath.Join(framework.IngressManifestPath, "http")
+			jig.CreateIngress(multiIngFilePath, ns, ingAnnotations, map[string]string{})
+			jig.WaitForIngress(false /*waitForNodePort*/)
+			mciIngress := jig.Ingress
+
+			By("Deleting the single cluster ingress and verifying that multi-cluster ingress continues to work")
+			jig.Ingress = singleIng
+			jig.Class = ""
+			jig.TryDeleteIngress()
+			jig.Ingress = mciIngress
+			jig.Class = framework.MulticlusterIngressClassValue
+			jig.WaitForIngress(false /*waitForNodePort*/)
+
+			By("Cleanup: Deleting the multi-cluster ingress")
+			jig.TryDeleteIngress()
+		})
 	})
 
 	// Time: borderline 5m, slow by design
