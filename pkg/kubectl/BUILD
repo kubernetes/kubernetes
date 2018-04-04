@@ -33,7 +33,7 @@ go_test(
         "service_basic_test.go",
         "service_test.go",
         "serviceaccount_test.go",
-        "sorting_printer_test.go",
+        "sorter_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -115,7 +115,7 @@ go_library(
         "service.go",
         "service_basic.go",
         "serviceaccount.go",
-        "sorting_printer.go",
+        "sorter.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl",
     deps = [
