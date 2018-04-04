@@ -300,6 +300,8 @@ kind: KubeProxyConfiguration
 
 * Some users, especially those with very large clusters, may see higher memory usage by the kube-controller-manager in 1.10. ([#61041](https://github.com/kubernetes/kubernetes/issues/61041))
 
+* Due to an issue in ingress-gce controller in 1.10.0, creating multi-cluster ingresses with [kubemci CLI](https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress) fails. This will be fixed in 1.10.1 release. ([GoogleCloudPlatform/k8s-multicluster-ingress#175](https://github.com/GoogleCloudPlatform/k8s-multicluster-ingress/issues/175))
+
 ## Deprecations
 
 * etcd2 as a backend is deprecated and support will be removed in Kubernetes 1.13.
