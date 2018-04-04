@@ -70,6 +70,7 @@ const (
 	errorStatus  = "ERROR"
 
 	ServiceAnnotationLoadBalancerFloatingNetworkID = "loadbalancer.openstack.org/floating-network-id"
+	ServiceAnnotationLoadBalancerSubnetID          = "loadbalancer.openstack.org/subnet-id"
 
 	// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 	// to indicate that we want an internal loadbalancer service.
@@ -643,6 +644,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s/%s", apiService.Namespace, apiService.Name)
 	}
 
+	lbaas.opts.SubnetID = getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerSubnetID, lbaas.opts.SubnetID)
 	if len(lbaas.opts.SubnetID) == 0 {
 		// Get SubnetID automatically.
 		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetID by one node.
@@ -1158,6 +1160,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(ctx context.Context, clusterName string
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
+	lbaas.opts.SubnetID = getStringFromServiceAnnotation(service, ServiceAnnotationLoadBalancerSubnetID, lbaas.opts.SubnetID)
 	if len(lbaas.opts.SubnetID) == 0 && len(nodes) > 0 {
 		// Get SubnetID automatically.
 		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetID by one node.
