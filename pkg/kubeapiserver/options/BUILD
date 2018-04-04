@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "admission.go",
+        "api_enablement.go",
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
@@ -68,6 +69,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
