@@ -423,7 +423,6 @@ kube::golang::place_bins() {
 # Ideally, not a shell script because testing shell scripts is painful.
 kube::golang::build_kube_toolchain() {
   local targets=(
-    hack/cmd/teststale
     vendor/github.com/jteeuwen/go-bindata/go-bindata
   )
 
@@ -513,33 +512,9 @@ kube::golang::build_binaries_for_platform() {
 
     local testpkg="$(dirname ${test})"
 
-    # Staleness check always happens on the host machine, so we don't
-    # have to locate the `teststale` binaries for the other platforms.
-    # Since we place the host binaries in `$KUBE_GOPATH/bin`, we can
-    # assume that the binary exists there, if it exists at all.
-    # Otherwise, something has gone wrong with building the `teststale`
-    # binary and we should safely proceed building the test binaries
-    # assuming that they are stale. There is no good reason to error
-    # out.
-    if test -x "${KUBE_GOPATH}/bin/teststale" && ! "${KUBE_GOPATH}/bin/teststale" -binary "${outfile}" -package "${testpkg}"
-    then
-      continue
-    fi
-
-    # `go test -c` below directly builds the binary. It builds the packages,
-    # but it never installs them. `go test -i` only installs the dependencies
-    # of the test, but not the test package itself. So neither `go test -c`
-    # nor `go test -i` installs, for example, test/e2e.a. And without that,
-    # doing a staleness check on k8s.io/kubernetes/test/e2e package always
-    # returns true (always stale). And that's why we need to install the
-    # test package.
-    go install "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${testpkg}"
-
     mkdir -p "$(dirname ${outfile})"
-    go test -i -c \
+
+    go test -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \

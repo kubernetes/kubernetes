@@ -278,12 +278,6 @@ runTests() {
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
-    # `go test` does not install the things it builds. `go test -i` installs
-    # the build artifacts but doesn't run the tests.  The two together provide
-    # a large speedup for tests that do not need to be rebuilt.
-    go test -i "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
-     "${testargs[@]:+${testargs[@]}}"
     go test "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
@@ -319,21 +313,11 @@ runTests() {
   for path in $(echo $cover_ignore_dirs | sed 's/|/ /g'); do
       echo -e "skipped\tk8s.io/kubernetes/$path"
   done
-  #
-  # `go test` does not install the things it builds. `go test -i` installs
-  # the build artifacts but doesn't run the tests.  The two together provide
-  # a large speedup for tests that do not need to be rebuilt.
+
   printf "%s\n" "${@}" \
     | grep -Ev $cover_ignore_dirs \
     | xargs -I{} -n 1 -P ${KUBE_COVERPROCS} \
     bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
-      go test -i ${goflags[@]:+${goflags[@]}} \
-        ${KUBE_RACE} \
-        ${KUBE_TIMEOUT} \
-        -cover -covermode=\"${KUBE_COVERMODE}\" \
-        -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-        \"\${_pkg}\" \
-        ${testargs[@]:+${testargs[@]}}
       go test ${goflags[@]:+${goflags[@]}} \
         ${KUBE_RACE} \
         ${KUBE_TIMEOUT} \
