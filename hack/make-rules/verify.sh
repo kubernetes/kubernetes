@@ -74,7 +74,7 @@ function is-quick {
 }
 
 function is-explicitly-chosen {
-  local name="${1#verify-}"
+  local name="${1#verify?}"
   name="${name%.*}"
   for e in ${WHAT}; do
     if [[ $e == "$name" ]]; then
@@ -85,7 +85,7 @@ function is-explicitly-chosen {
 }
 
 function run-cmd {
-  local filename="${2##*/verify-}"
+  local filename="${2##*/verify?}"
   local testname="${filename%%.*}"
   local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
   local tr
@@ -124,6 +124,7 @@ function run-checks {
       if ! is-explicitly-chosen "${check_name}"; then
         continue
       fi
+      what_matched_something=true
     else
       if is-excluded "${t}" ; then
         echo "Skipping ${check_name}"
@@ -159,9 +160,15 @@ if ${QUICK} ; then
   echo "Running in quick mode (QUICK=true). Only fast checks will run."
 fi
 
+what_matched_something=false
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
-run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+run-checks "${KUBE_ROOT}/hack/verify_*.py" python
+
+if [[ ! -z ${WHAT:-} && $what_matched_something = false ]]; then
+  echo "ERROR: no verify scripts matched WHAT=${WHAT}"
+  ret=1
+fi
 
 if [[ ${ret} -eq 1 ]]; then
     print-failed-tests
