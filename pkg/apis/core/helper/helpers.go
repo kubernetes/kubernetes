@@ -323,16 +323,6 @@ func ingressEqual(lhs, rhs *core.LoadBalancerIngress) bool {
 	return true
 }
 
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusDeepCopy(lb *core.LoadBalancerStatus) *core.LoadBalancerStatus {
-	c := &core.LoadBalancerStatus{}
-	c.Ingress = make([]core.LoadBalancerIngress, len(lb.Ingress))
-	for i := range lb.Ingress {
-		c.Ingress[i] = lb.Ingress[i]
-	}
-	return c
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
