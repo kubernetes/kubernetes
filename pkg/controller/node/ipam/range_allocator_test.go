@@ -24,13 +24,18 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 const (
 	nodePollInterval = 100 * time.Millisecond
 )
+
+var alwaysReady = func() bool { return true }
 
 func waitForUpdatedNodeWithTimeout(nodeHandler *testutil.FakeNodeHandler, number int, timeout time.Duration) error {
 	return wait.Poll(nodePollInterval, timeout, func() (bool, error) {
@@ -39,6 +44,19 @@ func waitForUpdatedNodeWithTimeout(nodeHandler *testutil.FakeNodeHandler, number
 		}
 		return false, nil
 	})
+}
+
+// Creates a fakeNodeInformer using the provided fakeNodeHandler.
+func getFakeNodeInformer(fakeNodeHandler *testutil.FakeNodeHandler) coreinformers.NodeInformer {
+	fakeClient := &fake.Clientset{}
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakeNodeInformer := fakeInformerFactory.Core().V1().Nodes()
+
+	for _, node := range fakeNodeHandler.Existing {
+		fakeNodeInformer.Informer().GetStore().Add(node)
+	}
+
+	return fakeNodeInformer
 }
 
 func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
@@ -130,19 +148,23 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		expectedAllocatedCIDR string
 		allocatedCIDRs        []string
 	}) {
-		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		// Initialize the range allocator.
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		rangeAllocator, ok := allocator.(*rangeAllocator)
+		if !ok {
+			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+			return
+		}
+		rangeAllocator.nodesSynced = alwaysReady
+		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		go allocator.Run(wait.NeverStop)
+
 		// this is a bit of white box testing
 		for _, allocated := range tc.allocatedCIDRs {
 			_, cidr, err := net.ParseCIDR(allocated)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
 			}
-			rangeAllocator, ok := allocator.(*rangeAllocator)
-			if !ok {
-				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
-				return
-			}
-			rangeAllocator.recorder = testutil.NewFakeRecorder()
 			if err = rangeAllocator.cidrs.Occupy(cidr); err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 			}
@@ -212,19 +234,23 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 		subNetMaskSize  int
 		allocatedCIDRs  []string
 	}) {
-		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		// Initialize the range allocator.
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		rangeAllocator, ok := allocator.(*rangeAllocator)
+		if !ok {
+			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+			return
+		}
+		rangeAllocator.nodesSynced = alwaysReady
+		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		go allocator.Run(wait.NeverStop)
+
 		// this is a bit of white box testing
 		for _, allocated := range tc.allocatedCIDRs {
 			_, cidr, err := net.ParseCIDR(allocated)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
 			}
-			rangeAllocator, ok := allocator.(*rangeAllocator)
-			if !ok {
-				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
-				return
-			}
-			rangeAllocator.recorder = testutil.NewFakeRecorder()
 			err = rangeAllocator.cidrs.Occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
@@ -307,6 +333,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			}(),
 			serviceCIDR:                      nil,
 			subNetMaskSize:                   30,
+			allocatedCIDRs:                   []string{"127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
 			expectedAllocatedCIDRFirstRound:  "127.123.234.0/30",
 			cidrsToRelease:                   []string{"127.123.234.0/30"},
 			expectedAllocatedCIDRSecondRound: "127.123.234.0/30",
@@ -324,19 +351,23 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		allocatedCIDRs                   []string
 		cidrsToRelease                   []string
 	}) {
-		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		// Initialize the range allocator.
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		rangeAllocator, ok := allocator.(*rangeAllocator)
+		if !ok {
+			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+			return
+		}
+		rangeAllocator.nodesSynced = alwaysReady
+		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		go allocator.Run(wait.NeverStop)
+
 		// this is a bit of white box testing
 		for _, allocated := range tc.allocatedCIDRs {
 			_, cidr, err := net.ParseCIDR(allocated)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
 			}
-			rangeAllocator, ok := allocator.(*rangeAllocator)
-			if !ok {
-				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
-				return
-			}
-			rangeAllocator.recorder = testutil.NewFakeRecorder()
 			err = rangeAllocator.cidrs.Occupy(cidr)
 			if err != nil {
 				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
