@@ -22,6 +22,7 @@ import (
 
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
 const (
@@ -53,6 +54,11 @@ func (a *APIServer) Start() error {
 	config.ServiceClusterIPRange = *ipnet
 	config.AllowPrivileged = true
 	config.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+
+	// test with the node authorizer on (this replaces the default AlwaysAllow we were using for e2e node tests)
+	// TODO(mtaufen): parameterize this config in the future
+	config.Authorization.Mode = modes.ModeNode
+
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)

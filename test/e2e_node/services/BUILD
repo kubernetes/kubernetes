@@ -26,6 +26,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controller/namespace:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
