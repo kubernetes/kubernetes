@@ -177,7 +177,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
-	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
+	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		closeFn()
 		glog.Fatalf("error in bringing up the master: %v", err)

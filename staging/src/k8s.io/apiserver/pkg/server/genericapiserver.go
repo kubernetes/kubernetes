@@ -95,9 +95,7 @@ type GenericAPIServer struct {
 	// admissionControl is used to build the RESTStorage that backs an API Group.
 	admissionControl admission.Interface
 
-	// requestContextMapper provides a way to get the context for a request.  It may be nil.
-	requestContextMapper apirequest.RequestContextMapper
-
+	// SecureServingInfo holds configuration of the TLS server.
 	SecureServingInfo *SecureServingInfo
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
@@ -146,7 +144,7 @@ type GenericAPIServer struct {
 	// if the client requests it via Accept-Encoding
 	enableAPIResponseCompression bool
 
-	// delegationTarget is the next delegate in the chain or nil
+	// delegationTarget is the next delegate in the chain. This is never nil.
 	delegationTarget DelegationTarget
 
 	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
@@ -200,12 +198,14 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
 }
 
-var EmptyDelegate = emptyDelegate{
-	requestContextMapper: apirequest.NewRequestContextMapper(),
-}
-
 type emptyDelegate struct {
 	requestContextMapper apirequest.RequestContextMapper
+}
+
+func NewEmptyDelegate() DelegationTarget {
+	return emptyDelegate{
+		requestContextMapper: apirequest.NewRequestContextMapper(),
+	}
 }
 
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
@@ -230,10 +230,8 @@ func (s emptyDelegate) NextDelegate() DelegationTarget {
 	return nil
 }
 
-// RequestContextMapper is exposed so that third party resource storage can be build in a different location.
-// TODO refactor third party resource storage
 func (s *GenericAPIServer) RequestContextMapper() apirequest.RequestContextMapper {
-	return s.requestContextMapper
+	return s.delegationTarget.RequestContextMapper()
 }
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
@@ -366,7 +364,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.requestContextMapper).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.delegationTarget.RequestContextMapper()).WebService())
 
 	return nil
 }
@@ -411,7 +409,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	}
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
-	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.requestContextMapper).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.delegationTarget.RequestContextMapper()).WebService())
 
 	return nil
 }

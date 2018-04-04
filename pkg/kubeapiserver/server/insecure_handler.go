@@ -38,20 +38,20 @@ import (
 // You shouldn't be using this.  It makes sig-auth sad.
 // InsecureServingInfo *ServingInfo
 
-func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
+func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config, contextMapper apirequest.RequestContextMapper) http.Handler {
 	handler := apiHandler
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
-		handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+		handler = genericapifilters.WithAudit(handler, contextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
-		handler = genericapifilters.WithLegacyAudit(handler, c.RequestContextMapper, c.LegacyAuditWriter)
+		handler = genericapifilters.WithLegacyAudit(handler, contextMapper, c.LegacyAuditWriter)
 	}
-	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, insecureSuperuser{}, nil)
+	handler = genericapifilters.WithAuthentication(handler, contextMapper, insecureSuperuser{}, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc, c.RequestTimeout)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.RequestContextMapper, c.LongRunningFunc)
-	handler = genericfilters.WithWaitGroup(handler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
-	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c), c.RequestContextMapper)
-	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, contextMapper, c.LongRunningFunc, c.RequestTimeout)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, contextMapper, c.LongRunningFunc)
+	handler = genericfilters.WithWaitGroup(handler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c), contextMapper)
+	handler = apirequest.WithRequestContext(handler, contextMapper)
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
