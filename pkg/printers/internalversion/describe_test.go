@@ -2133,14 +2133,14 @@ URL:	http://localhost
 				"name":              "MyName",
 				"namespace":         "MyNamespace",
 				"creationTimestamp": "2017-04-01T00:00:00Z",
-				"resourceVersion":   int64(123),
+				"resourceVersion":   123,
 				"uid":               "00000000-0000-0000-0000-000000000001",
 				"dummy3":            "present",
 			},
 			"items": []interface{}{
 				map[string]interface{}{
 					"itemBool": true,
-					"itemInt":  int64(42),
+					"itemInt":  42,
 				},
 			},
 			"url":    "http://localhost",
