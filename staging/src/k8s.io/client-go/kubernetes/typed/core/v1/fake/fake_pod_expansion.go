@@ -56,3 +56,13 @@ func (c *FakePods) Evict(eviction *policy.Eviction) error {
 	_, err := c.Fake.Invokes(action, eviction)
 	return err
 }
+
+func (c *FakePods) PatchStatus(name string, data []byte) (*v1.Pod, error) {
+	obj, err := c.Fake.Invokes(
+		core.NewPatchSubresourceAction(podsResource, c.ns, name, data, "status"), &v1.Pod{})
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*v1.Pod), err
+}
