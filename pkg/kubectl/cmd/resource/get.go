@@ -218,7 +218,7 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-			fmt.Fprint(options.ErrOut, "You must specify the type of resource to get. ", cmdutil.ValidResourceTypeList(f))
+			fmt.Fprintf(options.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.ValidResourceTypeList(f))
 			fullCmdName := cmd.Parent().CommandPath()
 			usageString := "Required resource not specified."
 			if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {
