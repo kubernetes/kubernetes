@@ -41,7 +41,7 @@ options:
       will not be loaded.
   channel:
     type: string
-    default: "1.9/stable"
+    default: "1.10/stable"
     description: |
       Snap channel to install Kubernetes master services from
   client_password:
