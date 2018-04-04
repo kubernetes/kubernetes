@@ -250,7 +250,6 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 					DevicePath: "fake/path",
 				},
 			}},
-		Spec: v1.NodeSpec{ExternalID: testHostname},
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

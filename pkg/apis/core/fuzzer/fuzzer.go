@@ -469,10 +469,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				ss.SessionAffinityConfig = nil
 			}
 		},
-		func(n *core.Node, c fuzz.Continue) {
-			c.FuzzNoCustom(n)
-			n.Spec.ExternalID = "external"
-		},
 		func(s *core.NodeStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.Allocatable = s.Capacity
