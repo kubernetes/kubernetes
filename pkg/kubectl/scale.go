@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/apis/batch"
 
 	scaleclient "k8s.io/client-go/scale"
 )
@@ -95,20 +94,6 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		}
 		return true, nil
 	}
-}
-
-// ValidateJob ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
-func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
-	if precondition.Size != -1 && job.Spec.Parallelism == nil {
-		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), "nil"}
-	}
-	if precondition.Size != -1 && int(*job.Spec.Parallelism) != precondition.Size {
-		return PreconditionError{"parallelism", strconv.Itoa(precondition.Size), strconv.Itoa(int(*job.Spec.Parallelism))}
-	}
-	if len(precondition.ResourceVersion) != 0 && job.ResourceVersion != precondition.ResourceVersion {
-		return PreconditionError{"resource version", precondition.ResourceVersion, job.ResourceVersion}
-	}
-	return nil
 }
 
 // validateGeneric ensures that the preconditions match. Returns nil if they are valid, otherwise an error

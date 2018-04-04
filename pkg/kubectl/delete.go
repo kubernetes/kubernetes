@@ -30,13 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob"
 )
 
 const (
@@ -80,6 +83,9 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface, sc scalecli
 	case api.Kind("Pod"):
 		return &PodReaper{c.Core()}, nil
 
+	case batch.Kind("Job"):
+		return &JobReaper{c.Batch(), c.Core(), Interval, Timeout}, nil
+
 	case apps.Kind("StatefulSet"):
 		return &StatefulSetReaper{c.Apps(), c.Core(), Interval, Timeout, sc}, nil
 
@@ -107,6 +113,11 @@ type ReplicaSetReaper struct {
 }
 type DaemonSetReaper struct {
 	client                extensionsclient.DaemonSetsGetter
+	pollInterval, timeout time.Duration
+}
+type JobReaper struct {
+	client                batchclient.JobsGetter
+	podClient             coreclient.PodsGetter
 	pollInterval, timeout time.Duration
 }
 type DeploymentReaper struct {
@@ -339,6 +350,53 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 	falseVar := false
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
 	return statefulsets.Delete(name, deleteOptions)
+}
+
+func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
+	jobs := reaper.client.Jobs(namespace)
+	pods := reaper.podClient.Pods(namespace)
+	scaler := &scalejob.JobPsuedoScaler{
+		JobsClient: reaper.client,
+	}
+	job, err := jobs.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if timeout == 0 {
+		// we will never have more active pods than job.Spec.Parallelism
+		parallelism := *job.Spec.Parallelism
+		timeout = Timeout + time.Duration(10*parallelism)*time.Second
+	}
+
+	// TODO: handle overlapping jobs
+	retry := &scalejob.RetryParams{Interval: reaper.pollInterval, Timeout: reaper.timeout}
+	waitForJobs := &scalejob.RetryParams{Interval: reaper.pollInterval, Timeout: reaper.timeout}
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	// at this point only dead pods are left, that should be removed
+	selector, _ := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	podList, err := pods.List(options)
+	if err != nil {
+		return err
+	}
+	errList := []error{}
+	for _, pod := range podList.Items {
+		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
+			// ignores the error when the pod isn't found
+			if !errors.IsNotFound(err) {
+				errList = append(errList, err)
+			}
+		}
+	}
+	if len(errList) > 0 {
+		return utilerrors.NewAggregate(errList)
+	}
+	// once we have all the pods removed we can safely remove the job itself.
+	falseVar := false
+	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
+	return jobs.Delete(name, deleteOptions)
 }
 
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
