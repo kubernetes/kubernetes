@@ -1113,7 +1113,8 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
 
   local -r kubelet_env_file="/etc/default/kubelet"
-  echo "KUBELET_OPTS=\"${KUBELET_ARGS}\"" > "${kubelet_env_file}"
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-}"
+  echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
 
   # Write the systemd service file for kubelet.
   cat <<EOF >/etc/systemd/system/kubelet.service
@@ -2482,6 +2483,12 @@ if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
 fi
 
 source "${KUBE_HOME}/kube-env"
+
+
+if [[ -f "${KUBE_HOME}/kubelet-config.yaml" ]]; then
+  echo "Found Kubelet config file at ${KUBE_HOME}/kubelet-config.yaml"
+  KUBELET_CONFIG_FILE_ARG="--config ${KUBE_HOME}/kubelet-config.yaml"
+fi
 
 if [[ -e "${KUBE_HOME}/kube-master-certs" ]]; then
   source "${KUBE_HOME}/kube-master-certs"
