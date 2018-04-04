@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
+	flags "k8s.io/kubernetes/pkg/kubectl/printers"
 )
 
 func TestPrinterSupportsExpectedJSONPathFormats(t *testing.T) {
@@ -99,7 +99,7 @@ func TestPrinterSupportsExpectedJSONPathFormats(t *testing.T) {
 				templateArg = nil
 			}
 
-			printFlags := printers.JSONPathPrintFlags{
+			printFlags := flags.JSONPathPrintFlags{
 				TemplateArgument: templateArg,
 			}
 
@@ -177,7 +177,7 @@ func TestJSONPathPrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.JSONPathPrintFlags{
+			printFlags := flags.JSONPathPrintFlags{
 				TemplateArgument: &tc.templateArg,
 				AllowMissingKeys: tc.allowMissingKeys,
 			}

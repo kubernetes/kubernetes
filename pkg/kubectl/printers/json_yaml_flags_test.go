@@ -18,82 +18,48 @@ package printers_test
 
 import (
 	"bytes"
-	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
+	flags "k8s.io/kubernetes/pkg/kubectl/printers"
 )
 
-func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
+func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 	testObject := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-
-	customColumnsFile, err := ioutil.TempFile("", "printers_jsonpath_flags")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer func(tempFile *os.File) {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-	}(customColumnsFile)
-
-	fmt.Fprintf(customColumnsFile, "NAME\n.metadata.name")
 
 	testCases := []struct {
 		name           string
 		outputFormat   string
-		operation      string
-		dryRun         bool
-		expectedError  string
 		expectedOutput string
 		expectNoMatch  bool
 	}{
 		{
-			name:           "valid \"name\" output format with no operation prints resource name",
-			outputFormat:   "name",
-			expectedOutput: "pod/foo",
+			name:           "json output format matches a json printer",
+			outputFormat:   "json",
+			expectedOutput: "\"name\": \"foo\"",
 		},
 		{
-			name:           "valid \"name\" output format and an operation prints success message",
-			outputFormat:   "name",
-			operation:      "patched",
-			expectedOutput: "pod/foo patched",
+			name:           "yaml output format matches a yaml printer",
+			outputFormat:   "yaml",
+			expectedOutput: "name: foo",
 		},
 		{
-			name:           "valid \"name\" output format and an operation prints success message with dry run",
-			outputFormat:   "name",
-			operation:      "patched",
-			dryRun:         true,
-			expectedOutput: "pod/foo patched (dry run)",
-		},
-		{
-			name:          "operation and no valid \"name\" output does not match a printer",
-			operation:     "patched",
-			dryRun:        true,
+			name:          "output format for another printer does not match a json/yaml printer",
+			outputFormat:  "jsonpath",
 			expectNoMatch: true,
 		},
 		{
-			name:          "no printer is matched on an invalid outputFormat",
+			name:          "invalid output format results in no match",
 			outputFormat:  "invalid",
-			expectNoMatch: true,
-		},
-		{
-			name:          "printer should not match on any other format supported by another printer",
-			outputFormat:  "go-template",
 			expectNoMatch: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.NamePrintFlags{
-				Operation: tc.operation,
-				DryRun:    tc.dryRun,
-			}
+			printFlags := flags.JSONYamlPrintFlags{}
 
 			p, matched, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
@@ -104,13 +70,6 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 			}
 			if !matched {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
-			}
-
-			if len(tc.expectedError) > 0 {
-				if err == nil || !strings.Contains(err.Error(), tc.expectedError) {
-					t.Errorf("expecting error %q, got %v", tc.expectedError, err)
-				}
-				return
 			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
