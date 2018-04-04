@@ -42,6 +42,8 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -57,8 +59,8 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/proxy:go_default_library",
         "//vendor/k8s.io/client-go/listers/core/v1:go_default_library",
@@ -79,7 +81,7 @@ go_library(
         "//vendor/k8s.io/kube-aggregator/pkg/controllers:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/controllers/openapi:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/controllers/status:go_default_library",
-        "//vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/rest:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd:go_default_library",
     ],
 )
 
