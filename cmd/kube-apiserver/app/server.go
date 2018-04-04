@@ -112,15 +112,23 @@ func NewAPIServerCommand() *cobra.Command {
 for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cmd.Flags())
 
-			stopCh := server.SetupSignalHandler()
-			if err := Run(s, stopCh); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+			// set default options
+			completedOptions, err := Complete(s)
+			if err != nil {
+				return err
 			}
+
+			// validate options
+			if errs := completedOptions.Validate(); len(errs) != 0 {
+				return utilerrors.NewAggregate(errs)
+			}
+
+			stopCh := server.SetupSignalHandler()
+			return Run(completedOptions, stopCh)
 		},
 	}
 	s.AddFlags(cmd.Flags())
@@ -129,11 +137,11 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
+func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
-	server, err := CreateServerChain(runOptions, stopCh)
+	server, err := CreateServerChain(completeOptions, stopCh)
 	if err != nil {
 		return err
 	}
@@ -142,19 +150,19 @@ func Run(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) error {
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
-	nodeTunneler, proxyTransport, err := CreateNodeDialer(runOptions)
+func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
+	nodeTunneler, proxyTransport, err := CreateNodeDialer(completedOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	kubeAPIServerConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(runOptions, nodeTunneler, proxyTransport)
+	kubeAPIServerConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions, nodeTunneler, proxyTransport)
 	if err != nil {
 		return nil, err
 	}
 
 	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, pluginInitializer, runOptions)
+	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, versionedInformers, pluginInitializer, completedOptions.ServerRunOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +197,7 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	apiExtensionsServer.GenericAPIServer.PrepareRun()
 
 	// aggregator comes last in the chain
-	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, runOptions, versionedInformers, serviceResolver, proxyTransport, pluginInitializer)
+	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, completedOptions.ServerRunOptions, versionedInformers, serviceResolver, proxyTransport, pluginInitializer)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +232,7 @@ func CreateKubeAPIServer(kubeAPIServerConfig *master.Config, delegateAPIServer g
 }
 
 // CreateNodeDialer creates the dialer infrastructure to connect to the nodes.
-func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
+func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Transport, error) {
 	// Setup nodeTunneler if needed
 	var nodeTunneler tunneler.Tunneler
 	var proxyDialerFn utilnet.DialFunc
@@ -270,7 +278,7 @@ func CreateNodeDialer(s *options.ServerRunOptions) (tunneler.Tunneler, *http.Tra
 
 // CreateKubeAPIServerConfig creates all the resources for running the API server, but runs none of them
 func CreateKubeAPIServerConfig(
-	s *options.ServerRunOptions,
+	s completedServerRunOptions,
 	nodeTunneler tunneler.Tunneler,
 	proxyTransport *http.Transport,
 ) (
@@ -282,19 +290,8 @@ func CreateKubeAPIServerConfig(
 	pluginInitializers []admission.PluginInitializer,
 	lastErr error,
 ) {
-	// set defaults in the options before trying to create the generic config
-	if lastErr = defaultOptions(s); lastErr != nil {
-		return
-	}
-
-	// validate options
-	if errs := s.Validate(); len(errs) != 0 {
-		lastErr = utilerrors.NewAggregate(errs)
-		return
-	}
-
 	var genericConfig *genericapiserver.Config
-	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, lastErr = BuildGenericConfig(s, proxyTransport)
+	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, lastErr = BuildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if lastErr != nil {
 		return
 	}
@@ -322,7 +319,7 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-	storageFactory, lastErr := BuildStorageFactory(s, genericConfig.MergedResourceConfig)
+	storageFactory, lastErr := BuildStorageFactory(s.ServerRunOptions, genericConfig.MergedResourceConfig)
 	if lastErr != nil {
 		return
 	}
@@ -673,21 +670,29 @@ func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *servers
 	return storageFactory, nil
 }
 
-func defaultOptions(s *options.ServerRunOptions) error {
+// completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
+type completedServerRunOptions struct {
+	*options.ServerRunOptions
+}
+
+// Complete set default ServerRunOptions.
+// Should be called after kube-apiserver flags parsed.
+func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
+	var options completedServerRunOptions
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing.SecureServingOptions); err != nil {
-		return err
+		return options, err
 	}
 	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
-		return err
+		return options, err
 	}
 	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
-		return fmt.Errorf("error determining service IP ranges: %v", err)
+		return options, fmt.Errorf("error determining service IP ranges: %v", err)
 	}
 	s.ServiceClusterIPRange = serviceIPRange
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
-		return fmt.Errorf("error creating self-signed certificates: %v", err)
+		return options, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
 	if len(s.GenericServerRunOptions.ExternalHost) == 0 {
@@ -697,7 +702,7 @@ func defaultOptions(s *options.ServerRunOptions) error {
 			if hostname, err := os.Hostname(); err == nil {
 				s.GenericServerRunOptions.ExternalHost = hostname
 			} else {
-				return fmt.Errorf("error finding host name: %v", err)
+				return options, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
 		glog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
@@ -752,7 +757,7 @@ func defaultOptions(s *options.ServerRunOptions) error {
 		}
 		s.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
 		if err != nil {
-			return err
+			return options, err
 		}
 	}
 
@@ -769,8 +774,8 @@ func defaultOptions(s *options.ServerRunOptions) error {
 			}
 		}
 	}
-
-	return nil
+	options.ServerRunOptions = s
+	return options, nil
 }
 
 func readCAorNil(file string) ([]byte, error) {
