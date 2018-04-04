@@ -284,14 +284,18 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 	}
 
 	if a.usernameClaim == "email" {
-		// Check the email_verified claim to ensure the email is valid.
+		// If the email_verified claim is present, ensure the email is valid.
 		// https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
-		var emailVerified bool
-		if err := c.unmarshalClaim("email_verified", &emailVerified); err != nil {
-			return nil, false, fmt.Errorf("oidc: parse 'email_verified' claim: %v", err)
-		}
-		if !emailVerified {
-			return nil, false, fmt.Errorf("oidc: email not verified")
+		if hasEmailVerified := c.hasClaim("email_verified"); hasEmailVerified {
+			var emailVerified bool
+			if err := c.unmarshalClaim("email_verified", &emailVerified); err != nil {
+				return nil, false, fmt.Errorf("oidc: parse 'email_verified' claim: %v", err)
+			}
+
+			// If the email_verified claim is present we have to verify it is set to `true`.
+			if !emailVerified {
+				return nil, false, fmt.Errorf("oidc: email not verified")
+			}
 		}
 	}
 
@@ -346,4 +350,11 @@ func (c claims) unmarshalClaim(name string, v interface{}) error {
 		return fmt.Errorf("claim not present")
 	}
 	return json.Unmarshal([]byte(val), v)
+}
+
+func (c claims) hasClaim(name string) bool {
+	if _, ok := c[name]; !ok {
+		return false
+	}
+	return true
 }
