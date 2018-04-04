@@ -440,11 +440,11 @@ Accept: application/com.github.proto-openapi.spec.v2@v1.0+protobuf Accept-Encodi
 
 * Default enabled admission plugins are now `NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota`. Please note that if you previously had not set the `--admission-control` flag, your cluster behavior may change (to be more standard). ([#58684](https://github.com/kubernetes/kubernetes/pull/58684), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
 
-* Encryption key and encryption provider rotation now works properly. ([#58375](https://github.com/kubernetes/kubernetes/pull/58375), [@liggitt](https://github.com/liggitt)
+* Encryption key and encryption provider rotation now works properly. ([#58375](https://github.com/kubernetes/kubernetes/pull/58375), [@liggitt](https://github.com/liggitt))
 
 * RBAC: The system:kubelet-api-admin cluster role can be used to grant full access to the kubelet API  so integrators can grant this role to the --kubelet-client-certificate credential given to the apiserver. ([#57128](https://github.com/kubernetes/kubernetes/pull/57128), [@liggitt](https://github.com/liggitt))
 
-* DenyEscalatingExec admission controller now checks psp HostNetwork as well as hostIPC and hostPID. hostNetwork is also checked to deny exec /attach. ([#56839](https://github.com/kubernetes/kubernetes/pull/56839), [@hzxuzhonghu]=(https://github.com/hzxuzhonghu))
+* DenyEscalatingExec admission controller now checks psp HostNetwork as well as hostIPC and hostPID. hostNetwork is also checked to deny exec /attach. ([#56839](https://github.com/kubernetes/kubernetes/pull/56839), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
 
 * When using Role-Based Access Control, the "admin", "edit", and "view" roles now have the expected permissions on NetworkPolicy resources, rather than reserving those permissions to only cluster-admin. ([#56650](https://github.com/kubernetes/kubernetes/pull/56650), [@danwinship](https://github.com/danwinship))
 
@@ -840,7 +840,7 @@ And point to the file using the --config flag, as in
 
 * Fixed race condition issue when detaching azure disk, preventing `Multi-Attach error`s when scheduling one pod from one node to another. ([#60183](https://github.com/kubernetes/kubernetes/pull/60183), [@andyzhangx](https://github.com/andyzhangx))
 
-* Add AzureDisk support for vmss nodes. ([#59716]([https://github.com/kubernetes/kubernetes/pull/59716](https://github.com/kubernetes/kubernetes/pull/59716)), [@feiskyer](https://github.com/feiskyer))
+* Add AzureDisk support for vmss nodes. ([#59716](https://github.com/kubernetes/kubernetes/pull/59716), [@feiskyer](https://github.com/feiskyer))
 
 * Map correct vmset name for Azure internal load balancers. ([#59747](https://github.com/kubernetes/kubernetes/pull/59747), [@feiskyer](https://github.com/feiskyer))
 
