@@ -378,9 +378,6 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     creds = db.get('credentials')
     data_changed('kube-control.creds', creds)
 
-    # set --allow-privileged flag for kubelet
-    set_privileged()
-
     create_config(random.choice(servers), creds)
     configure_kubelet(dns, ingress_ip)
     configure_kube_proxy(servers, cluster_cidr)
@@ -632,8 +629,8 @@ def configure_kubelet(dns, ingress_ip):
     if (dns['enable-kube-dns']):
         kubelet_opts['cluster-dns'] = dns['sdn-ip']
 
-    privileged = is_state('kubernetes-worker.privileged')
-    kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'
+    # set --allow-privileged flag for kubelet
+    kubelet_opts['allow-privileged'] = set_privileged()
 
     if is_state('kubernetes-worker.gpu.enabled'):
         hookenv.log('Adding '
@@ -871,8 +868,10 @@ def remove_nrpe_config(nagios=None):
 
 
 def set_privileged():
-    """Update the allow-privileged flag for kubelet.
-
+    """Return 'true' if privileged containers are needed.
+    This is when a) the user requested them
+                 b) user does not care (auto) and GPUs are available in a pre
+                    1.9 era
     """
     privileged = hookenv.config('allow-privileged').lower()
     gpu_needs_privileged = (is_state('kubernetes-worker.gpu.enabled') and
@@ -886,6 +885,8 @@ def set_privileged():
         remove_state('kubernetes-worker.gpu.enabled')
         # No need to restart kubernetes (set the restart-needed state)
         # because set-privileged is already in the restart path
+
+    return privileged
 
 
 @when('config.changed.allow-privileged')
