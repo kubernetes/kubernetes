@@ -2506,8 +2506,8 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 	return events.Items
 }
 
-// waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
+// waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
+func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
 	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
@@ -2522,6 +2522,15 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 		}
 		return true, nil
 	}) != nil {
+		return nodes, err
+	}
+	return nodes, nil
+}
+
+// waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
+func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
+	nodes, err := waitListSchedulableNodes(c)
+	if err != nil {
 		ExpectNoError(err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")
 	}
 	return nodes
@@ -4095,11 +4104,19 @@ func CheckForControllerManagerHealthy(duration time.Duration) error {
 	return nil
 }
 
-// Returns number of ready Nodes excluding Master Node.
+// NumberOfRegisteredNodes returns number of registered Nodes excluding Master Node.
+func NumberOfRegisteredNodes(c clientset.Interface) (int, error) {
+	nodes, err := waitListSchedulableNodes(c)
+	if err != nil {
+		Logf("Failed to list nodes: %v", err)
+		return 0, err
+	}
+	return len(nodes.Items), nil
+}
+
+// NumberOfReadyNodes returns number of ready Nodes excluding Master Node.
 func NumberOfReadyNodes(c clientset.Interface) (int, error) {
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
-		"spec.unschedulable": "false",
-	}.AsSelector().String()})
+	nodes, err := waitListSchedulableNodes(c)
 	if err != nil {
 		Logf("Failed to list nodes: %v", err)
 		return 0, err
@@ -4116,9 +4133,7 @@ func NumberOfReadyNodes(c clientset.Interface) (int, error) {
 // By cluster size we mean number of Nodes excluding Master Node.
 func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector().String()})
+		nodes, err := waitListSchedulableNodes(c)
 		if err != nil {
 			Logf("Failed to list nodes: %v", err)
 			continue
