@@ -1623,6 +1623,106 @@ func TestWatch(t *testing.T) {
 	}
 }
 
+func TestWatchNonDefaultContentType(t *testing.T) {
+	var table = []struct {
+		t   watch.EventType
+		obj runtime.Object
+	}{
+		{watch.Added, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("need flusher!")
+		}
+
+		w.Header().Set("Transfer-Encoding", "chunked")
+		// manually set the content type here so we get the renegotiation behavior
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
+
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
+		for _, item := range table {
+			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
+				panic(err)
+			}
+			flusher.Flush()
+		}
+	}))
+	defer testServer.Close()
+
+	// set the default content type to protobuf so that we test falling back to JSON serialization
+	contentConfig := defaultContentConfig()
+	contentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	s := testRESTClientWithConfig(t, testServer, contentConfig)
+	watching, err := s.Get().Prefix("path/to/watch/thing").Watch()
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+
+	for _, item := range table {
+		got, ok := <-watching.ResultChan()
+		if !ok {
+			t.Fatalf("Unexpected early close")
+		}
+		if e, a := item.t, got.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := item.obj, got.Object; !apiequality.Semantic.DeepDerivative(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
+	_, ok := <-watching.ResultChan()
+	if ok {
+		t.Fatal("Unexpected non-close")
+	}
+}
+
+func TestWatchUnknownContentType(t *testing.T) {
+	var table = []struct {
+		t   watch.EventType
+		obj runtime.Object
+	}{
+		{watch.Added, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("need flusher!")
+		}
+
+		w.Header().Set("Transfer-Encoding", "chunked")
+		// manually set the content type here so we get the renegotiation behavior
+		w.Header().Set("Content-Type", "foobar")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
+
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
+		for _, item := range table {
+			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
+				panic(err)
+			}
+			flusher.Flush()
+		}
+	}))
+	defer testServer.Close()
+
+	// set the default content type to protobuf so that we test falling back to JSON serialization
+	s := testRESTClient(t, testServer)
+	watching, err := s.Get().Prefix("path/to/watch/thing").Watch()
+	if err == nil {
+		t.Fatalf("Expected to fail due to lack of known stream serialization for content type")
+	}
+}
+
 func TestStream(t *testing.T) {
 	expectedBody := "expected body"
 
@@ -1653,7 +1753,7 @@ func TestStream(t *testing.T) {
 	}
 }
 
-func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
+func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig ContentConfig) *RESTClient {
 	baseURL, _ := url.Parse("http://localhost")
 	if srv != nil {
 		var err error
@@ -1663,11 +1763,17 @@ func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
 		}
 	}
 	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
-	client, err := NewRESTClient(baseURL, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
+	client, err := NewRESTClient(baseURL, versionedAPIPath, contentConfig, 0, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
+
+}
+
+func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
+	contentConfig := defaultContentConfig()
+	return testRESTClientWithConfig(t, srv, contentConfig)
 }
 
 func TestDoContext(t *testing.T) {

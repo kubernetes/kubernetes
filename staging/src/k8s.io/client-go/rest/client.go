@@ -81,11 +81,12 @@ type RESTClient struct {
 }
 
 type Serializers struct {
-	Encoder             runtime.Encoder
-	Decoder             runtime.Decoder
-	StreamingSerializer runtime.Serializer
-	Framer              runtime.Framer
-	RenegotiatedDecoder func(contentType string, params map[string]string) (runtime.Decoder, error)
+	Encoder               runtime.Encoder
+	Decoder               runtime.Decoder
+	StreamingSerializer   runtime.Serializer
+	Framer                runtime.Framer
+	RenegotiatedDecoder   func(contentType string, params map[string]string) (runtime.Decoder, error)
+	RenegotiatedStreaming func(contentType string, params map[string]string) (runtime.Decoder, runtime.Serializer, runtime.Framer, error)
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
@@ -200,6 +201,14 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 	if info.StreamSerializer != nil {
 		s.StreamingSerializer = info.StreamSerializer.Serializer
 		s.Framer = info.StreamSerializer.Framer
+		s.RenegotiatedStreaming = func(contentType string, params map[string]string) (runtime.Decoder, runtime.Serializer, runtime.Framer, error) {
+			info, ok := runtime.SerializerInfoForMediaType(mediaTypes, contentType)
+			if !ok || info.StreamSerializer == nil {
+				return nil, nil, nil, fmt.Errorf("stream serializer for %s not registered", contentType)
+			}
+			decoder := config.NegotiatedSerializer.DecoderToVersion(info.Serializer, internalGV)
+			return decoder, info.StreamSerializer.Serializer, info.StreamSerializer.Framer, nil
+		}
 	}
 
 	return s, nil

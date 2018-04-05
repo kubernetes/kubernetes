@@ -532,9 +532,32 @@ func (r *Request) Watch() (watch.Interface, error) {
 		}
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
-	framer := r.serializers.Framer.NewFrameReader(resp.Body)
-	decoder := streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
-	return watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, r.serializers.Decoder)), nil
+
+	framer := r.serializers.Framer
+	streamingSerializer := r.serializers.StreamingSerializer
+	normalDecoder := r.serializers.Decoder
+
+	// check if we need to renegotiate for different content types (like done in
+	// transformResponse for non-streaming requests)
+	contentType := resp.Header.Get("Content-Type")
+	if len(contentType) > 0 && (framer == nil || streamingSerializer == nil || normalDecoder == nil || (len(r.content.ContentType) > 0 && contentType != r.content.ContentType)) {
+		if r.serializers.RenegotiatedStreaming == nil {
+			return nil, fmt.Errorf("stream serialization not supported for this client")
+		}
+		mediaType, params, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			return nil, err
+		}
+		normalDecoder, streamingSerializer, framer, err = r.serializers.RenegotiatedStreaming(mediaType, params)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	frameReader := framer.NewFrameReader(resp.Body)
+	streamingDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
+
+	return watch.NewStreamWatcher(restclientwatch.NewDecoder(streamingDecoder, normalDecoder)), nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.
