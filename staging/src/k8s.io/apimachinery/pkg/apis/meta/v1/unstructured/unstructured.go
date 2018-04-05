@@ -82,9 +82,9 @@ func (obj *Unstructured) EachListItem(fn func(runtime.Object) error) error {
 
 func (obj *Unstructured) UnstructuredContent() map[string]interface{} {
 	if obj.Object == nil {
-		obj.Object = make(map[string]interface{})
+		return make(map[string]interface{})
 	}
-	return obj.Object
+	return runtime.DeepCopyJSON(obj.Object)
 }
 
 func (obj *Unstructured) SetUnstructuredContent(content map[string]interface{}) {
