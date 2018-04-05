@@ -291,6 +291,11 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # Size of ranges allocated to each node. gcloud current supports only /32 and /24.
   IP_ALIAS_SIZE=${KUBE_GCE_IP_ALIAS_SIZE:-/24}
   IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
+  # If we're using custom network, use the subnet we already create for it as the one for ip-alias.
+  # Note that this means SUBNETWORK would override KUBE_GCE_IP_ALIAS_SUBNETWORK in case of custom network.
+  if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
+    IP_ALIAS_SUBNETWORK="${SUBNETWORK:-IP_ALIAS_SUBNETWORK}"
+  fi
   # Reserve the services IP space to avoid being allocated for other GCP resources.
   SERVICE_CLUSTER_IP_SUBNETWORK=${KUBE_GCE_SERVICE_CLUSTER_IP_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-services}
   NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-CloudAllocator}
