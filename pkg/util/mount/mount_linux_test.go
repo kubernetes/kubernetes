@@ -25,10 +25,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 
-	"strconv"
+	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )
@@ -1679,4 +1681,111 @@ func TestFindExistingPrefix(t *testing.T) {
 		}
 		os.RemoveAll(base)
 	}
+}
+
+func TestGetFileType(t *testing.T) {
+	mounter := Mounter{"fake/path", false}
+
+	testCase := []struct {
+		name         string
+		expectedType FileType
+		setUp        func() (string, string, error)
+	}{
+		{
+			"Directory Test",
+			FileTypeDirectory,
+			func() (string, string, error) {
+				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				return tempDir, tempDir, err
+			},
+		},
+		{
+			"File Test",
+			FileTypeFile,
+			func() (string, string, error) {
+				tempFile, err := ioutil.TempFile("", "test-get-filetype")
+				if err != nil {
+					return "", "", err
+				}
+				tempFile.Close()
+				return tempFile.Name(), tempFile.Name(), nil
+			},
+		},
+		{
+			"Socket Test",
+			FileTypeSocket,
+			func() (string, string, error) {
+				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				if err != nil {
+					return "", "", err
+				}
+				tempSocketFile, err := createSocketFile(tempDir)
+				return tempSocketFile, tempDir, err
+			},
+		},
+		{
+			"Block Device Test",
+			FileTypeBlockDev,
+			func() (string, string, error) {
+				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				if err != nil {
+					return "", "", err
+				}
+
+				tempBlockFile := filepath.Join(tempDir, "test_blk_dev")
+				outputBytes, err := exec.New().Command("mknod", tempBlockFile, "b", "89", "1").CombinedOutput()
+				if err != nil {
+					err = fmt.Errorf("%v: %s ", err, outputBytes)
+				}
+				return tempBlockFile, tempDir, err
+			},
+		},
+		{
+			"Character Device Test",
+			FileTypeCharDev,
+			func() (string, string, error) {
+				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				if err != nil {
+					return "", "", err
+				}
+
+				tempCharFile := filepath.Join(tempDir, "test_char_dev")
+				outputBytes, err := exec.New().Command("mknod", tempCharFile, "c", "89", "1").CombinedOutput()
+				if err != nil {
+					err = fmt.Errorf("%v: %s ", err, outputBytes)
+				}
+				return tempCharFile, tempDir, err
+			},
+		},
+	}
+
+	for idx, tc := range testCase {
+		path, cleanUpPath, err := tc.setUp()
+		if err != nil {
+			// Locally passed, but upstream CI is not friendly to create such device files
+			// Leave "Operation not permitted" out, which can be covered in an e2e test
+			if isOperationNotPermittedError(err) {
+				continue
+			}
+			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
+		}
+		if len(cleanUpPath) > 0 {
+			defer os.RemoveAll(cleanUpPath)
+		}
+
+		fileType, err := mounter.GetFileType(path)
+		if err != nil {
+			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
+		}
+		if fileType != tc.expectedType {
+			t.Fatalf("[%d-%s] expected %s, but got %s", idx, tc.name, tc.expectedType, fileType)
+		}
+	}
+}
+
+func isOperationNotPermittedError(err error) bool {
+	if strings.Contains(err.Error(), "Operation not permitted") {
+		return true
+	}
+	return false
 }
