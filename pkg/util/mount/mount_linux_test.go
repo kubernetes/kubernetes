@@ -25,10 +25,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"syscall"
 	"testing"
 
-	"strconv"
+	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )
@@ -1678,5 +1679,77 @@ func TestFindExistingPrefix(t *testing.T) {
 			t.Errorf("test %q: expected dirs %v, got %v", test.name, test.expectedDirs, dirs)
 		}
 		os.RemoveAll(base)
+	}
+}
+
+func TestGetFileType(t *testing.T) {
+	mounter := Mounter{"fake/path", false}
+
+	tempDir, err := ioutil.TempDir("", "test-get-filetype")
+	if err != nil {
+		t.Fatalf("unexpected error: +%v when creating temp directory", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempFile, err := ioutil.TempFile("", "test-get-filetype")
+	if err != nil {
+		t.Fatalf("unexpected error: +%v when creating temp file", err)
+	}
+	defer tempFile.Close()
+	defer os.RemoveAll(tempFile.Name())
+
+	tempSocketFile, err := createSocketFile(tempDir)
+	if err != nil {
+		t.Fatalf("unexpected error: +%v when creating temp socket file", err)
+	}
+
+	tempBlockFile := "/dev/test_blk_dev"
+	outputBytes, err := exec.New().Command("mknod", tempBlockFile, "b", "89", "1").CombinedOutput()
+	if err != nil {
+		t.Fatalf("unexpected error when creating temp block special file: %s", outputBytes)
+	}
+	defer os.RemoveAll(tempBlockFile)
+
+	tempCharFile := "/dev/test_char_dev"
+	outputBytes, err = exec.New().Command("mknod", tempCharFile, "c", "89", "1").CombinedOutput()
+	if err != nil {
+		t.Fatalf("unexpected error when creating temp character special file: %s", outputBytes)
+	}
+	defer os.RemoveAll(tempCharFile)
+
+	testCase := []struct {
+		filePath     string
+		expectedType FileType
+	}{
+		{
+			tempDir,
+			FileTypeDirectory,
+		},
+		{
+			tempFile.Name(),
+			FileTypeFile,
+		},
+		{
+			tempSocketFile,
+			FileTypeSocket,
+		},
+		{
+			tempBlockFile,
+			FileTypeBlockDev,
+		},
+		{
+			tempCharFile,
+			FileTypeCharDev,
+		},
+	}
+
+	for idx, tc := range testCase {
+		filePath, err := mounter.GetFileType(tc.filePath)
+		if err != nil {
+			t.Errorf("[%d] unexpected error : +%v", idx, err)
+		}
+		if filePath != tc.expectedType {
+			t.Errorf("[%d] expected %s, but got %s", idx, tc.expectedType, filePath)
+		}
 	}
 }
