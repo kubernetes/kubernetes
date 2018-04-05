@@ -12,5 +12,7 @@ reviewers:
 - jamiehannaford
 - kad
 - xiangpengzhao
-- mattmoyer
 - kargakis
+labels: 
+- area/kubeadm
+- sig/cluster-lifecycle
