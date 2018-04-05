@@ -423,31 +423,7 @@ func (mounter *Mounter) MakeRShared(path string) error {
 }
 
 func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	var pathType FileType
-	finfo, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		return pathType, fmt.Errorf("path %q does not exist", pathname)
-	}
-	// err in call to os.Stat
-	if err != nil {
-		return pathType, err
-	}
-
-	mode := finfo.Sys().(*syscall.Stat_t).Mode
-	switch mode & syscall.S_IFMT {
-	case syscall.S_IFSOCK:
-		return FileTypeSocket, nil
-	case syscall.S_IFBLK:
-		return FileTypeBlockDev, nil
-	case syscall.S_IFCHR:
-		return FileTypeCharDev, nil
-	case syscall.S_IFDIR:
-		return FileTypeDirectory, nil
-	case syscall.S_IFREG:
-		return FileTypeFile, nil
-	}
-
-	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+	return getFileType(pathname)
 }
 
 func (mounter *Mounter) MakeDir(pathname string) error {
