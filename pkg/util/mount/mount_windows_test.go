@@ -20,6 +20,7 @@ package mount
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -549,5 +550,54 @@ func TestPathWithinBase(t *testing.T) {
 		result := pathWithinBase(test.fullPath, test.basePath)
 		assert.Equal(t, result, test.expectedResult, "Expect result not equal with pathWithinBase(%s, %s) return: %q, expected: %q",
 			test.fullPath, test.basePath, result, test.expectedResult)
+	}
+}
+
+func TestGetFileType(t *testing.T) {
+	mounter := New("fake/path")
+
+	testCase := []struct {
+		name         string
+		expectedType FileType
+		setUp        func() (string, string, error)
+	}{
+		{
+			"Directory Test",
+			FileTypeDirectory,
+			func() (string, string, error) {
+				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
+				return tempDir, tempDir, err
+			},
+		},
+		{
+			"File Test",
+			FileTypeFile,
+			func() (string, string, error) {
+				tempFile, err := ioutil.TempFile("", "test-get-filetype")
+				if err != nil {
+					return "", "", err
+				}
+				tempFile.Close()
+				return tempFile.Name(), tempFile.Name(), nil
+			},
+		},
+	}
+
+	for idx, tc := range testCase {
+		path, cleanUpPath, err := tc.setUp()
+		if err != nil {
+			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
+		}
+		if len(cleanUpPath) > 0 {
+			defer os.RemoveAll(cleanUpPath)
+		}
+
+		fileType, err := mounter.GetFileType(path)
+		if err != nil {
+			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
+		}
+		if fileType != tc.expectedType {
+			t.Fatalf("[%d-%s] expected %s, but got %s", idx, tc.name, tc.expectedType, fileType)
+		}
 	}
 }
