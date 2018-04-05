@@ -259,7 +259,7 @@ func (n *Mounter) GetFileType(pathname string) (mount.FileType, error) {
 		return mount.FileTypeBlockDev, nil
 	case "directory":
 		return mount.FileTypeDirectory, nil
-	case "regular file":
+	case "regular file", "regular empty file":
 		return mount.FileTypeFile, nil
 	}
 
