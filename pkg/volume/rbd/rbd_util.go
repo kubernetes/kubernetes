@@ -372,7 +372,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	nbdToolsFound := false
 
 	if !mapped {
-		nbdToolsFound := checkRbdNbdTools(b.exec)
+		nbdToolsFound = checkRbdNbdTools(b.exec)
 		if nbdToolsFound {
 			devicePath, mapped = waitForPath(b.Pool, b.Image, 1 /*maxRetries*/, true /*useNbdDriver*/)
 		}
