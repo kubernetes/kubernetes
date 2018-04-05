@@ -2793,7 +2793,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelA}},
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: podLabelA}},
 			},
 			nodes: []v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
@@ -3132,7 +3132,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		nodeListInfo := FakeNodeListInfo(test.nodes)
-		for indexNode, node := range test.nodes {
+		nodeInfoMap := make(map[string]*schedulercache.NodeInfo)
+		for i, node := range test.nodes {
 			var podsOnNode []*v1.Pod
 			for _, pod := range test.pods {
 				if pod.Spec.NodeName == node.Name {
@@ -3140,21 +3141,23 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				}
 			}
 
+			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
+			nodeInfo.SetNode(&test.nodes[i])
+			nodeInfoMap[node.Name] = nodeInfo
+		}
+
+		for indexNode, node := range test.nodes {
 			testFit := PodAffinityChecker{
 				info:      nodeListInfo,
 				podLister: schedulertesting.FakePodLister(test.pods),
 			}
-			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
-			nodeInfo.SetNode(&node)
-			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
 
 			var meta algorithm.PredicateMetadata
-
 			if !test.nometa {
 				meta = PredicateMetadata(test.pod, nodeInfoMap)
 			}
 
-			fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfo)
+			fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfoMap[node.Name])
 			if !fits && !reflect.DeepEqual(reasons, test.nodesExpectAffinityFailureReasons[indexNode]) {
 				t.Errorf("index: %d test: %s unexpected failure reasons: %v expect: %v", indexTest, test.test, reasons, test.nodesExpectAffinityFailureReasons[indexNode])
 			}
