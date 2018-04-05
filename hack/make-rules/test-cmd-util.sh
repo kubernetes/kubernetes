@@ -5195,7 +5195,8 @@ runTests() {
     kube::test::get_object_assert 'clusterrolebindings -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CRB:'
     kube::test::get_object_assert 'clusterroles -l test-cmd=auth' "{{range.items}}{{$id_field}}:{{end}}" 'testing-CR:'
 
-    kubectl delete "${kube_flags[@]}" rolebindings,role,clusterroles,clusterrolebindings -n some-other-random -l test-cmd=auth
+    kubectl delete "${kube_flags[@]}" clusterroles,clusterrolebindings -l test-cmd=auth
+    kubectl delete "${kube_flags[@]}" rolebindings,role -n some-other-random -l test-cmd=auth
   fi
 
   #####################

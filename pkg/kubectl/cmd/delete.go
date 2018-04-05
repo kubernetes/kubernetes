@@ -90,13 +90,14 @@ var (
 type DeleteOptions struct {
 	resource.FilenameOptions
 
-	Selector        string
-	DeleteAll       bool
-	IgnoreNotFound  bool
-	Cascade         bool
-	DeleteNow       bool
-	ForceDeletion   bool
-	WaitForDeletion bool
+	Selector         string
+	DeleteAll        bool
+	IgnoreNotFound   bool
+	Cascade          bool
+	DeleteNow        bool
+	ForceDeletion    bool
+	WaitForDeletion  bool
+	EnforceNamespace bool
 
 	GracePeriod int
 	Timeout     time.Duration
@@ -167,6 +168,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 	if err != nil {
 		return err
 	}
+	o.EnforceNamespace = enforceNamespace
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := f.NewBuilder().
@@ -228,6 +230,20 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 		}
 	} else if o.ForceDeletion {
 		fmt.Fprintf(o.ErrOut, "warning: --force is ignored because --grace-period is not 0.\n")
+	}
+	if o.EnforceNamespace {
+		if err := o.Result.Visit(func(info *resource.Info, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
+				kind := info.Mapping.GroupVersionKind.GroupKind()
+				return fmt.Errorf("%s/%s", strings.ToLower(kind.String()), info.Name)
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("You cannot specify namespace for non-namespaced resources: %v", err)
+		}
 	}
 	return nil
 }
