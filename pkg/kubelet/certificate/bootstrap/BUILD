@@ -30,6 +30,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/transport:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/k8s.io/client-go/util/certificate:go_default_library",
         "//vendor/k8s.io/client-go/util/certificate/csr:go_default_library",
     ],
 )
