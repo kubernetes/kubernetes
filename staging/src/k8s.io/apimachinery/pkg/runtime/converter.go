@@ -446,9 +446,6 @@ func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
 // DeepCopyJSONValue deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
 // types produced by json.Unmarshal().
 func DeepCopyJSONValue(x interface{}) interface{} {
-	if x == nil {
-		return nil
-	}
 	switch x := x.(type) {
 	case map[string]interface{}:
 		if x == nil {
@@ -470,7 +467,7 @@ func DeepCopyJSONValue(x interface{}) interface{} {
 			clone[i] = DeepCopyJSONValue(v)
 		}
 		return clone
-	case string, int64, bool, float64, encodingjson.Number:
+	case string, int64, bool, float64, nil, encodingjson.Number:
 		return x
 	default:
 		panic(fmt.Errorf("cannot deep copy %T", x))
