@@ -66,8 +66,9 @@ type manager struct {
 	podStatusChannel chan podStatusSyncRequest
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
-	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
-	podDeletionSafety PodDeletionSafetyProvider
+	apiStatusVersions      map[kubetypes.MirrorPodUID]uint64
+	podDeletionSafety      PodDeletionSafetyProvider
+	podTryCleanupResources PodTryCleanupResourcesProvider
 }
 
 // PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
@@ -82,6 +83,13 @@ type PodStatusProvider interface {
 type PodDeletionSafetyProvider interface {
 	// A function which returns true if the pod can safely be deleted
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
+}
+
+// An object which tries to clean up stale resources.  It is not
+// guaranteed to clean up all potentially unused resources.
+type PodTryCleanupResourcesProvider interface {
+	// A function which attempts to clean up any dangling resources.
+	PodTryCleanupResources(pod *v1.Pod, status v1.PodStatus) error
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -110,14 +118,15 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider, podTryCleanupResources PodTryCleanupResourcesProvider) Manager {
 	return &manager{
-		kubeClient:        kubeClient,
-		podManager:        podManager,
-		podStatuses:       make(map[types.UID]versionedPodStatus),
-		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
-		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
-		podDeletionSafety: podDeletionSafety,
+		kubeClient:             kubeClient,
+		podManager:             podManager,
+		podStatuses:            make(map[types.UID]versionedPodStatus),
+		podStatusChannel:       make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
+		apiStatusVersions:      make(map[kubetypes.MirrorPodUID]uint64),
+		podDeletionSafety:      podDeletionSafety,
+		podTryCleanupResources: podTryCleanupResources,
 	}
 }
 
@@ -480,6 +489,12 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 
 	glog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
 	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
+
+	// Clean up exited containers
+	err = m.podTryCleanupResources.PodTryCleanupResources(pod, status.status)
+	if err != nil {
+		glog.Warningf("Failed to clean up all resources associated with pod %q: %v", format.Pod(pod), err)
+	}
 
 	// We don't handle graceful deletion of mirror pods.
 	if m.canBeDeleted(pod, status.status) {

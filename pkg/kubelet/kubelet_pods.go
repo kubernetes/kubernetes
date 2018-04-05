@@ -930,6 +930,49 @@ func (kl *Kubelet) podResourcesAreReclaimed(pod *v1.Pod) bool {
 	return kl.PodResourcesAreReclaimed(pod, status)
 }
 
+// PodTryCleanupResources tries to remove stale resources from the pod.
+// Any resources which it deems unsafe to remove are not removed.
+func (kl *Kubelet) PodTryCleanupResources(pod *v1.Pod, status v1.PodStatus) error {
+	if !kl.IsPodDeleted(pod.UID) {
+		glog.V(3).Infof("Pod %q is not deleted; will not clean up",
+			format.Pod(pod))
+		return nil
+	}
+	if !notRunning(status.ContainerStatuses) {
+		// We shouldnt delete pods that still have running containers
+		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+		return fmt.Errorf("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+	}
+	// pod's containers should be deleted
+	runtimeStatus, err := kl.podCache.Get(pod.UID)
+	if err != nil {
+		glog.V(3).Infof("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
+		return fmt.Errorf("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
+	}
+	if len(runtimeStatus.ContainerStatuses) > 0 {
+		glog.V(3).Infof("Pod %q is terminated, looking for exited containers: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
+		var notExited bool = false
+		for _, c := range runtimeStatus.ContainerStatuses {
+			if c.State == kubecontainer.ContainerStateExited {
+				glog.V(3).Infof("Found exited container %v",
+					c.ID.ID)
+				kl.containerRuntime.DeleteContainer(c.ID)
+				if err != nil {
+					glog.V(3).Infof("ERROR from delete container: %#+v", err)
+				}
+			} else {
+				glog.V(3).Infof("NOT cleaning up container %v (state %v)", c.ID.ID, c.State)
+				notExited = true
+			}
+		}
+		if notExited {
+			glog.V(3).Infof("Pod %q is terminated, but some containers have not exited", format.Pod(pod))
+			return fmt.Errorf("Pod %q is terminated, but some containers have not exited", format.Pod(pod))
+		}
+	}
+	return nil
+}
+
 // notRunning returns true if every status is terminated or waiting, or the status list
 // is empty.
 func notRunning(statuses []v1.ContainerStatus) bool {

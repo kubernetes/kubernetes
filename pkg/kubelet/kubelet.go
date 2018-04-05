@@ -713,7 +713,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.containerLogManager = logs.NewStubContainerLogManager()
 	}
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		var (

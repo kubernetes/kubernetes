@@ -141,14 +141,24 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {
+			// os.FindProcess does not check whether the process
+			// exists; it simply creates a Go Process object around
+			// the specified pid.
 			p, err := os.FindProcess(pid)
 			if err != nil {
-				// Process not running anymore, do nothing
 				continue
 			}
 			glog.V(3).Infof("Attempt to kill process with pid: %v", pid)
-			if err := p.Kill(); err != nil {
-				glog.V(3).Infof("failed to kill process with pid: %v", pid)
+			err = p.Kill()
+			if err == nil {
+				continue
+			} else if strings.Contains(err.Error(), "process already finished") {
+				// Hate parsing strings, but
+				// vendor/github.com/opencontainers/runc/libcontainer/
+				// also does this.
+				glog.V(3).Infof("process with pid %v no longer exists", pid)
+			} else {
+				glog.V(3).Infof("failed to kill process with pid: %v: %v", pid, err)
 				errlist = append(errlist, err)
 			}
 		}
