@@ -357,6 +357,18 @@ func TestEqualIgnoreHash(t *testing.T) {
 			true,
 		},
 		{
+			"Same spec, the label is different, the former doesn't have pod-template-hash label, same number of labels",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{"something": "else"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-2"}),
+			false,
+		},
+		{
+			"Same spec, the label is different, the latter doesn't have pod-template-hash label, same number of labels",
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1"}),
+			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{"something": "else"}),
+			false,
+		},
+		{
 			"Same spec, the label is different, and the pod-template-hash label value is the same",
 			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1"}),
 			generatePodTemplateSpec("foo", "foo-node", map[string]string{}, map[string]string{extensions.DefaultDeploymentUniqueLabelKey: "value-1", "something": "else"}),

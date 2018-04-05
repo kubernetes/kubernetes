@@ -632,25 +632,16 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 }
 
 // EqualIgnoreHash returns true if two given podTemplateSpec are equal, ignoring the diff in value of Labels[pod-template-hash]
-// We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
-// (e.g. the addition of a new field will cause the hash code to change)
-// Note that we assume input podTemplateSpecs contain non-empty labels
+// We ignore pod-template-hash because:
+// 1. The hash result would be different upon podTemplateSpec API changes
+//    (e.g. the addition of a new field will cause the hash code to change)
+// 2. The deployment template won't have hash labels
 func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 	t1Copy := template1.DeepCopy()
 	t2Copy := template2.DeepCopy()
-	// First, compare template.Labels (ignoring hash)
-	labels1, labels2 := t1Copy.Labels, t2Copy.Labels
-	if len(labels1) > len(labels2) {
-		labels1, labels2 = labels2, labels1
-	}
-	// We make sure len(labels2) >= len(labels1)
-	for k, v := range labels2 {
-		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
-			return false
-		}
-	}
-	// Then, compare the templates without comparing their labels
-	t1Copy.Labels, t2Copy.Labels = nil, nil
+	// Remove hash labels from template.Labels before comparing
+	delete(t1Copy.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	delete(t2Copy.Labels, extensions.DefaultDeploymentUniqueLabelKey)
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
