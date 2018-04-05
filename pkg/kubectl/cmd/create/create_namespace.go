@@ -36,8 +36,19 @@ var (
 	  kubectl create namespace my-namespace`))
 )
 
+type NamespaceOpts struct {
+	CreateSubcommandOptions *CreateSubcommandOptions
+}
+
 // NewCmdCreateNamespace is a macro command to create a new namespace
 func NewCmdCreateNamespace(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	options := &NamespaceOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: NewPrintFlags("created"),
+			CmdOut:     cmdOut,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use: "namespace NAME [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -46,24 +57,26 @@ func NewCmdCreateNamespace(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Long:                  namespaceLong,
 		Example:               namespaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateNamespace(f, cmdOut, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(cmd, args))
+			cmdutil.CheckErr(options.Run(f))
 		},
 	}
+
+	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.NamespaceV1GeneratorName)
 
 	return cmd
 }
 
-// CreateNamespace implements the behavior to run the create namespace command
-func CreateNamespace(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func (o *NamespaceOpts) Complete(cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.NamespaceV1GeneratorName:
@@ -71,10 +84,11 @@ func CreateNamespace(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
-		Name:                name,
-		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetDryRunFlag(cmd),
-		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
-	})
+
+	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+}
+
+// CreateNamespace implements the behavior to run the create namespace command
+func (o *NamespaceOpts) Run(f cmdutil.Factory) error {
+	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
 }

@@ -49,13 +49,35 @@ func TestCreatePriorityClass(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{}
 	buf := bytes.NewBuffer([]byte{})
 
+	outputFormat := "name"
+
 	cmd := NewCmdCreatePriorityClass(tf, buf)
 	cmd.Flags().Set("value", "1000")
 	cmd.Flags().Set("global-default", "true")
 	cmd.Flags().Set("description", "my priority")
 	cmd.Flags().Set("dry-run", "true")
-	cmd.Flags().Set("output", "name")
-	CreatePriorityClass(tf, buf, cmd, []string{pcName})
+	cmd.Flags().Set("output", outputFormat)
+
+	printFlags := NewPrintFlags("created")
+	printFlags.OutputFormat = &outputFormat
+
+	options := &PriorityClassOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: printFlags,
+			CmdOut:     buf,
+			Name:       pcName,
+		},
+	}
+	err := options.Complete(cmd, []string{pcName})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = options.Run(tf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	expectedOutput := "priorityclass.scheduling.k8s.io/" + pcName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())

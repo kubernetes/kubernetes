@@ -62,7 +62,8 @@ type CreateClusterRoleOptions struct {
 func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	c := &CreateClusterRoleOptions{
 		CreateRoleOptions: &CreateRoleOptions{
-			Out: cmdOut,
+			PrintFlags: NewPrintFlags("created"),
+			Out:        cmdOut,
 		},
 	}
 	cmd := &cobra.Command{
@@ -77,9 +78,11 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 			cmdutil.CheckErr(c.RunCreateRole())
 		},
 	}
+
+	c.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&c.Verbs, "verb", c.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSliceVar(&c.NonResourceURLs, "non-resource-url", c.NonResourceURLs, "A partial url that user should have access to.")
@@ -172,10 +175,5 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 		}
 	}
 
-	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(useShortOutput, c.Out, clusterRole, c.DryRun, "created")
-		return nil
-	}
-
-	return c.PrintObject(clusterRole)
+	return c.PrintObj(clusterRole)
 }

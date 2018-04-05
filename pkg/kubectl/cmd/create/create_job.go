@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -42,6 +43,10 @@ var (
 )
 
 type CreateJobOptions struct {
+	PrintFlags *PrintFlags
+
+	PrintObj func(obj runtime.Object) error
+
 	Name string
 	From string
 
@@ -57,7 +62,8 @@ type CreateJobOptions struct {
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
 func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	c := &CreateJobOptions{
-		Out: cmdOut,
+		PrintFlags: NewPrintFlags("created"),
+		Out:        cmdOut,
 	}
 	cmd := &cobra.Command{
 		Use:     "job NAME [--from=CRONJOB]",
@@ -69,9 +75,11 @@ func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 			cmdutil.CheckErr(c.RunCreateJob())
 		},
 	}
+
+	c.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().String("from", "", "The name of the resource to create a Job from (only cronjob is supported).")
 
@@ -99,6 +107,18 @@ func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	c.DryRun = cmdutil.GetDryRunFlag(cmd)
 	c.Cmd = cmd
 	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+
+	if c.DryRun {
+		c.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := c.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	c.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, c.Out)
+	}
 
 	return nil
 }
@@ -150,10 +170,5 @@ func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 		}
 	}
 
-	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(useShortOutput, c.Out, job, c.DryRun, "created")
-		return nil
-	}
-
-	return cmdutil.PrintObject(c.Cmd, job, c.Out)
+	return c.PrintObj(job)
 }

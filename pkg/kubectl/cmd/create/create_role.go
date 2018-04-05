@@ -100,6 +100,8 @@ type ResourceOptions struct {
 }
 
 type CreateRoleOptions struct {
+	PrintFlags *PrintFlags
+
 	Name          string
 	Verbs         []string
 	Resources     []ResourceOptions
@@ -111,12 +113,14 @@ type CreateRoleOptions struct {
 	Client       clientgorbacv1.RbacV1Interface
 	Mapper       meta.RESTMapper
 	Out          io.Writer
-	PrintObject  func(obj runtime.Object) error
+	PrintObj     func(obj runtime.Object) error
 }
 
 // Role is a command to ease creating Roles.
 func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	c := &CreateRoleOptions{
+		PrintFlags: NewPrintFlags("created"),
+
 		Out: cmdOut,
 	}
 	cmd := &cobra.Command{
@@ -131,9 +135,11 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 			cmdutil.CheckErr(c.RunCreateRole())
 		},
 	}
+
+	c.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&c.Verbs, "verb", c.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
@@ -198,13 +204,20 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	c.DryRun = cmdutil.GetDryRunFlag(cmd)
 	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
-	c.Namespace, _, err = f.DefaultNamespace()
+	if c.DryRun {
+		c.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := c.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
+	c.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, c.Out)
+	}
 
-	c.PrintObject = func(obj runtime.Object) error {
-		return cmdutil.PrintObject(cmd, obj, c.Out)
+	c.Namespace, _, err = f.DefaultNamespace()
+	if err != nil {
+		return err
 	}
 
 	clientset, err := f.KubernetesClientSet()
@@ -292,12 +305,7 @@ func (c *CreateRoleOptions) RunCreateRole() error {
 		}
 	}
 
-	if useShortOutput := c.OutputFormat == "name"; useShortOutput || len(c.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(useShortOutput, c.Out, role, c.DryRun, "created")
-		return nil
-	}
-
-	return c.PrintObject(role)
+	return c.PrintObj(role)
 }
 
 func arrayContains(s []string, e string) bool {
