@@ -465,19 +465,19 @@ func TestNodeAddresses(t *testing.T) {
 }
 
 func TestNewOpenStack(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := ConfigFromEnv()
 	if !ok {
 		t.Skip("No config found in environment")
 	}
 
-	_, err := newOpenStack(cfg)
+	_, err := NewOpenStack(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 }
 
 func TestLoadBalancer(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := ConfigFromEnv()
 	if !ok {
 		t.Skip("No config found in environment")
 	}
@@ -488,7 +488,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Logf("Trying LBVersion = '%s'\n", v)
 		cfg.LoadBalancer.LBVersion = v
 
-		os, err := newOpenStack(cfg)
+		os, err := NewOpenStack(cfg)
 		if err != nil {
 			t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 		}
@@ -541,12 +541,12 @@ func TestZones(t *testing.T) {
 var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
 
 func TestVolumes(t *testing.T) {
-	cfg, ok := configFromEnv()
+	cfg, ok := ConfigFromEnv()
 	if !ok {
 		t.Skip("No config found in environment")
 	}
 
-	os, err := newOpenStack(cfg)
+	os, err := NewOpenStack(cfg)
 	if err != nil {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}

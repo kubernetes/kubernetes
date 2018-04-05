@@ -441,6 +441,14 @@ func (os *OpenStack) getVolume(volumeID string) (Volume, error) {
 	return volumes.getVolume(volumeID)
 }
 
+func (os *OpenStack) GetVolume(volumeID string) (Volume, error) {
+	volumes, err := os.volumeService("")
+	if err != nil {
+		return Volume{}, fmt.Errorf("unable to initialize cinder client for region: %s, err: %v", os.region, err)
+	}
+	return volumes.getVolume(volumeID)
+}
+
 // CreateVolume creates a volume of given size (in GiB)
 func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
 	volumes, err := os.volumeService("")
