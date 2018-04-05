@@ -68,11 +68,12 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
 		ps = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
-		numNodes = framework.TestContext.CloudConfig.NumNodes
+		var err error
+		numNodes, err = framework.NumberOfRegisteredNodes(f.ClientSet)
+		Expect(err).NotTo(HaveOccurred())
 		systemNamespace = metav1.NamespaceSystem
 
 		By("ensuring all nodes are ready")
-		var err error
 		originalNodeNames, err = framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, numNodes)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Got the following nodes before restart: %v", originalNodeNames)
