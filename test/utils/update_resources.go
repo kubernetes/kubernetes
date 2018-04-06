@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
@@ -32,10 +33,10 @@ const (
 	waitRetryTImeout    = 5 * time.Minute
 )
 
-func ScaleResourceWithRetries(scaler kubectl.Scaler, namespace, name string, size uint) error {
+func ScaleResourceWithRetries(scaler kubectl.Scaler, namespace, name string, size uint, gr schema.GroupResource) error {
 	waitForScale := kubectl.NewRetryParams(updateRetryInterval, updateRetryTimeout)
 	waitForReplicas := kubectl.NewRetryParams(waitRetryInterval, waitRetryTImeout)
-	if err := scaler.Scale(namespace, name, size, nil, waitForScale, waitForReplicas); err != nil {
+	if err := scaler.Scale(namespace, name, size, nil, waitForScale, waitForReplicas, gr); err != nil {
 		return fmt.Errorf("Error while scaling %s to %d replicas: %v", name, size, err)
 	}
 	return nil

@@ -60,7 +60,7 @@ var (
 func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
-	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "job", "statefulset"}
+	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
@@ -145,12 +145,7 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 			return err
 		}
 
-		mapping := info.ResourceMapping()
-		if mapping.Resource == "jobs" {
-			fmt.Fprintf(errOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", cmd.Parent().Name())
-		}
-
-		scaler, err := f.Scaler(mapping)
+		scaler, err := f.Scaler()
 		if err != nil {
 			return err
 		}
@@ -164,7 +159,9 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 			waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
 		}
 
-		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
+		mapping := info.ResourceMapping()
+		gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
+		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas, gvk.GroupResource()); err != nil {
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
