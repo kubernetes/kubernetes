@@ -36,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
+	cmdapply "k8s.io/kubernetes/pkg/kubectl/cmd/apply"
+	cmdcreate "k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -236,10 +238,10 @@ func TestEdit(t *testing.T) {
 			case "edit":
 				cmd = NewCmdEdit(tf, buf, errBuf)
 			case "create":
-				cmd = NewCmdCreate(tf, buf, errBuf)
+				cmd = cmdcreate.NewCmdCreate(tf, buf, errBuf)
 				cmd.Flags().Set("edit", "true")
 			case "edit-last-applied":
-				cmd = NewCmdApplyEditLastApplied(tf, buf, errBuf)
+				cmd = cmdapply.NewCmdApplyEditLastApplied(tf, buf, errBuf)
 			default:
 				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
 			}

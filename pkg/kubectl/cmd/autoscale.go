@@ -22,6 +22,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/kubectl"
+	cmdcreate "k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -129,7 +130,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}
 		default:
-			return errUnsupportedGenerator(cmd, generatorName)
+			return cmdcreate.ErrUnsupportedGenerator(cmd, generatorName)
 		}
 
 		// Generate new object
