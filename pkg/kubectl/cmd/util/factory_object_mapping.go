@@ -224,55 +224,15 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		return nil, errors.New("provided options object is not a PodLogOptions")
 	}
 
-	var selector labels.Selector
-	var namespace string
 	switch t := object.(type) {
 	case *api.Pod:
 		return clientset.Core().Pods(t.Namespace).GetLogs(t.Name, opts), nil
-
-	case *api.ReplicationController:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
-	case *extensions.ReplicaSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.DaemonSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *batch.Job:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *apps.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	default:
-		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
 
+	namespace, selector, err := selectorsForObject(object)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
+	}
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
 	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	if err != nil {
@@ -282,6 +242,61 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 	}
 	return clientset.Core().Pods(pod.Namespace).GetLogs(pod.Name, opts), nil
+}
+
+func selectorsForObject(object runtime.Object) (namespace string, selector labels.Selector, err error) {
+	switch t := object.(type) {
+	case *extensions.ReplicaSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *api.ReplicationController:
+		namespace = t.Namespace
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+
+	case *apps.StatefulSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *extensions.DaemonSet:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *extensions.Deployment:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *batch.Job:
+		namespace = t.Namespace
+		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+
+	case *api.Service:
+		namespace = t.Namespace
+		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
+			return "", nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
+		}
+		selector = labels.SelectorFromSet(t.Spec.Selector)
+
+	default:
+		return "", nil, fmt.Errorf("selector for %T not implemented", object)
+	}
+
+	return namespace, selector, nil
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
@@ -335,58 +350,16 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 	if err != nil {
 		return nil, err
 	}
-	var selector labels.Selector
-	var namespace string
+
 	switch t := object.(type) {
-	case *extensions.ReplicaSet:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector.MatchLabels)
-
-	case *api.ReplicationController:
-		namespace = t.Namespace
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
-	case *apps.StatefulSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-	case *extensions.DaemonSet:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *extensions.Deployment:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *batch.Job:
-		namespace = t.Namespace
-		selector, err = metav1.LabelSelectorAsSelector(t.Spec.Selector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid label selector: %v", err)
-		}
-
-	case *api.Service:
-		namespace = t.Namespace
-		if t.Spec.Selector == nil || len(t.Spec.Selector) == 0 {
-			return nil, fmt.Errorf("invalid service '%s': Service is defined without a selector", t.Name)
-		}
-		selector = labels.SelectorFromSet(t.Spec.Selector)
-
 	case *api.Pod:
 		return t, nil
-
-	default:
-		return nil, fmt.Errorf("cannot attach to %T: not implemented", object)
 	}
 
+	namespace, selector, err := selectorsForObject(object)
+	if err != nil {
+		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
+	}
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	return pod, err
