@@ -9,3 +9,5 @@ spec:
     kind: Foo
     plural: foos
   scope: Namespaced
+  subresources:
+    status: {}
