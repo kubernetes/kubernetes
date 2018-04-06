@@ -24,21 +24,27 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	admissionregistrationinformers "k8s.io/client-go/informers/admissionregistration/v1beta1"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 
-// ValidatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
-type ValidatingWebhookConfigurationManager struct {
+// validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
+type validatingWebhookConfigurationManager struct {
 	configuration *atomic.Value
 	lister        admissionregistrationlisters.ValidatingWebhookConfigurationLister
+	hasSynced     func() bool
 }
 
-func NewValidatingWebhookConfigurationManager(informer admissionregistrationinformers.ValidatingWebhookConfigurationInformer) *ValidatingWebhookConfigurationManager {
-	manager := &ValidatingWebhookConfigurationManager{
+var _ generic.Source = &validatingWebhookConfigurationManager{}
+
+func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
+	informer := f.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
+	manager := &validatingWebhookConfigurationManager{
 		configuration: &atomic.Value{},
 		lister:        informer.Lister(),
+		hasSynced:     informer.Informer().HasSynced,
 	}
 
 	// Start with an empty list
@@ -55,11 +61,16 @@ func NewValidatingWebhookConfigurationManager(informer admissionregistrationinfo
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
-func (v *ValidatingWebhookConfigurationManager) Webhooks() *v1beta1.ValidatingWebhookConfiguration {
-	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration)
+func (v *validatingWebhookConfigurationManager) Webhooks() []v1beta1.Webhook {
+	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration).Webhooks
 }
 
-func (v *ValidatingWebhookConfigurationManager) updateConfiguration() {
+// HasSynced returns true if the shared informers have synced.
+func (v *validatingWebhookConfigurationManager) HasSynced() bool {
+	return v.hasSynced()
+}
+
+func (v *validatingWebhookConfigurationManager) updateConfiguration() {
 	configurations, err := v.lister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error updating configuration: %v", err))
