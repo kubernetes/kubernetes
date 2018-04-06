@@ -634,9 +634,9 @@ def configure_kubelet(dns, ingress_ip):
 
     if is_state('kubernetes-worker.gpu.enabled'):
         hookenv.log('Adding '
-                    '--feature-gates=Accelerators=true,DevicePlugins=true '
+                    '--feature-gates=DevicePlugins=true '
                     'to kubelet')
-        kubelet_opts['feature-gates'] = 'Accelerators=true,DevicePlugins=true'
+        kubelet_opts['feature-gates'] = 'DevicePlugins=true'
 
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
