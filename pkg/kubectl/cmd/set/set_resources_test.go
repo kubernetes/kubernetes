@@ -73,7 +73,7 @@ func TestResourcesLocal(t *testing.T) {
 	opts := ResourcesOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -127,7 +127,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	opts := ResourcesOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -508,7 +508,7 @@ func TestSetResourcesRemote(t *testing.T) {
 			opts := ResourcesOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags("", false),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 					OutputFormat: &outputFormat,
 				},

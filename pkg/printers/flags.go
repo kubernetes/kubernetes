@@ -45,8 +45,8 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
-func (f *PrintFlags) Complete(dryRun bool) error {
-	f.NamePrintFlags.DryRun = dryRun
+func (f *PrintFlags) Complete(messageTemplate string) error {
+	f.NamePrintFlags.Operation = fmt.Sprintf(messageTemplate, f.NamePrintFlags.Operation)
 	return nil
 }
 
@@ -80,6 +80,6 @@ func NewPrintFlags(operation string) *PrintFlags {
 		OutputFormat: &outputFormat,
 
 		JSONYamlPrintFlags: NewJSONYamlPrintFlags(),
-		NamePrintFlags:     NewNamePrintFlags(operation, false),
+		NamePrintFlags:     NewNamePrintFlags(operation),
 	}
 }

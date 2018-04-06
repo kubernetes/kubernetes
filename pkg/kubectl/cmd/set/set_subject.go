@@ -74,7 +74,7 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
-	PrintObject func(obj runtime.Object) error
+	PrintObj func(obj runtime.Object) error
 }
 
 func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
@@ -117,14 +117,14 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
-	o.PrintFlags.Complete(o.DryRun)
-
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
-
-	o.PrintObject = func(obj runtime.Object) error {
+	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
@@ -251,7 +251,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObject(info.Object); err != nil {
+			if err := o.PrintObj(info.Object); err != nil {
 				return err
 			}
 			continue
@@ -264,7 +264,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		return o.PrintObject(info.AsVersioned())
+		return o.PrintObj(info.AsVersioned())
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

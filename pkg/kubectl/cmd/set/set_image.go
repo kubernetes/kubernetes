@@ -127,7 +127,9 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.ResolveImage = f.ResolveImage
 	o.Cmd = cmd
 
-	o.PrintFlags.Complete(o.DryRun)
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -250,15 +252,15 @@ func (o *ImageOptions) Run() error {
 			continue
 		}
 
+		// no changes
+		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
+			continue
+		}
+
 		if o.Local || o.DryRun {
 			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
 				return err
 			}
-			continue
-		}
-
-		// no changes
-		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
 			continue
 		}
 

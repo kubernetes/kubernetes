@@ -74,7 +74,7 @@ func TestImageLocal(t *testing.T) {
 	opts := ImageOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -100,7 +100,7 @@ func TestImageLocal(t *testing.T) {
 func TestSetImageValidation(t *testing.T) {
 	printFlags := &printers.PrintFlags{
 		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-		NamePrintFlags:     printers.NewNamePrintFlags("", false),
+		NamePrintFlags:     printers.NewNamePrintFlags(""),
 	}
 
 	testCases := []struct {
@@ -196,7 +196,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	opts := ImageOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -590,7 +590,7 @@ func TestSetImageRemote(t *testing.T) {
 			opts := ImageOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags("", false),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 					OutputFormat: &outputFormat,
 				},

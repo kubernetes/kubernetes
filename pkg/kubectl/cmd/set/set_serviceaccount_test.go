@@ -92,7 +92,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			saConfig := serviceAccountConfig{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags("", false),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 					OutputFormat: &outputFormat,
 				},
@@ -136,7 +136,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	opts := serviceAccountConfig{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -380,7 +380,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			saConfig := serviceAccountConfig{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags("", false),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 					OutputFormat: &outputFormat,
 				},
@@ -427,7 +427,7 @@ func TestServiceAccountValidation(t *testing.T) {
 			saConfig := &serviceAccountConfig{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags("", false),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 					OutputFormat: &outputFormat,
 				},

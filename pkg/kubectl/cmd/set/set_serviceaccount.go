@@ -120,13 +120,13 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
 	saConfig.cmd = cmd
 
-	saConfig.PrintFlags.Complete(saConfig.dryRun)
-
+	if saConfig.dryRun {
+		saConfig.PrintFlags.Complete("%s (dry run)")
+	}
 	printer, err := saConfig.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
-
 	saConfig.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, saConfig.out)
 	}

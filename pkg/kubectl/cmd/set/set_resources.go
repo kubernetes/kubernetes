@@ -148,13 +148,13 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Cmd = cmd
 	o.DryRun = cmdutil.GetDryRunFlag(o.Cmd)
 
-	o.PrintFlags.Complete(o.DryRun)
-
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
-
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}

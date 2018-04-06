@@ -53,7 +53,6 @@ type SelectorOptions struct {
 	selector  *metav1.LabelSelector
 
 	out              io.Writer
-	PrintObject      func(obj runtime.Object) error
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	PrintObj func(runtime.Object) error
@@ -119,8 +118,6 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 
-	o.PrintFlags.Complete(o.dryrun)
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -158,14 +155,17 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		}
 	}
 
+	if o.dryrun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
-
-	o.PrintObject = func(obj runtime.Object) error {
+	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.out)
 	}
+
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
 	}
@@ -208,7 +208,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			return o.PrintObject(info.Object)
+			return o.PrintObj(info.Object)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -225,7 +225,7 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		return o.PrintObject(patch.Info.AsVersioned())
+		return o.PrintObj(patch.Info.AsVersioned())
 	})
 }
 

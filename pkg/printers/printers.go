@@ -42,7 +42,7 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 		printer = p
 
 	case "name":
-		nameFlags := NewNamePrintFlags("", false)
+		nameFlags := NewNamePrintFlags("")
 		namePrinter, err := nameFlags.ToPrinter(format)
 		if err != nil {
 			return nil, err
