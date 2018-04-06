@@ -269,12 +269,25 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 	if len(nodeToVictims) > 0 {
 		for _, extender := range g.extenders {
 			if extender.SupportsPreemption() {
-				var err error
-				// Replace nodeToVictims with result after preemption from extender.
-				if nodeToVictims, err = extender.ProcessPreemption(pod, nodeToVictims, g.cachedNodeInfoMap); err != nil {
+				newNodeToVictims, err := extender.ProcessPreemption(
+					pod,
+					nodeToVictims,
+					g.cachedNodeInfoMap,
+				)
+				if err != nil {
+					if extender.IsIgnorable() {
+						glog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
+							extender, err)
+						continue
+					}
 					return nil, err
 				}
-				// If node list is empty, no preemption will happen, skip other extenders.
+
+				// Replace nodeToVictims with new result after preemption. So the
+				// rest of extenders can continue use it as parameter.
+				nodeToVictims = newNodeToVictims
+
+				// If node list becomes empty, no preemption can happen regardless of other extenders.
 				if len(nodeToVictims) == 0 {
 					break
 				}
@@ -384,7 +397,13 @@ func findNodesThatFit(
 			}
 			filteredList, failedMap, err := extender.Filter(pod, filtered, nodeNameToInfo)
 			if err != nil {
-				return []*v1.Node{}, FailedPredicateMap{}, err
+				if extender.IsIgnorable() {
+					glog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
+						extender, err)
+					continue
+				} else {
+					return []*v1.Node{}, FailedPredicateMap{}, err
+				}
 			}
 
 			for failedNodeName, failedMsg := range failedMap {

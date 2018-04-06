@@ -174,6 +174,9 @@ type ExtenderConfig struct {
 	//   will skip checking the resource in predicates.
 	// +optional
 	ManagedResources []ExtenderManagedResource `json:"managedResources,omitempty"`
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool `json:"ignorable,omitempty"`
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize

@@ -1274,6 +1274,30 @@ func TestPreempt(t *testing.T) {
 			expectedNode: "",
 			expectedPods: []string{},
 		},
+		{
+			name: "One scheduler extender allows only machine1, the other returns error but ignorable. Only machine1 would be chosen",
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
+				Containers: veryLargeContainers,
+				Priority:   &highPriority},
+			},
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			extenders: []*FakeExtender{
+				{
+					predicates: []fitPredicate{errorPredicateExtender},
+					ignorable:  true,
+				},
+				{
+					predicates: []fitPredicate{machine1PredicateExtender},
+				},
+			},
+			expectedNode: "machine1",
+			expectedPods: []string{"m1.1", "m1.2"},
+		},
 	}
 
 	for _, test := range tests {

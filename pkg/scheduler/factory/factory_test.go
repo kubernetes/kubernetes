@@ -539,6 +539,11 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 type fakeExtender struct {
 	isBinder          bool
 	interestedPodName string
+	ignorable         bool
+}
+
+func (f *fakeExtender) IsIgnorable() bool {
+	return f.ignorable
 }
 
 func (f *fakeExtender) ProcessPreemption(

@@ -49,6 +49,7 @@ type HTTPExtender struct {
 	client           *http.Client
 	nodeCacheCapable bool
 	managedResources sets.String
+	ignorable        bool
 }
 
 func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
@@ -102,7 +103,14 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		client:           client,
 		nodeCacheCapable: config.NodeCacheCapable,
 		managedResources: managedResources,
+		ignorable:        config.Ignorable,
 	}, nil
+}
+
+// IsIgnorable returns true indicates scheduling should not fail when this extender
+// is unavailable
+func (h *HTTPExtender) IsIgnorable() bool {
+	return h.ignorable
 }
 
 // SupportsPreemption returns if a extender support preemption.
@@ -147,11 +155,12 @@ func (h *HTTPExtender) ProcessPreemption(
 
 	// Extender will always return NodeNameToMetaVictims.
 	// So let's convert it to NodeToVictims by using NodeNameToInfo.
-	nodeToVictims, err := h.convertToNodeToVictims(result.NodeNameToMetaVictims, nodeNameToInfo)
+	newNodeToVictims, err := h.convertToNodeToVictims(result.NodeNameToMetaVictims, nodeNameToInfo)
 	if err != nil {
 		return nil, err
 	}
-	return nodeToVictims, nil
+	// Do not override nodeToVictims
+	return newNodeToVictims, nil
 }
 
 // convertToNodeToVictims converts "nodeNameToMetaVictims" from object identifiers,

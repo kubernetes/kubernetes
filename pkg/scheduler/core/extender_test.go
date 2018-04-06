@@ -113,10 +113,15 @@ type FakeExtender struct {
 	nodeCacheCapable bool
 	filteredNodes    []*v1.Node
 	unInterested     bool
+	ignorable        bool
 
 	// Cached node information for fake extender
 	cachedNodeNameToInfo map[string]*schedulercache.NodeInfo
 	cachedPDBs           []*policy.PodDisruptionBudget
+}
+
+func (f *FakeExtender) IsIgnorable() bool {
+	return f.ignorable
 }
 
 func (f *FakeExtender) SupportsPreemption() bool {
@@ -141,7 +146,10 @@ func (f *FakeExtender) ProcessPreemption(
 
 	for node, victims := range nodeToVictimsCopy {
 		// Try to do preemption on extender side.
-		extenderVictimPods, extendernPDBViolations, fits := f.selectVictimsOnNodeByExtender(pod, node, nodeNameToInfo)
+		extenderVictimPods, extendernPDBViolations, fits, err := f.selectVictimsOnNodeByExtender(pod, node, nodeNameToInfo)
+		if err != nil {
+			return nil, err
+		}
 		// If it's unfit after extender's preemption, this node is unresolvable by preemption overall,
 		// let's remove it from potential preemption nodes.
 		if !fits {
@@ -164,15 +172,18 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	pod *v1.Pod,
 	node *v1.Node,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
-) ([]*v1.Pod, int, bool) {
-	// TODO(harry): add more test in generic_scheduler_test.go to verify this logic.
+) ([]*v1.Pod, int, bool, error) {
 	// If a extender support preemption but have no cached node info, let's run filter to make sure
 	// default scheduler's decision still stand with given pod and node.
 	if !f.nodeCacheCapable {
-		if fits, _ := f.runPredicate(pod, node); !fits {
-			return nil, 0, false
+		fits, err := f.runPredicate(pod, node)
+		if err != nil {
+			return nil, 0, false, err
 		}
-		return []*v1.Pod{}, 0, true
+		if !fits {
+			return nil, 0, false, nil
+		}
+		return []*v1.Pod{}, 0, true, nil
 	}
 
 	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
@@ -200,8 +211,12 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption.
-	if fits, _ := f.runPredicate(pod, nodeInfoCopy.Node()); !fits {
-		return nil, 0, false
+	fits, err := f.runPredicate(pod, nodeInfoCopy.Node())
+	if err != nil {
+		return nil, 0, false, err
+	}
+	if !fits {
+		return nil, 0, false, nil
 	}
 
 	var victims []*v1.Pod
@@ -225,7 +240,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 		reprievePod(p.(*v1.Pod))
 	}
 
-	return victims, numViolatingVictim, true
+	return victims, numViolatingVictim, true, nil
 }
 
 // runPredicate run predicates of extender one by one for given pod and node.
@@ -439,7 +454,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// Filter/Prioritize phases if the extender is not interested in
 			// the pod.
 			//
-			// If scheduler sends the pod by mistake, the test will fail
+			// If scheduler sends the pod by mistake, the test would fail
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
@@ -455,6 +470,28 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			expectsErr:   false,
 			expectedHost: "machine2", // machine2 has higher score
 			name:         "test 8",
+		},
+		{
+			// Scheduling is expected to not fail in
+			// Filter/Prioritize phases if the extender is not available and ignorable.
+			//
+			// If scheduler did not ignore the extender, the test would fail
+			// because of the errors from errorPredicateExtender.
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			extenders: []FakeExtender{
+				{
+					predicates: []fitPredicate{errorPredicateExtender},
+					ignorable:  true,
+				},
+				{
+					predicates: []fitPredicate{machine1PredicateExtender},
+				},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectsErr:   false,
+			expectedHost: "machine1",
+			name:         "test 9",
 		},
 	}
 
