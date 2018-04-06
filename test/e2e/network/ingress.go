@@ -382,7 +382,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
 		})
 
-		It("should be able to switch between HTTPS and HTTP2 modes", func() {
+		// TODO (gau): Remove [Unreleased] label once HTTP2 is in the next Ingress release
+		It("should be able to switch between HTTPS and HTTP2 modes [Unreleased]", func() {
 			httpsScheme := "request_scheme=https"
 
 			By("Create a basic HTTP2 ingress")
