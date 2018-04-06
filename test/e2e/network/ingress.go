@@ -673,10 +673,15 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			name := jig.Ingress.Name
 			// Verify that the ingress is spread to 1 cluster as expected.
 			verifyKubemciStatusHas(name, "is spread across 1 cluster")
+			// Validate that removing the ingress from all clusters throws an error.
 			// Reuse the ingress file created while creating the ingress.
 			filePath := filepath.Join(framework.TestContext.OutputDir, "mci.yaml")
-			if _, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath); err != nil {
-				framework.Failf("unexpected error in running kubemci remove-clusters: %s", err)
+			if _, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath); err == nil {
+				framework.Failf("expected non-nil error in running kubemci remove-clusters to remove from all clusters")
+			}
+			// remove-clusters should succeed with --force=true
+			if _, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath, "--force=true"); err != nil {
+				framework.Failf("unexpected error in running kubemci remove-clusters to remove from all clusters with --force=true: %s", err)
 			}
 			verifyKubemciStatusHas(name, "is spread across 0 cluster")
 		})
