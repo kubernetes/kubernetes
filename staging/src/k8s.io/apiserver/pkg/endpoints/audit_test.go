@@ -70,7 +70,7 @@ func TestAudit(t *testing.T) {
 			if events[i].RequestObject == nil {
 				return nil
 			}
-			return fmt.Errorf("expected RequestBody to be nil, got non-nill '%s'", events[i].RequestObject.Raw)
+			return fmt.Errorf("expected RequestBody to be nil, got non-nil '%s'", events[i].RequestObject.Raw)
 		}
 	}
 	requestBodyIs := func(i int, text string) eventCheck {
@@ -100,7 +100,7 @@ func TestAudit(t *testing.T) {
 			if events[i].ResponseObject == nil {
 				return nil
 			}
-			return fmt.Errorf("expected ResponseBody to be nil, got non-nill '%s'", events[i].ResponseObject.Raw)
+			return fmt.Errorf("expected ResponseBody to be nil, got non-nil '%s'", events[i].ResponseObject.Raw)
 		}
 	}
 	responseBodyMatches := func(i int, pattern string) eventCheck {
