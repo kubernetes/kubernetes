@@ -65,11 +65,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		// TODO: we either want to remove timeout or document it (if we
-		// document, move timeout out of this function and declare it in
-		// api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -114,6 +109,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			}
 			return nil
 		}
+
+		requestReceived := request.TimeStampFrom(ctx)
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"), scope.RequestTimeout, requestReceived)
 
 		result, err := patchResource(
 			ctx,

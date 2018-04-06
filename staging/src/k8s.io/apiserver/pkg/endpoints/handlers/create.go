@@ -40,9 +40,6 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		trace := utiltrace.New("Create " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		var (
 			namespace, name string
 			err             error
@@ -105,6 +102,10 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		// TODO: replace with content type negotiation?
 		includeUninitialized := req.URL.Query().Get("includeUninitialized") == "1"
+
+		requestReceived := request.TimeStampFrom(ctx)
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"), scope.RequestTimeout, requestReceived)
 
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {

@@ -73,6 +73,7 @@ type APIGroupVersion struct {
 	Admit   admission.Interface
 	Context request.RequestContextMapper
 
+	RequestTimeout    time.Duration
 	MinRequestTimeout time.Duration
 
 	// EnableAPIResponseCompression indicates whether API Responses should support compression
@@ -88,6 +89,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	installer := &APIInstaller{
 		group:                        g,
 		prefix:                       prefix,
+		requestTimeout:               g.RequestTimeout,
 		minRequestTimeout:            g.MinRequestTimeout,
 		enableAPIResponseCompression: g.EnableAPIResponseCompression,
 	}

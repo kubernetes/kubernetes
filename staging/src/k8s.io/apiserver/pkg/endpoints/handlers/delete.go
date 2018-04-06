@@ -41,9 +41,6 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -111,6 +108,10 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
+		requestReceived := request.TimeStampFrom(ctx)
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"), scope.RequestTimeout, requestReceived)
+
 		trace.Step("About to delete object from database")
 		wasDeleted := true
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
@@ -167,9 +168,6 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
 			scope.err(err, w, req)
@@ -249,6 +247,9 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
+		requestReceived := request.TimeStampFrom(ctx)
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"), scope.RequestTimeout, requestReceived)
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			return r.DeleteCollection(ctx, options, &listOptions)
 		})
