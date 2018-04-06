@@ -25,7 +25,7 @@ import (
 	sets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	container "k8s.io/kubernetes/pkg/kubelet/container"
-	network "k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 
 // Mock of NetworkPlugin interface

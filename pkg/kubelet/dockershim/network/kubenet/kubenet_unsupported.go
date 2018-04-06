@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 
 type kubenetNetworkPlugin struct {

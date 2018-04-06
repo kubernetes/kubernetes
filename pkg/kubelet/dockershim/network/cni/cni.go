@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	utilexec "k8s.io/utils/exec"
 )
 
