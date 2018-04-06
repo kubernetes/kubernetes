@@ -23,16 +23,31 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	apiextensionscmd "k8s.io/apiextensions-apiserver/pkg/cmd/server"
+	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
-func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, externalInformers kubeexternalinformers.SharedInformerFactory, commandOptions *options.ServerRunOptions) (*apiextensionsapiserver.Config, error) {
+func createAPIExtensionsConfig(
+	kubeAPIServerConfig genericapiserver.Config,
+	externalInformers kubeexternalinformers.SharedInformerFactory,
+	pluginInitializers []admission.PluginInitializer,
+	commandOptions *options.ServerRunOptions,
+) (*apiextensionsapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
 	genericConfig := kubeAPIServerConfig
+
+	// override genericConfig.AdmissionControl with apiextensions' scheme,
+	// because apiextentions apiserver should use its own scheme to convert resources.
+	commandOptions.Admission.ApplyTo(
+		&genericConfig,
+		externalInformers,
+		genericConfig.LoopbackClientConfig,
+		apiextensionsapiserver.Scheme,
+		pluginInitializers...)
 
 	// copy the etcd options so we don't mutate originals.
 	etcdOptions := *commandOptions.Etcd
