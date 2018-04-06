@@ -33,8 +33,7 @@ const (
 
 var (
 	defaultPodSandboxImage = defaultPodSandboxImageName +
-		"-" + runtime.GOARCH + ":" +
-		defaultPodSandboxImageVersion
+		":" + defaultPodSandboxImageVersion
 )
 
 // NewContainerRuntimeOptions will create a new ContainerRuntimeOptions with

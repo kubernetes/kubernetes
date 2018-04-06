@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type Resource struct {
@@ -376,7 +377,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 					Containers: []v1.Container{
 						{
 							Name:      rsName,
-							Image:     framework.GetPauseImageName(f.ClientSet),
+							Image:     imageutils.GetPauseImageName(),
 							Resources: *resource,
 						},
 					},

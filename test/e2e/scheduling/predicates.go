@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -658,7 +659,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Ports: conf.Ports,
 				},
 			},
@@ -823,7 +824,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		HostPorts:      map[string]int{"port1": 4321},
 	}

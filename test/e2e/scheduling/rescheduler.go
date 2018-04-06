@@ -26,6 +26,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -124,7 +125,7 @@ func reserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		CpuRequest:     request,
 	}

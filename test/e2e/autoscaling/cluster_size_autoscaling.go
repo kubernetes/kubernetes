@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -1395,7 +1396,7 @@ func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Name:              id,
 		Namespace:         f.Namespace.Name,
 		Timeout:           timeout,
-		Image:             framework.GetPauseImageName(f.ClientSet),
+		Image:             imageutils.GetPauseImageName(),
 		Replicas:          replicas,
 		MemRequest:        request,
 		NodeSelector:      selector,
@@ -1633,7 +1634,7 @@ func runAntiAffinityPods(f *framework.Framework, namespace string, pods int, id 
 		Name:           id,
 		Namespace:      namespace,
 		Timeout:        scaleUpTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       pods,
 		Labels:         podLabels,
 	}
@@ -1657,7 +1658,7 @@ func runVolumeAntiAffinityPods(f *framework.Framework, namespace string, pods in
 		Name:           id,
 		Namespace:      namespace,
 		Timeout:        scaleUpTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       pods,
 		Labels:         podLabels,
 	}
@@ -1738,7 +1739,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 		Name:           id,
 		Namespace:      namespace,
 		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       0,
 		Labels:         labels,
 		MemRequest:     memRequest,

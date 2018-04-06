@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "test",
-						Image: framework.GetPauseImageName(f.ClientSet),
+						Image: imageutils.GetPauseImageName(),
 					},
 				},
 			},

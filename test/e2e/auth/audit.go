@@ -80,7 +80,7 @@ var _ = SIGDescribe("Advanced Audit", func() {
 						Spec: apiv1.PodSpec{
 							Containers: []apiv1.Container{{
 								Name:  "pause",
-								Image: framework.GetPauseImageName(f.ClientSet),
+								Image: imageutils.GetPauseImageName(),
 							}},
 						},
 					}

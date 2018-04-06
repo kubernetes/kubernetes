@@ -47,6 +47,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"net/http/httptest"
 )
@@ -319,7 +320,7 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
-					Image: framework.GetPauseImageName(cs),
+					Image: imageutils.GetPauseImageName(),
 				},
 			},
 			Tolerations:   conf.Tolerations,
