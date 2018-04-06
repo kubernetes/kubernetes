@@ -83,7 +83,7 @@ type RuntimeStats struct {
 const (
 	// SystemContainerKubelet is the container name for the system container tracking Kubelet usage.
 	SystemContainerKubelet = "kubelet"
-	// SystemContainerRuntime is the container name for the system container tracking the runtime (e.g. docker or rkt) usage.
+	// SystemContainerRuntime is the container name for the system container tracking the runtime (e.g. docker) usage.
 	SystemContainerRuntime = "runtime"
 	// SystemContainerMisc is the container name for the system container tracking non-kubernetes processes.
 	SystemContainerMisc = "misc"

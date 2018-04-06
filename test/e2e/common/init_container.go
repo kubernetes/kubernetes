@@ -42,8 +42,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should invoke init containers on a RestartNever pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -101,8 +99,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should invoke init containers on a RestartAlways pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -164,8 +160,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should not start app containers if init containers fail on a RestartAlways pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -274,8 +268,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 	})
 
 	It("should not start app containers and fail the pod if init containers fail on a RestartNever pod", func() {
-		framework.SkipIfContainerRuntimeIs("rkt") // #25988
-
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
