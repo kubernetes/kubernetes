@@ -34,7 +34,7 @@ spec:
       k8s.gcr.io/busybox:1.24
       k8s.gcr.io/dnsutils:e2e
       k8s.gcr.io/e2e-net-amd64:1.0
-      k8s.gcr.io/echoserver:1.6
+      k8s.gcr.io/echoserver:1.10
       k8s.gcr.io/eptest:0.1
       k8s.gcr.io/fakegitserver:0.1
       k8s.gcr.io/galera-install:0.1
