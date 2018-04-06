@@ -19,7 +19,7 @@ spec:
       serviceAccountName: fluentd-gcp-scaler
       containers:
       - name: fluentd-gcp-scaler
-        image: gcr.io/google-containers/fluentd-gcp-scaler:0.3
+        image: k8s.gcr.io/fluentd-gcp-scaler:0.3
         command:
           - /scaler.sh
           - --ds-name=fluentd-gcp-v3.0.0

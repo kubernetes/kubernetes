@@ -285,7 +285,7 @@ function kube::release::create_docker_images_for_server() {
     mkdir -p "${images_dir}"
 
     local -r docker_registry="k8s.gcr.io"
-    # TODO(thockin): Remove all traces of this after 1.10 release.
+    # TODO(thockin): Remove all traces of this after 1.11 release.
     # The following is the old non-indirected registry name.  To ease the
     # transition to the new name (above), we are double-tagging saved images.
     local -r deprecated_registry="gcr.io/google_containers"
