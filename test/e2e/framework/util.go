@@ -2077,11 +2077,6 @@ func AssertCleanup(ns string, selectors ...string) {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
 
-	backoff := wait.Backoff{
-		Duration: 5 * time.Second,
-		Factor:   2,
-		Steps:    3,
-	}
 	var e error
 	verifyCleanupFunc := func() (bool, error) {
 		e = nil
@@ -2099,7 +2094,7 @@ func AssertCleanup(ns string, selectors ...string) {
 		}
 		return true, nil
 	}
-	err := wait.ExponentialBackoff(backoff, verifyCleanupFunc)
+	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
 	if err != nil {
 		Failf(e.Error())
 	}
