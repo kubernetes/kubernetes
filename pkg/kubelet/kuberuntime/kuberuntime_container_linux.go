@@ -63,9 +63,13 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	lc.Resources.OomScoreAdj = oomScoreAdj
 
 	if m.cpuCFSQuota {
+		cpuPeriod := defaultQuotaPeriod
+		if period, found := container.Resources.Limits[v1.ResourceCPUPeriodUsec]; found {
+			cpuPeriod = period.Value()
+		}
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
-		cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
+		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		lc.Resources.CpuQuota = cpuQuota
 		lc.Resources.CpuPeriod = cpuPeriod
 	}
