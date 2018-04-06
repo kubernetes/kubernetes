@@ -44,7 +44,7 @@ type FakeVolumeBinder struct {
 	BindCalled   bool
 }
 
-func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, nodeName string) (unboundVolumesSatisfied, boundVolumesSatsified bool, err error) {
+func (b *FakeVolumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatsified bool, err error) {
 	return b.config.FindUnboundSatsified, b.config.FindBoundSatsified, b.config.FindErr
 }
 
