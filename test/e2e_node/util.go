@@ -399,7 +399,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 func restartKubelet() {
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
-	regex := regexp.MustCompile("(kubelet-[0-9]+)")
+	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
 	Expect(len(matches)).NotTo(BeZero())
 	kube := matches[0]
