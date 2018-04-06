@@ -33,6 +33,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/printers"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
@@ -91,6 +92,8 @@ var (
 )
 
 type EnvOptions struct {
+	PrintFlags *printers.PrintFlags
+
 	Out io.Writer
 	Err io.Writer
 	In  io.Reader
@@ -100,13 +103,12 @@ type EnvOptions struct {
 	EnvArgs   []string
 	Resources []string
 
-	All         bool
-	Resolve     bool
-	List        bool
-	ShortOutput bool
-	Local       bool
-	Overwrite   bool
-	DryRun      bool
+	All       bool
+	Resolve   bool
+	List      bool
+	Local     bool
+	Overwrite bool
+	DryRun    bool
 
 	ResourceVersion   string
 	ContainerSelector string
@@ -114,6 +116,8 @@ type EnvOptions struct {
 	Output            string
 	From              string
 	Prefix            string
+
+	PrintObj func(runtime.Object) error
 
 	Builder *resource.Builder
 	Infos   []*resource.Info
@@ -127,6 +131,8 @@ type EnvOptions struct {
 // pod templates are selected by default and allowing environment to be overwritten
 func NewEnvOptions(in io.Reader, out, errout io.Writer) *EnvOptions {
 	return &EnvOptions{
+		PrintFlags: printers.NewPrintFlags("env updated"),
+
 		Out:               out,
 		Err:               errout,
 		In:                in,
@@ -162,9 +168,9 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", options.Overwrite, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
-	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddPrinterFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
 
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -209,7 +215,16 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	o.Resources = resources
 	o.Cmd = cmd
 
-	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
+	o.PrintFlags.Complete(o.DryRun)
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
 
 	if o.List && len(o.Output) > 0 {
 		return cmdutil.UsageErrorf(o.Cmd, "--list and --output may not be specified together")
@@ -418,7 +433,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
 				return err
 			}
 			continue
@@ -437,14 +452,9 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if len(o.Output) > 0 {
-			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
+		if err := o.PrintObj(info.AsVersioned()); err != nil {
+			return err
 		}
-
-		cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, false, "env updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

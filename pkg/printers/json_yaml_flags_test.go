@@ -61,14 +61,14 @@ func TestPrinterSupportsExpectedJSONYamlFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			printFlags := printers.JSONYamlPrintFlags{}
 
-			p, matched, err := printFlags.ToPrinter(tc.outputFormat)
+			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if matched {
+				if !printers.IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if !matched {
+			if printers.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
 			}
 			if err != nil {

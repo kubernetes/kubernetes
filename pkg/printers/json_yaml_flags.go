@@ -17,7 +17,6 @@ limitations under the License.
 package printers
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -32,17 +31,15 @@ type JSONYamlPrintFlags struct{}
 // handling --output=(yaml|json) printing.
 // Returns false if the specified outputFormat does not match a supported format.
 // Supported Format types can be found in pkg/printers/printers.go
-func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error) {
 	outputFormat = strings.ToLower(outputFormat)
 	switch outputFormat {
 	case "json":
-		return &JSONPrinter{}, true, nil
+		return &JSONPrinter{}, nil
 	case "yaml":
-		return &YAMLPrinter{}, true, nil
-	case "":
-		return nil, false, fmt.Errorf("missing output format")
+		return &YAMLPrinter{}, nil
 	default:
-		return nil, false, nil
+		return nil, NoCompatiblePrinterError{f}
 	}
 }
 

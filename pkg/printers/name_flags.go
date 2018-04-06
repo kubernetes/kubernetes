@@ -17,7 +17,6 @@ limitations under the License.
 package printers
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -46,23 +45,27 @@ type NamePrintFlags struct {
 // handling --output=name printing.
 // Returns false if the specified outputFormat does not match a supported format.
 // Supported format types can be found in pkg/printers/printers.go
-func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error) {
 	decoders := []runtime.Decoder{scheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}
 	namePrinter := &NamePrinter{
 		Operation: f.Operation,
-		DryRun:    f.DryRun,
 		Typer:     scheme.Scheme,
 		Decoders:  decoders,
+	}
+
+	if f.DryRun {
+		namePrinter.Operation = namePrinter.Operation + " (dry run)"
 	}
 
 	outputFormat = strings.ToLower(outputFormat)
 	switch outputFormat {
 	case "name":
-		return namePrinter, true, nil
+		namePrinter.ShortOutput = true
+		fallthrough
 	case "":
-		return nil, false, fmt.Errorf("missing output format")
+		return namePrinter, nil
 	default:
-		return nil, false, nil
+		return nil, NoCompatiblePrinterError{f}
 	}
 }
 

@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "customcolumn.go",
         "customcolumn_flags.go",
+        "flags.go",
         "humanreadable.go",
         "humanreadable_flags.go",
         "interface.go",

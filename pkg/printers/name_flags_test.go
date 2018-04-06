@@ -44,14 +44,13 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 			expectedOutput: "pod/foo",
 		},
 		{
-			name:           "valid \"name\" output format and an operation prints success message",
+			name:           "valid \"name\" output format and an operation results in a short-output (non success printer) message",
 			outputFormat:   "name",
 			operation:      "patched",
-			expectedOutput: "pod/foo patched",
+			expectedOutput: "pod/foo",
 		},
 		{
-			name:           "valid \"name\" output format and an operation prints success message with dry run",
-			outputFormat:   "name",
+			name:           "empty output format and an operation prints success message with dry run",
 			operation:      "patched",
 			dryRun:         true,
 			expectedOutput: "pod/foo patched (dry run)",
@@ -59,8 +58,14 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 		{
 			name:          "operation and no valid \"name\" output does not match a printer",
 			operation:     "patched",
+			outputFormat:  "invalid",
 			dryRun:        true,
 			expectNoMatch: true,
+		},
+		{
+			name:           "operation and empty output still matches name printer",
+			expectedOutput: "pod/foo patched",
+			operation:      "patched",
 		},
 		{
 			name:          "no printer is matched on an invalid outputFormat",
@@ -81,15 +86,15 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 				DryRun:    tc.dryRun,
 			}
 
-			p, matched, err := printFlags.ToPrinter(tc.outputFormat)
+			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if matched {
+				if !printers.IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if !matched {
-				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
+			if printers.IsNoCompatiblePrinterError(err) {
+				t.Fatalf("expected to match name printer for output format %q", tc.outputFormat)
 			}
 
 			if len(tc.expectedError) > 0 {

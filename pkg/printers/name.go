@@ -30,10 +30,9 @@ import (
 
 // NamePrinter is an implementation of ResourcePrinter which outputs "resource/name" pair of an object.
 type NamePrinter struct {
-	// DryRun indicates whether the "(dry run)" message
-	// should be appended to the finalized "successful"
-	// message printed about an action on an object.
-	DryRun bool
+	// ShortOutput indicates whether an operation should be
+	// printed along side the "resource/name" pair for an object.
+	ShortOutput bool
 	// Operation describes the name of the action that
 	// took place on an object, to be included in the
 	// finalized "successful" message.
@@ -73,7 +72,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		}
 	}
 
-	return printObj(w, name, p.Operation, p.DryRun, GetObjectGroupKind(obj, p.Typer))
+	return printObj(w, name, p.Operation, p.ShortOutput, GetObjectGroupKind(obj, p.Typer))
 }
 
 func GetObjectGroupKind(obj runtime.Object, typer runtime.ObjectTyper) schema.GroupKind {
@@ -103,25 +102,25 @@ func GetObjectGroupKind(obj runtime.Object, typer runtime.ObjectTyper) schema.Gr
 	return schema.GroupKind{Kind: "<unknown>"}
 }
 
-func printObj(w io.Writer, name string, operation string, dryRun bool, groupKind schema.GroupKind) error {
+func printObj(w io.Writer, name string, operation string, shortOutput bool, groupKind schema.GroupKind) error {
 	if len(groupKind.Kind) == 0 {
 		return fmt.Errorf("missing kind for resource with name %v", name)
 	}
 
-	dryRunMsg := ""
-	if dryRun {
-		dryRunMsg = " (dry run)"
-	}
 	if len(operation) > 0 {
 		operation = " " + operation
 	}
 
+	if shortOutput {
+		operation = ""
+	}
+
 	if len(groupKind.Group) == 0 {
-		fmt.Fprintf(w, "%s/%s%s%s\n", strings.ToLower(groupKind.Kind), name, operation, dryRunMsg)
+		fmt.Fprintf(w, "%s/%s%s\n", strings.ToLower(groupKind.Kind), name, operation)
 		return nil
 	}
 
-	fmt.Fprintf(w, "%s.%s/%s%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation, dryRunMsg)
+	fmt.Fprintf(w, "%s.%s/%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation)
 	return nil
 }
 
