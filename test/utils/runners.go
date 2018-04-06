@@ -131,8 +131,9 @@ type RCConfig struct {
 	// Env vars, set the same for every pod.
 	Env map[string]string
 
-	// Extra labels added to every pod.
-	Labels map[string]string
+	// Extra labels and annotations added to every pod.
+	Labels      map[string]string
+	Annotations map[string]string
 
 	// Node selector for pods in the RC.
 	NodeSelector map[string]string
@@ -292,7 +293,8 @@ func (config *DeploymentConfig) create() error {
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": config.Name},
+					Labels:      map[string]string{"name": config.Name},
+					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -362,7 +364,8 @@ func (config *ReplicaSetConfig) create() error {
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": config.Name},
+					Labels:      map[string]string{"name": config.Name},
+					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -428,7 +431,8 @@ func (config *JobConfig) create() error {
 			Completions: func(i int) *int32 { x := int32(i); return &x }(config.Replicas),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": config.Name},
+					Labels:      map[string]string{"name": config.Name},
+					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -542,7 +546,8 @@ func (config *RCConfig) create() error {
 			},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": config.Name},
+					Labels:      map[string]string{"name": config.Name},
+					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
 					Affinity: config.Affinity,

@@ -364,6 +364,12 @@ func SkipUnlessClusterMonitoringModeIs(supportedMonitoring ...string) {
 	}
 }
 
+func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
+	if !TestContext.EnablePrometheusMonitoring {
+		Skipf("Skipped because prometheus monitoring is not enabled")
+	}
+}
+
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {
 		Skipf("Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
