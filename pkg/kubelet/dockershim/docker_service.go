@@ -120,13 +120,6 @@ type NetworkPluginSettings struct {
 	PluginConfDir string
 	// MTU is the desired MTU for network devices created by the plugin.
 	MTU int
-
-	// RuntimeHost is an interface that serves as a trap-door from plugin back
-	// into the kubelet.
-	// TODO: This shouldn't be required, remove once we move host ports into CNI
-	// and figure out bandwidth shaping. See corresponding comments above
-	// network.Host interface.
-	LegacyRuntimeHost network.LegacyHost
 }
 
 // namespaceGetter is a wrapper around the dockerService that implements
@@ -153,7 +146,6 @@ func (p *portMappingGetter) GetPodPortMappings(containerID string) ([]*hostport.
 // and dockerServices which implements the rest of the network host interfaces.
 // The legacy host methods are slated for deletion.
 type dockerNetworkHost struct {
-	network.LegacyHost
 	*namespaceGetter
 	*portMappingGetter
 }
@@ -232,7 +224,6 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDirs)
 	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDirs))
 	netHost := &dockerNetworkHost{
-		pluginSettings.LegacyRuntimeHost,
 		&namespaceGetter{ds},
 		&portMappingGetter{ds},
 	}

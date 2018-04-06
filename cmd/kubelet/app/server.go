@@ -359,7 +359,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		ExternalKubeClient:  nil,
 		EventClient:         nil,
 		Mounter:             mounter,
-		NetworkPlugins:      ProbeNetworkPlugins(s.CNIConfDir, cni.SplitDirs(s.CNIBinDir)),
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		Writer:              writer,
@@ -1112,7 +1111,6 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 
 	// Initialize network plugin settings.
-	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       kubeletconfiginternal.HairpinMode(c.HairpinMode),
 		NonMasqueradeCIDR: f.NonMasqueradeCIDR,
@@ -1120,7 +1118,6 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		PluginConfDir:     r.CNIConfDir,
 		PluginBinDirs:     cni.SplitDirs(r.CNIBinDir),
 		MTU:               int(r.NetworkPluginMTU),
-		LegacyRuntimeHost: nh,
 	}
 
 	// Initialize streaming configuration. (Not using TLS now)
