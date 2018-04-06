@@ -14,7 +14,7 @@ go_library(
         "hostport_manager.go",
         "hostport_syncer.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hostport",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport",
     deps = [
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/conntrack:go_default_library",
@@ -56,7 +56,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/network/hostport/testing:all-srcs",
+        "//pkg/kubelet/dockershim/network/hostport/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

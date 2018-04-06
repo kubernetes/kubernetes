@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["hairpin.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hairpin",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hairpin",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
