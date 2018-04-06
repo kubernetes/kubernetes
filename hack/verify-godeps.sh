@@ -35,7 +35,7 @@ kube::util::ensure_godep_version
 
 if [[ -z ${TMP_GOPATH:-} ]]; then
   # Create a nice clean place to put our new godeps
-  _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
+  _tmpdir="$(kube::realpath $(mktemp -d -t gopath.XXXXXX))"
 else
   # reuse what we might have saved previously
   _tmpdir="${TMP_GOPATH}"
