@@ -76,7 +76,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
-	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -543,14 +542,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		glog.Infof("Experimental host user namespace defaulting is enabled.")
 	}
 
-	hairpinMode, err := effectiveHairpinMode(kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode), crOptions.NetworkPluginName)
-	if err != nil {
-		// This is a non-recoverable error. Returning it up the callstack will just
-		// lead to retries of the same failure, so just fail hard.
-		glog.Fatalf("Invalid hairpin mode: %v", err)
-	}
-	glog.Infof("Hairpin mode set to %q", hairpinMode)
-
 	machineInfo, err := klet.cadvisor.MachineInfo()
 	if err != nil {
 		return nil, err
@@ -574,12 +565,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// TODO: These need to become arguments to a standalone docker shim.
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       hairpinMode,
-		NonMasqueradeCIDR: nonMasqueradeCIDR,
-		PluginName:        crOptions.NetworkPluginName,
-		PluginConfDir:     crOptions.CNIConfDir,
-		PluginBinDirs:     cni.SplitDirs(crOptions.CNIBinDir),
-		MTU:               int(crOptions.NetworkPluginMTU),
+		HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
+		NonMasqueradeCIDR:  nonMasqueradeCIDR,
+		PluginName:         crOptions.NetworkPluginName,
+		PluginConfDir:      crOptions.CNIConfDir,
+		PluginBinDirString: crOptions.CNIBinDir,
+		MTU:                int(crOptions.NetworkPluginMTU),
 	}
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)

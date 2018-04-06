@@ -80,7 +80,6 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	dynamickubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
-	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -1112,12 +1111,12 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 
 	// Initialize network plugin settings.
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       kubeletconfiginternal.HairpinMode(c.HairpinMode),
-		NonMasqueradeCIDR: f.NonMasqueradeCIDR,
-		PluginName:        r.NetworkPluginName,
-		PluginConfDir:     r.CNIConfDir,
-		PluginBinDirs:     cni.SplitDirs(r.CNIBinDir),
-		MTU:               int(r.NetworkPluginMTU),
+		HairpinMode:        kubeletconfiginternal.HairpinMode(c.HairpinMode),
+		NonMasqueradeCIDR:  f.NonMasqueradeCIDR,
+		PluginName:         r.NetworkPluginName,
+		PluginConfDir:      r.CNIConfDir,
+		PluginBinDirString: r.CNIBinDir,
+		MTU:                int(r.NetworkPluginMTU),
 	}
 
 	// Initialize streaming configuration. (Not using TLS now)

@@ -22,7 +22,6 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -40,30 +39,6 @@ const (
 	// KubeFirewallChain is kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
-
-// effectiveHairpinMode determines the effective hairpin mode given the
-// configured mode, container runtime, and whether cbr0 should be configured.
-func effectiveHairpinMode(hairpinMode kubeletconfig.HairpinMode, networkPlugin string) (kubeletconfig.HairpinMode, error) {
-	// The hairpin mode setting doesn't matter if:
-	// - We're not using a bridge network. This is hard to check because we might
-	//   be using a plugin.
-	// - It's set to hairpin-veth for a container runtime that doesn't know how
-	//   to set the hairpin flag on the veth's of containers. Currently the
-	//   docker runtime is the only one that understands this.
-	// - It's set to "none".
-	if hairpinMode == kubeletconfig.PromiscuousBridge || hairpinMode == kubeletconfig.HairpinVeth {
-		if hairpinMode == kubeletconfig.PromiscuousBridge && networkPlugin != "kubenet" {
-			// This is not a valid combination, since promiscuous-bridge only works on kubenet. Users might be using the
-			// default values (from before the hairpin-mode flag existed) and we
-			// should keep the old behavior.
-			glog.Warningf("Hairpin mode set to %q but kubenet is not enabled, falling back to %q", hairpinMode, kubeletconfig.HairpinVeth)
-			return kubeletconfig.HairpinVeth, nil
-		}
-	} else if hairpinMode != kubeletconfig.HairpinNone {
-		return "", fmt.Errorf("unknown value: %q", hairpinMode)
-	}
-	return hairpinMode, nil
-}
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
 // requires special networking configuration.
