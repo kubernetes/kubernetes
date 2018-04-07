@@ -39,6 +39,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob"
 )
 
 const (
@@ -155,7 +156,7 @@ func getOverlappingControllers(rcClient coreclient.ReplicationControllerInterfac
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	rc := reaper.client.ReplicationControllers(namespace)
-	scaler := NewScaler(reaper.scaleClient, schema.GroupResource{Resource: "replicationcontrollers"})
+	scaler := NewScaler(reaper.scaleClient)
 	ctrl, err := rc.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -206,7 +207,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 		// No overlapping controllers.
 		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
-		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil && !errors.IsNotFound(err) {
+		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas, schema.GroupResource{Resource: "replicationcontrollers"}); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -224,7 +225,7 @@ func getOverlappingReplicaSets(c extensionsclient.ReplicaSetInterface, rs *exten
 
 func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	rsc := reaper.client.ReplicaSets(namespace)
-	scaler := NewScaler(reaper.scaleClient, reaper.gr)
+	scaler := NewScaler(reaper.scaleClient)
 	rs, err := rsc.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -276,7 +277,7 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		// No overlapping ReplicaSets.
 		retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 		waitForReplicas := NewRetryParams(reaper.pollInterval, timeout)
-		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas); err != nil && !errors.IsNotFound(err) {
+		if err = scaler.Scale(namespace, name, 0, nil, retry, waitForReplicas, reaper.gr); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -325,7 +326,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 
 func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	statefulsets := reaper.client.StatefulSets(namespace)
-	scaler := NewScaler(reaper.scaleClient, apps.Resource("statefulsets"))
+	scaler := NewScaler(reaper.scaleClient)
 	ss, err := statefulsets.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -340,7 +341,7 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
 	waitForStatefulSet := NewRetryParams(reaper.pollInterval, timeout)
-	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil && !errors.IsNotFound(err) {
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet, apps.Resource("statefulsets")); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -354,7 +355,9 @@ func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Durat
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *metav1.DeleteOptions) error {
 	jobs := reaper.client.Jobs(namespace)
 	pods := reaper.podClient.Pods(namespace)
-	scaler := ScalerFor(schema.GroupKind{Group: batch.GroupName, Kind: "Job"}, reaper.client, nil, schema.GroupResource{})
+	scaler := &scalejob.JobPsuedoScaler{
+		JobsClient: reaper.client,
+	}
 	job, err := jobs.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -366,8 +369,8 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 	}
 
 	// TODO: handle overlapping jobs
-	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForJobs := NewRetryParams(reaper.pollInterval, timeout)
+	retry := &scalejob.RetryParams{Interval: reaper.pollInterval, Timeout: reaper.timeout}
+	waitForJobs := &scalejob.RetryParams{Interval: reaper.pollInterval, Timeout: reaper.timeout}
 	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForJobs); err != nil && !errors.IsNotFound(err) {
 		return err
 	}

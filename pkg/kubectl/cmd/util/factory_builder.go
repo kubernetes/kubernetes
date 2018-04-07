@@ -103,19 +103,13 @@ func (f *ring2Factory) ScaleClient() (scaleclient.ScalesGetter, error) {
 	return scaleclient.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
 }
 
-func (f *ring2Factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-	clientset, err := f.clientAccessFactory.ClientSet()
-	if err != nil {
-		return nil, err
-	}
-
+func (f *ring2Factory) Scaler() (kubectl.Scaler, error) {
 	scalesGetter, err := f.ScaleClient()
 	if err != nil {
 		return nil, err
 	}
-	gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
 
-	return kubectl.ScalerFor(mapping.GroupVersionKind.GroupKind(), clientset.Batch(), scalesGetter, gvk.GroupResource()), nil
+	return kubectl.NewScaler(scalesGetter), nil
 }
 
 func (f *ring2Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
