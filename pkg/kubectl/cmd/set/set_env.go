@@ -215,13 +215,17 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	o.Resources = resources
 	o.Cmd = cmd
 
-	o.PrintFlags.Complete(o.DryRun)
-
+	if o.DryRun {
+		// TODO(juanvallejo): This can be cleaned up even further by creating
+		// a PrintFlags struct that binds the --dry-run flag, and whose
+		// ToPrinter method returns a printer that understands how to print
+		// this success message.
+		o.PrintFlags.Complete("%s (dry run)")
+	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
-
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}

@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -61,14 +63,23 @@ func TestImageLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
+	outputFormat := "name"
+
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdImage(tf, buf, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
+	opts := ImageOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Out:   buf,
 		Local: true}
 	err := opts.Complete(tf, cmd, []string{"cassandra=thingy"})
@@ -87,6 +98,11 @@ func TestImageLocal(t *testing.T) {
 }
 
 func TestSetImageValidation(t *testing.T) {
+	printFlags := &printers.PrintFlags{
+		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+		NamePrintFlags:     printers.NewNamePrintFlags(""),
+	}
+
 	testCases := []struct {
 		name         string
 		imageOptions *ImageOptions
@@ -94,13 +110,14 @@ func TestSetImageValidation(t *testing.T) {
 	}{
 		{
 			name:         "test resource < 1 and filenames empty",
-			imageOptions: &ImageOptions{},
+			imageOptions: &ImageOptions{PrintFlags: printFlags},
 			expectErr:    "[one or more resources must be specified as <resource> <name> or <resource>/<name>, at least one image update is required]",
 		},
 		{
 			name: "test containerImages < 1",
 			imageOptions: &ImageOptions{
-				Resources: []string{"a", "b", "c"},
+				PrintFlags: printFlags,
+				Resources:  []string{"a", "b", "c"},
 
 				FilenameOptions: resource.FilenameOptions{
 					Filenames: []string{"testFile"},
@@ -111,7 +128,8 @@ func TestSetImageValidation(t *testing.T) {
 		{
 			name: "test containerImages > 1 and all containers are already specified by *",
 			imageOptions: &ImageOptions{
-				Resources: []string{"a", "b", "c"},
+				PrintFlags: printFlags,
+				Resources:  []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
 					Filenames: []string{"testFile"},
 				},
@@ -125,7 +143,8 @@ func TestSetImageValidation(t *testing.T) {
 		{
 			name: "success case",
 			imageOptions: &ImageOptions{
-				Resources: []string{"a", "b", "c"},
+				PrintFlags: printFlags,
+				Resources:  []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
 					Filenames: []string{"testFile"},
 				},
@@ -166,14 +185,23 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
+	outputFormat := "name"
+
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdImage(tf, buf, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ImageOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
+	opts := ImageOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Out:   buf,
 		Local: true}
 	err := opts.Complete(tf, cmd, []string{"*=thingy"})
@@ -552,11 +580,21 @@ func TestSetImageRemote(t *testing.T) {
 				}),
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
+
+			outputFormat := "yaml"
+
 			out := new(bytes.Buffer)
 			cmd := NewCmdImage(tf, out, out)
 			cmd.SetOutput(out)
-			cmd.Flags().Set("output", "yaml")
+			cmd.Flags().Set("output", outputFormat)
 			opts := ImageOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+					OutputFormat: &outputFormat,
+				},
+
 				Out:   out,
 				Local: false}
 			err := opts.Complete(tf, cmd, input.args)

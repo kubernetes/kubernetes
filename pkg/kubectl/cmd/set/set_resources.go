@@ -21,6 +21,8 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 
@@ -61,6 +63,8 @@ var (
 type ResourcesOptions struct {
 	resource.FilenameOptions
 
+	PrintFlags *printers.PrintFlags
+
 	Infos             []*resource.Info
 	Out               io.Writer
 	Err               io.Writer
@@ -72,6 +76,10 @@ type ResourcesOptions struct {
 	ChangeCause       string
 	Local             bool
 	Cmd               *cobra.Command
+
+	DryRun bool
+
+	PrintObj func(runtime.Object) error
 
 	Limits               string
 	Requests             string
@@ -85,6 +93,8 @@ type ResourcesOptions struct {
 // pod templates are selected by default.
 func NewResourcesOptions(out io.Writer, errOut io.Writer) *ResourcesOptions {
 	return &ResourcesOptions{
+		PrintFlags: printers.NewPrintFlags("resource requirements updated"),
+
 		Out:               out,
 		Err:               errOut,
 		ContainerSelector: "*",
@@ -112,7 +122,8 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
+
 	//usage := "Filename, directory, or URL to a file identifying the resource to get from the server"
 	//kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	usage := "identifying the resource to get from a server."
@@ -135,6 +146,18 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
 	o.Cmd = cmd
+	o.DryRun = cmdutil.GetDryRunFlag(o.Cmd)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -238,8 +261,8 @@ func (o *ResourcesOptions) Run() error {
 			continue
 		}
 
-		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
+		if o.Local || o.DryRun {
+			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
 				return err
 			}
 			continue
@@ -262,14 +285,9 @@ func (o *ResourcesOptions) Run() error {
 		}
 		info.Refresh(obj, true)
 
-		shortOutput := o.Output == "name"
-		if len(o.Output) > 0 && !shortOutput {
-			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
+		if err := o.PrintObj(info.AsVersioned()); err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

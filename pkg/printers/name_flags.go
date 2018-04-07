@@ -31,10 +31,6 @@ import (
 // a resource's fully-qualified Kind.group/name, or a successful
 // message about that resource if an Operation is provided.
 type NamePrintFlags struct {
-	// DryRun indicates whether the "(dry run)" message
-	// should be appended to the finalized "successful"
-	// message printed about an action on an object.
-	DryRun bool
 	// Operation describes the name of the action that
 	// took place on an object, to be included in the
 	// finalized "successful" message.
@@ -51,10 +47,6 @@ func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error)
 		Operation: f.Operation,
 		Typer:     scheme.Scheme,
 		Decoders:  decoders,
-	}
-
-	if f.DryRun {
-		namePrinter.Operation = namePrinter.Operation + " (dry run)"
 	}
 
 	outputFormat = strings.ToLower(outputFormat)
@@ -75,9 +67,8 @@ func (f *NamePrintFlags) AddFlags(c *cobra.Command) {}
 
 // NewNamePrintFlags returns flags associated with
 // --name printing, with default values set.
-func NewNamePrintFlags(operation string, dryRun bool) *NamePrintFlags {
+func NewNamePrintFlags(operation string) *NamePrintFlags {
 	return &NamePrintFlags{
 		Operation: operation,
-		DryRun:    dryRun,
 	}
 }

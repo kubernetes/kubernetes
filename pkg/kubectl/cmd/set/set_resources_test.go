@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -60,14 +62,23 @@ func TestResourcesLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
+	outputFormat := "name"
+
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdResources(tf, buf, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
+	opts := ResourcesOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Out:               buf,
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
@@ -105,14 +116,23 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
+	outputFormat := "name"
+
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdResources(tf, buf, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
+	opts := ResourcesOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Out:               buf,
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
@@ -478,11 +498,21 @@ func TestSetResourcesRemote(t *testing.T) {
 				}),
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
+
+			outputFormat := "yaml"
+
 			buf := new(bytes.Buffer)
 			cmd := NewCmdResources(tf, buf, buf)
 			cmd.SetOutput(buf)
-			cmd.Flags().Set("output", "yaml")
+			cmd.Flags().Set("output", outputFormat)
 			opts := ResourcesOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+					OutputFormat: &outputFormat,
+				},
+
 				Out:               buf,
 				Limits:            "cpu=200m,memory=512Mi",
 				ContainerSelector: "*"}

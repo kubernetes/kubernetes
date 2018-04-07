@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
@@ -54,6 +56,8 @@ var (
 
 // serviceAccountConfig encapsulates the data required to perform the operation.
 type serviceAccountConfig struct {
+	PrintFlags *printers.PrintFlags
+
 	fileNameOptions        resource.FilenameOptions
 	out                    io.Writer
 	err                    io.Writer
@@ -68,11 +72,15 @@ type serviceAccountConfig struct {
 	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
 	infos                  []*resource.Info
 	serviceAccountName     string
+
+	PrintObj func(runtime.Object) error
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
 func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	saConfig := &serviceAccountConfig{
+		PrintFlags: printers.NewPrintFlags("serviceaccount updated"),
+
 		out: out,
 		err: err,
 	}
@@ -89,7 +97,8 @@ func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command 
 			cmdutil.CheckErr(saConfig.Run())
 		},
 	}
-	cmdutil.AddPrinterFlags(cmd)
+
+	saConfig.PrintFlags.AddFlags(cmd)
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &saConfig.fileNameOptions, usage)
@@ -110,6 +119,17 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.output = cmdutil.GetFlagString(cmd, "output")
 	saConfig.updatePodSpecForObject = f.UpdatePodSpecForObject
 	saConfig.cmd = cmd
+
+	if saConfig.dryRun {
+		saConfig.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := saConfig.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	saConfig.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, saConfig.out)
+	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -151,6 +171,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 		})
 		return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 	}
+
 	patches := CalculatePatches(saConfig.infos, cmdutil.InternalVersionJSONEncoder(), patchFn)
 	for _, patch := range patches {
 		info := patch.Info
@@ -159,7 +180,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			continue
 		}
 		if saConfig.local || saConfig.dryRun {
-			if err := cmdutil.PrintObject(saConfig.cmd, patch.Info.AsVersioned(), saConfig.out); err != nil {
+			if err := saConfig.PrintObj(patch.Info.AsVersioned()); err != nil {
 				return err
 			}
 			continue
@@ -177,13 +198,10 @@ func (saConfig *serviceAccountConfig) Run() error {
 				}
 			}
 		}
-		if len(saConfig.output) > 0 {
-			if err := cmdutil.PrintObject(saConfig.cmd, info.AsVersioned(), saConfig.out); err != nil {
-				return err
-			}
-			continue
+
+		if err := saConfig.PrintObj(info.AsVersioned()); err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(saConfig.shortOutput, saConfig.out, info.Object, saConfig.dryRun, "serviceaccount updated")
 	}
 	return utilerrors.NewAggregate(patchErrs)
 }

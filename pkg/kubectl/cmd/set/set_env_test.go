@@ -74,7 +74,7 @@ func TestSetEnvLocal(t *testing.T) {
 	opts := EnvOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -123,7 +123,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	opts := EnvOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-			NamePrintFlags:     printers.NewNamePrintFlags("", false),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 			OutputFormat: &outputFormat,
 		},
@@ -514,7 +514,7 @@ func TestSetEnvRemote(t *testing.T) {
 			opts := EnvOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
-					NamePrintFlags:     printers.NewNamePrintFlags("", false),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
 
 					OutputFormat: &outputFormat,
 				},

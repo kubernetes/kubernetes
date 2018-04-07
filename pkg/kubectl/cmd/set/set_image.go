@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,12 +38,13 @@ import (
 type ImageOptions struct {
 	resource.FilenameOptions
 
+	PrintFlags *printers.PrintFlags
+
 	Infos        []*resource.Info
 	Selector     string
 	Out          io.Writer
 	Err          io.Writer
 	DryRun       bool
-	ShortOutput  bool
 	All          bool
 	Record       bool
 	Output       string
@@ -49,6 +52,8 @@ type ImageOptions struct {
 	Local        bool
 	Cmd          *cobra.Command
 	ResolveImage func(in string) (string, error)
+
+	PrintObj func(runtime.Object) error
 
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
@@ -81,6 +86,8 @@ var (
 
 func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ImageOptions{
+		PrintFlags: printers.NewPrintFlags("image updated"),
+
 		Out: out,
 		Err: err,
 	}
@@ -98,7 +105,8 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
+
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
@@ -112,13 +120,25 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = f.ResolveImage
 	o.Cmd = cmd
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -238,7 +258,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
 				return err
 			}
 			continue
@@ -263,13 +283,9 @@ func (o *ImageOptions) Run() error {
 
 		info.Refresh(obj, true)
 
-		if len(o.Output) > 0 {
-			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
+		if err := o.PrintObj(info.AsVersioned()); err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(o.ShortOutput, o.Out, info.Object, o.DryRun, "image updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

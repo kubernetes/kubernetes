@@ -50,12 +50,6 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 			expectedOutput: "pod/foo",
 		},
 		{
-			name:           "empty output format and an operation prints success message with dry run",
-			operation:      "patched",
-			dryRun:         true,
-			expectedOutput: "pod/foo patched (dry run)",
-		},
-		{
 			name:          "operation and no valid \"name\" output does not match a printer",
 			operation:     "patched",
 			outputFormat:  "invalid",
@@ -83,7 +77,6 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			printFlags := printers.NamePrintFlags{
 				Operation: tc.operation,
-				DryRun:    tc.dryRun,
 			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
