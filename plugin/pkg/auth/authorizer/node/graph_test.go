@@ -146,7 +146,7 @@ func TestDeleteEdges_locked(t *testing.T) {
 				return expectNodes[i].ID() < expectNodes[j].ID()
 			})
 			startNodes := c.start.graph.Nodes()
-			sort.Slice(expectNodes, func(i, j int) bool {
+			sort.Slice(startNodes, func(i, j int) bool {
 				return startNodes[i].ID() < startNodes[j].ID()
 			})
 			assert.Equal(t, expectNodes, startNodes)
@@ -161,7 +161,7 @@ func TestDeleteEdges_locked(t *testing.T) {
 				return expectEdges[i].From().ID() < expectEdges[j].From().ID()
 			})
 			startEdges := c.start.graph.Edges()
-			sort.Slice(expectEdges, func(i, j int) bool {
+			sort.Slice(startEdges, func(i, j int) bool {
 				if startEdges[i].From().ID() == startEdges[j].From().ID() {
 					return startEdges[i].To().ID() < startEdges[j].To().ID()
 				}
