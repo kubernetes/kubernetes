@@ -23,7 +23,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	batch "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -126,4 +130,66 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			t.Errorf("%s: expected\n\t%#v\ngot\n\t%#v", k, tc.ExpectedAttributes, attribs)
 		}
 	}
+}
+
+type fakeAuthorizer struct {
+	decision authorizer.Decision
+	reason   string
+	err      error
+}
+
+func (f fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return f.decision, f.reason, f.err
+}
+
+func TestAuditAnnotation(t *testing.T) {
+	testcases := map[string]struct {
+		authorizer         fakeAuthorizer
+		decisionAnnotation string
+		reasonAnnotation   string
+	}{
+		"decision allow": {
+			fakeAuthorizer{
+				authorizer.DecisionAllow,
+				"RBAC: allowed to patch pod",
+				nil,
+			},
+			"allow",
+			"RBAC: allowed to patch pod",
+		},
+		"decision forbid": {
+			fakeAuthorizer{
+				authorizer.DecisionDeny,
+				"RBAC: not allowed to patch pod",
+				nil,
+			},
+			"forbid",
+			"RBAC: not allowed to patch pod",
+		},
+		"error": {
+			fakeAuthorizer{
+				authorizer.DecisionNoOpinion,
+				"",
+				errors.New("can't parse user info"),
+			},
+			"",
+			reasonError,
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	negotiatedSerializer := serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
+	for k, tc := range testcases {
+		audit := &auditinternal.Event{Level: auditinternal.LevelMetadata}
+		handler := WithAuthorization(&fakeHTTPHandler{}, &fakeRequestContextMapper{
+			audit: audit,
+		}, tc.authorizer, negotiatedSerializer)
+
+		req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+		req.RemoteAddr = "127.0.0.1"
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+		assert.Equal(t, tc.decisionAnnotation, audit.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
+		assert.Equal(t, tc.reasonAnnotation, audit.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
+	}
+
 }

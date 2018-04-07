@@ -736,13 +736,17 @@ func TestAudit(t *testing.T) {
 }
 
 type fakeRequestContextMapper struct {
-	user *user.DefaultInfo
+	user  *user.DefaultInfo
+	audit *auditinternal.Event
 }
 
 func (m *fakeRequestContextMapper) Get(req *http.Request) (request.Context, bool) {
 	ctx := request.NewContext()
 	if m.user != nil {
 		ctx = request.WithUser(ctx, m.user)
+	}
+	if m.audit != nil {
+		ctx = request.WithAuditEvent(ctx, m.audit)
 	}
 
 	resolver := newTestRequestInfoResolver()
