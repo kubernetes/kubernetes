@@ -48,6 +48,8 @@ import (
 
 const enableEquivalenceCache = true
 
+const resyncInterval int32 = 0
+
 func TestCreate(t *testing.T) {
 	handler := utiltesting.FakeHandler{
 		StatusCode:   500,
@@ -532,6 +534,7 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
+		resyncInterval,
 		enableEquivalenceCache,
 	)
 }
