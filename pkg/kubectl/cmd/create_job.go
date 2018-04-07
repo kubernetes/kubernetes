@@ -60,7 +60,7 @@ func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Out: cmdOut,
 	}
 	cmd := &cobra.Command{
-		Use:     "job NAME [--from-cronjob=CRONJOB]",
+		Use:     "job NAME [--from=CRONJOB]",
 		Short:   jobLong,
 		Long:    jobLong,
 		Example: jobExample,
