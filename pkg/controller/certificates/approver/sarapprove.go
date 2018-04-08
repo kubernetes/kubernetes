@@ -212,9 +212,6 @@ func isSelfNodeServerCert(csr *capi.CertificateSigningRequest, x509cr *x509.Cert
 	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
 		return false
 	}
-	if len(x509cr.DNSNames) == 0 || len(x509cr.IPAddresses) == 0 {
-		return false
-	}
 	if !hasExactUsages(csr, kubeletServerUsages) {
 		return false
 	}
