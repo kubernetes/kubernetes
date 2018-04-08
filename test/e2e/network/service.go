@@ -43,7 +43,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// TODO(yankaiz): Move constants and default settings to service_util.go.
 const (
 	defaultServeHostnameServicePort = 80
 	defaultServeHostnameServiceName = "svc-hostname"
