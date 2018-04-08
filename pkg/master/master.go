@@ -54,10 +54,12 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -324,6 +326,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
 
+	schedulingrestprovider := schedulingrest.RESTStorageProvider{}
 	// The order here is preserved in discovery.
 	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
 	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
@@ -341,7 +344,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
-		schedulingrest.RESTStorageProvider{},
+		schedulingrestprovider,
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
@@ -357,6 +360,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		name, hook, err := schedulingrestprovider.PostStartHook()
+		if err != nil {
+			return nil, err
+		}
+		m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
+	}
 
 	return m, nil
 }
