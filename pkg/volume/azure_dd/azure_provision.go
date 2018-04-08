@@ -121,7 +121,6 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 	}
 
 	// normalize values
-	fsType = normalizeFsType(fsType)
 	skuName, err := normalizeStorageAccountType(storageAccountType)
 	if err != nil {
 		return nil, err
