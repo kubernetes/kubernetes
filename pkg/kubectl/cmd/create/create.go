@@ -283,12 +283,16 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 		}
 	}
 	// TODO post content with stream.  Right now it ignores body content
-	bytes, err := restClient.Post().RequestURI(o.Raw).Body(data).DoRaw()
+	result := restClient.Post().RequestURI(o.Raw).Body(data).Do()
+	if err := result.Error(); err != nil {
+		return err
+	}
+	body, err := result.Raw()
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "%v", string(bytes))
+	fmt.Fprintf(o.Out, "%v", string(body))
 	return nil
 }
 
