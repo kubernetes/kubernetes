@@ -58,14 +58,14 @@ func NewResourceConfig() *ResourceConfig {
 }
 
 func (o *ResourceConfig) DisableAll() {
-	for k := range o.GroupVersionConfigs {
-		o.GroupVersionConfigs[k] = false
+	for version := range o.GroupVersionResourceConfigs {
+		o.DisableVersions(version)
 	}
 }
 
 func (o *ResourceConfig) EnableAll() {
-	for k := range o.GroupVersionConfigs {
-		o.GroupVersionConfigs[k] = true
+	for version := range o.GroupVersionResourceConfigs {
+		o.EnableVersions(version)
 	}
 }
 
@@ -94,6 +94,31 @@ func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 		}
 
 		o.GroupVersionResourceConfigs[version].Enable = true
+	}
+}
+
+func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		version := resource.GroupVersion()
+		_, versionExists := o.GroupVersionResourceConfigs[version]
+		if !versionExists {
+			o.GroupVersionResourceConfigs[version] = NewGroupVersionResourceConfig()
+		}
+
+		o.GroupVersionResourceConfigs[version].DisabledResources.Insert(resource.Resource)
+	}
+}
+
+func (o *ResourceConfig) EnableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		version := resource.GroupVersion()
+		_, versionExists := o.GroupVersionResourceConfigs[version]
+		if !versionExists {
+			o.GroupVersionResourceConfigs[version] = NewGroupVersionResourceConfig()
+		}
+
+		o.GroupVersionResourceConfigs[version].EnabledResources.Insert(resource.Resource)
+		o.GroupVersionResourceConfigs[version].DisabledResources.Delete(resource.Resource)
 	}
 }
 

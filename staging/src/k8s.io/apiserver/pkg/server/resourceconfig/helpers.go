@@ -84,12 +84,20 @@ func MergeAPIResourceConfigs(
 		}
 	}
 
+	// "api/legacy=false" allows users to disable legacy api versions.
+	disableLegacyAPIs := false
+	legacyAPIFlagValue, ok := overrides["api/legacy"]
+	if ok && legacyAPIFlagValue == "false" {
+		disableLegacyAPIs = true
+	}
+	_ = disableLegacyAPIs // hush the compiler while we don't have legacy APIs to disable.
+
 	// "<resourceSpecifier>={true|false} allows users to enable/disable API.
-	// This takes preference over api/all, if specified.
+	// This takes preference over api/all and api/legacy, if specified.
 	// Iterate through all group/version overrides specified in runtimeConfig.
 	for key := range overrides {
 		// Have already handled them above. Can skip them here.
-		if key == "api/all" {
+		if key == "api/all" || key == "api/legacy" {
 			continue
 		}
 
@@ -98,6 +106,11 @@ func MergeAPIResourceConfigs(
 			continue
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
+		// HACK: Hack for "v1" legacy group version.
+		// Remove when we stop supporting the legacy group version.
+		if groupVersionString == "api/v1" {
+			groupVersionString = "v1"
+		}
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
@@ -123,6 +136,47 @@ func MergeAPIResourceConfigs(
 		}
 	}
 
+	// Iterate through all group/version/resource overrides specified in runtimeConfig.
+	for key := range overrides {
+		tokens := strings.Split(key, "/")
+		if len(tokens) != 3 {
+			continue
+		}
+		groupVersionString := tokens[0] + "/" + tokens[1]
+		// HACK: Hack for "v1" legacy group version.
+		// Remove when we stop supporting the legacy group version.
+		if groupVersionString == "api/v1" {
+			groupVersionString = "v1"
+		}
+		resource := tokens[2]
+		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
+		if err != nil {
+			return nil, fmt.Errorf("invalid key %s", key)
+		}
+		// Exclude group not registered into the registry.
+		if !registry.IsRegistered(groupVersion.Group) {
+			continue
+		}
+
+		// Verify that the groupVersion is registered into registry.
+		if !registry.IsRegisteredVersion(groupVersion) {
+			return nil, fmt.Errorf("group version %s has not been registered", groupVersion.String())
+		}
+
+		if !resourceConfig.AnyResourcesForVersionEnabled(groupVersion) {
+			return nil, fmt.Errorf("%v is disabled, you cannot configure its resources individually", groupVersion)
+		}
+
+		enabled, err := getRuntimeConfigValue(overrides, key, false)
+		if err != nil {
+			return nil, err
+		}
+		if enabled {
+			resourceConfig.EnableResources(groupVersion.WithResource(resource))
+		} else {
+			resourceConfig.DisableResources(groupVersion.WithResource(resource))
+		}
+	}
 	return resourceConfig, nil
 }
 
@@ -145,7 +199,7 @@ func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, d
 func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
 	groups := []string{}
 	for key := range resourceConfig {
-		if key == "api/all" {
+		if key == "api/all" || key == "api/legacy" {
 			continue
 		}
 		tokens := strings.Split(key, "/")
@@ -153,6 +207,9 @@ func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
 			return groups, fmt.Errorf("runtime-config invalid key %s", key)
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
+		if groupVersionString == "api/v1" {
+			groupVersionString = "v1"
+		}
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("runtime-config invalid key %s", key)
