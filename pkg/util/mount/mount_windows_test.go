@@ -20,6 +20,7 @@ package mount
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -549,5 +550,48 @@ func TestPathWithinBase(t *testing.T) {
 		result := pathWithinBase(test.fullPath, test.basePath)
 		assert.Equal(t, result, test.expectedResult, "Expect result not equal with pathWithinBase(%s, %s) return: %q, expected: %q",
 			test.fullPath, test.basePath, result, test.expectedResult)
+	}
+}
+
+func TestGetFileType(t *testing.T) {
+	mounter := New("fake/path")
+
+	tempDir, err := ioutil.TempDir("", "test-get-filetype")
+	if err != nil {
+		t.Fatalf("unexpected error: +%v when creating temp directory", err)
+	}
+	t.Log(tempDir)
+	defer os.RemoveAll(tempDir)
+
+	tempFile, err := ioutil.TempFile("", "test-get-filetype")
+	if err != nil {
+		t.Fatalf("unexpected error: +%v when creating temp file", err)
+	}
+	t.Log(tempFile.Name())
+	defer tempFile.Close()
+	defer os.RemoveAll(tempFile.Name())
+
+	testCase := []struct {
+		filePath     string
+		expectedType FileType
+	}{
+		{
+			tempDir,
+			FileTypeDirectory,
+		},
+		{
+			tempFile.Name(),
+			FileTypeFile,
+		},
+	}
+
+	for idx, tc := range testCase {
+		filePath, err := mounter.GetFileType(tc.filePath)
+		if err != nil {
+			t.Errorf("[%d] unexpected error : +%v", idx, err)
+		}
+		if filePath != tc.expectedType {
+			t.Errorf("[%d] expected %s, but got %s", idx, tc.expectedType, filePath)
+		}
 	}
 }
