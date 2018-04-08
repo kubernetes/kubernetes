@@ -34,7 +34,7 @@ import (
 func NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) genericapiserver.APIGroupInfo {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, aggregatorscheme.Registry, aggregatorscheme.Scheme, metav1.ParameterCodec, aggregatorscheme.Codecs)
 
-	if apiResourceConfigSource.VersionEnabled(v1beta1.SchemeGroupVersion) {
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(v1beta1.SchemeGroupVersion) {
 		apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
 		apiServiceREST := apiservicestorage.NewREST(aggregatorscheme.Scheme, restOptionsGetter)
@@ -43,7 +43,7 @@ func NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSourc
 		apiGroupInfo.VersionedResourcesStorageMap["v1beta1"] = storage
 	}
 
-	if apiResourceConfigSource.VersionEnabled(v1.SchemeGroupVersion) {
+	if apiResourceConfigSource.AnyResourcesForVersionEnabled(v1.SchemeGroupVersion) {
 		apiGroupInfo.GroupMeta.GroupVersion = v1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
 		apiServiceREST := apiservicestorage.NewREST(aggregatorscheme.Scheme, restOptionsGetter)
