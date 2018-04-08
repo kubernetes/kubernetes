@@ -65,7 +65,7 @@ func GetValidatedClusterInfoObject(cfg *kubeadmapi.NodeConfiguration) (*clientcm
 	}
 }
 
-// isHTTPSURL checks whether the string is parsable as an URL and whether the Scheme is https
+// isHTTPSURL checks whether the string is parsable as a URL and whether the Scheme is https
 func isHTTPSURL(s string) bool {
 	u, err := url.Parse(s)
 	return err == nil && u.Scheme == "https"
