@@ -19,6 +19,7 @@ package util
 import (
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -988,7 +989,13 @@ func TestMakeAbsolutePath(t *testing.T) {
 			goos:         "linux",
 			path:         "non-absolute/path",
 			expectedPath: "/non-absolute/path",
-			name:         "basic linux",
+			name:         "linux non-absolute path",
+		},
+		{
+			goos:         "linux",
+			path:         "/absolute/path",
+			expectedPath: "/absolute/path",
+			name:         "linux absolute path",
 		},
 		{
 			goos:         "windows",
@@ -1016,9 +1023,11 @@ func TestMakeAbsolutePath(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		path := MakeAbsolutePath(test.goos, test.path)
-		if path != test.expectedPath {
-			t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
+		if runtime.GOOS == test.goos {
+			path := MakeAbsolutePath(test.goos, test.path)
+			if path != test.expectedPath {
+				t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
+			}
 		}
 	}
 }

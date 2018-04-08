@@ -726,7 +726,7 @@ func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
 // MakeAbsolutePath convert path to absolute path according to GOOS
 func MakeAbsolutePath(goos, path string) string {
 	if goos != "windows" {
-		return "/" + filepath.Clean(path)
+		return filepath.Clean("/" + path)
 	}
 	// These are all for windows
 	// If there is a colon, give up.
