@@ -381,7 +381,9 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		return fmt.Errorf("nil %q node object", kl.nodeName)
 	}
 
-	kl.updatePodCIDR(node.Spec.PodCIDR)
+	if node.Spec.PodCIDR != "" {
+		kl.updatePodCIDR(node.Spec.PodCIDR)
+	}
 
 	kl.setNodeStatus(node)
 	// Patch the current status on the API server
