@@ -34,7 +34,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
@@ -144,7 +143,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 			clientBuilder = rootClientBuilder
 		}
 
-		if err := startControllers(c, c.Generic.Kubeconfig, rootClientBuilder, clientBuilder, stop, c.Generic.EventRecorder, cloud); err != nil {
+		if err := startControllers(c, rootClientBuilder, clientBuilder, stop, cloud); err != nil {
 			glog.Fatalf("error running controllers: %v", err)
 		}
 	}
@@ -192,7 +191,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig) error {
 }
 
 // startControllers starts the cloud specific controller loops.
-func startControllers(c *cloudcontrollerconfig.CompletedConfig, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+func startControllers(c *cloudcontrollerconfig.CompletedConfig, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, cloud cloudprovider.Interface) error {
 	// Function to build the kube client object
 	client := func(serviceAccountName string) kubernetes.Interface {
 		return clientBuilder.ClientOrDie(serviceAccountName)
