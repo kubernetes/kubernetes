@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -31,8 +32,40 @@ import (
 	"github.com/golang/glog"
 )
 
-func New() HTTPProber {
+const (
+	defaultKubeletClientCertificateFile = "kubelet-client.crt"
+	defaultKubeletClientKeyFile         = "kubelet-client.key"
+)
+
+func NewHttpProber() HTTPProber {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	return NewWithTLSConfig(tlsConfig)
+}
+
+func NewHTTPSProber(certDir string) HTTPProber {
+	if certDir == "" {
+		glog.Errorln("path to HTTPS prober key/cert is not set")
+		return NewHttpProber()
+	}
+
+	certPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientCertificateFile))
+	if err != nil {
+		glog.Errorf("unable to build HTTPS prober cert path: %v", err)
+	}
+	keyPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientKeyFile))
+	if err != nil {
+		glog.Errorf("unable to build HTTPS prober key path: %v", err)
+	}
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		glog.Errorf("unable to read and parse key/cert for HTTPS prober: %v", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
+	}
+	tlsConfig.BuildNameToCertificate()
 	return NewWithTLSConfig(tlsConfig)
 }
 
