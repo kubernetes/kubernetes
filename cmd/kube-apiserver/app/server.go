@@ -35,7 +35,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -56,6 +55,7 @@ import (
 	openapi "k8s.io/kube-openapi/pkg/common"
 
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -93,6 +93,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
+	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 const etcdRetryLimit = 60
@@ -101,7 +102,6 @@ const etcdRetryInterval = 1 * time.Second
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
-	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
 		Long: `The Kubernetes API server validates and configures data
@@ -109,8 +109,16 @@ for the api objects which include pods, services, replicationcontrollers, and
 others. The API Server services REST operations and provides the frontend to the
 cluster's shared state through which all other components interact.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
+
+			stopCh := server.SetupSignalHandler()
+			if err := Run(s, stopCh); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
 		},
 	}
+	s.AddFlags(cmd.Flags())
 
 	return cmd
 }
