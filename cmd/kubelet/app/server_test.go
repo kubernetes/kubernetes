@@ -45,6 +45,12 @@ func TestValueOfAllocatableResources(t *testing.T) {
 			errorExpected:  false,
 			name:           "Valid resource quantity",
 		},
+		{
+			kubeReserved:   map[string]string{},
+			systemReserved: map[string]string{},
+			errorExpected:  false,
+			name:           "nil resource quantity",
+		},
 	}
 
 	for _, test := range testCases {
