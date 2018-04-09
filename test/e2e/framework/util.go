@@ -4123,9 +4123,10 @@ func NumberOfReadyNodes(c clientset.Interface) (int, error) {
 	return len(nodes.Items), nil
 }
 
-// WaitForReadyNodes waits until the cluster has desired size and there is no not-ready nodes in it.
-// By cluster size we mean number of Nodes excluding Master Node.
-func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
+// CheckNodesReady waits up to timeout for cluster to has desired size and
+// there is no not-ready nodes in it. By cluster size we mean number of Nodes
+// excluding Master Node.
+func CheckNodesReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := waitListSchedulableNodes(c)
 		if err != nil {
@@ -4142,11 +4143,19 @@ func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) e
 
 		if numNodes == size && numReady == size {
 			Logf("Cluster has reached the desired number of ready nodes %d", size)
-			return nil
+			return nodes.Items, nil
 		}
 		Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numReady, numNodes-numReady)
 	}
-	return fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
+	return nil, fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
+}
+
+// WaitForReadyNodes waits up to timeout for cluster to has desired size and
+// there is no not-ready nodes in it. By cluster size we mean number of Nodes
+// excluding Master Node.
+func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
+	_, err := CheckNodesReady(c, size, timeout)
+	return err
 }
 
 func GenerateMasterRegexp(prefix string) string {
