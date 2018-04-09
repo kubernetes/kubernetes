@@ -14,20 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package etcd
 
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"log"
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/pkg/transport"
 )
 
 // EtcdClusterInterrogator is an interface to get etcd cluster related information
 type EtcdClusterInterrogator interface {
-	GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error)
+	GetEtcdClusterStatus() (*EtcdStatus, error)
 }
 
 // EtcdCluster provides connection parameters for an etcd cluster
@@ -36,6 +41,31 @@ type EtcdCluster struct {
 	TLS       *tls.Config
 }
 
+// EtcdStatusChecker an interface for etcd status validation functions
+type EtcdStatusChecker interface {
+	VersionsMatch() bool
+}
+
+// EtcdStatus provides data about an etcd cluster
+type EtcdStatus struct {
+	Versions []string
+	Members  []uint64
+}
+
+// VersionsMatch ensure that all etcd versions are identical
+func (s EtcdStatus) VersionsMatch() bool {
+	var version string
+	for i, v := range s.Versions {
+		if i == 0 {
+			version = v
+		} else if version != v {
+			return false
+		}
+	}
+	return true
+}
+
+// New define a new EtcdCluster
 func New(endpoints []string, ca, cert, key string) (*EtcdCluster, error) {
 
 	var tlsConfig *tls.Config
@@ -59,10 +89,12 @@ func New(endpoints []string, ca, cert, key string) (*EtcdCluster, error) {
 	}, nil
 }
 
-// GetEtcdClusterStatus returns nil for status Up or error for status Down
-func (cluster EtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
+// GetEtcdClusterStatus connects to all etcd endpoints in EtcdCluster and
+// provides data on the cluster. In event a member is unresponsive, fails with
+// error inidicating so.
+func (cluster EtcdCluster) GetEtcdClusterStatus() (*EtcdStatus, error) {
 
-	var resp []*clientv3.StatusResponse
+	var status EtcdStatus
 	for _, ep := range cluster.Endpoints {
 		cli, err := clientv3.New(clientv3.Config{
 			Endpoints:   []string{ep},
@@ -70,15 +102,51 @@ func (cluster EtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, e
 			TLS:         cluster.TLS,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Failed to connect to etcd at %s: %v", ep, err)
 		}
 		defer cli.Close()
 
-		r, err := cli.Status(context.Background(), ep)
+		memberResp, err := cli.MemberList(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if len(status.Members) == 0 {
+			status.Members = sortedMembers(memberResp.Members)
+		} else {
+			if !reflect.DeepEqual(status.Members, sortedMembers(memberResp.Members)) {
+				return nil, fmt.Errorf("Cluster has mismatched members")
+			}
+		}
+
+		statusResp, err := cli.Status(context.Background(), ep)
 		if err != nil {
 			return nil, err
 		}
-		resp = append(resp, r)
+		status.Versions = append(status.Versions, statusResp.Version)
 	}
-	return resp, nil
+	return &status, nil
+}
+
+type uint64slice []uint64
+
+func (s uint64slice) Len() int {
+	return len(s)
+}
+
+func (s uint64slice) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s uint64slice) Less(i, j int) bool {
+	return s[i] < s[j]
+}
+
+func sortedMembers(members []*etcdserverpb.Member) []uint64 {
+	var memberIds uint64slice
+	for _, m := range members {
+		memberIds = append(memberIds, m.ID)
+	}
+	sort.Sort(memberIds)
+	return memberIds
 }

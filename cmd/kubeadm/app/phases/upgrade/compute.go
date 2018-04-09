@@ -23,7 +23,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -74,7 +74,7 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, cluster util.EtcdClusterInterrogator, featureGates map[string]bool) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, cluster etcdutil.EtcdClusterInterrogator, featureGates map[string]bool) ([]Upgrade, error) {
 	fmt.Println("[upgrade] Fetching available versions to upgrade to")
 
 	// Collect the upgrades kubeadm can do in this list
@@ -112,15 +112,8 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		return nil, err
 	}
 
-	var etcdVersion string
-	for i, es := range etcdStatus {
-		if i == 0 {
-			etcdVersion = es.Version
-			continue
-		}
-		if etcdVersion != es.Version {
-			return nil, fmt.Errorf("etcd cluster has nodes with mismatched versions: %s != %s", etcdVersion, es.Version)
-		}
+	if !etcdStatus.VersionsMatch() {
+		return nil, fmt.Errorf("etcd cluster has nodes with mismatched versions: %v", etcdStatus.Versions)
 	}
 
 	// Construct a descriptor for the current state of the world
@@ -129,7 +122,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		DNSVersion:      dns.GetDNSVersion(clusterVersion, ActiveDNSAddon(featureGates)),
 		KubeadmVersion:  kubeadmVersionStr,
 		KubeletVersions: kubeletVersions,
-		EtcdVersion:     etcdVersion,
+		EtcdVersion:     etcdStatus.Versions[0],
 	}
 
 	// Do a "dumb guess" that a new minor upgrade is available just because the latest stable version is higher than the cluster version

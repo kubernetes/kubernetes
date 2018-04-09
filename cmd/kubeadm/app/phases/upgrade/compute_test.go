@@ -19,11 +19,11 @@ package upgrade
 import (
 	"fmt"
 
-	"github.com/coreos/etcd/clientv3"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"reflect"
 	"testing"
+
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 type fakeVersionGetter struct {
@@ -65,29 +65,23 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 
 type fakeEtcdCluster struct{}
 
-func (f fakeEtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
-	client := &clientv3.StatusResponse{
-		Version: "3.1.12",
-	}
-	return []*clientv3.StatusResponse{client}, nil
+func (f fakeEtcdCluster) GetEtcdClusterStatus() (*etcdutil.EtcdStatus, error) {
+	return &etcdutil.EtcdStatus{
+		Versions: []string{"3.1.12"},
+	}, nil
 }
 
 type mismatchEtcdCluster struct{}
 
-func (f mismatchEtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
-	return []*clientv3.StatusResponse{
-		&clientv3.StatusResponse{
-			Version: "3.1.12",
-		},
-		&clientv3.StatusResponse{
-			Version: "3.2.0",
-		},
+func (f mismatchEtcdCluster) GetEtcdClusterStatus() (*etcdutil.EtcdStatus, error) {
+	return &etcdutil.EtcdStatus{
+		Versions: []string{"3.1.12", "3.2.0"},
 	}, nil
 }
 
 type degradedEtcdCluster struct{}
 
-func (f degradedEtcdCluster) GetEtcdClusterStatus() ([]*clientv3.StatusResponse, error) {
+func (f degradedEtcdCluster) GetEtcdClusterStatus() (*etcdutil.EtcdStatus, error) {
 	return nil, fmt.Errorf("Degraded etcd cluster")
 }
 
@@ -99,7 +93,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		expectedUpgrades            []Upgrade
 		allowExperimental, allowRCs bool
 		errExpected                 bool
-		etcdCluster                 kubeadmutil.EtcdClusterInterrogator
+		etcdCluster                 etcdutil.EtcdClusterInterrogator
 	}{
 		{ // no action needed, already up-to-date
 			vg: &fakeVersionGetter{
