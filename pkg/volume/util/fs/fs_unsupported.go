@@ -1,4 +1,4 @@
-// +build !linux,!darwin
+// +build !linux,!darwin,!windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
