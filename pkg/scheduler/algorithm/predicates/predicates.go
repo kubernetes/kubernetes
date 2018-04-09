@@ -1593,7 +1593,7 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	unboundSatisfied, boundSatisfied, err := c.binder.Binder.FindPodVolumes(pod, node.Name)
+	unboundSatisfied, boundSatisfied, err := c.binder.Binder.FindPodVolumes(pod, node)
 	if err != nil {
 		return false, nil, err
 	}
