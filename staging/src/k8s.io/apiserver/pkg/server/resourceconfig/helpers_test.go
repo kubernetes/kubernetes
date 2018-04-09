@@ -82,7 +82,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		{
 			// disable resource
 			runtimeConfig: map[string]string{
-				"api/v1/pods": "false",
+				"/v1/pods": "false",
 			},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
@@ -98,7 +98,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		{
 			// Disable v1.
 			runtimeConfig: map[string]string{
-				"api/v1": "false",
+				"/v1": "false",
 			},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				return newFakeAPIResourceConfigSource()
@@ -147,7 +147,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 		{
 			// cannot disable individual resource when version is not enabled.
 			runtimeConfig: map[string]string{
-				"api/v1/pods": "false",
+				"/v1/pods": "false",
 			},
 			defaultResourceConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()

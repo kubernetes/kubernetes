@@ -287,8 +287,10 @@ func TestAddFlags(t *testing.T) {
 			StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
 			DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
 		},
-		APIEnablement: &apiserveroptions.APIEnablementOptions{
-			RuntimeConfig: utilflag.ConfigurationMap{},
+		APIEnablement: &kubeoptions.APIEnablementOptions{
+			GenericAPIEnablement: &apiserveroptions.APIEnablementOptions{
+				RuntimeConfig: utilflag.ConfigurationMap{},
+			},
 		},
 		EnableLogsHandler:       false,
 		EnableAggregatorRouting: true,

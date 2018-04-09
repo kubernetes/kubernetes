@@ -99,7 +99,7 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 	s.ServiceClusterIPRange.IP = net.IPv4(10, 0, 0, 0)
 	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
 	s.Etcd.StorageConfig = *storageConfig
-	s.APIEnablement.RuntimeConfig.Set("api/all=true")
+	s.APIEnablement.GenericAPIEnablement.RuntimeConfig.Set("api/all=true")
 
 	fs.Parse(customFlags)
 	completedOptions, err := app.Complete(s)
