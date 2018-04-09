@@ -68,7 +68,9 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 	)
 
 	BeforeEach(func() {
+		// Requires SSH access to vCenter.
 		framework.SkipUnlessProviderIs("vsphere")
+
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
@@ -76,9 +78,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 
 		nodes := framework.GetReadySchedulableNodesOrDie(client)
 		numNodes := len(nodes.Items)
-		if numNodes < 1 {
-			framework.Skipf("Requires at least %d nodes (not %d)", 1, len(nodes.Items))
-		}
+		Expect(numNodes).NotTo(BeZero(), "No nodes are available for testing volume access through vpxd restart")
 
 		vcNodesMap = make(map[string][]node)
 		for i := 0; i < numNodes; i++ {
