@@ -131,7 +131,7 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 			return cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
 		}
 		if strings.Index(o.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(o.FilenameOptions.Filenames[0], "https://") == 0 {
-			return cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+			return cmdutil.UsageErrorf(cmd, "--raw cannot read from an url")
 		}
 		if o.FilenameOptions.Recursive {
 			return cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")

@@ -96,7 +96,7 @@ func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode i
 	b.Backoff.Reset(b.baseUrlKey(actualUrl))
 }
 
-// CalculateBackoff takes a url and back's off exponentially,
+// CalculateBackoff takes an url and back's off exponentially,
 // based on its knowledge of existing failures.
 func (b *URLBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 	return b.Backoff.Get(b.baseUrlKey(actualUrl))

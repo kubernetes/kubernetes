@@ -269,7 +269,7 @@ waitLoop:
 			}
 
 			// Call the generic validator function here.
-			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
+			// This might validate for example, that (1) getting an url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
 				Logf("%s is running right image but validator function failed: %v", podID, err)
 				continue waitLoop
