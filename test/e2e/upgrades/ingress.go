@@ -180,7 +180,7 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	// Ignore compute.SslCertificates since we know it will change during an upgrade/downgrade.
 	// TODO(rramkumar): Remove this once glbc 1.1 is released.
 	t.resourceStore.SslList = nil
-	postUpgradeResourceStore.Fw.SslList = nil
+	postUpgradeResourceStore.SslList = nil
 
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()
