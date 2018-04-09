@@ -35,10 +35,13 @@ import (
 	registrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/discovery"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 )
@@ -158,6 +161,61 @@ func TestDelete(t *testing.T) {
 	defer storage.CustomResource.Store.DestroyFunc()
 	test := registrytest.New(t, storage.CustomResource.Store)
 	test.TestDelete(validNewCustomResource())
+}
+
+func TestGenerationNumber(t *testing.T) {
+	// enable alpha feature CustomResourceSubresources
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceSubresources, true)()
+
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.CustomResource.Store.DestroyFunc()
+	modifiedRno := *validNewCustomResource()
+	modifiedRno.SetGeneration(10)
+	ctx := genericapirequest.NewDefaultContext()
+	cr, err := createCustomResource(storage.CustomResource, modifiedRno, t)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	etcdCR, err := storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	storedCR, _ := etcdCR.(*unstructured.Unstructured)
+
+	// Generation initialization
+	if storedCR.GetGeneration() != 1 {
+		t.Fatalf("Unexpected generation number %v", storedCR.GetGeneration())
+	}
+
+	// Updates to spec should increment the generation number
+	setSpecReplicas(storedCR, getSpecReplicas(storedCR)+1)
+	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	etcdCR, err = storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	storedCR, _ = etcdCR.(*unstructured.Unstructured)
+	if storedCR.GetGeneration() != 2 {
+		t.Fatalf("Unexpected generation, spec: %v", storedCR.GetGeneration())
+	}
+
+	// Updates to status should not increment the generation number
+	setStatusReplicas(storedCR, getStatusReplicas(storedCR)+1)
+	if _, _, err := storage.CustomResource.Update(ctx, storedCR.GetName(), rest.DefaultUpdatedObjectInfo(storedCR), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	etcdCR, err = storage.CustomResource.Get(ctx, cr.GetName(), &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	storedCR, _ = etcdCR.(*unstructured.Unstructured)
+	if storedCR.GetGeneration() != 2 {
+		t.Fatalf("Unexpected generation, spec: %v", storedCR.GetGeneration())
+	}
+
 }
 
 func TestCategories(t *testing.T) {
@@ -397,4 +455,35 @@ func (c unstructuredJsonCodec) Encode(obj runtime.Object, w io.Writer) error {
 	}
 	w.Write(bs)
 	return nil
+}
+
+func setSpecReplicas(u *unstructured.Unstructured, replicas int64) {
+	setNestedField(u, replicas, "spec", "replicas")
+}
+
+func getSpecReplicas(u *unstructured.Unstructured) int64 {
+	val, found, err := unstructured.NestedInt64(u.Object, "spec", "replicas")
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+
+func setStatusReplicas(u *unstructured.Unstructured, replicas int64) {
+	setNestedField(u, replicas, "status", "replicas")
+}
+
+func getStatusReplicas(u *unstructured.Unstructured) int64 {
+	val, found, err := unstructured.NestedInt64(u.Object, "status", "replicas")
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+
+func setNestedField(u *unstructured.Unstructured, value interface{}, fields ...string) {
+	if u.Object == nil {
+		u.Object = make(map[string]interface{})
+	}
+	unstructured.SetNestedField(u.Object, value, fields...)
 }
