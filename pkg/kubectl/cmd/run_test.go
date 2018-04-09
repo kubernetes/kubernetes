@@ -188,12 +188,28 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 					}, nil
 				}),
 			}
+
 			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{}
+
 			cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
-			err := RunRun(tf, os.Stdin, os.Stdout, os.Stderr, cmd, test.args, test.argsLenAtDash)
+
+			opts := &RunOpts{
+				DeleteOptions: NewDeleteOptions(os.Stdout, os.Stderr),
+
+				In:     os.Stdin,
+				Out:    os.Stdout,
+				ErrOut: os.Stderr,
+
+				Image:     "nginx",
+				Generator: "run/v1",
+
+				ArgsLenAtDash: test.argsLenAtDash,
+			}
+
+			err := opts.Run(tf, cmd, test.args)
 			if test.expectError && err == nil {
 				t.Errorf("unexpected non-error (%s)", test.name)
 			}
@@ -335,6 +351,18 @@ func TestGenerateService(t *testing.T) {
 					}
 				}),
 			}
+
+			buff := &bytes.Buffer{}
+			opts := &RunOpts{
+				DeleteOptions: NewDeleteOptions(os.Stdout, os.Stderr),
+
+				Out:    buff,
+				ErrOut: buff,
+
+				Port:   test.port,
+				Record: false,
+			}
+
 			cmd := &cobra.Command{}
 			cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 			cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
@@ -343,7 +371,7 @@ func TestGenerateService(t *testing.T) {
 			addRunFlags(cmd)
 
 			if !test.expectPOST {
-				cmd.Flags().Set("dry-run", "true")
+				opts.DryRun = true
 			}
 
 			if len(test.port) > 0 {
@@ -351,8 +379,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			buff := &bytes.Buffer{}
-			_, err := generateService(tf, cmd, test.args, test.serviceGenerator, test.params, "namespace", buff)
+			_, err := opts.generateService(tf, cmd, test.serviceGenerator, test.params, "namespace")
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
@@ -473,7 +500,12 @@ func TestRunValidations(t *testing.T) {
 			for flagName, flagValue := range test.flags {
 				cmd.Flags().Set(flagName, flagValue)
 			}
-			err := RunRun(tf, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
+			cmd.Run(cmd, test.args)
+
+			var err error
+			if errBuf.Len() > 0 {
+				err = fmt.Errorf("%v", errBuf.String())
+			}
 			if err != nil && len(test.expectedErr) > 0 {
 				if !strings.Contains(err.Error(), test.expectedErr) {
 					t.Errorf("unexpected error: %v", err)
