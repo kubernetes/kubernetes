@@ -69,11 +69,6 @@ func (m *metadata) NodeAddressesByProviderID(ctx context.Context, providerID str
 	return nil, errors.New("NodeAddressesByProviderID not implemented")
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (m *metadata) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return m.InstanceID(ctx, name)
-}
-
 // InstanceID returns the cloud provider ID of the specified instance.
 func (m *metadata) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	instanceID, err := m.get(metadataTypeInstanceID)

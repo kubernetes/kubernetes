@@ -96,11 +96,6 @@ func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID strin
 	return az.NodeAddresses(ctx, name)
 }
 
-// ExternalID returns the cloud provider ID of the specified instance (deprecated).
-func (az *Cloud) ExternalID(ctx context.Context, name types.NodeName) (string, error) {
-	return az.InstanceID(ctx, name)
-}
-
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
