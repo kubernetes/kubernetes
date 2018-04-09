@@ -363,6 +363,8 @@ var AllServices = []*ServiceInfo{
 		additionalMethods: []string{
 			"AddInstance",
 			"RemoveInstance",
+			"AddHealthCheck",
+			"RemoveHealthCheck",
 		},
 	},
 	{
