@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			func(t disruptiveTest) {
 				It(t.testItStmt, func() {
 					By("Executing Spec")
-					t.runTest(c, f, clientPod, pvc)
+					t.runTest(c, f, clientPod)
 				})
 			}(test)
 		}
