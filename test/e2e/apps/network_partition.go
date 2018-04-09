@@ -377,9 +377,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			nn, err := framework.NumberOfRegisteredNodes(f.ClientSet)
 			framework.ExpectNoError(err)
-			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
+			nodes, err := framework.CheckNodesReady(f.ClientSet, nn, framework.NodeReadyInitialTimeout)
 			framework.ExpectNoError(err)
-			common.RestartNodes(f.ClientSet, nodeNames)
+			common.RestartNodes(f.ClientSet, nodes)
 
 			By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
