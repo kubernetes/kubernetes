@@ -37,7 +37,7 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 		{
 			name:           "deployment name and images ok",
 			deploymentName: "images-name-ok",
-			images:         []string{"nn/image1", "registry/nn/image2", "nn/image3:tag", "nn/image4@digest"},
+			images:         []string{"nn/image1", "registry/nn/image2", "nn/image3:tag", "nn/image4@digest", "nn/image5@sha256:digest"},
 			expected: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "images-name-ok",
@@ -58,6 +58,7 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 								{Name: "image2", Image: "registry/nn/image2"},
 								{Name: "image3", Image: "nn/image3:tag"},
 								{Name: "image4", Image: "nn/image4@digest"},
+								{Name: "image5", Image: "nn/image5@sha256:digest"},
 							},
 						},
 					},

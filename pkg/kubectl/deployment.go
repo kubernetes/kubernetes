@@ -78,7 +78,8 @@ func buildPodSpec(images []string) v1.PodSpec {
 		// Remove any tag or hash
 		if strings.Contains(name, ":") {
 			name = strings.Split(name, ":")[0]
-		} else if strings.Contains(name, "@") {
+		}
+		if strings.Contains(name, "@") {
 			name = strings.Split(name, "@")[0]
 		}
 		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
