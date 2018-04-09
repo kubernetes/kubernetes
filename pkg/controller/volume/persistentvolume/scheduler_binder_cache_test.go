@@ -26,32 +26,37 @@ import (
 
 func TestUpdateGetBindings(t *testing.T) {
 	scenarios := map[string]struct {
-		updateBindings []*bindingInfo
-		updatePod      string
-		updateNode     string
+		updateBindings      []*bindingInfo
+		updateProvisionings []*v1.PersistentVolumeClaim
+		updatePod           string
+		updateNode          string
 
-		getBindings []*bindingInfo
-		getPod      string
-		getNode     string
+		getBindings      []*bindingInfo
+		getProvisionings []*v1.PersistentVolumeClaim
+		getPod           string
+		getNode          string
 	}{
 		"no-pod": {
 			getPod:  "pod1",
 			getNode: "node1",
 		},
 		"no-node": {
-			updatePod:      "pod1",
-			updateNode:     "node1",
-			updateBindings: []*bindingInfo{},
-			getPod:         "pod1",
-			getNode:        "node2",
+			updatePod:           "pod1",
+			updateNode:          "node1",
+			updateBindings:      []*bindingInfo{},
+			updateProvisionings: []*v1.PersistentVolumeClaim{},
+			getPod:              "pod1",
+			getNode:             "node2",
 		},
 		"binding-exists": {
-			updatePod:      "pod1",
-			updateNode:     "node1",
-			updateBindings: []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
-			getPod:         "pod1",
-			getNode:        "node1",
-			getBindings:    []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
+			updatePod:           "pod1",
+			updateNode:          "node1",
+			updateBindings:      []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
+			updateProvisionings: []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "pvc2"}}},
+			getPod:              "pod1",
+			getNode:             "node1",
+			getBindings:         []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}},
+			getProvisionings:    []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "pvc2"}}},
 		},
 	}
 
@@ -61,11 +66,18 @@ func TestUpdateGetBindings(t *testing.T) {
 		// Perform updates
 		updatePod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: scenario.updatePod, Namespace: "ns"}}
 		cache.UpdateBindings(updatePod, scenario.updateNode, scenario.updateBindings)
+		cache.UpdateProvisionedPVCs(updatePod, scenario.updateNode, scenario.updateProvisionings)
 
 		// Verify updated bindings
 		bindings := cache.GetBindings(updatePod, scenario.updateNode)
 		if !reflect.DeepEqual(bindings, scenario.updateBindings) {
 			t.Errorf("Test %v failed: returned bindings after update different. Got %+v, expected %+v", name, bindings, scenario.updateBindings)
+		}
+
+		// Verify updated provisionings
+		provisionings := cache.GetProvisionedPVCs(updatePod, scenario.updateNode)
+		if !reflect.DeepEqual(provisionings, scenario.updateProvisionings) {
+			t.Errorf("Test %v failed: returned provisionings after update different. Got %+v, expected %+v", name, provisionings, scenario.updateProvisionings)
 		}
 
 		// Get bindings
@@ -74,19 +86,30 @@ func TestUpdateGetBindings(t *testing.T) {
 		if !reflect.DeepEqual(bindings, scenario.getBindings) {
 			t.Errorf("Test %v failed: unexpected bindings returned. Got %+v, expected %+v", name, bindings, scenario.updateBindings)
 		}
+
+		// Get provisionings
+		provisionings = cache.GetProvisionedPVCs(getPod, scenario.getNode)
+		if !reflect.DeepEqual(provisionings, scenario.getProvisionings) {
+			t.Errorf("Test %v failed: unexpected bindings returned. Got %+v, expected %+v", name, provisionings, scenario.getProvisionings)
+		}
 	}
 }
 
 func TestDeleteBindings(t *testing.T) {
 	initialBindings := []*bindingInfo{{pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "pvc1"}}}}
+	initialProvisionings := []*v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "pvc2"}}}
 	cache := NewPodBindingCache()
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "ns"}}
 
-	// Get nil bindings
+	// Get nil bindings and provisionings
 	bindings := cache.GetBindings(pod, "node1")
 	if bindings != nil {
 		t.Errorf("Test failed: expected initial nil bindings, got %+v", bindings)
+	}
+	provisionings := cache.GetProvisionedPVCs(pod, "node1")
+	if provisionings != nil {
+		t.Errorf("Test failed: expected initial nil provisionings, got %+v", provisionings)
 	}
 
 	// Delete nothing
@@ -94,19 +117,28 @@ func TestDeleteBindings(t *testing.T) {
 
 	// Perform updates
 	cache.UpdateBindings(pod, "node1", initialBindings)
+	cache.UpdateProvisionedPVCs(pod, "node1", initialProvisionings)
 
-	// Get bindings
+	// Get bindings and provisionings
 	bindings = cache.GetBindings(pod, "node1")
 	if !reflect.DeepEqual(bindings, initialBindings) {
 		t.Errorf("Test failed: expected bindings %+v, got %+v", initialBindings, bindings)
+	}
+	provisionings = cache.GetProvisionedPVCs(pod, "node1")
+	if !reflect.DeepEqual(provisionings, initialProvisionings) {
+		t.Errorf("Test failed: expected provisionings %+v, got %+v", initialProvisionings, provisionings)
 	}
 
 	// Delete
 	cache.DeleteBindings(pod)
 
-	// Get bindings
+	// Get bindings and provisionings
 	bindings = cache.GetBindings(pod, "node1")
 	if bindings != nil {
 		t.Errorf("Test failed: expected nil bindings, got %+v", bindings)
+	}
+	provisionings = cache.GetProvisionedPVCs(pod, "node1")
+	if provisionings != nil {
+		t.Errorf("Test failed: expected nil provisionings, got %+v", provisionings)
 	}
 }
