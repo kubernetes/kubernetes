@@ -340,10 +340,10 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 	return body, err
 }
 
-// httpget Defines function to retrieve a url and return the results.  Exists for unit test stubbing.
+// httpget Defines function to retrieve an url and return the results.  Exists for unit test stubbing.
 type httpget func(url string) (int, string, io.ReadCloser, error)
 
-// httpgetImpl Implements a function to retrieve a url and return the results.
+// httpgetImpl Implements a function to retrieve an url and return the results.
 func httpgetImpl(url string) (int, string, io.ReadCloser, error) {
 	resp, err := http.Get(url)
 	if err != nil {

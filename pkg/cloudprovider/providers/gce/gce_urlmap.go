@@ -36,7 +36,7 @@ func (gce *GCECloud) GetUrlMap(name string) (*compute.UrlMap, error) {
 	return v, mc.Observe(err)
 }
 
-// CreateUrlMap creates a url map
+// CreateUrlMap creates an url map
 func (gce *GCECloud) CreateUrlMap(urlMap *compute.UrlMap) error {
 	mc := newUrlMapMetricContext("create")
 	return mc.Observe(gce.c.UrlMaps().Insert(context.Background(), meta.GlobalKey(urlMap.Name), urlMap))
@@ -48,7 +48,7 @@ func (gce *GCECloud) UpdateUrlMap(urlMap *compute.UrlMap) error {
 	return mc.Observe(gce.c.UrlMaps().Update(context.Background(), meta.GlobalKey(urlMap.Name), urlMap))
 }
 
-// DeleteUrlMap deletes a url map by name.
+// DeleteUrlMap deletes an url map by name.
 func (gce *GCECloud) DeleteUrlMap(name string) error {
 	mc := newUrlMapMetricContext("delete")
 	return mc.Observe(gce.c.UrlMaps().Delete(context.Background(), meta.GlobalKey(name)))

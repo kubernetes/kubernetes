@@ -439,7 +439,7 @@ func validateIngressRules(ingressRules []extensions.IngressRule, fldPath *field.
 			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "must be a DNS name, not an IP address"))
 			}
-			// TODO: Ports and ips are allowed in the host part of a url
+			// TODO: Ports and ips are allowed in the host part of an url
 			// according to RFC 3986, consider allowing them.
 			if strings.Contains(ih.Host, "*") {
 				for _, msg := range validation.IsWildcardDNS1123Subdomain(ih.Host) {
