@@ -482,38 +482,38 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
 func makeHealthzServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
-	mux := mux.NewPathRecorderMux("kube-scheduler")
-	healthz.InstallHandler(mux)
+	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
+	healthz.InstallHandler(pathRecorderMux)
 	if config.HealthzBindAddress == config.MetricsBindAddress {
-		configz.InstallHandler(mux)
-		mux.Handle("/metrics", prometheus.Handler())
+		configz.InstallHandler(pathRecorderMux)
+		pathRecorderMux.Handle("/metrics", prometheus.Handler())
 	}
 	if config.EnableProfiling {
-		routes.Profiling{}.Install(mux)
+		routes.Profiling{}.Install(pathRecorderMux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	return &http.Server{
 		Addr:    config.HealthzBindAddress,
-		Handler: mux,
+		Handler: pathRecorderMux,
 	}
 }
 
 // makeMetricsServer builds a metrics server from the config.
 func makeMetricsServer(config *componentconfig.KubeSchedulerConfiguration) *http.Server {
-	mux := mux.NewPathRecorderMux("kube-scheduler")
-	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
+	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
+	configz.InstallHandler(pathRecorderMux)
+	pathRecorderMux.Handle("/metrics", prometheus.Handler())
 	if config.EnableProfiling {
-		routes.Profiling{}.Install(mux)
+		routes.Profiling{}.Install(pathRecorderMux)
 		if config.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	return &http.Server{
 		Addr:    config.MetricsBindAddress,
-		Handler: mux,
+		Handler: pathRecorderMux,
 	}
 }
 
