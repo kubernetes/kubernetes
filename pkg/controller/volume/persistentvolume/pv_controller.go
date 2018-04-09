@@ -135,6 +135,14 @@ const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 // a volume for this PVC.
 const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
+// This annotation is added to a PVC that has been triggered by scheduler to
+// be dynamically provisioned. Its value is the name of the selected node.
+const annSelectedNode = "volume.alpha.kubernetes.io/selected-node"
+
+// If the provisioner name in a storage class is set to "kubernetes.io/no-provisioner",
+// then dynamic provisioning is not supported by the storage.
+const notSupportedProvisioner = "kubernetes.io/no-provisioner"
+
 // CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with namespace of a persistent volume claim used to create this volume.
 const CloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
