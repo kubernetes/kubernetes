@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "admission.go",
+        "api_enablement.go",
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
@@ -23,6 +24,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
+        "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
@@ -67,6 +69,8 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/resourceconfig:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
@@ -90,6 +94,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
+        "api_enablement_test.go",
         "authorization_test.go",
         "storage_versions_test.go",
     ],
@@ -97,5 +102,6 @@ go_test(
     deps = [
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
     ],
 )
