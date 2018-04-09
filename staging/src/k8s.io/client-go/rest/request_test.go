@@ -1522,7 +1522,7 @@ func TestBody(t *testing.T) {
 	f.Close()
 	defer os.Remove(f.Name())
 
-	var nilObject *v1.DeleteOptions
+	var nilObject *metav1.DeleteOptions
 	typedObject := interface{}(nilObject)
 	c := testRESTClient(t, nil)
 	tests := []struct {

@@ -155,7 +155,7 @@ func TestDefaulting(t *testing.T) {
 			c.FuzzNoCustom(s)
 			s.MatchExpressions = nil // need to fuzz this specially
 		},
-		func(s *apiv1.ListOptions, c fuzz.Continue) {
+		func(s *metav1.ListOptions, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			s.LabelSelector = "" // need to fuzz requirement strings specially
 			s.FieldSelector = "" // need to fuzz requirement strings specially
