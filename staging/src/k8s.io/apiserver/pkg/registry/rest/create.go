@@ -97,6 +97,11 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetInitializers(nil)
 	}
 
+	// Ensure LastApplied is not set unless the feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		objectMeta.SetLastApplied(nil)
+	}
+
 	// ClusterName is ignored and should not be saved
 	objectMeta.SetClusterName("")
 
