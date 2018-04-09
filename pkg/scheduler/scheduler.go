@@ -328,7 +328,7 @@ func (sched *Scheduler) bindVolumesWorker() {
 		// The Pod is always sent back to the scheduler afterwards.
 		err := sched.config.VolumeBinder.Binder.BindPodVolumes(assumed)
 		if err != nil {
-			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name, err)
+			glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", assumed.Namespace, assumed.Name, err)
 			reason = "VolumeBindingFailed"
 			eventType = v1.EventTypeWarning
 		} else {
