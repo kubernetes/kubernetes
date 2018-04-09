@@ -377,3 +377,12 @@ func (u *Unstructured) GetClusterName() string {
 func (u *Unstructured) SetClusterName(clusterName string) {
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }
+
+func (u *Unstructured) GetLastApplied() map[string]string {
+	val, _, _ := NestedStringMap(u.Object, "metadata", "lastApplied")
+	return val
+}
+
+func (u *Unstructured) SetLastApplied(lastApplied map[string]string) {
+	u.setNestedMap(lastApplied, "metadata", "lastApplied")
+}
