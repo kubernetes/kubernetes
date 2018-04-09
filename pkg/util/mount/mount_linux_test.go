@@ -21,6 +21,7 @@ package mount
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -418,7 +419,7 @@ func TestPathWithinBase(t *testing.T) {
 }
 
 func TestSafeMakeDir(t *testing.T) {
-	defaultPerm := os.FileMode(0750)
+	defaultPerm := os.FileMode(0750) + os.ModeDir
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -426,6 +427,7 @@ func TestSafeMakeDir(t *testing.T) {
 		prepare     func(base string) error
 		path        string
 		checkPath   string
+		perm        os.FileMode
 		expectError bool
 	}{
 		{
@@ -435,6 +437,37 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"test/directory",
+			defaultPerm,
+			false,
+		},
+		{
+			"directory-with-sgid",
+			func(base string) error {
+				return nil
+			},
+			"test/directory",
+			"test/directory",
+			os.FileMode(0777) + os.ModeDir + os.ModeSetgid,
+			false,
+		},
+		{
+			"directory-with-suid",
+			func(base string) error {
+				return nil
+			},
+			"test/directory",
+			"test/directory",
+			os.FileMode(0777) + os.ModeDir + os.ModeSetuid,
+			false,
+		},
+		{
+			"directory-with-sticky-bit",
+			func(base string) error {
+				return nil
+			},
+			"test/directory",
+			"test/directory",
+			os.FileMode(0777) + os.ModeDir + os.ModeSticky,
 			false,
 		},
 		{
@@ -444,6 +477,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"test/directory",
+			defaultPerm,
 			false,
 		},
 		{
@@ -453,6 +487,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"",
 			"",
+			defaultPerm,
 			false,
 		},
 		{
@@ -462,6 +497,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"..",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -471,6 +507,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/../../..",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -483,6 +520,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"destination/directory",
+			defaultPerm,
 			false,
 		},
 		{
@@ -492,6 +530,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -514,6 +553,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test1/dir/dir/dir/dir/dir/dir/dir/foo",
 			"test2/foo",
+			defaultPerm,
 			false,
 		},
 		{
@@ -523,6 +563,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -532,6 +573,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -541,6 +583,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -556,6 +599,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"dir/test",
 			"",
+			defaultPerm,
 			false,
 		},
 		{
@@ -568,6 +612,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"dir/test",
 			"",
+			defaultPerm,
 			true,
 		},
 		{
@@ -577,6 +622,7 @@ func TestSafeMakeDir(t *testing.T) {
 			},
 			"test/directory",
 			"",
+			defaultPerm,
 			true,
 		},
 	}
@@ -589,7 +635,7 @@ func TestSafeMakeDir(t *testing.T) {
 		}
 		test.prepare(base)
 		pathToCreate := filepath.Join(base, test.path)
-		err = doSafeMakeDir(pathToCreate, base, defaultPerm)
+		err = doSafeMakeDir(pathToCreate, base, test.perm)
 		if err != nil && !test.expectError {
 			t.Errorf("test %q: %s", test.name, err)
 		}
@@ -601,14 +647,17 @@ func TestSafeMakeDir(t *testing.T) {
 		}
 
 		if test.checkPath != "" {
-			if _, err := os.Stat(filepath.Join(base, test.checkPath)); err != nil {
+			st, err := os.Stat(filepath.Join(base, test.checkPath))
+			if err != nil {
 				t.Errorf("test %q: cannot read path %s", test.name, test.checkPath)
+			}
+			if st.Mode() != test.perm {
+				t.Errorf("test %q: expected permissions %o, got %o", test.name, test.perm, st.Mode())
 			}
 		}
 
 		os.RemoveAll(base)
 	}
-
 }
 
 func validateDirEmpty(dir string) error {
@@ -1131,6 +1180,44 @@ func TestBindSubPath(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "mount-unix-socket",
+			prepare: func(base string) ([]string, string, string, error) {
+				volpath, subpathMount := getTestPaths(base)
+				mounts := []string{subpathMount}
+				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				socketFile, socketCreateError := createSocketFile(volpath)
+
+				return mounts, volpath, socketFile, socketCreateError
+			},
+			expectError: false,
+		},
+		{
+			name: "subpath-mounting-fifo",
+			prepare: func(base string) ([]string, string, string, error) {
+				volpath, subpathMount := getTestPaths(base)
+				mounts := []string{subpathMount}
+				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				if err := os.MkdirAll(subpathMount, defaultPerm); err != nil {
+					return nil, "", "", err
+				}
+
+				testFifo := filepath.Join(volpath, "mount_test.fifo")
+				err := syscall.Mkfifo(testFifo, 0)
+				return mounts, volpath, testFifo, err
+			},
+			expectError: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -1139,6 +1226,7 @@ func TestBindSubPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
+
 		mounts, volPath, subPath, err := test.prepare(base)
 		if err != nil {
 			os.RemoveAll(base)
@@ -1260,6 +1348,7 @@ func TestParseMountInfo(t *testing.T) {
 
 func TestSafeOpen(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
+
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -1387,6 +1476,32 @@ func TestSafeOpen(t *testing.T) {
 			"test",
 			true,
 		},
+		{
+			"mount-unix-socket",
+			func(base string) error {
+				socketFile, socketError := createSocketFile(base)
+
+				if socketError != nil {
+					return fmt.Errorf("Error preparing socket file %s with %v", socketFile, socketError)
+				}
+				return nil
+			},
+			"mt.sock",
+			false,
+		},
+		{
+			"mounting-unix-socket-in-middle",
+			func(base string) error {
+				testSocketFile, socketError := createSocketFile(base)
+
+				if socketError != nil {
+					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, socketError)
+				}
+				return nil
+			},
+			"mt.sock/bar",
+			true,
+		},
 	}
 
 	for _, test := range tests {
@@ -1395,6 +1510,7 @@ func TestSafeOpen(t *testing.T) {
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
+
 		test.prepare(base)
 		pathToCreate := filepath.Join(base, test.path)
 		fd, err := doSafeOpen(pathToCreate, base)
@@ -1411,6 +1527,25 @@ func TestSafeOpen(t *testing.T) {
 		syscall.Close(fd)
 		os.RemoveAll(base)
 	}
+}
+
+func createSocketFile(socketDir string) (string, error) {
+	testSocketFile := filepath.Join(socketDir, "mt.sock")
+
+	// Switch to volume path and create the socket file
+	// socket file can not have length of more than 108 character
+	// and hence we must use relative path
+	oldDir, _ := os.Getwd()
+
+	err := os.Chdir(socketDir)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		os.Chdir(oldDir)
+	}()
+	_, socketCreateError := net.Listen("unix", "mt.sock")
+	return testSocketFile, socketCreateError
 }
 
 func TestFindExistingPrefix(t *testing.T) {
@@ -1502,6 +1637,17 @@ func TestFindExistingPrefix(t *testing.T) {
 			"",
 			[]string{"test", "directory"},
 			false,
+		},
+		{
+			"with-fifo-in-middle",
+			func(base string) error {
+				testFifo := filepath.Join(base, "mount_test.fifo")
+				return syscall.Mkfifo(testFifo, 0)
+			},
+			"mount_test.fifo/directory",
+			"",
+			nil,
+			true,
 		},
 	}
 

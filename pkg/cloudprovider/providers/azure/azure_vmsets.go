@@ -18,7 +18,7 @@ package azure
 
 import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,7 +54,7 @@ type VMSet interface {
 	GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error)
 	// EnsureHostsInPool ensures the given Node's primary IP configurations are
 	// participating in the specified LoadBalancer Backend Pool.
-	EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string) error
+	EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error
 	// EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified vmSet.
 	EnsureBackendPoolDeleted(poolID, vmSetName string) error
 

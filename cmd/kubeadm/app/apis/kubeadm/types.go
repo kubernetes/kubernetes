@@ -224,6 +224,8 @@ type NodeConfiguration struct {
 	// will be fetched. Currently we only pay attention to one API server but
 	// hope to support >1 in the future.
 	DiscoveryTokenAPIServers []string
+	// DiscoveryTimeout modifies the discovery timeout
+	DiscoveryTimeout *metav1.Duration
 	// NodeName is the name of the node to join the cluster. Defaults
 	// to the name of the host.
 	NodeName string
@@ -281,6 +283,8 @@ type HostPathMount struct {
 	HostPath string
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string
+	// Writable controls write access to the volume
+	Writable bool
 }
 
 // KubeProxy contains elements describing the proxy configuration.

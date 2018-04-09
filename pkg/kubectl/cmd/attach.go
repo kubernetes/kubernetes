@@ -83,9 +83,9 @@ func NewCmdAttach(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) 
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
-	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", "", "Container name. If omitted, the first container in the pod will be chosen")
-	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", false, "Pass stdin to the container")
-	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", false, "Stdin is a TTY")
+	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
+	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
 	return cmd
 }
 

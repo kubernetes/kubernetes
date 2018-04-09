@@ -17,19 +17,22 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/gomega"
+	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-
 	"github.com/vmware/govmomi/vim25/mo"
-
 	vim25types "github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
+	vimtypes "github.com/vmware/govmomi/vim25/types"
+
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,11 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-
-	"github.com/vmware/govmomi/find"
-	vimtypes "github.com/vmware/govmomi/vim25/types"
-	"regexp"
-	"strings"
 )
 
 const (
@@ -657,7 +655,7 @@ func registerNodeVM(nodeName, workingDir, vmxFilePath string, rpool *object.Reso
 	framework.Logf("Registering node VM %s with vmx file path %s", nodeName, vmxFilePath)
 
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodeName)
-	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, true)
+	finder := find.NewFinder(nodeInfo.VSphere.Client.Client, false)
 
 	vmFolder, err := finder.FolderOrDefault(ctx, workingDir)
 	Expect(err).NotTo(HaveOccurred())

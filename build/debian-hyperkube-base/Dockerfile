@@ -40,6 +40,7 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     openssh-client \
     nfs-common \
     socat \
+    udev \
     util-linux
 
 COPY cni-bin/bin /opt/cni/bin

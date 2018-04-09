@@ -126,38 +126,6 @@ func openLocalPort(hp *hostport) (closeable, error) {
 	return socket, nil
 }
 
-// openHostports opens all given hostports using the given hostportOpener
-// If encounter any error, clean up and return the error
-// If all ports are opened successfully, return the hostport and socket mapping
-// TODO: move openHostports and closeHostports into a common struct
-func openHostports(portOpener hostportOpener, podPortMapping *PodPortMapping) (map[hostport]closeable, error) {
-	var retErr error
-	ports := make(map[hostport]closeable)
-	for _, pm := range podPortMapping.PortMappings {
-		if pm.HostPort <= 0 {
-			continue
-		}
-		hp := portMappingToHostport(pm)
-		socket, err := portOpener(&hp)
-		if err != nil {
-			retErr = fmt.Errorf("cannot open hostport %d for pod %s: %v", pm.HostPort, getPodFullName(podPortMapping), err)
-			break
-		}
-		ports[hp] = socket
-	}
-
-	// If encounter any error, close all hostports that just got opened.
-	if retErr != nil {
-		for hp, socket := range ports {
-			if err := socket.Close(); err != nil {
-				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podPortMapping), err)
-			}
-		}
-		return nil, retErr
-	}
-	return ports, nil
-}
-
 // portMappingToHostport creates hostport structure based on input portmapping
 func portMappingToHostport(portMapping *PortMapping) hostport {
 	return hostport{

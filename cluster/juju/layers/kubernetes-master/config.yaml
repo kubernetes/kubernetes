@@ -31,9 +31,17 @@ options:
       privileged mode. If "auto", kube-apiserver will not run in privileged
       mode by default, but will switch to privileged mode if gpu hardware is
       detected on a worker node.
+  enable-nvidia-plugin:
+    type: string
+    default: "auto"
+    description: |
+      Load the nvidia device plugin daemonset. Supported values are
+      "auto" and "false". When "auto", the daemonset will be loaded
+      only if GPUs are detected. When "false" the nvidia device plugin
+      will not be loaded.
   channel:
     type: string
-    default: "1.9/stable"
+    default: "1.10/stable"
     description: |
       Snap channel to install Kubernetes master services from
   client_password:
@@ -86,3 +94,8 @@ options:
     description: |
       The storage backend for kube-apiserver persistence. Can be "etcd2", "etcd3", or
       "auto". Auto mode will select etcd3 on new installations, or etcd2 on upgrades.
+  enable-metrics:
+    type: boolean
+    default: true
+    description: |
+      If true the metrics server for Kubernetes will be deployed onto the cluster.

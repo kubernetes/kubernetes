@@ -21,13 +21,14 @@ import (
 	"net/http"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
 	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // requestBackoff if backoff is disabled in cloud provider it
@@ -51,6 +52,9 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 	var retryErr error
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		machine, retryErr = az.getVirtualMachine(name)
+		if retryErr == cloudprovider.InstanceNotFound {
+			return true, cloudprovider.InstanceNotFound
+		}
 		if retryErr != nil {
 			glog.Errorf("backoff: failure, will retry,err=%v", retryErr)
 			return false, nil
@@ -164,16 +168,18 @@ func (az *Cloud) CreateOrUpdateLBWithRetry(lb network.LoadBalancer) error {
 func (az *Cloud) ListLBWithRetry() ([]network.LoadBalancer, error) {
 	allLBs := []network.LoadBalancer{}
 	var result network.LoadBalancerListResult
+	var resultPage LoadBalancerListResultPage
 
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		var retryErr error
-		result, retryErr = az.LoadBalancerClient.List(az.ResourceGroup)
+		resultPage, retryErr = az.LoadBalancerClient.List(az.ResourceGroup)
 		if retryErr != nil {
 			glog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
 				az.ResourceGroup,
 				retryErr)
 			return false, retryErr
 		}
+		result = resultPage.Response()
 		glog.V(2).Infof("LoadBalancerClient.List(%v) - backoff: success", az.ResourceGroup)
 		return true, nil
 	})
@@ -190,13 +196,14 @@ func (az *Cloud) ListLBWithRetry() ([]network.LoadBalancer, error) {
 		if result.NextLink != nil {
 			err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 				var retryErr error
-				result, retryErr = az.LoadBalancerClient.ListNextResults(az.ResourceGroup, result)
+				resultPage, retryErr = az.LoadBalancerClient.ListNextResults(az.ResourceGroup, resultPage)
 				if retryErr != nil {
 					glog.Errorf("LoadBalancerClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
 						az.ResourceGroup,
 						retryErr)
 					return false, retryErr
 				}
+				result = resultPage.Response()
 				glog.V(2).Infof("LoadBalancerClient.ListNextResults(%v) - backoff: success", az.ResourceGroup)
 				return true, nil
 			})
@@ -214,15 +221,18 @@ func (az *Cloud) ListLBWithRetry() ([]network.LoadBalancer, error) {
 func (az *Cloud) ListPIPWithRetry(pipResourceGroup string) ([]network.PublicIPAddress, error) {
 	allPIPs := []network.PublicIPAddress{}
 	var result network.PublicIPAddressListResult
+	var resultPage PublicIPAddressListResultPage
+
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		var retryErr error
-		result, retryErr = az.PublicIPAddressesClient.List(pipResourceGroup)
+		resultPage, retryErr = az.PublicIPAddressesClient.List(pipResourceGroup)
 		if retryErr != nil {
 			glog.Errorf("PublicIPAddressesClient.List(%v) - backoff: failure, will retry,err=%v",
 				pipResourceGroup,
 				retryErr)
 			return false, retryErr
 		}
+		result = resultPage.Response()
 		glog.V(2).Infof("PublicIPAddressesClient.List(%v) - backoff: success", pipResourceGroup)
 		return true, nil
 	})
@@ -239,13 +249,14 @@ func (az *Cloud) ListPIPWithRetry(pipResourceGroup string) ([]network.PublicIPAd
 		if result.NextLink != nil {
 			err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 				var retryErr error
-				result, retryErr = az.PublicIPAddressesClient.ListNextResults(az.ResourceGroup, result)
+				resultPage, retryErr = az.PublicIPAddressesClient.ListNextResults(az.ResourceGroup, resultPage)
 				if retryErr != nil {
 					glog.Errorf("PublicIPAddressesClient.ListNextResults(%v) - backoff: failure, will retry,err=%v",
 						pipResourceGroup,
 						retryErr)
 					return false, retryErr
 				}
+				result = resultPage.Response()
 				glog.V(2).Infof("PublicIPAddressesClient.ListNextResults(%v) - backoff: success", pipResourceGroup)
 				return true, nil
 			})

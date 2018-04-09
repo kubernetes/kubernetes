@@ -70,7 +70,7 @@ func (s *mustRunAs) Validate(_ *api.Pod, groups []int64) field.ErrorList {
 
 	for _, group := range groups {
 		if !s.isGroupValid(group) {
-			detail := fmt.Sprintf("%d is not an allowed group", group)
+			detail := fmt.Sprintf("group %d must be in the ranges: %v", group, s.ranges)
 			allErrs = append(allErrs, field.Invalid(field.NewPath(s.field), groups, detail))
 		}
 	}

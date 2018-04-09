@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,8 +45,6 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -451,7 +450,12 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return false, []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
 	}
-
+	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
+		nodeInfo.TransientInfo.TransientLock.Lock()
+		defer nodeInfo.TransientInfo.TransientLock.Unlock()
+		nodeInfo.TransientInfo.TransNodeInfo.AllocatableVolumesCount = c.maxVolumes - numExistingVolumes
+		nodeInfo.TransientInfo.TransNodeInfo.RequestedVolumes = numNewVolumes
+	}
 	return true, nil, nil
 }
 
@@ -678,10 +682,6 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
 					result.MilliCPU = cpu
 				}
-			case v1.ResourceNvidiaGPU:
-				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
-					result.NvidiaGPU = gpu
-				}
 			default:
 				if v1helper.IsScalarResourceName(rName) {
 					value := rQuantity.Value()
@@ -730,7 +730,6 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 	if podRequest.MilliCPU == 0 &&
 		podRequest.Memory == 0 &&
-		podRequest.NvidiaGPU == 0 &&
 		podRequest.EphemeralStorage == 0 &&
 		len(podRequest.ScalarResources) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
@@ -743,10 +742,6 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	if allocatable.Memory < podRequest.Memory+nodeInfo.RequestedResource().Memory {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceMemory, podRequest.Memory, nodeInfo.RequestedResource().Memory, allocatable.Memory))
 	}
-	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
-		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
-	}
-
 	if allocatable.EphemeralStorage < podRequest.EphemeralStorage+nodeInfo.RequestedResource().EphemeralStorage {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceEphemeralStorage, podRequest.EphemeralStorage, nodeInfo.RequestedResource().EphemeralStorage, allocatable.EphemeralStorage))
 	}
@@ -1593,7 +1588,7 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMe
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	unboundSatisfied, boundSatisfied, err := c.binder.Binder.FindPodVolumes(pod, node.Name)
+	unboundSatisfied, boundSatisfied, err := c.binder.Binder.FindPodVolumes(pod, node)
 	if err != nil {
 		return false, nil, err
 	}

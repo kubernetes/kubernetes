@@ -109,10 +109,6 @@ func getResourceLimits(pod *v1.Pod) *schedulercache.Resource {
 				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > result.EphemeralStorage {
 					result.EphemeralStorage = ephemeralStorage
 				}
-			case v1.ResourceNvidiaGPU:
-				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
-					result.NvidiaGPU = gpu
-				}
 			default:
 				if v1helper.IsScalarResourceName(rName) {
 					value := rQuantity.Value()

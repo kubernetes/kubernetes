@@ -57,8 +57,18 @@ var (
 		kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
+func NewViewLastAppliedOptions(out, err io.Writer) *ViewLastAppliedOptions {
+	return &ViewLastAppliedOptions{
+		Out:          out,
+		ErrOut:       err,
+		OutputFormat: "yaml",
+	}
+}
+
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	options := &ViewLastAppliedOptions{Out: out, ErrOut: err}
+	options := NewViewLastAppliedOptions(out, err)
+	validArgs := cmdutil.ValidArgList(f)
+
 	cmd := &cobra.Command{
 		Use: "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
@@ -66,23 +76,24 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Co
 		Long:    applyViewLastAppliedLong,
 		Example: applyViewLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.ValidateOutputArgs(cmd))
-			cmdutil.CheckErr(options.Complete(f, args))
+			cmdutil.CheckErr(options.Complete(cmd, f, args))
 			cmdutil.CheckErr(options.Validate(cmd))
-			cmdutil.CheckErr(options.RunApplyViewLastApplied())
+			cmdutil.CheckErr(options.RunApplyViewLastApplied(cmd))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
-	cmd.Flags().StringP("output", "o", "", "Output format. Must be one of yaml|json")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&options.OutputFormat, "output", "o", options.OutputFormat, "Output format. Must be one of yaml|json")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources in the namespace of the specified resource types")
 	usage := "that contains the last-applied-configuration annotations"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 
 	return cmd
 }
 
-func (o *ViewLastAppliedOptions) Complete(f cmdutil.Factory, args []string) error {
+func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -130,7 +141,7 @@ func (o *ViewLastAppliedOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
-func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
+func (o *ViewLastAppliedOptions) RunApplyViewLastApplied(cmd *cobra.Command) error {
 	for _, str := range o.LastAppliedConfigurationList {
 		switch o.OutputFormat {
 		case "json":
@@ -146,23 +157,13 @@ func (o *ViewLastAppliedOptions) RunApplyViewLastApplied() error {
 				return err
 			}
 			fmt.Fprint(o.Out, string(yamlOutput))
+		default:
+			return cmdutil.UsageErrorf(
+				cmd,
+				"Unexpected -o output mode: %s, the flag 'output' must be one of yaml|json",
+				o.OutputFormat)
 		}
 	}
 
 	return nil
-}
-
-func (o *ViewLastAppliedOptions) ValidateOutputArgs(cmd *cobra.Command) error {
-	format := cmdutil.GetFlagString(cmd, "output")
-	switch format {
-	case "json":
-		o.OutputFormat = "json"
-		return nil
-	// If flag -o is not specified, use yaml as default
-	case "yaml", "":
-		o.OutputFormat = "yaml"
-		return nil
-	default:
-		return cmdutil.UsageErrorf(cmd, "Unexpected -o output mode: %s, the flag 'output' must be one of yaml|json", format)
-	}
 }

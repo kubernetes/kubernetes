@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [[ "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" == "ubuntu" || "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then
   source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
 else
   echo "Cannot operate on cluster using node os distro: ${NODE_OS_DISTRIBUTION}" >&2
@@ -514,6 +514,23 @@ function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
 }
 
+function build-node-labels {
+  local master=$1
+  local node_labels=""
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
+    # Add kube-proxy daemonset label to node to avoid situation during cluster
+    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
+  fi
+  if [[ -n "${NODE_LABELS:-}" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
+  fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
+  fi
+  echo $node_labels
+}
+
 # $1: if 'true', we're rendering flags for a master, else a node
 function construct-kubelet-flags {
   local master=$1
@@ -585,18 +602,7 @@ function construct-kubelet-flags {
   if [[ -n "${ENABLE_CUSTOM_METRICS:-}" ]]; then
     flags+=" --enable-custom-metrics=${ENABLE_CUSTOM_METRICS}"
   fi
-  local node_labels=""
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
-    # Add kube-proxy daemonset label to node to avoid situation during cluster
-    # upgrade/downgrade when there are two instances of kube-proxy running on a node.
-    node_labels="beta.kubernetes.io/kube-proxy-ds-ready=true"
-  fi
-  if [[ -n "${NODE_LABELS:-}" ]]; then
-    node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
-  fi
-  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
-    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
-  fi
+  local node_labels=$(build-node-labels ${master})
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -646,7 +652,7 @@ function build-kube-env {
   local server_binary_tar_url=$SERVER_BINARY_TAR_URL
   local kube_manifests_tar_url="${KUBE_MANIFESTS_TAR_URL:-}"
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] ; then
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "ubuntu" || "${NODE_OS_DISTRIBUTION}" == "custom") ]]; then
     # TODO: Support fallback .tar.gz settings on Container Linux
     server_binary_tar_url=$(split_csv "${SERVER_BINARY_TAR_URL}")
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
@@ -673,6 +679,10 @@ ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
 ENABLE_METRICS_SERVER: $(yaml-quote ${ENABLE_METRICS_SERVER:-false})
 ENABLE_METADATA_AGENT: $(yaml-quote ${ENABLE_METADATA_AGENT:-none})
 METADATA_AGENT_VERSION: $(yaml-quote ${METADATA_AGENT_VERSION:-})
+METADATA_AGENT_CPU_REQUEST: $(yaml-quote ${METADATA_AGENT_CPU_REQUEST:-})
+METADATA_AGENT_MEMORY_REQUEST: $(yaml-quote ${METADATA_AGENT_MEMORY_REQUEST:-})
+METADATA_AGENT_CLUSTER_LEVEL_CPU_REQUEST: $(yaml-quote ${METADATA_AGENT_CLUSTER_LEVEL_CPU_REQUEST:-})
+METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST: $(yaml-quote ${METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST:-})
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote ${DOCKER_REGISTRY_MIRROR_URL:-})
 ENABLE_L7_LOADBALANCING: $(yaml-quote ${ENABLE_L7_LOADBALANCING:-none})
 ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
@@ -732,6 +742,7 @@ ADVANCED_AUDIT_WEBHOOK_THROTTLE_BURST: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_THR
 ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF: $(yaml-quote ${ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF:-})
 GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 GCE_GLBC_IMAGE: $(yaml-quote ${GCE_GLBC_IMAGE:-})
+ENABLE_NODE_JOURNAL: $(yaml-quote ${ENABLE_NODE_JOURNAL:-false})
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
@@ -763,8 +774,8 @@ EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
-  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci") || "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]] || \
-     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci") || "${NODE_OS_DISTRIBUTION}" = "ubuntu" ]] ; then
+  if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu") ]] || \
+     [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" = "ubuntu" || "${NODE_OS_DISTRIBUTION}" = "custom") ]] ; then
     cat >>$file <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
@@ -834,6 +845,7 @@ ETCD_CA_KEY: $(yaml-quote ${ETCD_CA_KEY_BASE64:-})
 ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
 ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
 ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
+ENCRYPTION_PROVIDER_CONFIG: $(yaml-quote ${ENCRYPTION_PROVIDER_CONFIG:-})
 EOF
     if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
       cat >>$file <<EOF
@@ -972,6 +984,17 @@ ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
 EOF
+      if [[ "${master}" == "false" ]]; then
+          # TODO(kubernetes/autoscaler#718): AUTOSCALER_ENV_VARS is a hotfix for cluster autoscaler,
+          # which reads the kube-env to determine the shape of a node and was broken by #60020.
+          # This should be removed as soon as a more reliable source of information is available!
+          local node_labels=$(build-node-labels false)
+          local node_taints="${NODE_TAINTS:-}"
+          local autoscaler_env_vars="node_labels=${node_labels};node_taints=${node_taints}"
+          cat >>$file <<EOF
+AUTOSCALER_ENV_VARS: $(yaml-quote ${autoscaler_env_vars})
+EOF
+      fi
   fi
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
     cat >>$file <<EOF
@@ -1275,6 +1298,9 @@ minVersion = version.LooseVersion("1.3.0")
 required = [ "alpha", "beta", "core" ]
 data = json.loads(sys.argv[1])
 rel = data.get("Google Cloud SDK")
+if "CL @" in rel:
+  print("Using dev version of gcloud: %s" %rel)
+  exit(0)
 if rel != "HEAD" and version.LooseVersion(rel) < minVersion:
   print("gcloud version out of date ( < %s )" % minVersion)
   exit(1)
@@ -1408,7 +1434,7 @@ function get-template-name-from-version() {
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
 
-# validates the NODE_LOCAL_SSDS_EXT variable 
+# validates the NODE_LOCAL_SSDS_EXT variable
 function validate-node-local-ssds-ext(){
   ssdopts="${1}"
 
@@ -1484,7 +1510,7 @@ function create-node-template() {
       done
     done
   fi
-  
+
   if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
     # Some versions of seq will count down from 1 if "seq 0" is specified
@@ -1494,7 +1520,7 @@ function create-node-template() {
       done
     fi
   fi
-  
+
 
   local network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
@@ -1618,14 +1644,8 @@ function check-existing() {
   fi
 }
 
-# TODO(#54017): Remove below logics for handling deprecated network mode field.
-# `x_gcloud_mode` was replaced by `x_gcloud_subnet_mode` in gcloud 175.0.0 and
-# the content changed as well. Keeping such logic to make the transition eaiser.
 function check-network-mode() {
   local mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
-  if [[ -z "${mode}" ]]; then
-    mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
-  fi
   # The deprecated field uses lower case. Convert to upper case for consistency.
   echo "$(echo $mode | tr [a-z] [A-Z])"
 }
@@ -1639,7 +1659,7 @@ function create-network() {
       network_mode="custom"
     fi
     echo "Creating new ${network_mode} network: ${NETWORK}"
-    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode="${network_mode}"
+    gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --subnet-mode="${network_mode}"
   else
     PREEXISTING_NETWORK=true
     PREEXISTING_NETWORK_MODE="$(check-network-mode)"
@@ -1674,8 +1694,8 @@ function create-network() {
 }
 
 function expand-default-subnetwork() {
-  gcloud compute networks switch-mode "${NETWORK}" \
-    --mode custom \
+  gcloud compute networks update "${NETWORK}" \
+    --switch-to-custom-subnet-mode \
     --project "${NETWORK_PROJECT}" \
     --quiet || true
   gcloud compute networks subnets expand-ip-range "${NETWORK}" \
@@ -1711,12 +1731,6 @@ function create-subnetworks() {
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
   if [[ -z ${subnet} ]]; then
-    # Only allow auto-creation for default subnets
-    if [[ ${IP_ALIAS_SUBNETWORK} != ${INSTANCE_PREFIX}-subnet-default ]]; then
-      echo "${color_red}Subnetwork ${NETWORK}:${IP_ALIAS_SUBNETWORK} does not exist${color_norm}"
-      exit 1
-    fi
-
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
     gcloud beta compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
@@ -1729,7 +1743,7 @@ function create-subnetworks() {
       --secondary-range "services-default=${SERVICE_CLUSTER_IP_RANGE}"
     echo "Created subnetwork ${IP_ALIAS_SUBNETWORK}"
   else
-    if ! echo ${subnet} | grep --quiet secondaryIpRanges ${subnet}; then
+    if ! echo ${subnet} | grep --quiet secondaryIpRanges; then
       echo "${color_red}Subnet ${IP_ALIAS_SUBNETWORK} does not have a secondary range${color_norm}"
       exit 1
     fi

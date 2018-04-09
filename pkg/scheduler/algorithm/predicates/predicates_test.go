@@ -37,18 +37,19 @@ import (
 )
 
 var (
-	extendedResourceA = v1.ResourceName("example.com/aaa")
-	extendedResourceB = v1.ResourceName("example.com/bbb")
-	hugePageResourceA = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	extendedResourceA     = v1.ResourceName("example.com/aaa")
+	extendedResourceB     = v1.ResourceName("example.com/bbb")
+	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
+	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
+	hugePageResourceA     = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
-func makeResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
+func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
 	return v1.NodeResources{
 		Capacity: v1.ResourceList{
 			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 			v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
 			v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
-			v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 			extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
 			hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
@@ -56,12 +57,11 @@ func makeResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugeP
 	}
 }
 
-func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
+func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
 	return v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
 		v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
-		v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
 		extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
 		hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
@@ -299,6 +299,24 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "kubernetes.io resource capacity enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceA, 10, 0, 0)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{kubernetesIOResourceB: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
+			fits:    false,
+			test:    "kubernetes.io resource capacity enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(kubernetesIOResourceB, 10, 0, 0)},
+		},
+		{
+			pod: newResourcePod(
 				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
@@ -337,7 +355,7 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	for _, test := range enoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		RegisterPredicateMetadataProducerWithExtendedResourceOptions(test.ignoredExtendedResources)
 		meta := PredicateMetadata(test.pod, nil)
@@ -394,7 +412,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0, 0, 0)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -452,7 +470,7 @@ func TestPodFitsResources(t *testing.T) {
 	}
 
 	for _, test := range storagePodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -2042,7 +2060,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits: true,
 			wErr: nil,
@@ -2054,7 +2072,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits: false,
 			wErr: nil,
@@ -2065,34 +2083,6 @@ func TestRunGeneralPredicates(t *testing.T) {
 			test: "not enough cpu and memory resource",
 		},
 		{
-			pod: &v1.Pod{},
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
-			fits: true,
-			wErr: nil,
-			test: "no resources/port/host requested always fits on GPU machine",
-		},
-		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 1})),
-			node:    &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
-			fits:    false,
-			wErr:    nil,
-			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceNvidiaGPU, 1, 1, 1)},
-			test:    "not enough GPU resource",
-		},
-		{
-			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
-			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 0})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
-			fits: true,
-			wErr: nil,
-			test: "enough GPU resource",
-		},
-		{
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					NodeName: "machine2",
@@ -2101,7 +2091,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -2113,7 +2103,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -3423,7 +3413,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 					ImagePullPolicy: "Always",
 					// at least one requirement -> burstable pod
 					Resources: v1.ResourceRequirements{
-						Requests: makeAllocatableResources(100, 100, 100, 100, 0, 0, 0),
+						Requests: makeAllocatableResources(100, 100, 100, 0, 0, 0),
 					},
 				},
 			},

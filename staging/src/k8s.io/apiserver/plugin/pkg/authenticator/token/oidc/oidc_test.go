@@ -287,7 +287,7 @@ func TestToken(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			// If "email_verified" isn't present, assume false
+			// If "email_verified" isn't present, assume true
 			name: "no-email-verified-claim",
 			options: Options{
 				IssuerURL:     "https://auth.example.com",
@@ -303,6 +303,30 @@ func TestToken(t *testing.T) {
 				"iss": "https://auth.example.com",
 				"aud": "my-client",
 				"email": "jane@example.com",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane@example.com",
+			},
+		},
+		{
+			name: "invalid-email-verified-claim",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			// string value for "email_verified"
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"email": "jane@example.com",
+				"email_verified": "false",
 				"exp": %d
 			}`, valid.Unix()),
 			wantErr: true,

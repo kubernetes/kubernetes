@@ -293,7 +293,12 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			filename, oldName)
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, coreClient, coreClient)
+	scalesGetter, err := f.ScaleClient()
+	if err != nil {
+		return err
+	}
+
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, coreClient, coreClient, scalesGetter)
 
 	// To successfully pull off a rolling update the new and old rc have to differ
 	// by at least one selector. Every new pod should have the selector and every

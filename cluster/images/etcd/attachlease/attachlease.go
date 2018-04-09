@@ -17,13 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"strings"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 var (

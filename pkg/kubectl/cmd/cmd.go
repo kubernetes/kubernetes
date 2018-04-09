@@ -168,7 +168,8 @@ __kubectl_require_pod_and_container()
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
-        kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_*)
+        kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_* |\
+        kubectl_apply_edit-last-applied | kubectl_apply_view-last-applied)
             __kubectl_get_resource
             return
             ;;
@@ -310,7 +311,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Settings Commands:",
 			Commands: []*cobra.Command{
-				NewCmdLabel(f, out),
+				NewCmdLabel(f, out, err),
 				NewCmdAnnotate(f, out),
 				NewCmdCompletion(out, ""),
 			},
@@ -345,6 +346,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
+	cmds.AddCommand(NewCmdApiResources(f, out))
 	cmds.AddCommand(NewCmdOptions(out))
 
 	return cmds

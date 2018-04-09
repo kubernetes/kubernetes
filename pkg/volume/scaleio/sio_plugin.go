@@ -27,7 +27,6 @@ import (
 )
 
 const (
-	sioName           = "scaleio"
 	sioPluginName     = "kubernetes.io/scaleio"
 	sioConfigFileName = "sioconf.dat"
 )

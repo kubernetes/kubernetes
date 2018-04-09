@@ -163,7 +163,7 @@ var _ = SIGDescribe("Proxy", func() {
 				CreatedPods: &pods,
 			}
 			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, cfg.Name)
+			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, cfg.Name)
 
 			Expect(framework.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(HaveOccurred())
 

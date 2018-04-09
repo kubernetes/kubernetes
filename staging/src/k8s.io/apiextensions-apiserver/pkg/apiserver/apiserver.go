@@ -162,7 +162,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		// groups. This leads to a nil client above and undefined behaviour further down.
 		//
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
-		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
+		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q: %v. KUBE_API_VERSIONS is only for testing. Things will break.",
+			kubeAPIVersions, err)
 	}
 	s.Informers = internalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 
@@ -196,7 +197,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return s, nil
 	}
 
-	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler, c.GenericConfig.RequestContextMapper)
+	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler, delegationTarget.RequestContextMapper())
 	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())
 	finalizingController := finalizer.NewCRDFinalizer(
 		s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(),

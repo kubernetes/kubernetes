@@ -19,7 +19,6 @@ package resource
 import (
 	"bytes"
 	encjson "encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -80,31 +79,6 @@ func defaultClientConfig() *restclient.Config {
 			GroupVersion:         &scheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		},
 	}
-}
-
-type testPrinter struct {
-	Objects        []runtime.Object
-	Err            error
-	GenericPrinter bool
-}
-
-func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Objects = append(t.Objects, obj)
-	fmt.Fprintf(out, "%#v", obj)
-	return t.Err
-}
-
-// TODO: implement HandledResources()
-func (t *testPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (t *testPrinter) IsGeneric() bool {
-	return t.GenericPrinter
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
@@ -246,7 +220,6 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 
 	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
 	actual := []runtime.Object{}
-	//actual := tf.Printer.(*testPrinter).Objects
 	if len(actual) != len(expected) {
 		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
 	}
@@ -374,77 +347,6 @@ foo       0/0                 0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetObjectsFiltered(t *testing.T) {
-	initTestErrorHandler(t)
-
-	pods, _, _ := testData()
-	pods.Items[0].Status.Phase = api.PodFailed
-	first := &pods.Items[0]
-
-	testCases := []struct {
-		args   []string
-		resp   runtime.Object
-		flags  map[string]string
-		expect string
-	}{
-		{args: []string{"pods", "foo"}, resp: first, flags: map[string]string{"show-all": "true"},
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
-
-		{args: []string{"pods", "foo"}, flags: map[string]string{"show-all": "false"}, resp: first,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
-
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
-
-		{args: []string{"pods/foo"}, resp: first, flags: map[string]string{"show-all": "false"},
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\n"},
-
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false", "output": "name"}, resp: pods,
-			expect: "pod/foo\npod/bar\n"},
-
-		{args: []string{}, flags: map[string]string{"show-all": "false", "filename": "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}, resp: pods,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nfoo       0/0       Failed    0          <unknown>\nbar       0/0                 0          <unknown>\n"},
-
-		{args: []string{"pods"}, resp: pods, flags: map[string]string{"show-all": "false"},
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
-
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "name"}, resp: pods,
-			expect: "pod/foo\npod/bar\n"},
-
-		{args: []string{"pods"}, flags: map[string]string{"show-all": "false"}, resp: pods,
-			expect: "NAME      READY     STATUS    RESTARTS   AGE\nbar       0/0                 0          <unknown>\n"},
-	}
-
-	for i, test := range testCases {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory()
-			defer tf.Cleanup()
-			defer tf.Cleanup()
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-
-			tf.UnstructuredClient = &fake.RESTClient{
-				GroupVersion:         schema.GroupVersion{Version: "v1"},
-				NegotiatedSerializer: unstructuredSerializer,
-				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
-			}
-			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
-
-			cmd := NewCmdGet(tf, buf, errBuf)
-			cmd.SetOutput(buf)
-			for k, v := range test.flags {
-				cmd.Flags().Lookup(k).Value.Set(v)
-			}
-			cmd.Run(cmd, test.args)
-
-			if e, a := test.expect, buf.String(); e != a {
-				t.Errorf("expected %q, got %q", e, a)
-			}
-		})
 	}
 }
 
@@ -756,10 +658,10 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
+pod/foo   0/0                 0          <unknown>
+pod/bar   0/0                 0          <unknown>
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -904,10 +806,10 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
+pod/foo   0/0                 0          <unknown>
+pod/bar   0/0                 0          <unknown>
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -949,10 +851,10 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
-NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
+pod/foo   0/0                 0          <unknown>
+pod/bar   0/0                 0          <unknown>
+NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -997,10 +899,10 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
 
-	expected := `NAME      TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-baz       ClusterIP   <none>       <none>        <none>    <unknown>
-NAME      STATUS    ROLES     AGE         VERSION
-foo       Unknown   <none>    <unknown>   
+	expected := `NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
+NAME       STATUS    ROLES     AGE         VERSION
+node/foo   Unknown   <none>    <unknown>   
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)

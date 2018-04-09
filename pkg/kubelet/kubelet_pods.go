@@ -68,6 +68,11 @@ import (
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 )
 
+const (
+	managedHostsHeader                = "# Kubernetes-managed hosts file.\n"
+	managedHostsHeaderWithHostNetwork = "# Kubernetes-managed hosts file (host network).\n"
+)
+
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
@@ -88,26 +93,6 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
 	activePods := kl.filterOutTerminatedPods(allPods)
 	return activePods
-}
-
-// makeGPUDevices determines the devices for the given container.
-// Experimental.
-func (kl *Kubelet) makeGPUDevices(pod *v1.Pod, container *v1.Container) ([]kubecontainer.DeviceInfo, error) {
-	if container.Resources.Limits.NvidiaGPU().IsZero() {
-		return nil, nil
-	}
-
-	nvidiaGPUPaths, err := kl.gpuManager.AllocateGPU(pod, container)
-	if err != nil {
-		return nil, err
-	}
-	var devices []kubecontainer.DeviceInfo
-	for _, path := range nvidiaGPUPaths {
-		// Devices have to be mapped one to one because of nvidia CUDA library requirements.
-		devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
-	}
-
-	return devices, nil
 }
 
 func makeAbsolutePath(goos, path string) string {
@@ -235,7 +220,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			hostPath, cleanupAction, err = mounter.PrepareSafeSubpath(mountutil.Subpath{
 				VolumeMountIndex: i,
 				Path:             hostPath,
-				VolumeName:       mount.Name,
+				VolumeName:       vol.InnerVolumeSpecName,
 				VolumePath:       volumePath,
 				PodDir:           podDir,
 				ContainerName:    container.Name,
@@ -356,15 +341,18 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 	if err != nil {
 		return nil, err
 	}
-	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
-	return hostsFileContent, nil
+	var buffer bytes.Buffer
+	buffer.WriteString(managedHostsHeaderWithHostNetwork)
+	buffer.Write(hostsFileContent)
+	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
+	return buffer.Bytes(), nil
 }
 
 // managedHostsFileContent generates the content of the managed etc hosts based on Pod IP and other
 // information.
 func managedHostsFileContent(hostIP, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
 	var buffer bytes.Buffer
-	buffer.WriteString("# Kubernetes-managed hosts file.\n")
+	buffer.WriteString(managedHostsHeader)
 	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
 	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
 	buffer.WriteString("fe00::0\tip6-localnet\n")
@@ -376,9 +364,8 @@ func managedHostsFileContent(hostIP, hostName, hostDomainName string, hostAliase
 	} else {
 		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
 	}
-	hostsFileContent := buffer.Bytes()
-	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
-	return hostsFileContent
+	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
+	return buffer.Bytes()
 }
 
 func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
@@ -461,8 +448,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		return nil, nil, err
 	}
 
-	cgroupParent := kl.GetPodCgroupParent(pod)
-	opts.CgroupParent = cgroupParent
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, nil, err
@@ -472,12 +457,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
-	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	devices, err := kl.makeGPUDevices(pod, container)
-	if err != nil {
-		return nil, nil, err
-	}
-	opts.Devices = append(opts.Devices, devices...)
 
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
@@ -1099,35 +1078,28 @@ func (kl *Kubelet) podKiller() {
 	killing := sets.NewString()
 	// guard for the killing set
 	lock := sync.Mutex{}
-	for {
-		select {
-		case podPair, ok := <-kl.podKillingCh:
-			if !ok {
-				return
-			}
+	for podPair := range kl.podKillingCh {
+		runningPod := podPair.RunningPod
+		apiPod := podPair.APIPod
 
-			runningPod := podPair.RunningPod
-			apiPod := podPair.APIPod
+		lock.Lock()
+		exists := killing.Has(string(runningPod.ID))
+		if !exists {
+			killing.Insert(string(runningPod.ID))
+		}
+		lock.Unlock()
 
-			lock.Lock()
-			exists := killing.Has(string(runningPod.ID))
-			if !exists {
-				killing.Insert(string(runningPod.ID))
-			}
-			lock.Unlock()
-
-			if !exists {
-				go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod) {
-					glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
-					err := kl.killPod(apiPod, runningPod, nil, nil)
-					if err != nil {
-						glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
-					}
-					lock.Lock()
-					killing.Delete(string(runningPod.ID))
-					lock.Unlock()
-				}(apiPod, runningPod)
-			}
+		if !exists {
+			go func(apiPod *v1.Pod, runningPod *kubecontainer.Pod) {
+				glog.V(2).Infof("Killing unwanted pod %q", runningPod.Name)
+				err := kl.killPod(apiPod, runningPod, nil, nil)
+				if err != nil {
+					glog.Errorf("Failed killing the pod %q: %v", runningPod.Name, err)
+				}
+				lock.Lock()
+				killing.Delete(string(runningPod.ID))
+				lock.Unlock()
+			}(apiPod, runningPod)
 		}
 	}
 }
@@ -1394,13 +1366,10 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(spec, s.ContainerStatuses, s.Phase))
-	// s (the PodStatus we are creating) will not have a PodScheduled condition yet, because converStatusToAPIStatus()
-	// does not create one. If the existing PodStatus has a PodScheduled condition, then copy it into s and make sure
-	// it is set to true. If the existing PodStatus does not have a PodScheduled condition, then create one that is set to true.
-	if _, oldPodScheduled := podutil.GetPodCondition(&pod.Status, v1.PodScheduled); oldPodScheduled != nil {
-		s.Conditions = append(s.Conditions, *oldPodScheduled)
-	}
-	podutil.UpdatePodCondition(s, &v1.PodCondition{
+	// Status manager will take care of the LastTransitionTimestamp, either preserve
+	// the timestamp from apiserver, or set a new one. When kubelet sees the pod,
+	// `PodScheduled` condition must be true.
+	s.Conditions = append(s.Conditions, v1.PodCondition{
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})

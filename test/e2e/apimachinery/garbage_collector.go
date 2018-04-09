@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -88,8 +89,8 @@ func getOrphanOptions() *metav1.DeleteOptions {
 }
 
 var (
-	zero = int64(0)
-
+	zero                        = int64(0)
+	lablecount                  = int64(0)
 	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
 )
 
@@ -323,6 +324,14 @@ func newCronJob(name, schedule string) *batchv1beta1.CronJob {
 	}
 }
 
+// getUniqLabel returns a UniqLabel based on labeLkey and labelvalue.
+func getUniqLabel(labelkey, labelvalue string) map[string]string {
+	count := atomic.AddInt64(&lablecount, 1)
+	uniqlabelkey := fmt.Sprintf("%s-%05d", labelkey, count)
+	uniqlabelvalue := fmt.Sprintf("%s-%05d", labelvalue, count)
+	return map[string]string{uniqlabelkey: uniqlabelvalue}
+}
+
 var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 
@@ -337,8 +346,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "delete_pods"}
+		uniqLabels := getUniqLabel("gctest", "delete_pods")
 		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
@@ -396,8 +404,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "orphan_pods"}
+		uniqLabels := getUniqLabel("gctest", "orphan_pods")
 		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
@@ -465,8 +472,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "orphan_pods_nil_option"}
+		uniqLabels := getUniqLabel("gctest", "orphan_pods_nil_option")
 		rc := newOwnerRC(f, rcName, 2, uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
@@ -520,8 +526,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
 		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "delete_rs"}
+		uniqLabels := getUniqLabel("gctest", "delete_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		By("create the deployment")
 		createdDeployment, err := deployClient.Create(deployment)
@@ -577,8 +582,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		deployClient := clientSet.ExtensionsV1beta1().Deployments(f.Namespace.Name)
 		rsClient := clientSet.ExtensionsV1beta1().ReplicaSets(f.Namespace.Name)
 		deploymentName := "simpletest.deployment"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "orphan_rs"}
+		uniqLabels := getUniqLabel("gctest", "orphan_rs")
 		deployment := newOwnerDeployment(f, deploymentName, uniqLabels)
 		By("create the deployment")
 		createdDeployment, err := deployClient.Create(deployment)
@@ -647,8 +651,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "delete_pods_foreground"}
+		uniqLabels := getUniqLabel("gctest", "delete_pods_foreground")
 		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
@@ -738,18 +741,16 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rc1Name := "simpletest-rc-to-be-deleted"
 		replicas := int32(estimateMaximumPods(clientSet, 10, 100))
 		halfReplicas := int(replicas / 2)
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels := map[string]string{"gctest": "valid_and_pending_owners"}
-		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabels)
+		uniqLabels_deleted := getUniqLabel("gctest_d", "valid_and_pending_owners_d")
+		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabels_deleted)
 		By("create the rc1")
 		rc1, err := rcClient.Create(rc1)
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		rc2Name := "simpletest-rc-to-stay"
-		// TODO: find better way to keep this label unique in the test
-		uniqLabels = map[string]string{"another.key": "another.value"}
-		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabels)
+		uniqLabels_stay := getUniqLabel("gctest_s", "valid_and_pending_owners_s")
+		rc2 := newOwnerRC(f, rc2Name, 0, uniqLabels_stay)
 		By("create the rc2")
 		rc2, err = rcClient.Create(rc2)
 		if err != nil {

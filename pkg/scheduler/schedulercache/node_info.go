@@ -19,6 +19,7 @@ package schedulercache
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/golang/glog"
 
@@ -49,9 +50,14 @@ type NodeInfo struct {
 	// as int64, to avoid conversions and accessing map.
 	allocatableResource *Resource
 
-	// Cached tains of the node for faster lookup.
+	// Cached taints of the node for faster lookup.
 	taints    []v1.Taint
 	taintsErr error
+
+	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
+	// scheduling cycle.
+	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
+	TransientInfo *transientSchedulerInfo
 
 	// Cached conditions of node for faster lookup.
 	memoryPressureCondition v1.ConditionStatus
@@ -62,11 +68,52 @@ type NodeInfo struct {
 	generation int64
 }
 
+//initializeNodeTransientInfo initializes transient information pertaining to node.
+func initializeNodeTransientInfo() nodeTransientInfo {
+	return nodeTransientInfo{AllocatableVolumesCount: 0, RequestedVolumes: 0}
+}
+
+// nodeTransientInfo contains transient node information while scheduling.
+type nodeTransientInfo struct {
+	// AllocatableVolumesCount contains number of volumes that could be attached to node.
+	AllocatableVolumesCount int
+	// Requested number of volumes on a particular node.
+	RequestedVolumes int
+}
+
+// transientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
+// It consists of items that are valid for a scheduling cycle and is used for message passing across predicates and
+// priorities. Some examples which could be used as fields are number of volumes being used on node, current utilization
+// on node etc.
+// IMPORTANT NOTE: Make sure that each field in this structure is documented along with usage. Expand this structure
+// only when absolutely needed as this data structure will be created and destroyed during every scheduling cycle.
+type transientSchedulerInfo struct {
+	TransientLock sync.Mutex
+	// NodeTransInfo holds the information related to nodeTransientInformation. NodeName is the key here.
+	TransNodeInfo nodeTransientInfo
+}
+
+// newTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
+func newTransientSchedulerInfo() *transientSchedulerInfo {
+	tsi := &transientSchedulerInfo{
+		TransNodeInfo: initializeNodeTransientInfo(),
+	}
+	return tsi
+}
+
+// resetTransientSchedulerInfo resets the transientSchedulerInfo.
+func (transientSchedInfo *transientSchedulerInfo) resetTransientSchedulerInfo() {
+	transientSchedInfo.TransientLock.Lock()
+	defer transientSchedInfo.TransientLock.Unlock()
+	// Reset TransientNodeInfo.
+	transientSchedInfo.TransNodeInfo.AllocatableVolumesCount = 0
+	transientSchedInfo.TransNodeInfo.RequestedVolumes = 0
+}
+
 // Resource is a collection of compute resource.
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64
-	NvidiaGPU        int64
 	EphemeralStorage int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
@@ -94,8 +141,6 @@ func (r *Resource) Add(rl v1.ResourceList) {
 			r.MilliCPU += rQuant.MilliValue()
 		case v1.ResourceMemory:
 			r.Memory += rQuant.Value()
-		case v1.ResourceNvidiaGPU:
-			r.NvidiaGPU += rQuant.Value()
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
@@ -113,7 +158,6 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	result := v1.ResourceList{
 		v1.ResourceCPU:              *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
 		v1.ResourceMemory:           *resource.NewQuantity(r.Memory, resource.BinarySI),
-		v1.ResourceNvidiaGPU:        *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
 		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
 	}
@@ -132,7 +176,6 @@ func (r *Resource) Clone() *Resource {
 	res := &Resource{
 		MilliCPU:         r.MilliCPU,
 		Memory:           r.Memory,
-		NvidiaGPU:        r.NvidiaGPU,
 		AllowedPodNumber: r.AllowedPodNumber,
 		EphemeralStorage: r.EphemeralStorage,
 	}
@@ -167,6 +210,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		requestedResource:   &Resource{},
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
+		TransientInfo:       newTransientSchedulerInfo(),
 		generation:          0,
 		usedPorts:           make(util.HostPortInfo),
 	}
@@ -277,6 +321,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		nonzeroRequest:          n.nonzeroRequest.Clone(),
 		allocatableResource:     n.allocatableResource.Clone(),
 		taintsErr:               n.taintsErr,
+		TransientInfo:           n.TransientInfo,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
@@ -319,7 +364,6 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	res, non0CPU, non0Mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
-	n.requestedResource.NvidiaGPU += res.NvidiaGPU
 	n.requestedResource.EphemeralStorage += res.EphemeralStorage
 	if n.requestedResource.ScalarResources == nil && len(res.ScalarResources) > 0 {
 		n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
@@ -375,7 +419,6 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
-			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
 			n.requestedResource.EphemeralStorage -= res.EphemeralStorage
 			if len(res.ScalarResources) > 0 && n.requestedResource.ScalarResources == nil {
 				n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
@@ -443,6 +486,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			// We ignore other conditions.
 		}
 	}
+	n.TransientInfo = newTransientSchedulerInfo()
 	n.generation++
 	return nil
 }

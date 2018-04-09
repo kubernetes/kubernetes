@@ -131,7 +131,7 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 			Containers: []v1.Container{
 				{
 					Name:      "container",
-					Image:     imageutils.GetPauseImageNameForHostArch(),
+					Image:     imageutils.GetPauseImageName(),
 					Resources: resources,
 				},
 			},

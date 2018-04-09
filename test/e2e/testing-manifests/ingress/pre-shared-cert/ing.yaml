@@ -6,6 +6,10 @@ metadata:
   # annotations:
   #  ingress.gcp.kubernetes.io/pre-shared-cert: "test-pre-shared-cert"
 spec:
+  # kubemci requires a default backend.
+  backend:
+    serviceName: echoheaders-https
+    servicePort: 80
   rules:
   - host: test.ingress.com
     http:

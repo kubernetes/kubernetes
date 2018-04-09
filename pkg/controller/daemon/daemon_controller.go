@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -55,8 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/util/metrics"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -134,8 +134,7 @@ type DaemonSetsController struct {
 func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -938,10 +937,11 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 
 				podTemplate := &template
 
-				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+				if false /*disabled for 1.10*/ && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 					podTemplate = template.DeepCopy()
 					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodHostnameNodeAffinity(
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
+					podTemplate.Spec.Tolerations = util.AppendNoScheduleTolerationIfNotExist(podTemplate.Spec.Tolerations)
 
 					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
 						ds, metav1.NewControllerRef(ds, controllerKind))
@@ -1389,7 +1389,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	var predicateFails []algorithm.PredicateFailureReason
 
 	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+	if false /*disabled for 1.10*/ && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err

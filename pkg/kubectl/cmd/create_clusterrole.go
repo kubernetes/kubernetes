@@ -38,7 +38,7 @@ var (
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
 		# Create a ClusterRole named "pod-reader" with ResourceName specified
-		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods --resource-name=readablepod --resource-name=anotherpod
+		kubectl create clusterrole pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
 		# Create a ClusterRole named "foo" with API Group specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
@@ -81,10 +81,10 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringSliceVar(&c.Verbs, "verb", []string{}, "Verb that applies to the resources contained in the rule")
-	cmd.Flags().StringSliceVar(&c.NonResourceURLs, "non-resource-url", []string{}, "A partial url that user should have access to.")
+	cmd.Flags().StringSliceVar(&c.Verbs, "verb", c.Verbs, "Verb that applies to the resources contained in the rule")
+	cmd.Flags().StringSliceVar(&c.NonResourceURLs, "non-resource-url", c.NonResourceURLs, "A partial url that user should have access to.")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
-	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", []string{}, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
+	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", c.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
 
 	return cmd
 }
@@ -166,7 +166,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 
 	// Create ClusterRole.
 	if !c.DryRun {
-		_, err = c.Client.ClusterRoles().Create(clusterRole)
+		clusterRole, err = c.Client.ClusterRoles().Create(clusterRole)
 		if err != nil {
 			return err
 		}

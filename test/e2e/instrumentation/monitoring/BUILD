@@ -42,6 +42,7 @@ go_library(
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
     ],
 )
 

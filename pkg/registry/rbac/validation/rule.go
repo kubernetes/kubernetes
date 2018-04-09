@@ -315,7 +315,7 @@ func (r *StaticRoles) GetClusterRole(name string) (*rbac.ClusterRole, error) {
 			return clusterRole, nil
 		}
 	}
-	return nil, errors.New("role not found")
+	return nil, errors.New("clusterrole not found")
 }
 
 func (r *StaticRoles) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {

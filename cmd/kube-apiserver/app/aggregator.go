@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -49,10 +50,26 @@ import (
 	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
 )
 
-func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, commandOptions *options.ServerRunOptions, externalInformers kubeexternalinformers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (*aggregatorapiserver.Config, error) {
+func createAggregatorConfig(
+	kubeAPIServerConfig genericapiserver.Config,
+	commandOptions *options.ServerRunOptions,
+	externalInformers kubeexternalinformers.SharedInformerFactory,
+	serviceResolver aggregatorapiserver.ServiceResolver,
+	proxyTransport *http.Transport,
+	pluginInitializers []admission.PluginInitializer,
+) (*aggregatorapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the aggregator
 	genericConfig := kubeAPIServerConfig
+
+	// override genericConfig.AdmissionControl with kube-aggregator's scheme,
+	// because aggregator apiserver should use its own scheme to convert its own resources.
+	commandOptions.Admission.ApplyTo(
+		&genericConfig,
+		externalInformers,
+		genericConfig.LoopbackClientConfig,
+		aggregatorscheme.Scheme,
+		pluginInitializers...)
 
 	// the aggregator doesn't wire these up.  It just delegates them to the kubeapiserver
 	genericConfig.EnableSwaggerUI = false

@@ -404,9 +404,8 @@ func TestGenericScheduler(t *testing.T) {
 			cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 		}
 		pvcs := []*v1.PersistentVolumeClaim{}
-		for _, pvc := range test.pvcs {
-			pvcs = append(pvcs, pvc)
-		}
+		pvcs = append(pvcs, test.pvcs...)
+
 		pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
 		scheduler := NewGenericScheduler(
@@ -661,11 +660,11 @@ func TestZeroRequest(t *testing.T) {
 	}
 }
 
-func printNodeToVictims(nodeToVictims map[*v1.Node]*Victims) string {
+func printNodeToVictims(nodeToVictims map[*v1.Node]*schedulerapi.Victims) string {
 	var output string
 	for node, victims := range nodeToVictims {
 		output += node.Name + ": ["
-		for _, pod := range victims.pods {
+		for _, pod := range victims.Pods {
 			output += pod.Name + ", "
 		}
 		output += "]"
@@ -673,15 +672,15 @@ func printNodeToVictims(nodeToVictims map[*v1.Node]*Victims) string {
 	return output
 }
 
-func checkPreemptionVictims(testName string, expected map[string]map[string]bool, nodeToPods map[*v1.Node]*Victims) error {
+func checkPreemptionVictims(testName string, expected map[string]map[string]bool, nodeToPods map[*v1.Node]*schedulerapi.Victims) error {
 	if len(expected) == len(nodeToPods) {
 		for k, victims := range nodeToPods {
 			if expPods, ok := expected[k.Name]; ok {
-				if len(victims.pods) != len(expPods) {
+				if len(victims.Pods) != len(expPods) {
 					return fmt.Errorf("test [%v]: unexpected number of pods. expected: %v, got: %v", testName, expected, printNodeToVictims(nodeToPods))
 				}
 				prevPriority := int32(math.MaxInt32)
-				for _, p := range victims.pods {
+				for _, p := range victims.Pods {
 					// Check that pods are sorted by their priority.
 					if *p.Spec.Priority > prevPriority {
 						return fmt.Errorf("test [%v]: pod %v of node %v was not sorted by priority", testName, p.Name, k)
@@ -884,7 +883,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	for _, test := range tests {
 		nodes := []*v1.Node{}
 		for _, n := range test.nodes {
-			node := makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5)
+			node := makeNode(n, 1000*5, priorityutil.DefaultMemoryRequest*5)
 			node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
 			nodes = append(nodes, node)
 		}
@@ -1275,6 +1274,30 @@ func TestPreempt(t *testing.T) {
 			expectedNode: "",
 			expectedPods: []string{},
 		},
+		{
+			name: "One scheduler extender allows only machine1, the other returns error but ignorable. Only machine1 would be chosen",
+			pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1")}, Spec: v1.PodSpec{
+				Containers: veryLargeContainers,
+				Priority:   &highPriority},
+			},
+			pods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.1", UID: types.UID("m1.1")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &midPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "m1.2", UID: types.UID("m1.2")}, Spec: v1.PodSpec{Containers: smallContainers, Priority: &lowPriority, NodeName: "machine1"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+
+				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &midPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
+			},
+			extenders: []*FakeExtender{
+				{
+					predicates: []fitPredicate{errorPredicateExtender},
+					ignorable:  true,
+				},
+				{
+					predicates: []fitPredicate{machine1PredicateExtender},
+				},
+			},
+			expectedNode: "machine1",
+			expectedPods: []string{"m1.1", "m1.2"},
+		},
 	}
 
 	for _, test := range tests {
@@ -1283,11 +1306,20 @@ func TestPreempt(t *testing.T) {
 		for _, pod := range test.pods {
 			cache.AddPod(pod)
 		}
+		cachedNodeInfoMap := map[string]*schedulercache.NodeInfo{}
 		for _, name := range nodeNames {
-			cache.AddNode(makeNode(name, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
+			node := makeNode(name, 1000*5, priorityutil.DefaultMemoryRequest*5)
+			cache.AddNode(node)
+
+			// Set nodeInfo to extenders to mock extenders' cache for preemption.
+			cachedNodeInfo := schedulercache.NewNodeInfo()
+			cachedNodeInfo.SetNode(node)
+			cachedNodeInfoMap[name] = cachedNodeInfo
 		}
 		extenders := []algorithm.SchedulerExtender{}
 		for _, extender := range test.extenders {
+			// Set nodeInfoMap as extenders cached node information.
+			extender.cachedNodeNameToInfo = cachedNodeInfoMap
 			extenders = append(extenders, extender)
 		}
 		scheduler := NewGenericScheduler(

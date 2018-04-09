@@ -86,7 +86,7 @@ func ingressUpgradeGCE(isUpgrade bool) error {
 		}
 	} else {
 		// Downgrade to latest release image.
-		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/google_containers\\/glbc:0.9.7/' /etc/kubernetes/manifests/glbc.manifest"
+		command = "sudo sed -i -re 's/(image:)(.*)/\\1 k8s.gcr.io\\/ingress-gce-glbc-amd64:v1.0.1/' /etc/kubernetes/manifests/glbc.manifest"
 	}
 	// Kubelet should restart glbc automatically.
 	sshResult, err := NodeExec(GetMasterHost(), command)
@@ -120,10 +120,11 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 }
 
 func locationParamGKE() string {
-	if TestContext.CloudConfig.Zone != "" {
-		return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	if TestContext.CloudConfig.MultiMaster {
+		// GKE Regional Clusters are being tested.
+		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
 	}
-	return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
 }
 
 func appendContainerCommandGroupIfNeeded(args []string) []string {
@@ -317,8 +318,7 @@ func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]str
 		go func() { result <- WaitForNodeToBeReady(c, n, timeout) }()
 	}
 	failed := false
-	// TODO(mbforbes): Change to `for range` syntax once we support only Go
-	// >= 1.4.
+
 	for i := range nodeList.Items {
 		_ = i
 		if !<-result {

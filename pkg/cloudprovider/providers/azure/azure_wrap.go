@@ -19,10 +19,11 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -241,4 +242,12 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 	}
 
 	return newTimedcache(rtCacheTTL, getter)
+}
+
+func (az *Cloud) useStandardLoadBalancer() bool {
+	return strings.EqualFold(az.LoadBalancerSku, loadBalancerSkuStandard)
+}
+
+func (az *Cloud) excludeMasterNodesFromStandardLB() bool {
+	return az.ExcludeMasterFromStandardLB != nil && *az.ExcludeMasterFromStandardLB
 }

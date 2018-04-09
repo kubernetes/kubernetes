@@ -14,7 +14,6 @@ go_library(
         "proxier.go",
         "proxysocket.go",
         "roundrobin.go",
-        "udp_server.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "rlimit.go",

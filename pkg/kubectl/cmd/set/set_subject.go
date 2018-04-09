@@ -21,6 +21,8 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +56,8 @@ type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool
 // SubjectOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
 type SubjectOptions struct {
+	PrintFlags *printers.PrintFlags
+
 	resource.FilenameOptions
 
 	Infos             []*resource.Info
@@ -70,11 +74,13 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
-	PrintObject func(obj runtime.Object, out io.Writer) error
+	PrintObj func(obj runtime.Object) error
 }
 
 func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &SubjectOptions{
+		PrintFlags: printers.NewPrintFlags("subjects updated"),
+
 		Out: out,
 		Err: errOut,
 	}
@@ -92,16 +98,17 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
+
 	usage := "the resource to update the subjects"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArrayVar(&options.Users, "user", []string{}, "Usernames to bind to the role")
-	cmd.Flags().StringArrayVar(&options.Groups, "group", []string{}, "Groups to bind to the role")
-	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", []string{}, "Service accounts to bind to the role")
+	cmd.Flags().StringArrayVar(&options.Users, "user", options.Users, "Usernames to bind to the role")
+	cmd.Flags().StringArrayVar(&options.Groups, "group", options.Groups, "Groups to bind to the role")
+	cmd.Flags().StringArrayVar(&options.ServiceAccounts, "serviceaccount", options.ServiceAccounts, "Service accounts to bind to the role")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -109,8 +116,16 @@ func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Co
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	o.PrintObject = func(obj runtime.Object, out io.Writer) error {
-		return cmdutil.PrintObject(cmd, obj, out)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
 	}
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -236,7 +251,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObject(info.Object, o.Out); err != nil {
+			if err := o.PrintObj(info.Object); err != nil {
 				return err
 			}
 			continue
@@ -249,11 +264,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		shortOutput := o.Output == "name"
-		if len(o.Output) > 0 && !shortOutput {
-			return o.PrintObject(info.AsVersioned(), o.Out)
-		}
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "subjects updated")
+		return o.PrintObj(info.AsVersioned())
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

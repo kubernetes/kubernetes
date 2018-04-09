@@ -266,6 +266,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 			nautilus = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
 			kitten = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
 		})
+		/*
+			Release : v1.9
+			Testname: Kubectl, replication controller
+			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2.
+		*/
 		framework.ConformanceIt("should create and stop a replication controller ", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
@@ -274,6 +279,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, scale replication controller
+			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Update the replicaset to 1. Number of running instances of the Pod MUST be 1. Update the replicaset to 2. Number of running instances of the Pod MUST be 2.
+		*/
 		framework.ConformanceIt("should scale a replication controller ", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
@@ -288,6 +298,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, rolling update replication controller
+			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Run a rolling update to run a different version of the container. All running instances SHOULD now be running the newer version of the container as part of the rolling update.
+		*/
 		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
 			By("creating the initial replication controller")
 			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
@@ -315,6 +330,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		}
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, guestbook application
+			Description: Create Guestbook application that contains redis server, 2 instances of redis slave, frontend application, frontend service and redis master service and redis slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend redis database. Application flow MUST work as expected and the data written MUST be available to read.
+		*/
 		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
 				cleanupKubectlInputs(contents, ns)
@@ -679,6 +699,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl api-versions", func() {
+		/*
+			Release : v1.9
+			Testname: Kubectl, check version v1
+			Description: Run kubectl to get api versions, output MUST contain returned versions with ‘v1’ listed.
+		*/
 		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
 			By("validating api versions")
 			output := framework.RunKubectlOrDie("api-versions")
@@ -770,13 +795,18 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl cluster-info", func() {
+		/*
+			Release : v1.9
+			Testname: Kubectl, cluster info
+			Description: Call kubectl to get cluster-info, output MUST contain cluster-info returned and Kubernetes Master SHOULD be running.
+		*/
 		framework.ConformanceIt("should check if Kubernetes master services is included in cluster-info ", func() {
 			By("validating cluster-info")
 			output := framework.RunKubectlOrDie("cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
 			requiredItems := []string{"Kubernetes master", "is running at"}
 			if framework.ProviderIs("gce", "gke") {
-				requiredItems = append(requiredItems, "KubeDNS", "Heapster")
+				requiredItems = append(requiredItems, "Heapster")
 			}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
@@ -787,6 +817,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl describe", func() {
+		/*
+			Release : v1.9
+			Testname: Kubectl, describe pod or rc
+			Description: Deploy a redis controller and a redis service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
+		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
 			kv, err := framework.KubectlVersion()
 			Expect(err).NotTo(HaveOccurred())
@@ -890,6 +925,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl expose", func() {
+		/*
+			Release : v1.9
+			Testname: Kubectl, create service, replication controller
+			Description: Create a Pod running redis master listening to port 6379. Using kubectl expose the redis master  replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that redis master is listening. Using kubectl expose the redis master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that redis master is listening.
+		*/
 		framework.ConformanceIt("should create services for rc ", func() {
 			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -981,6 +1021,11 @@ metadata:
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, label update
+			Description: When a Pod is running, update a Label using ‘kubectl label’ command. The label MUST be created in the Pod. A ‘kubectl get pod’ with -l option on the container MUST verify that the label can be read back. Use ‘kubectl label label-’ to remove the label. Kubetctl get pod’ with -l option SHOULD no list the deleted label as the label is removed.
+		*/
 		framework.ConformanceIt("should update the label on a resource ", func() {
 			labelName := "testing-label"
 			labelValue := "testing-label-value"
@@ -1016,6 +1061,17 @@ metadata:
 			cleanupKubectlInputs(rc, ns, simplePodSelector)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, logs
+			Description: When a Pod is running then it MUST generate logs.
+			Starting a Pod should have a log line indicating the the server is running and ready to accept connections. 			   Also log command options MUST work as expected and described below.
+				‘kubectl log -tail=1’ should generate a output of one line, the last line in the log.
+				‘kubectl --limit-bytes=1’ should generate a single byte output.
+				‘kubectl --tail=1 --timestamp should genrate one line with timestamp in RFC3339 format
+				‘kubectl --since=1s’ should output logs that are only 1 second older from now
+				‘kubectl --since=24h’ should output logs that are only 1 day older from now
+		*/
 		framework.ConformanceIt("should be able to retrieve and filter logs ", func() {
 			// Split("something\n", "\n") returns ["something", ""], so
 			// strip trailing newline first
@@ -1067,6 +1123,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl patch", func() {
+		/*
+			Release : v1.9
+			Testname: Kubectl, patch to annotate
+			Description: Start running a redis master and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
+		*/
 		framework.ConformanceIt("should add annotations for pods in rc ", func() {
 			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
@@ -1096,6 +1157,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl version", func() {
+		/*
+			Release : v1.9
+			Testname: Kubectl, version
+			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the the Client and the Server that the kubectl is configured to connect to.
+		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie("version")
 			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
@@ -1123,6 +1189,11 @@ metadata:
 			cleanUp()
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, run default
+			Description: Command ‘kubectl run’ MUST create a running pod with possible replicas given a image using the option --image=’nginx’. The running Pod SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command.
+		*/
 		framework.ConformanceIt("should create an rc or deployment from an image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, nsFlag)
@@ -1153,6 +1224,11 @@ metadata:
 			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, run rc
+			Description: Command ‘kubectl run’ MUST create a running rc with default one replicas given a image using the option --image=’nginx’. The running replication controller SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command. Also there MUST be 1 pod controlled by this replica set running 1 container with the image specified. A ‘kubetctl logs’ command MUST return the logs from the container in the replication controller.
+		*/
 		framework.ConformanceIt("should create an rc from an image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
@@ -1209,6 +1285,11 @@ metadata:
 			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, rolling update
+			Description: Command ‘kubectl rolling-update’ MUST replace the specified replication controller with a new replication controller by updating one pod at a time to use the new Pod spec.
+		*/
 		framework.ConformanceIt("should support rolling-update to same image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
@@ -1253,6 +1334,11 @@ metadata:
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, run deployment
+			Description: Command ‘kubectl run’ MUST create a job, with --generator=deployment, when a image name is specified in the run command. After the run command there SHOULD be a deployment that should exist with one container running the specified image. Also there SHOULD be a Pod that is controlled by this deployment, with a container running the specified image.
+		*/
 		framework.ConformanceIt("should create a deployment from an image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", dName, "--image="+nginxImage, "--generator=deployment/v1beta1", nsFlag)
@@ -1293,6 +1379,11 @@ metadata:
 			framework.RunKubectlOrDie("delete", "jobs", jobName, nsFlag)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, run job
+			Description: Command ‘kubectl run’ MUST create a deployment, with --generator=job, when a image name is specified in the run command. After the run command there SHOULD be a job that should exist with one container running the specified image. Also there SHOULD be a restart policy on the job spec that SHOULD match the command line.
+		*/
 		framework.ConformanceIt("should create a job from an image when restart is OnFailure ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+nginxImage, nsFlag)
@@ -1361,6 +1452,11 @@ metadata:
 			framework.RunKubectlOrDie("delete", "pods", podName, nsFlag)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, run pod
+			Description: Command ‘kubectl run’ MUST create a pod, with --generator=run-pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
+		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+nginxImage, nsFlag)
@@ -1392,6 +1488,11 @@ metadata:
 			framework.RunKubectlOrDie("delete", "pods", podName, nsFlag)
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, replace
+			Description: Command ‘kubectl replace’ on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to ‘kubectl replace’ SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
+		*/
 		framework.ConformanceIt("should update a single-container pod's image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+nginxImage, "--labels=run="+podName, nsFlag)
@@ -1428,6 +1529,11 @@ metadata:
 	framework.KubeDescribe("Kubectl run --rm job", func() {
 		jobName := "e2e-test-rm-busybox-job"
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, run job with --rm
+			Description: Start a job with a Pod using ‘kubectl run’ but specify --rm=true. Wait for the Pod to start running by verifying that there is output as expected. Now verify that the job has exited and cannot be found. With --rm=true option the job MUST start by running the image specified and then get deleted itself.
+		*/
 		framework.ConformanceIt("should create a job from an image, then delete the job ", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
@@ -1453,6 +1559,11 @@ metadata:
 
 	framework.KubeDescribe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
+		/*
+			Release : v1.9
+			Testname: Kubectl, proxy port zero
+			Description: Start a proxy server on port zero by running ‘kubectl proxy’ with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
+		*/
 		framework.ConformanceIt("should support proxy with --port 0 ", func() {
 			By("starting the proxy server")
 			port, cmd, err := startProxyServer()
@@ -1473,6 +1584,11 @@ metadata:
 			}
 		})
 
+		/*
+			Release : v1.9
+			Testname: Kubectl, proxy socket
+			Description: Start a proxy server on by running ‘kubectl proxy’ with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide atleast one version string
+		*/
 		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			By("Starting the proxy")
 			tmpdir, err := ioutil.TempDir("", "kubectl-proxy-unix")

@@ -37,6 +37,11 @@ spec:
       serviceAccountName: metadata-proxy
       hostNetwork: true
       dnsPolicy: Default
+      tolerations:
+      - operator: "Exists"
+        effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       containers:
       - name: metadata-proxy
         image: k8s.gcr.io/metadata-proxy:v0.1.9

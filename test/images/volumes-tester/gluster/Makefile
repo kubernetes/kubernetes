@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.4
-PREFIX = staging-k8s.gcr.io
+TAG = 0.5
+PREFIX = gcr.io/kubernetes-e2e-test-images
 
 all: push
 

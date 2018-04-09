@@ -51,6 +51,7 @@ func TestCreateRole(t *testing.T) {
 			verbs:     "get,watch,list",
 			resources: "pods,pods",
 			expectedRole: &rbac.Role{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
@@ -68,6 +69,7 @@ func TestCreateRole(t *testing.T) {
 			verbs:     "get,watch,list",
 			resources: "replicasets/scale",
 			expectedRole: &rbac.Role{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
@@ -85,6 +87,7 @@ func TestCreateRole(t *testing.T) {
 			verbs:     "get,watch,list",
 			resources: "replicasets.extensions/scale",
 			expectedRole: &rbac.Role{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
@@ -102,6 +105,7 @@ func TestCreateRole(t *testing.T) {
 			verbs:     "get,watch,list",
 			resources: "pods,deployments.extensions",
 			expectedRole: &rbac.Role{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},

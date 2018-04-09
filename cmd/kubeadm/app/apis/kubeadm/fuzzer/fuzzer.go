@@ -60,6 +60,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				Name:      "foo",
 				HostPath:  "foo",
 				MountPath: "foo",
+				Writable:  false,
 			}}
 			obj.Etcd.ExtraArgs = map[string]string{"foo": "foo"}
 			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
@@ -127,6 +128,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryFile = "foo"
 			obj.DiscoveryToken = "foo"
 			obj.DiscoveryTokenAPIServers = []string{"foo"}
+			obj.DiscoveryTimeout = &metav1.Duration{Duration: 1}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
 			obj.CRISocket = "foo"

@@ -138,7 +138,7 @@ func (c *namespacedScaleClient) Get(resource schema.GroupResource, name string) 
 		SubResource("scale").
 		Do()
 	if err := result.Error(); err != nil {
-		return nil, fmt.Errorf("could not fetch the scale for %s %s: %v", resource.String(), name, err)
+		return nil, err
 	}
 
 	scaleBytes, err := result.Raw()
@@ -196,7 +196,10 @@ func (c *namespacedScaleClient) Update(resource schema.GroupResource, scale *aut
 		Body(scaleUpdateBytes).
 		Do()
 	if err := result.Error(); err != nil {
-		return nil, fmt.Errorf("could not update the scale for %s %s: %v", resource.String(), scale.Name, err)
+		// propagate "raw" error from the API
+		// this allows callers to interpret underlying Reason field
+		// for example: errors.IsConflict(err)
+		return nil, err
 	}
 
 	scaleBytes, err := result.Raw()

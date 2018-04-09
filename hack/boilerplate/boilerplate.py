@@ -20,8 +20,6 @@ import argparse
 import datetime
 import difflib
 import glob
-import json
-import mmap
 import os
 import re
 import sys
@@ -63,6 +61,14 @@ def get_refs():
 
     return refs
 
+def is_generated_file(filename, data, regexs):
+    for d in skipped_ungenerated_files:
+        if d in filename:
+            return False
+
+    p = regexs["generated"]
+    return p.search(data)
+
 def file_passes(filename, refs, regexs):
     try:
         f = open(filename, 'r')
@@ -73,15 +79,22 @@ def file_passes(filename, refs, regexs):
     data = f.read()
     f.close()
 
+    # determine if the file is automatically generated
+    generated = is_generated_file(filename, data, regexs)
+
     basename = os.path.basename(filename)
-    extension = file_extension(filename)
+    if generated:
+        extension = "generatego"
+    else:
+        extension = file_extension(filename)
+
     if extension != "":
         ref = refs[extension]
     else:
         ref = refs[basename]
 
     # remove build tags from the top of Go files
-    if extension == "go":
+    if extension == "go" or extension =="generatego":
         p = regexs["go_build_constraints"]
         (data, found) = p.subn("", data, 1)
 
@@ -105,15 +118,19 @@ def file_passes(filename, refs, regexs):
     p = regexs["year"]
     for d in data:
         if p.search(d):
-            print('File %s is missing the year' % filename, file=verbose_out)
+            if generated:
+                print('File %s has the YEAR field, but it should not be in generated file' % filename, file=verbose_out)
+            else:
+                print('File %s has the YEAR field, but missing the year of date' % filename, file=verbose_out)
             return False
 
-    # Replace all occurrences of the regex "2014|2015|2016|2017|2018" with "YEAR"
-    p = regexs["date"]
-    for i, d in enumerate(data):
-        (data[i], found) = p.subn('YEAR', d)
-        if found != 0:
-            break
+    if not generated:
+        # Replace all occurrences of the regex "2014|2015|2016|2017|2018" with "YEAR"
+        p = regexs["date"]
+        for i, d in enumerate(data):
+            (data[i], found) = p.subn('YEAR', d)
+            if found != 0:
+                break
 
     # if we don't match the reference at this point, fail
     if ref != data:
@@ -133,6 +150,10 @@ def file_extension(filename):
 skipped_dirs = ['Godeps', 'third_party', '_gopath', '_output', '.git', 'cluster/env.sh',
                 "vendor", "test/e2e/generated/bindata.go", "hack/boilerplate/test",
                 "pkg/generated/bindata.go"]
+
+# list all the files contain 'DO NOT EDIT', but are not generated
+skipped_ungenerated_files = ['hack/build-ui.sh', 'hack/lib/swagger.sh',
+                             'hack/boilerplate/boilerplate.py']
 
 def normalize_files(files):
     newfiles = []
@@ -187,6 +208,8 @@ def get_regexs():
     regexs["go_build_constraints"] = re.compile(r"^(// \+build.*\n)+\n", re.MULTILINE)
     # strip #!.* from shell scripts
     regexs["shebang"] = re.compile(r"^(#!.*\n)\n*", re.MULTILINE)
+    # Search for generated files
+    regexs["generated"] = re.compile( 'DO NOT EDIT' )
     return regexs
 
 def main():

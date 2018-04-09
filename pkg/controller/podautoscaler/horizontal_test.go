@@ -124,6 +124,7 @@ type testCase struct {
 	testClient        *fake.Clientset
 	testMetricsClient *metricsfake.Clientset
 	testCMClient      *cmfake.FakeCustomMetricsClient
+	testEMClient      *emfake.FakeExternalMetricsClient
 	testScaleClient   *scalefake.FakeScaleClient
 }
 
@@ -246,16 +247,32 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		defer tc.Unlock()
 
 		obj := &v1.PodList{}
-		for i := 0; i < len(tc.reportedCPURequests); i++ {
+
+		specifiedCPURequests := tc.reportedCPURequests != nil
+
+		numPodsToCreate := int(tc.initialReplicas)
+		if specifiedCPURequests {
+			numPodsToCreate = len(tc.reportedCPURequests)
+		}
+
+		for i := 0; i < numPodsToCreate; i++ {
 			podReadiness := v1.ConditionTrue
 			if tc.reportedPodReadiness != nil {
 				podReadiness = tc.reportedPodReadiness[i]
 			}
+
 			podPhase := v1.PodRunning
 			if tc.reportedPodPhase != nil {
 				podPhase = tc.reportedPodPhase[i]
 			}
+
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
+
+			reportedCPURequest := resource.MustParse("1.0")
+			if specifiedCPURequests {
+				reportedCPURequest = tc.reportedCPURequests[i]
+			}
+
 			pod := v1.Pod{
 				Status: v1.PodStatus{
 					Phase: podPhase,
@@ -273,12 +290,13 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 						"name": podNamePrefix,
 					},
 				},
+
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceCPU: tc.reportedCPURequests[i],
+									v1.ResourceCPU: reportedCPURequest,
 								},
 							},
 						},
@@ -581,6 +599,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	}
 	if tc.testCMClient != nil {
 		testCMClient = tc.testCMClient
+	}
+	if tc.testEMClient != nil {
+		testEMClient = tc.testEMClient
 	}
 	if tc.testScaleClient != nil {
 		testScaleClient = tc.testScaleClient
@@ -1348,13 +1369,14 @@ func TestEmptyMetrics(t *testing.T) {
 
 func TestEmptyCPURequest(t *testing.T) {
 	tc := testCase{
-		minReplicas:     1,
-		maxReplicas:     5,
-		initialReplicas: 1,
-		desiredReplicas: 1,
-		CPUTarget:       100,
-		reportedLevels:  []uint64{200},
-		useMetricsAPI:   true,
+		minReplicas:         1,
+		maxReplicas:         5,
+		initialReplicas:     1,
+		desiredReplicas:     1,
+		CPUTarget:           100,
+		reportedLevels:      []uint64{200},
+		reportedCPURequests: []resource.Quantity{},
+		useMetricsAPI:       true,
 		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
 			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
 			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
@@ -1568,6 +1590,16 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 				},
 			},
 		},
+		"FailedGetExternalMetric": {
+			{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricSource{
+					MetricSelector: &metav1.LabelSelector{},
+					MetricName:     "qps",
+					TargetValue:    resource.NewMilliQuantity(300, resource.DecimalSI),
+				},
+			},
+		},
 	}
 
 	for reason, specs := range metricsTargets {
@@ -1581,15 +1613,19 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 			reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 			useMetricsAPI:       true,
 		}
-		_, testMetricsClient, testCMClient, _, _ := tc.prepareTestClient(t)
+		_, testMetricsClient, testCMClient, testEMClient, _ := tc.prepareTestClient(t)
 		tc.testMetricsClient = testMetricsClient
 		tc.testCMClient = testCMClient
+		tc.testEMClient = testEMClient
 
 		testMetricsClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			return true, &metricsapi.PodMetricsList{}, fmt.Errorf("something went wrong")
 		})
 		testCMClient.PrependReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			return true, &cmapi.MetricValueList{}, fmt.Errorf("something went wrong")
+		})
+		testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
 		})
 
 		tc.expectedConditions = []autoscalingv1.HorizontalPodAutoscalerCondition{

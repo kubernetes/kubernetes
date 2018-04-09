@@ -11,6 +11,7 @@ go_library(
     srcs = ["token.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/discovery/token",
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/util/pubkeypin:go_default_library",

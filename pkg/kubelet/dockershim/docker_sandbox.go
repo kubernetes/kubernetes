@@ -17,6 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -26,7 +27,6 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	defaultSandboxImage = "k8s.gcr.io/pause-amd64:3.1"
+	defaultSandboxImage = "k8s.gcr.io/pause:3.1"
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2

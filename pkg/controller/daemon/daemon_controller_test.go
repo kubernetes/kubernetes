@@ -453,6 +453,8 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 // When ScheduleDaemonSetPods is enabled, DaemonSets without node selectors should
 // launch pods on every node by NodeAffinity.
 func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
+	t.Skip("disabled for 1.10")
+
 	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
 	// Rollback feature gate.
 	defer func() {

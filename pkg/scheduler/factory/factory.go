@@ -20,6 +20,8 @@ package factory
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"reflect"
 	"time"
 
@@ -50,7 +52,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -292,8 +293,31 @@ func NewConfigFactory(
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer)
+		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer)
 	}
+
+	// Setup cache comparer
+	comparer := &cacheComparer{
+		podLister:  podInformer.Lister(),
+		nodeLister: nodeInformer.Lister(),
+		pdbLister:  pdbInformer.Lister(),
+		cache:      c.schedulerCache,
+		podQueue:   c.podQueue,
+	}
+
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, compareSignal)
+
+	go func() {
+		for {
+			select {
+			case <-c.StopEverything:
+				return
+			case <-ch:
+				comparer.Compare()
+			}
+		}
+	}()
 
 	return c
 }
@@ -379,23 +403,6 @@ func (c *configFactory) invalidatePredicatesForPvUpdate(oldPV, newPV *v1.Persist
 		if isZoneRegionLabel(k) && !reflect.DeepEqual(v, oldPV.Labels[k]) {
 			invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 			break
-		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		oldAffinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(oldPV.Annotations)
-		if err != nil {
-			glog.Errorf("cannot get node affinity fo *v1.PersistentVolume: %v", oldPV)
-			return
-		}
-		newAffinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(newPV.Annotations)
-		if err != nil {
-			glog.Errorf("cannot get node affinity fo *v1.PersistentVolume: %v", newPV)
-			return
-		}
-
-		// If node affinity of PV is changed.
-		if !reflect.DeepEqual(oldAffinity, newAffinity) {
-			invalidPredicates.Insert(predicates.CheckVolumeBindingPred)
 		}
 	}
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)

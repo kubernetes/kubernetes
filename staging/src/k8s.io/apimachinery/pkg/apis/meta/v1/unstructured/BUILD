@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "helpers_test.go",
         "unstructured_list_test.go",
+        "unstructured_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

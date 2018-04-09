@@ -306,7 +306,7 @@ func Test_toRealServer(t *testing.T) {
 	for i := range Tests {
 		got, err := toRealServer(&Tests[i].ipvsDestination)
 		if err != nil {
-			t.Errorf("case %d unexpected error: %d", i, err)
+			t.Errorf("case %d unexpected error: %v", i, err)
 		}
 		if !reflect.DeepEqual(*got, Tests[i].realServer) {
 			t.Errorf("case %d Failed to translate Destination - got %#v, want %#v", i, *got, Tests[i].realServer)
@@ -349,7 +349,7 @@ func Test_toIPVSDestination(t *testing.T) {
 	for i := range Tests {
 		got, err := toIPVSDestination(&Tests[i].realServer)
 		if err != nil {
-			t.Errorf("case %d unexpected error: %d", i, err)
+			t.Errorf("case %d unexpected error: %v", i, err)
 		}
 		if !reflect.DeepEqual(*got, Tests[i].ipvsDestination) {
 			t.Errorf("case %d failed to translate Destination - got %#v, want %#v", i, *got, Tests[i].ipvsDestination)

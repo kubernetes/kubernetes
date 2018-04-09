@@ -17,13 +17,13 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
-	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"

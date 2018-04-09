@@ -440,7 +440,7 @@ func generateScaleTestBackendDeploymentSpec(numReplicas int32) *extensions.Deplo
 					Containers: []v1.Container{
 						{
 							Name:  scaleTestBackendName,
-							Image: "gcr.io/google_containers/echoserver:1.6",
+							Image: "k8s.gcr.io/echoserver:1.10",
 							Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 							ReadinessProbe: &v1.Probe{
 								Handler: v1.Handler{

@@ -50,6 +50,7 @@ func TestCreateClusterRole(t *testing.T) {
 			verbs:     "get,watch,list",
 			resources: "pods,pods",
 			expectedClusterRole: &rbac.ClusterRole{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
@@ -67,6 +68,7 @@ func TestCreateClusterRole(t *testing.T) {
 			verbs:     "get,watch,list",
 			resources: "pods,deployments.extensions",
 			expectedClusterRole: &rbac.ClusterRole{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
@@ -90,6 +92,7 @@ func TestCreateClusterRole(t *testing.T) {
 			verbs:          "get",
 			nonResourceURL: "/logs/,/healthz",
 			expectedClusterRole: &rbac.ClusterRole{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
@@ -106,6 +109,7 @@ func TestCreateClusterRole(t *testing.T) {
 			nonResourceURL: "/logs/,/healthz",
 			resources:      "pods",
 			expectedClusterRole: &rbac.ClusterRole{
+				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole"},
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},

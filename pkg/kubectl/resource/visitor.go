@@ -154,6 +154,17 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	return nil
 }
 
+// String returns the general purpose string representation
+func (i *Info) String() string {
+	basicInfo := fmt.Sprintf("Name: %q, Namespace: %q\nObject: %+q", i.Name, i.Namespace, i.Object)
+	if i.Mapping != nil {
+		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource,
+			i.Mapping.GroupVersionKind.String())
+		return fmt.Sprint(mappingInfo, "\n", basicInfo)
+	}
+	return basicInfo
+}
+
 // Namespaced returns true if the object belongs to a namespace
 func (i *Info) Namespaced() bool {
 	return i.Mapping != nil && i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
@@ -578,7 +589,7 @@ func (v *StreamVisitor) Visit(fn VisitorFunc) error {
 			if err == io.EOF {
 				return nil
 			}
-			return err
+			return fmt.Errorf("error parsing %s: %v", v.Source, err)
 		}
 		// TODO: This needs to be able to handle object in other encodings and schemas.
 		ext.Raw = bytes.TrimSpace(ext.Raw)

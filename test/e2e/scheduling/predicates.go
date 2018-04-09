@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -71,7 +72,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, ns, RCName)
+			err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -147,7 +148,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, pausePodConfig{
 			Name:   podName,
 			Labels: map[string]string{"name": "additional"},
-		}), podName, false)
+		}), ns, podName, false)
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
 	})
 
@@ -222,7 +223,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		}
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
 	})
 
@@ -337,7 +338,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		}
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(cs, len(fillerPods), 1, ns)
 	})
 
@@ -362,7 +363,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		}
 
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(cs, 0, 1, ns)
 	})
 
@@ -461,7 +462,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			},
 			Labels: map[string]string{"name": "restricted"},
 		}
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(cs, 0, 1, ns)
 	})
 
@@ -585,11 +586,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			NodeSelector: map[string]string{labelKey: labelValue},
 		}
 
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podNameNoTolerations, false)
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podNameNoTolerations, false)
 		verifyResult(cs, 0, 1, ns)
 
 		By("Removing taint off the node")
-		WaitForSchedulerAfterAction(f, removeTaintFromNodeAction(cs, nodeName, testTaint), podNameNoTolerations, true)
+		WaitForSchedulerAfterAction(f, removeTaintFromNodeAction(cs, nodeName, testTaint), ns, podNameNoTolerations, true)
 		verifyResult(cs, 1, 0, ns)
 	})
 
@@ -609,14 +610,15 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
 		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
-		By("Trying to create a pod(pod1) with hostport 80 and hostIP 127.0.0.1 and expect scheduled")
-		creatHostPortPodOnNode(f, "pod1", ns, "127.0.0.1", v1.ProtocolTCP, nodeSelector, true)
+		port := int32(54321)
+		By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP 127.0.0.1 and expect scheduled", port))
+		creatHostPortPodOnNode(f, "pod1", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, true)
 
-		By("Trying to create another pod(pod2) with hostport 80 but hostIP 127.0.0.2 on the node which pod1 resides and expect scheduled")
-		creatHostPortPodOnNode(f, "pod2", ns, "127.0.0.2", v1.ProtocolTCP, nodeSelector, true)
+		By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP 127.0.0.2 on the node which pod1 resides and expect scheduled", port))
+		creatHostPortPodOnNode(f, "pod2", ns, "127.0.0.2", port, v1.ProtocolTCP, nodeSelector, true)
 
-		By("Trying to create a third pod(pod3) with hostport 80, hostIP 127.0.0.2 but use UDP protocol on the node which pod2 resides")
-		creatHostPortPodOnNode(f, "pod3", ns, "127.0.0.2", v1.ProtocolUDP, nodeSelector, true)
+		By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP 127.0.0.2 but use UDP protocol on the node which pod2 resides", port))
+		creatHostPortPodOnNode(f, "pod3", ns, "127.0.0.2", port, v1.ProtocolUDP, nodeSelector, true)
 	})
 
 	It("validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP", func() {
@@ -634,11 +636,12 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
 		defer framework.RemoveLabelOffNode(cs, nodeName, k)
 
-		By("Trying to create a pod(pod4) with hostport 80 and hostIP 0.0.0.0(empty string here) and expect scheduled")
-		creatHostPortPodOnNode(f, "pod4", ns, "", v1.ProtocolTCP, nodeSelector, true)
+		port := int32(54322)
+		By(fmt.Sprintf("Trying to create a pod(pod4) with hostport %v and hostIP 0.0.0.0(empty string here) and expect scheduled", port))
+		creatHostPortPodOnNode(f, "pod4", ns, "", port, v1.ProtocolTCP, nodeSelector, true)
 
-		By("Trying to create another pod(pod5) with hostport 80 but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled")
-		creatHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", v1.ProtocolTCP, nodeSelector, false)
+		By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled", port))
+		creatHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
 })
 
@@ -656,7 +659,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Ports: conf.Ports,
 				},
 			},
@@ -734,10 +737,10 @@ func createPausePodAction(f *framework.Framework, conf pausePodConfig) common.Ac
 
 // WaitForSchedulerAfterAction performs the provided action and then waits for
 // scheduler to act on the given pod.
-func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, podName string, expectSuccess bool) {
+func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, ns, podName string, expectSuccess bool) {
 	predicate := scheduleFailureEvent(podName)
 	if expectSuccess {
-		predicate = scheduleSuccessEvent(podName, "" /* any node */)
+		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
 	success, err := common.ObserveEventAfterAction(f, predicate, action)
 	Expect(err).NotTo(HaveOccurred())
@@ -821,7 +824,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 		Name:           id,
 		Namespace:      f.Namespace.Name,
 		Timeout:        defaultTimeout,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Replicas:       replicas,
 		HostPorts:      map[string]int{"port1": 4321},
 	}
@@ -832,12 +835,12 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 }
 
 // create pod which using hostport on the specified node according to the nodeSelector
-func creatHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
+func creatHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
 	createPausePod(f, pausePodConfig{
 		Name: podName,
 		Ports: []v1.ContainerPort{
 			{
-				HostPort:      80,
+				HostPort:      port,
 				ContainerPort: 80,
 				Protocol:      protocol,
 				HostIP:        hostIP,

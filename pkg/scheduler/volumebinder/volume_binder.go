@@ -40,11 +40,10 @@ func NewVolumeBinder(
 	client clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
-	nodeInformer coreinformers.NodeInformer,
 	storageClassInformer storageinformers.StorageClassInformer) *VolumeBinder {
 
 	return &VolumeBinder{
-		Binder:    persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer),
+		Binder:    persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer),
 		BindQueue: workqueue.NewNamed("podsToBind"),
 	}
 }

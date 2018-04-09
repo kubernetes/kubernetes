@@ -37,7 +37,7 @@ EVENT_PD=${EVENT_PD:-false}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-gci}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-gci}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-cos-stable-63-10032-71-0}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-cos-stable-65-10323-64-0}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 
 # GPUs supported in GCE do not have compatible drivers in Debian 7.
@@ -119,10 +119,6 @@ fi
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
-
-if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
-fi
 
 # Enable a simple "AdvancedAuditing" setup for testing.
 ENABLE_APISERVER_ADVANCED_AUDIT="${ENABLE_APISERVER_ADVANCED_AUDIT:-false}"

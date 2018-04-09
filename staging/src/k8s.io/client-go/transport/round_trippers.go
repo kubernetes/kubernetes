@@ -331,11 +331,11 @@ func (r *requestInfo) toCurl() string {
 	headers := ""
 	for key, values := range r.RequestHeaders {
 		for _, value := range values {
-			headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: %s", key, value))
+			headers += fmt.Sprintf(` -H %q`, fmt.Sprintf("%s: '%s'", key, value))
 		}
 	}
 
-	return fmt.Sprintf("curl -k -v -X%s %s %s", r.RequestVerb, headers, r.RequestURL)
+	return fmt.Sprintf("curl -k -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
 }
 
 // debuggingRoundTripper will display information about the requests passing

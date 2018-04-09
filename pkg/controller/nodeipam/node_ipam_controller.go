@@ -101,7 +101,7 @@ func NewNodeIpamController(
 	glog.V(0).Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(
 		&v1core.EventSinkImpl{
-			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
+			Interface: kubeClient.CoreV1().Events(""),
 		})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {

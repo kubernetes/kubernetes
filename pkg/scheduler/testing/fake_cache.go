@@ -100,3 +100,8 @@ func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil
 func (f *FakeCache) FilteredList(filter schedulercache.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil
 }
+
+// Snapshot is a fake method for testing
+func (f *FakeCache) Snapshot() *schedulercache.Snapshot {
+	return &schedulercache.Snapshot{}
+}

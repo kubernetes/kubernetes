@@ -1,5 +1,6 @@
 cluster/images/etcd-version-monitor
 cmd/hyperkube
+cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kube-scheduler/app
@@ -14,7 +15,6 @@ pkg/api/ref
 pkg/api/testapi
 pkg/api/testing
 pkg/api/testing/compat
-pkg/api/unversioned
 pkg/api/v1/endpoints
 pkg/api/v1/pod
 pkg/api/v1/resource
@@ -174,7 +174,6 @@ pkg/kubelet/dockershim/cm
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/testing
 pkg/kubelet/events
-pkg/kubelet/gpu
 pkg/kubelet/images
 pkg/kubelet/kuberuntime
 pkg/kubelet/leaky
@@ -197,7 +196,6 @@ pkg/kubelet/prober/results
 pkg/kubelet/prober/testing
 pkg/kubelet/qos
 pkg/kubelet/remote
-pkg/kubelet/rkt
 pkg/kubelet/secret
 pkg/kubelet/server
 pkg/kubelet/server/portforward
@@ -324,7 +322,6 @@ pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
 pkg/routes
-pkg/scheduler/api
 pkg/security/apparmor
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
@@ -403,7 +400,6 @@ plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
-plugin/pkg/admission/persistentvolume/label
 plugin/pkg/admission/podnodeselector
 plugin/pkg/admission/podpreset
 plugin/pkg/admission/podtolerationrestriction
@@ -449,12 +445,6 @@ staging/src/k8s.io/api/storage/v1alpha1
 staging/src/k8s.io/api/storage/v1beta1
 staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr
 staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1
-staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned
-staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/fake
-staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme
-staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1
-staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1/fake
-staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/internalinterfaces
 staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
 staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver
@@ -505,7 +495,6 @@ staging/src/k8s.io/apimachinery/pkg/util/proxy
 staging/src/k8s.io/apimachinery/pkg/util/rand
 staging/src/k8s.io/apimachinery/pkg/util/remotecommand
 staging/src/k8s.io/apimachinery/pkg/util/runtime
-staging/src/k8s.io/apimachinery/pkg/util/sets
 staging/src/k8s.io/apimachinery/pkg/util/sets/types
 staging/src/k8s.io/apimachinery/pkg/util/strategicpatch
 staging/src/k8s.io/apimachinery/pkg/util/uuid

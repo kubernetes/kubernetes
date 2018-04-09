@@ -32,6 +32,7 @@ go_library(
         "//pkg/util/labels:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",

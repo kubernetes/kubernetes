@@ -329,7 +329,7 @@ func TestLabelErrors(t *testing.T) {
 			tf.ClientConfigVal = defaultClientConfig()
 
 			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdLabel(tf, buf)
+			cmd := NewCmdLabel(tf, buf, buf)
 			cmd.SetOutput(buf)
 
 			for k, v := range testCase.flags {
@@ -391,7 +391,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf)
+	cmd := NewCmdLabel(tf, buf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}}}
 	err := opts.Complete(buf, cmd, []string{"a=b"})
@@ -424,7 +424,7 @@ func TestLabelLocal(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf)
+	cmd := NewCmdLabel(tf, buf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		local: true}
@@ -482,8 +482,8 @@ func TestLabelMultipleObjects(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{all: true}
+	cmd := NewCmdLabel(tf, buf, buf)
 	err := opts.Complete(buf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()

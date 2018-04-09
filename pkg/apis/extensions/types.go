@@ -818,8 +818,8 @@ type PodSecurityPolicySpec struct {
 	// To allow all capabilities you may use '*'.
 	// +optional
 	AllowedCapabilities []api.Capability
-	// Volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
-	// may be used.
+	// Volumes is a white list of allowed volume plugins. Empty indicates that
+	// no volumes may be used. To allow all volumes you may use '*'.
 	// +optional
 	Volumes []FSType
 	// HostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
@@ -938,7 +938,7 @@ type AllowedFlexVolume struct {
 type SELinuxStrategyOptions struct {
 	// Rule is the strategy that will dictate the allowable labels that may be set.
 	Rule SELinuxStrategy
-	// seLinuxOptions required to run as; required for MustRunAs
+	// SELinuxOptions required to run as; required for MustRunAs
 	// More info: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#selinux
 	// +optional
 	SELinuxOptions *api.SELinuxOptions
@@ -949,9 +949,9 @@ type SELinuxStrategyOptions struct {
 type SELinuxStrategy string
 
 const (
-	// container must have SELinux labels of X applied.
+	// SELinuxStrategyMustRunAs means that container must have SELinux labels of X applied.
 	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
-	// container may make requests for any SELinux context labels.
+	// SELinuxStrategyRunAsAny means that container may make requests for any SELinux context labels.
 	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
@@ -959,7 +959,8 @@ const (
 type RunAsUserStrategyOptions struct {
 	// Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
 	Rule RunAsUserStrategy
-	// Ranges are the allowed ranges of uids that may be used.
+	// Ranges are the allowed ranges of uids that may be used. If you would like to force a single uid
+	// then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
 	Ranges []UserIDRange
 }
@@ -985,11 +986,11 @@ type GroupIDRange struct {
 type RunAsUserStrategy string
 
 const (
-	// container must run as a particular uid.
+	// RunAsUserStrategyMustRunAs means that container must run as a particular uid.
 	RunAsUserStrategyMustRunAs RunAsUserStrategy = "MustRunAs"
-	// container must run as a non-root uid
+	// RunAsUserStrategyMustRunAsNonRoot means that container must run as a non-root uid
 	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategy = "MustRunAsNonRoot"
-	// container may make requests for any uid.
+	// RunAsUserStrategyRunAsAny means that container may make requests for any uid.
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
 )
 
@@ -999,7 +1000,7 @@ type FSGroupStrategyOptions struct {
 	// +optional
 	Rule FSGroupStrategyType
 	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
-	// fs group then supply a single range with the same start and end.
+	// fs group then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
 	Ranges []GroupIDRange
 }
@@ -1009,9 +1010,9 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
-	// container must have FSGroup of X applied.
+	// FSGroupStrategyMustRunAs means that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
-	// container may make requests for any FSGroup labels.
+	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
 	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
 )
 
@@ -1021,7 +1022,7 @@ type SupplementalGroupsStrategyOptions struct {
 	// +optional
 	Rule SupplementalGroupsStrategyType
 	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
-	// supplemental group then supply a single range with the same start and end.
+	// supplemental group then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
 	Ranges []GroupIDRange
 }
@@ -1031,9 +1032,9 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
-	// container must run as a particular gid.
+	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
-	// container may make requests for any gid.
+	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 

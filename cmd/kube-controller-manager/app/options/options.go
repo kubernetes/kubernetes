@@ -60,7 +60,6 @@ func NewKubeControllerManagerOptions() *KubeControllerManagerOptions {
 		gcIgnoredResources = append(gcIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
 	}
 	s.Generic.ComponentConfig.GCIgnoredResources = gcIgnoredResources
-	s.Generic.ComponentConfig.LeaderElection.LeaderElect = true
 
 	return &s
 }

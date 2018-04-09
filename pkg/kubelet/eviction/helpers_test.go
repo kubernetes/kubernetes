@@ -19,6 +19,7 @@ package eviction
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -1913,4 +1915,35 @@ func (s1 thresholdList) Equal(s2 thresholdList) bool {
 		}
 	}
 	return true
+}
+
+func TestThresholdStopCh(t *testing.T) {
+	var wg sync.WaitGroup
+	fakeClock := clock.NewFakeClock(time.Now())
+	stop := NewInitialStopCh(fakeClock)
+
+	// Should be able to reset the InitialStopCh right away
+	if !stop.Reset() {
+		t.Errorf("Expected to be able to close the initialStopCh, but was unsuccessful")
+	}
+
+	// Need to wait notifierRefreshInterval before closing
+	if stop.Reset() {
+		t.Errorf("Expected not to be able to close the initialStopCh, but was successful")
+	}
+
+	wg.Add(1)
+	ch := stop.Ch()
+	go func() {
+		defer wg.Done()
+		// wait for the channel to close
+		<-ch
+	}()
+
+	fakeClock.Step(2 * notifierRefreshInterval)
+	if !stop.Reset() {
+		t.Errorf("Expected to be able to close the initialStopCh, but was unsuccessful")
+	}
+	// ensure the Reset() closed the channel
+	wg.Wait()
 }

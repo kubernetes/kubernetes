@@ -321,15 +321,12 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 		defaultArguments["cluster-signing-cert-file"] = ""
 	}
 
-	command := []string{"kube-controller-manager"}
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManagerExtraArgs)...)
-
 	if cfg.CloudProvider != "" {
-		command = append(command, "--cloud-provider="+cfg.CloudProvider)
+		defaultArguments["cloud-provider"] = cfg.CloudProvider
 
 		// Only append the --cloud-config option if there's a such file
 		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
+			defaultArguments["cloud-config"] = DefaultCloudConfigPath
 		}
 	}
 
@@ -337,9 +334,14 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
 		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
-		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet,
-			"--node-cidr-mask-size="+maskSize)
+		defaultArguments["allocate-node-cidrs"] = "true"
+		defaultArguments["cluster-cidr"] = cfg.Networking.PodSubnet
+		defaultArguments["node-cidr-mask-size"] = maskSize
 	}
+
+	command := []string{"kube-controller-manager"}
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManagerExtraArgs)...)
+
 	return command
 }
 

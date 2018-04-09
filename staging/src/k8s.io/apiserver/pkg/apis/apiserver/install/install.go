@@ -30,7 +30,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apiserver.GroupName,
-			RootScopedKinds:            sets.NewString("APIService"),
+			RootScopedKinds:            sets.NewString("AdmissionConfiguration"),
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: apiserver.AddToScheme,
 		},

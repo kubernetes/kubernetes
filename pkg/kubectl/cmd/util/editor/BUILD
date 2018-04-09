@@ -41,7 +41,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["editor_test.go"],
+    srcs = [
+        "editoptions_test.go",
+        "editor_test.go",
+    ],
     embed = [":go_default_library"],
 )
 

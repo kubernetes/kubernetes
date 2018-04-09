@@ -1307,6 +1307,20 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		if pvc.Spec.VolumeMode != nil {
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
 		}
+		if len(pvc.Status.Conditions) > 0 {
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
+			for _, c := range pvc.Status.Conditions {
+				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
+					c.Type,
+					c.Status,
+					c.LastProbeTime.Time.Format(time.RFC1123Z),
+					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.Reason,
+					c.Message)
+			}
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -2924,17 +2938,9 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 		}
 		w.Write(LEVEL_0, "Min replicas:\t%s\n", minReplicas)
 		w.Write(LEVEL_0, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
+		w.Write(LEVEL_0, "%s pods:\t", hpa.Spec.ScaleTargetRef.Kind)
+		w.Write(LEVEL_0, "%d current / %d desired\n", hpa.Status.CurrentReplicas, hpa.Status.DesiredReplicas)
 
-		// TODO: switch to scale subresource once the required code is submitted.
-		if strings.ToLower(hpa.Spec.ScaleTargetRef.Kind) == "replicationcontroller" {
-			w.Write(LEVEL_0, "ReplicationController pods:\t")
-			rc, err := d.client.Core().ReplicationControllers(hpa.Namespace).Get(hpa.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
-			if err == nil {
-				w.Write(LEVEL_0, "%d current / %d desired\n", rc.Status.Replicas, rc.Spec.Replicas)
-			} else {
-				w.Write(LEVEL_0, "failed to check Replication Controller\n")
-			}
-		}
 		if len(hpa.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n")
 			w.Write(LEVEL_1, "Type\tStatus\tReason\tMessage\n")
@@ -2973,8 +2979,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
 	}
 
-	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n  CPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	w.Write(LEVEL_1, "------------\t----------\t---------------\t-------------\n")
+	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
+	w.Write(LEVEL_1, "Resource\tRequests\tLimits\n")
+	w.Write(LEVEL_1, "--------\t--------\t------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
 	cpuReqs, cpuLimits, memoryReqs, memoryLimits := reqs[api.ResourceCPU], limits[api.ResourceCPU], reqs[api.ResourceMemory], limits[api.ResourceMemory]
 	fractionCpuReqs := float64(0)
@@ -2989,9 +2996,21 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionMemoryReqs = float64(memoryReqs.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimits = float64(memoryLimits.Value()) / float64(allocatable.Memory().Value()) * 100
 	}
-	w.Write(LEVEL_1, "%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n",
-		cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits),
-		memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
+		api.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
+	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
+		api.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+	extResources := make([]string, 0, len(allocatable))
+	for resource := range allocatable {
+		if !helper.IsStandardContainerResourceName(string(resource)) && resource != api.ResourcePods {
+			extResources = append(extResources, string(resource))
+		}
+	}
+	sort.Strings(extResources)
+	for _, ext := range extResources {
+		extRequests, extLimits := reqs[api.ResourceName(ext)], limits[api.ResourceName(ext)]
+		w.Write(LEVEL_1, "%s\t%s\t%s\n", ext, extRequests.String(), extLimits.String())
+	}
 }
 
 func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceName]resource.Quantity, limits map[api.ResourceName]resource.Quantity) {
@@ -3794,23 +3813,19 @@ func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerI
 	}
 
 	// to print taints in the sorted order
-	keys := make([]string, 0, len(taints))
-	for _, taint := range taints {
-		keys = append(keys, string(taint.Effect)+","+taint.Key)
-	}
-	sort.Strings(keys)
-
-	for i, key := range keys {
-		for _, taint := range taints {
-			if string(taint.Effect)+","+taint.Key == key {
-				if i != 0 {
-					w.Write(LEVEL_0, "%s", initialIndent)
-					w.Write(LEVEL_0, "%s", innerIndent)
-				}
-				w.Write(LEVEL_0, "%s\n", taint.ToString())
-				i++
-			}
+	sort.Slice(taints, func(i, j int) bool {
+		cmpKey := func(taint api.Taint) string {
+			return string(taint.Effect) + "," + taint.Key
 		}
+		return cmpKey(taints[i]) < cmpKey(taints[j])
+	})
+
+	for i, taint := range taints {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
+		}
+		w.Write(LEVEL_0, "%s\n", taint.ToString())
 	}
 }
 
@@ -3829,33 +3844,26 @@ func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 	}
 
 	// to print tolerations in the sorted order
-	keys := make([]string, 0, len(tolerations))
-	for _, toleration := range tolerations {
-		keys = append(keys, toleration.Key)
-	}
-	sort.Strings(keys)
+	sort.Slice(tolerations, func(i, j int) bool {
+		return tolerations[i].Key < tolerations[j].Key
+	})
 
-	for i, key := range keys {
-		for _, toleration := range tolerations {
-			if toleration.Key == key {
-				if i != 0 {
-					w.Write(LEVEL_0, "%s", initialIndent)
-					w.Write(LEVEL_0, "%s", innerIndent)
-				}
-				w.Write(LEVEL_0, "%s", toleration.Key)
-				if len(toleration.Value) != 0 {
-					w.Write(LEVEL_0, "=%s", toleration.Value)
-				}
-				if len(toleration.Effect) != 0 {
-					w.Write(LEVEL_0, ":%s", toleration.Effect)
-				}
-				if toleration.TolerationSeconds != nil {
-					w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
-				}
-				w.Write(LEVEL_0, "\n")
-				i++
-			}
+	for i, toleration := range tolerations {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
 		}
+		w.Write(LEVEL_0, "%s", toleration.Key)
+		if len(toleration.Value) != 0 {
+			w.Write(LEVEL_0, "=%s", toleration.Value)
+		}
+		if len(toleration.Effect) != 0 {
+			w.Write(LEVEL_0, ":%s", toleration.Effect)
+		}
+		if toleration.TolerationSeconds != nil {
+			w.Write(LEVEL_0, " for %ds", *toleration.TolerationSeconds)
+		}
+		w.Write(LEVEL_0, "\n")
 	}
 }
 

@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -239,6 +240,7 @@ type TestFactory struct {
 	cmdutil.Factory
 
 	Client             kubectl.RESTClient
+	ScaleGetter        scaleclient.ScalesGetter
 	UnstructuredClient kubectl.RESTClient
 	DescriberVal       printers.Describer
 	Namespace          string
@@ -481,6 +483,10 @@ func (f *TestFactory) LogsForObject(object, options runtime.Object, timeout time
 	default:
 		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
+}
+
+func (f *TestFactory) ScaleClient() (scaleclient.ScalesGetter, error) {
+	return f.ScaleGetter, nil
 }
 
 func testDynamicResources() []*discovery.APIGroupResources {

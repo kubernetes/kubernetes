@@ -171,6 +171,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmd.Flags().String("docker-email", "", i18n.T("Email for Docker registry"))
 	cmd.Flags().String("docker-server", "https://index.docker.io/v1/", i18n.T("Server location for Docker registry"))
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
+	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -182,22 +183,27 @@ func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.
 	if err != nil {
 		return err
 	}
-	requiredFlags := []string{"docker-username", "docker-password", "docker-email", "docker-server"}
-	for _, requiredFlag := range requiredFlags {
-		if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
-			return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
+	fromFileFlag := cmdutil.GetFlagStringSlice(cmd, "from-file")
+	if len(fromFileFlag) == 0 {
+		requiredFlags := []string{"docker-username", "docker-password", "docker-server"}
+		for _, requiredFlag := range requiredFlags {
+			if value := cmdutil.GetFlagString(cmd, requiredFlag); len(value) == 0 {
+				return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
+			}
 		}
 	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretForDockerRegistryV1GeneratorName:
 		generator = &kubectl.SecretForDockerRegistryGeneratorV1{
-			Name:       name,
-			Username:   cmdutil.GetFlagString(cmd, "docker-username"),
-			Email:      cmdutil.GetFlagString(cmd, "docker-email"),
-			Password:   cmdutil.GetFlagString(cmd, "docker-password"),
-			Server:     cmdutil.GetFlagString(cmd, "docker-server"),
-			AppendHash: cmdutil.GetFlagBool(cmd, "append-hash"),
+			Name:        name,
+			Username:    cmdutil.GetFlagString(cmd, "docker-username"),
+			Email:       cmdutil.GetFlagString(cmd, "docker-email"),
+			Password:    cmdutil.GetFlagString(cmd, "docker-password"),
+			Server:      cmdutil.GetFlagString(cmd, "docker-server"),
+			AppendHash:  cmdutil.GetFlagBool(cmd, "append-hash"),
+			FileSources: cmdutil.GetFlagStringSlice(cmd, "from-file"),
 		}
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)

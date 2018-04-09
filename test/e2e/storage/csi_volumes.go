@@ -184,7 +184,7 @@ func csiClusterRoleBinding(
 	return ret
 }
 
-var _ = utils.SIGDescribe("CSI Volumes [Feature:CSI]", func() {
+var _ = utils.SIGDescribe("CSI Volumes [Flaky]", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (

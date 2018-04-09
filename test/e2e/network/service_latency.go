@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -127,7 +128,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	cfg := testutils.RCConfig{
 		Client:         f.ClientSet,
 		InternalClient: f.InternalClientset,
-		Image:          framework.GetPauseImageName(f.ClientSet),
+		Image:          imageutils.GetPauseImageName(),
 		Name:           "svc-latency-rc",
 		Namespace:      f.Namespace.Name,
 		Replicas:       1,

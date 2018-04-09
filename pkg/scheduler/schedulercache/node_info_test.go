@@ -41,7 +41,6 @@ func TestNewResource(t *testing.T) {
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
 				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
-				v1.ResourceNvidiaGPU:                *resource.NewQuantity(1000, resource.DecimalSI),
 				v1.ResourcePods:                     *resource.NewQuantity(80, resource.BinarySI),
 				v1.ResourceEphemeralStorage:         *resource.NewQuantity(5000, resource.BinarySI),
 				"scalar.test/" + "scalar1":          *resource.NewQuantity(1, resource.DecimalSI),
@@ -50,7 +49,6 @@ func TestNewResource(t *testing.T) {
 			expected: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
-				NvidiaGPU:        1000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
@@ -76,7 +74,6 @@ func TestResourceList(t *testing.T) {
 			expected: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:              *resource.NewScaledQuantity(0, -3),
 				v1.ResourceMemory:           *resource.NewQuantity(0, resource.BinarySI),
-				v1.ResourceNvidiaGPU:        *resource.NewQuantity(0, resource.DecimalSI),
 				v1.ResourcePods:             *resource.NewQuantity(0, resource.BinarySI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(0, resource.BinarySI),
 			},
@@ -85,7 +82,6 @@ func TestResourceList(t *testing.T) {
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
-				NvidiaGPU:        1000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
@@ -93,7 +89,6 @@ func TestResourceList(t *testing.T) {
 			expected: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
 				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
-				v1.ResourceNvidiaGPU:                *resource.NewQuantity(1000, resource.DecimalSI),
 				v1.ResourcePods:                     *resource.NewQuantity(80, resource.BinarySI),
 				v1.ResourceEphemeralStorage:         *resource.NewQuantity(5000, resource.BinarySI),
 				"scalar.test/" + "scalar1":          *resource.NewQuantity(1, resource.DecimalSI),
@@ -123,7 +118,6 @@ func TestResourceClone(t *testing.T) {
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
-				NvidiaGPU:        1000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
@@ -131,7 +125,6 @@ func TestResourceClone(t *testing.T) {
 			expected: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
-				NvidiaGPU:        1000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"scalar.test/scalar1": 1, "hugepages-test": 2},
@@ -168,7 +161,6 @@ func TestResourceAddScalar(t *testing.T) {
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
-				NvidiaGPU:        1000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"hugepages-test": 2},
@@ -178,7 +170,6 @@ func TestResourceAddScalar(t *testing.T) {
 			expected: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
-				NvidiaGPU:        1000,
 				EphemeralStorage: 5000,
 				AllowedPodNumber: 80,
 				ScalarResources:  map[v1.ResourceName]int64{"hugepages-test": 2, "scalar2": 200},
@@ -205,7 +196,6 @@ func TestNewNodeInfo(t *testing.T) {
 		requestedResource: &Resource{
 			MilliCPU:         300,
 			Memory:           1524,
-			NvidiaGPU:        0,
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
@@ -213,11 +203,11 @@ func TestNewNodeInfo(t *testing.T) {
 		nonzeroRequest: &Resource{
 			MilliCPU:         300,
 			Memory:           1524,
-			NvidiaGPU:        0,
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
+		TransientInfo:       newTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
 		usedPorts: util.HostPortInfo{
@@ -300,6 +290,7 @@ func TestNodeInfoClone(t *testing.T) {
 			nodeInfo: &NodeInfo{
 				requestedResource:   &Resource{},
 				nonzeroRequest:      &Resource{},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
 				usedPorts: util.HostPortInfo{
@@ -368,6 +359,7 @@ func TestNodeInfoClone(t *testing.T) {
 			expected: &NodeInfo{
 				requestedResource:   &Resource{},
 				nonzeroRequest:      &Resource{},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
 				usedPorts: util.HostPortInfo{
@@ -513,7 +505,6 @@ func TestNodeInfoAddPod(t *testing.T) {
 		requestedResource: &Resource{
 			MilliCPU:         300,
 			Memory:           1524,
-			NvidiaGPU:        0,
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
@@ -521,11 +512,11 @@ func TestNodeInfoAddPod(t *testing.T) {
 		nonzeroRequest: &Resource{
 			MilliCPU:         300,
 			Memory:           1524,
-			NvidiaGPU:        0,
 			EphemeralStorage: 0,
 			AllowedPodNumber: 0,
 			ScalarResources:  map[v1.ResourceName]int64(nil),
 		},
+		TransientInfo:       newTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
 		usedPorts: util.HostPortInfo{
@@ -626,7 +617,6 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				requestedResource: &Resource{
 					MilliCPU:         300,
 					Memory:           1524,
-					NvidiaGPU:        0,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
@@ -634,11 +624,11 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				nonzeroRequest: &Resource{
 					MilliCPU:         300,
 					Memory:           1524,
-					NvidiaGPU:        0,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
 				usedPorts: util.HostPortInfo{
@@ -743,7 +733,6 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				requestedResource: &Resource{
 					MilliCPU:         200,
 					Memory:           1024,
-					NvidiaGPU:        0,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
@@ -751,11 +740,11 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				nonzeroRequest: &Resource{
 					MilliCPU:         200,
 					Memory:           1024,
-					NvidiaGPU:        0,
 					EphemeralStorage: 0,
 					AllowedPodNumber: 0,
 					ScalarResources:  map[v1.ResourceName]int64(nil),
 				},
+				TransientInfo:       newTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          3,
 				usedPorts: util.HostPortInfo{

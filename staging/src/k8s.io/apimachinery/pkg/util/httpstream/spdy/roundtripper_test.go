@@ -399,7 +399,7 @@ func TestRoundTripRedirects(t *testing.T) {
 			var redirects int32 = 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if redirects < test.redirects {
-					redirects = atomic.AddInt32(&redirects, 1)
+					atomic.AddInt32(&redirects, 1)
 					http.Redirect(w, req, "redirect", http.StatusFound)
 					return
 				}

@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("SimpleMount", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "simple-mount-container",
-						Image: imageutils.GetPauseImageNameForHostArch(),
+						Image: imageutils.GetPauseImageName(),
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      "simply-mounted-volume",

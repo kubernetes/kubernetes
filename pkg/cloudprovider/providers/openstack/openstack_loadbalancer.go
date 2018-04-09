@@ -70,6 +70,7 @@ const (
 	errorStatus  = "ERROR"
 
 	ServiceAnnotationLoadBalancerFloatingNetworkID = "loadbalancer.openstack.org/floating-network-id"
+	ServiceAnnotationLoadBalancerSubnetID          = "loadbalancer.openstack.org/subnet-id"
 
 	// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 	// to indicate that we want an internal loadbalancer service.
@@ -367,7 +368,7 @@ func waitLoadbalancerDeleted(client *gophercloud.ServiceClient, loadbalancerID s
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		_, err := loadbalancers.Get(client, loadbalancerID).Extract()
 		if err != nil {
-			if err == ErrNotFound {
+			if isNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -552,7 +553,7 @@ func getNodeSecurityGroupIDForLB(compute *gophercloud.ServiceClient, nodes []*v1
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
-		srv, err := getServerByName(compute, nodeName, true)
+		srv, err := getServerByName(compute, nodeName)
 		if err != nil {
 			return nodeSecurityGroupIDs.List(), err
 		}
@@ -643,6 +644,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(ctx context.Context, clusterName string
 		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s/%s", apiService.Namespace, apiService.Name)
 	}
 
+	lbaas.opts.SubnetID = getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerSubnetID, lbaas.opts.SubnetID)
 	if len(lbaas.opts.SubnetID) == 0 {
 		// Get SubnetID automatically.
 		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetID by one node.
@@ -1158,6 +1160,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(ctx context.Context, clusterName string
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
+	lbaas.opts.SubnetID = getStringFromServiceAnnotation(service, ServiceAnnotationLoadBalancerSubnetID, lbaas.opts.SubnetID)
 	if len(lbaas.opts.SubnetID) == 0 && len(nodes) > 0 {
 		// Get SubnetID automatically.
 		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetID by one node.
@@ -1424,18 +1427,6 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(ctx context.Context, clusterName
 		}
 	}
 
-	// get all members associated with each poolIDs
-	var memberIDs []string
-	for _, pool := range poolIDs {
-		membersList, err := getMembersByPoolID(lbaas.lb, pool)
-		if err != nil && !isNotFound(err) {
-			return fmt.Errorf("error getting pool members %s: %v", pool, err)
-		}
-		for _, member := range membersList {
-			memberIDs = append(memberIDs, member.ID)
-		}
-	}
-
 	// delete all monitors
 	for _, monitorID := range monitorIDs {
 		err := v2monitors.Delete(lbaas.lb, monitorID).ExtractErr()
@@ -1450,9 +1441,14 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(ctx context.Context, clusterName
 
 	// delete all members and pools
 	for _, poolID := range poolIDs {
+		// get members for current pool
+		membersList, err := getMembersByPoolID(lbaas.lb, poolID)
+		if err != nil && !isNotFound(err) {
+			return fmt.Errorf("error getting pool members %s: %v", poolID, err)
+		}
 		// delete all members for this pool
-		for _, memberID := range memberIDs {
-			err := v2pools.DeleteMember(lbaas.lb, poolID, memberID).ExtractErr()
+		for _, member := range membersList {
+			err := v2pools.DeleteMember(lbaas.lb, poolID, member.ID).ExtractErr()
 			if err != nil && !isNotFound(err) {
 				return err
 			}
@@ -1463,7 +1459,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(ctx context.Context, clusterName
 		}
 
 		// delete pool
-		err := v2pools.Delete(lbaas.lb, poolID).ExtractErr()
+		err = v2pools.Delete(lbaas.lb, poolID).ExtractErr()
 		if err != nil && !isNotFound(err) {
 			return err
 		}

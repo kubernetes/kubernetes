@@ -69,6 +69,8 @@ var (
 
 	waitClass      = "waitClass"
 	immediateClass = "immediateClass"
+
+	nodeLabelKey = "nodeKey"
 )
 
 type testEnv struct {
@@ -86,26 +88,13 @@ func newTestBinder(t *testing.T) *testEnv {
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
-	nodeInformer := informerFactory.Core().V1().Nodes()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 
 	binder := NewVolumeBinder(
 		client,
 		pvcInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
-		nodeInformer,
 		classInformer)
-
-	// Add a node
-	err := nodeInformer.Informer().GetIndexer().Add(&v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "node1",
-			Labels: map[string]string{"key1": "node1"},
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to add node to internal cache: %v", err)
-	}
 
 	// Add storageclasses
 	waitMode := storagev1.VolumeBindingWaitForFirstConsumer
@@ -125,7 +114,7 @@ func newTestBinder(t *testing.T) *testEnv {
 		},
 	}
 	for _, class := range classes {
-		if err = classInformer.Informer().GetIndexer().Add(class); err != nil {
+		if err := classInformer.Informer().GetIndexer().Add(class); err != nil {
 			t.Fatalf("Failed to add storage class to internal cache: %v", err)
 		}
 	}
@@ -331,7 +320,7 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 		},
 	}
 	if node != "" {
-		pv.Spec.NodeAffinity = getVolumeNodeAffinity("key1", node)
+		pv.Spec.NodeAffinity = getVolumeNodeAffinity(nodeLabelKey, node)
 	}
 
 	if boundToPVC != nil {
@@ -404,8 +393,6 @@ func TestFindPodVolumes(t *testing.T) {
 		// Inputs
 		pvs     []*v1.PersistentVolume
 		podPVCs []*v1.PersistentVolumeClaim
-		// Defaults to node1
-		node string
 		// If nil, use pod PVCs
 		cachePVCs []*v1.PersistentVolumeClaim
 		// If nil, makePod with podPVCs
@@ -453,13 +440,6 @@ func TestFindPodVolumes(t *testing.T) {
 			pvs:             []*v1.PersistentVolume{pvNode1aBound},
 			expectedUnbound: true,
 			expectedBound:   true,
-		},
-		"unbound-pvc,node-not-exists": {
-			podPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
-			node:            "node12",
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
 		},
 		"unbound-pvc,pv-same-node": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC},
@@ -551,15 +531,21 @@ func TestFindPodVolumes(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 
+	testNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				nodeLabelKey: "node1",
+			},
+		},
+	}
+
 	for name, scenario := range scenarios {
 		glog.V(5).Infof("Running test case %q", name)
 
 		// Setup
 		testEnv := newTestBinder(t)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
-		if scenario.node == "" {
-			scenario.node = "node1"
-		}
 
 		// a. Init pvc cache
 		if scenario.cachePVCs == nil {
@@ -573,7 +559,7 @@ func TestFindPodVolumes(t *testing.T) {
 		}
 
 		// Execute
-		unboundSatisfied, boundSatisfied, err := testEnv.binder.FindPodVolumes(scenario.pod, scenario.node)
+		unboundSatisfied, boundSatisfied, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -588,7 +574,7 @@ func TestFindPodVolumes(t *testing.T) {
 		if unboundSatisfied != scenario.expectedUnbound {
 			t.Errorf("Test %q failed: expected unboundSatsified %v, got %v", name, scenario.expectedUnbound, unboundSatisfied)
 		}
-		testEnv.validatePodCache(t, name, scenario.node, scenario.pod, scenario.expectedBindings)
+		testEnv.validatePodCache(t, name, testNode.Name, scenario.pod, scenario.expectedBindings)
 	}
 }
 

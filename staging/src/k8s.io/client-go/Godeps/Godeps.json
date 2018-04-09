@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/client-go",
 	"GoVersion": "go1.9",
-	"GodepVersion": "v79",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
@@ -139,10 +139,6 @@
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
 		{
-			"ImportPath": "github.com/howeyc/gopass",
-			"Rev": "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
-		},
-		{
 			"ImportPath": "github.com/imdario/mergo",
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
 		},
@@ -164,7 +160,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

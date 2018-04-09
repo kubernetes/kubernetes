@@ -51,7 +51,7 @@ func IsLegalFile(filename string) bool {
 		}
 	}
 	for _, substring := range LegalFileSubstring {
-		if strings.Index(lowerfile, substring) != -1 {
+		if strings.Contains(lowerfile, substring) {
 			return true
 		}
 	}

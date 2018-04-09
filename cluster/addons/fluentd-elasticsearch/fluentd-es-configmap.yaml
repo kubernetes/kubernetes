@@ -117,8 +117,19 @@ data:
       pos_file /var/log/es-containers.log.pos
       time_format %Y-%m-%dT%H:%M:%S.%NZ
       tag raw.kubernetes.*
-      format json
       read_from_head true
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
     </source>
 
     # Detect exceptions in the log output and forward them as one log entry.

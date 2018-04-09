@@ -41,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/version"
-	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func TestClient(t *testing.T) {
@@ -612,7 +612,7 @@ func TestMultiWatch(t *testing.T) {
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{
 					Name:  "pause",
-					Image: e2e.GetPauseImageName(client),
+					Image: imageutils.GetPauseImageName(),
 				}},
 			},
 		})
@@ -718,7 +718,7 @@ func TestMultiWatch(t *testing.T) {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{{
 								Name:  "nothing",
-								Image: e2e.GetPauseImageName(client),
+								Image: imageutils.GetPauseImageName(),
 							}},
 						},
 					})
@@ -749,7 +749,7 @@ func TestMultiWatch(t *testing.T) {
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
-			pod.Spec.Containers[0].Image = e2e.GetPauseImageName(client)
+			pod.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 			sentTimes <- timePair{time.Now(), name}
 			if _, err := client.Core().Pods(ns.Name).Update(pod); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))

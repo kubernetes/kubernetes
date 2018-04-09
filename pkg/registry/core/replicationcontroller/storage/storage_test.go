@@ -174,8 +174,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	controller.Spec.Replicas += 1
-	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	ctrl, err = storage.Controller.Get(ctx, rc.Name, &metav1.GetOptions{})
@@ -189,8 +188,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment either spec or status generation numbers
 	controller.Status.Replicas += 1
-	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
-	if err != nil {
+	if _, _, err := storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	ctrl, err = storage.Controller.Get(ctx, rc.Name, &metav1.GetOptions{})

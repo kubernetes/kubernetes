@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 )
@@ -69,6 +69,17 @@ const (
 	// ServiceAnnotationLoadBalancerResourceGroup is the annotation used on the service
 	// to specify the resource group of load balancer objects that are not in the same resource group as the cluster.
 	ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+
+	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
+	// to specify a list of allowed service tags separated by comma
+	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
+)
+
+var (
+	// supportedServiceTags holds a list of supported service tags on Azure.
+	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for more information.
+	supportedServiceTags = sets.NewString("VirtualNetwork", "VIRTUAL_NETWORK", "AzureLoadBalancer", "AZURE_LOADBALANCER",
+		"Internet", "INTERNET", "AzureTrafficManager", "Storage", "Sql")
 )
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -208,8 +219,14 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 		}
 	}
 
-	// service does not have a load balancer, select one
-	if wantLb {
+	hasMode, _, _ := getServiceLoadBalancerMode(service)
+	if az.useStandardLoadBalancer() && hasMode {
+		return nil, nil, false, fmt.Errorf("standard load balancer doesn't work with annotation %q", ServiceAnnotationLoadBalancerMode)
+	}
+
+	// service does not have a basic load balancer, select one.
+	// Standard load balancer doesn't need this because all backends nodes should be added to same LB.
+	if wantLb && !az.useStandardLoadBalancer() {
 		// select new load balancer for service
 		selectedLB, exists, err := az.selectLoadBalancer(clusterName, service, &existingLBs, nodes)
 		if err != nil {
@@ -225,6 +242,11 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 			Name:                         &defaultLBName,
 			Location:                     &az.Location,
 			LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
+		}
+		if az.useStandardLoadBalancer() {
+			defaultLB.Sku = &network.LoadBalancerSku{
+				Name: network.LoadBalancerSkuNameStandard,
+			}
 		}
 	}
 
@@ -416,6 +438,12 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 	pip.Tags = &map[string]*string{"service": &serviceName}
+	if az.useStandardLoadBalancer() {
+		pip.Sku = &network.PublicIPAddressSku{
+			Name: network.PublicIPAddressSkuNameStandard,
+		}
+	}
+
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIPWithRetry(pipResourceGroup, pip)
@@ -793,7 +821,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	if wantLb && nodes != nil {
 		// Add the machines to the backend pool if they're not already
 		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
-		err := az.vmSet.EnsureHostsInPool(serviceName, nodes, lbBackendPoolID, vmSetName)
+		err := az.vmSet.EnsureHostsInPool(serviceName, nodes, lbBackendPoolID, vmSetName, isInternal)
 		if err != nil {
 			return nil, err
 		}
@@ -838,14 +866,21 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if err != nil {
 		return nil, err
 	}
+	serviceTags, err := getServiceTags(service)
+	if err != nil {
+		return nil, err
+	}
 	var sourceAddressPrefixes []string
-	if sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges) {
+	if (sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
 			sourceAddressPrefixes = []string{"Internet"}
 		}
 	} else {
 		for _, ip := range sourceRanges {
 			sourceAddressPrefixes = append(sourceAddressPrefixes, ip.String())
+		}
+		for _, serviceTag := range serviceTags {
+			sourceAddressPrefixes = append(sourceAddressPrefixes, serviceTag)
 		}
 	}
 	expectedSecurityRules := []network.SecurityRule{}
@@ -1318,4 +1353,24 @@ func useSharedSecurityRule(service *v1.Service) bool {
 	}
 
 	return false
+}
+
+func getServiceTags(service *v1.Service) ([]string, error) {
+	if serviceTags, found := service.Annotations[ServiceAnnotationAllowedServiceTag]; found {
+		tags := strings.Split(strings.TrimSpace(serviceTags), ",")
+		for _, tag := range tags {
+			// Storage and Sql service tags support setting regions with suffix ".Region"
+			if strings.HasPrefix(tag, "Storage.") || strings.HasPrefix(tag, "Sql.") {
+				continue
+			}
+
+			if !supportedServiceTags.Has(tag) {
+				return nil, fmt.Errorf("only %q are allowed in service tags", supportedServiceTags.List())
+			}
+		}
+
+		return tags, nil
+	}
+
+	return nil, nil
 }

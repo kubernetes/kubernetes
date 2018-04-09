@@ -80,6 +80,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	dynamickubeletconfig "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -358,7 +359,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		ExternalKubeClient:  nil,
 		EventClient:         nil,
 		Mounter:             mounter,
-		NetworkPlugins:      ProbeNetworkPlugins(s.CNIConfDir, s.CNIBinDir),
+		NetworkPlugins:      ProbeNetworkPlugins(s.CNIConfDir, cni.SplitDirs(s.CNIBinDir)),
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		Writer:              writer,
@@ -661,6 +662,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
 				ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalPodPidsLimit:              s.PodPidsLimit,
+				EnforceCPULimits:                      s.CPUCFSQuota,
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,
@@ -1116,7 +1118,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		NonMasqueradeCIDR: f.NonMasqueradeCIDR,
 		PluginName:        r.NetworkPluginName,
 		PluginConfDir:     r.CNIConfDir,
-		PluginBinDir:      r.CNIBinDir,
+		PluginBinDirs:     cni.SplitDirs(r.CNIBinDir),
 		MTU:               int(r.NetworkPluginMTU),
 		LegacyRuntimeHost: nh,
 	}

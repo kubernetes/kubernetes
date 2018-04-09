@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/apiserver",
 	"GoVersion": "go1.9",
-	"GodepVersion": "v79",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
@@ -372,7 +372,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "944e07253867aacae43c04b2e6a239005443f33a"
+			"Rev": "ed7cfbae1fffc071f71e068df27bf4f0521402d8"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -487,10 +487,6 @@
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
 		{
-			"ImportPath": "github.com/howeyc/gopass",
-			"Rev": "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
-		},
-		{
 			"ImportPath": "github.com/imdario/mergo",
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
 		},
@@ -584,35 +580,35 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/blowfish",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ed25519",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ed25519/internal/edwards25519",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/nacl/secretbox",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/poly1305",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/salsa20/salsa",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
-			"Rev": "81e90905daefcd6fd217b62423c0908922eadb30"
+			"Rev": "49796115aa4b964c318aad4f3084fdb41e9aa067"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
@@ -1756,10 +1752,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/informers",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/client-go/informers/admissionregistration/v1beta1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

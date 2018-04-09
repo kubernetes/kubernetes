@@ -66,7 +66,7 @@ const (
 	defaultIPAMDir = "/var/lib/cni/networks"
 )
 
-// CNI plugins required by kubenet in /opt/cni/bin or vendor directory
+// CNI plugins required by kubenet in /opt/cni/bin or user-specified directory
 var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
 
 type kubenetNetworkPlugin struct {
@@ -91,15 +91,15 @@ type kubenetNetworkPlugin struct {
 	iptables        utiliptables.Interface
 	sysctl          utilsysctl.Interface
 	ebtables        utilebtables.Interface
-	// vendorDir is passed by kubelet cni-bin-dir parameter.
-	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
-	vendorDir         string
+	// binDirs is passed by kubelet cni-bin-dir parameter.
+	// kubenet will search for CNI binaries in DefaultCNIDir first, then continue to binDirs.
+	binDirs           []string
 	nonMasqueradeCIDR string
 	podCidr           string
 	gateway           net.IP
 }
 
-func NewPlugin(networkPluginDir string) network.NetworkPlugin {
+func NewPlugin(networkPluginDirs []string) network.NetworkPlugin {
 	protocol := utiliptables.ProtocolIpv4
 	execer := utilexec.New()
 	dbus := utildbus.New()
@@ -110,7 +110,7 @@ func NewPlugin(networkPluginDir string) network.NetworkPlugin {
 		execer:            utilexec.New(),
 		iptables:          iptInterface,
 		sysctl:            sysctl,
-		vendorDir:         networkPluginDir,
+		binDirs:           append([]string{DefaultCNIDir}, networkPluginDirs...),
 		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
 		nonMasqueradeCIDR: "10.0.0.0/8",
@@ -121,9 +121,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode kubeletc
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
 	plugin.nonMasqueradeCIDR = nonMasqueradeCIDR
-	plugin.cniConfig = &libcni.CNIConfig{
-		Path: []string{DefaultCNIDir, plugin.vendorDir},
-	}
+	plugin.cniConfig = &libcni.CNIConfig{Path: plugin.binDirs}
 
 	if mtu == network.UseDefaultMTU {
 		if link, err := findMinMTU(); err == nil {
@@ -564,22 +562,24 @@ func (plugin *kubenetNetworkPlugin) Status() error {
 		return fmt.Errorf("Kubenet does not have netConfig. This is most likely due to lack of PodCIDR")
 	}
 
-	if !plugin.checkCNIPlugin() {
-		return fmt.Errorf("could not locate kubenet required CNI plugins %v at %q or %q", requiredCNIPlugins, DefaultCNIDir, plugin.vendorDir)
+	if !plugin.checkRequiredCNIPlugins() {
+		return fmt.Errorf("could not locate kubenet required CNI plugins %v at %q", requiredCNIPlugins, plugin.binDirs)
 	}
 	return nil
 }
 
-// checkCNIPlugin returns if all kubenet required cni plugins can be found at /opt/cni/bin or user specified NetworkPluginDir.
-func (plugin *kubenetNetworkPlugin) checkCNIPlugin() bool {
-	if plugin.checkCNIPluginInDir(DefaultCNIDir) || plugin.checkCNIPluginInDir(plugin.vendorDir) {
-		return true
+// checkRequiredCNIPlugins returns if all kubenet required cni plugins can be found at /opt/cni/bin or user specified NetworkPluginDir.
+func (plugin *kubenetNetworkPlugin) checkRequiredCNIPlugins() bool {
+	for _, dir := range plugin.binDirs {
+		if plugin.checkRequiredCNIPluginsInOneDir(dir) {
+			return true
+		}
 	}
 	return false
 }
 
-// checkCNIPluginInDir returns if all required cni plugins are placed in dir
-func (plugin *kubenetNetworkPlugin) checkCNIPluginInDir(dir string) bool {
+// checkRequiredCNIPluginsInOneDir returns true if all required cni plugins are placed in dir
+func (plugin *kubenetNetworkPlugin) checkRequiredCNIPluginsInOneDir(dir string) bool {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return false

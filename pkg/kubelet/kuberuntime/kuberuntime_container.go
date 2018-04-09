@@ -150,9 +150,15 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
 		sandboxMeta.Namespace)
 	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
-	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
-		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
-			legacySymlink, containerID, containerLog, err)
+	// only create legacy symlink if containerLog path exists (or the error is not IsNotExist).
+	// Because if containerLog path does not exist, only dandling legacySymlink is created.
+	// This dangling legacySymlink is later removed by container gc, so it does not make sense
+	// to create it in the first place. it happens when journald logging driver is used with docker.
+	if _, err := m.osInterface.Stat(containerLog); !os.IsNotExist(err) {
+		if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+			glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
+				legacySymlink, containerID, containerLog, err)
+		}
 	}
 
 	// Step 4: execute the post start hook.

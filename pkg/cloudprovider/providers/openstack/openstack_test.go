@@ -88,6 +88,11 @@ func TestReadConfig(t *testing.T) {
 		t.Errorf("Should fail when no config is provided: %s", err)
 	}
 
+	// Since we are setting env vars, we need to reset old
+	// values for other tests to succeed.
+	env := clearEnviron(t)
+	defer resetEnviron(t, env)
+
 	os.Setenv("OS_PASSWORD", "mypass")
 	defer os.Unsetenv("OS_PASSWORD")
 
@@ -679,5 +684,26 @@ func TestToAuth3Options(t *testing.T) {
 	}
 	if ao.DomainName != cfg.Global.DomainName {
 		t.Errorf("DomainName %s != %s", ao.DomainName, cfg.Global.DomainName)
+	}
+}
+
+func clearEnviron(t *testing.T) []string {
+	env := os.Environ()
+	for _, pair := range env {
+		if strings.HasPrefix(pair, "OS_") {
+			i := strings.Index(pair, "=") + 1
+			os.Unsetenv(pair[:i-1])
+		}
+	}
+	return env
+}
+func resetEnviron(t *testing.T, items []string) {
+	for _, pair := range items {
+		if strings.HasPrefix(pair, "OS_") {
+			i := strings.Index(pair, "=") + 1
+			if err := os.Setenv(pair[:i-1], pair[i:]); err != nil {
+				t.Errorf("Setenv(%q, %q) failed during reset: %v", pair[:i-1], pair[i:], err)
+			}
+		}
 	}
 }

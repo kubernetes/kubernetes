@@ -403,10 +403,6 @@ func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(flag.CommandLine)
 }
 
-func (f *ring0Factory) DefaultResourceFilterFunc() kubectl.Filters {
-	return kubectl.NewResourceFilter()
-}
-
 func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{
 		{Resource: "replicationcontroller"},

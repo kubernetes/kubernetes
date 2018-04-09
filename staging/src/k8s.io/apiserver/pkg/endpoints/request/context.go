@@ -17,10 +17,10 @@ limitations under the License.
 package request
 
 import (
+	"context"
 	stderrs "errors"
 	"time"
 
-	"golang.org/x/net/context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/apis/audit"

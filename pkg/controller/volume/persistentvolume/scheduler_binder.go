@@ -62,7 +62,7 @@ type SchedulerVolumeBinder interface {
 	// if bound volumes satisfy the PV NodeAffinity.
 	//
 	// This function is called by the volume binding scheduler predicate and can be called in parallel
-	FindPodVolumes(pod *v1.Pod, nodeName string) (unboundVolumesSatisified, boundVolumesSatisfied bool, err error)
+	FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisified, boundVolumesSatisfied bool, err error)
 
 	// AssumePodVolumes will take the PV matches for unbound PVCs and update the PV cache assuming
 	// that the PV is prebound to the PVC.
@@ -88,9 +88,8 @@ type volumeBinder struct {
 	ctrl *PersistentVolumeController
 
 	// TODO: Need AssumeCache for PVC for dynamic provisioning
-	pvcCache  corelisters.PersistentVolumeClaimLister
-	nodeCache corelisters.NodeLister
-	pvCache   PVAssumeCache
+	pvcCache corelisters.PersistentVolumeClaimLister
+	pvCache  PVAssumeCache
 
 	// Stores binding decisions that were made in FindPodVolumes for use in AssumePodVolumes.
 	// AssumePodVolumes modifies the bindings again for use in BindPodVolumes.
@@ -102,7 +101,6 @@ func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
-	nodeInformer coreinformers.NodeInformer,
 	storageClassInformer storageinformers.StorageClassInformer) SchedulerVolumeBinder {
 
 	// TODO: find better way...
@@ -114,7 +112,6 @@ func NewVolumeBinder(
 	b := &volumeBinder{
 		ctrl:            ctrl,
 		pvcCache:        pvcInformer.Lister(),
-		nodeCache:       nodeInformer.Lister(),
 		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
 		podBindingCache: NewPodBindingCache(),
 	}
@@ -127,20 +124,15 @@ func (b *volumeBinder) GetBindingsCache() PodBindingCache {
 }
 
 // FindPodVolumes caches the matching PVs per node in podBindingCache
-func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, nodeName string) (unboundVolumesSatisfied, boundVolumesSatisfied bool, err error) {
+func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatisfied bool, err error) {
 	podName := getPodName(pod)
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
-	glog.V(5).Infof("FindPodVolumes for pod %q, node %q", podName, nodeName)
+	glog.V(5).Infof("FindPodVolumes for pod %q, node %q", podName, node.Name)
 
 	// Initialize to true for pods that don't have volumes
 	unboundVolumesSatisfied = true
 	boundVolumesSatisfied = true
-
-	node, err := b.nodeCache.Get(nodeName)
-	if node == nil || err != nil {
-		return false, false, fmt.Errorf("error getting node %q: %v", nodeName, err)
-	}
 
 	// The pod's volumes need to be processed in one call to avoid the race condition where
 	// volumes can get bound in between calls.

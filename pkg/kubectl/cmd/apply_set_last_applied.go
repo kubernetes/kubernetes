@@ -99,7 +99,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Com
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().BoolVar(&options.CreateAnnotation, "create-annotation", false, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
+	cmd.Flags().BoolVar(&options.CreateAnnotation, "create-annotation", options.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
 	usage := "that contains the last-applied-configuration annotations"
 	kubectl.AddJsonFilenameFlag(cmd, &options.FilenameOptions.Filenames, "Filename, directory, or URL to files "+usage)
 
@@ -143,12 +143,12 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 			if errors.IsNotFound(err) {
 				return err
 			} else {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 		}
 		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 		}
 		if originalBuf == nil && !o.CreateAnnotation {
 			return cmdutil.UsageErrorf(cmd, "no last-applied-configuration annotation found on resource: %s, to create the annotation, run the command with --create-annotation", info.Name)

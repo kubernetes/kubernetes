@@ -445,6 +445,7 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 				}
 			}
 		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
 	}
 }
@@ -1070,11 +1071,7 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.
 			})
 			defer wg.Done()
 
-			for {
-				index, ok := <-toProcess
-				if !ok {
-					return
-				}
+			for index := range toProcess {
 				accessor, err := meta.Accessor(items[index])
 				if err != nil {
 					errs <- err

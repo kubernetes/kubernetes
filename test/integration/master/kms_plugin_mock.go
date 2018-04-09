@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 
+	"github.com/golang/glog"
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
 
@@ -45,7 +46,6 @@ type base64Plugin struct {
 
 	// Allow users of the plugin to sense requests that were passed to KMS.
 	encryptRequest chan *kmsapi.EncryptRequest
-	decryptRequest chan *kmsapi.DecryptRequest
 }
 
 func NewBase64Plugin() (*base64Plugin, error) {
@@ -57,6 +57,7 @@ func NewBase64Plugin() (*base64Plugin, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on the unix socket, error: %v", err)
 	}
+	glog.Infof("Listening on %s", sockFile)
 
 	server := grpc.NewServer()
 
@@ -64,7 +65,6 @@ func NewBase64Plugin() (*base64Plugin, error) {
 		grpcServer:     server,
 		listener:       listener,
 		encryptRequest: make(chan *kmsapi.EncryptRequest, 1),
-		decryptRequest: make(chan *kmsapi.DecryptRequest, 1),
 	}
 
 	kmsapi.RegisterKeyManagementServiceServer(server, result)
@@ -85,7 +85,8 @@ func (s *base64Plugin) Version(ctx context.Context, request *kmsapi.VersionReque
 }
 
 func (s *base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
-	s.decryptRequest <- request
+	glog.Infof("Received Decrypt Request for DEK: %s", string(request.Cipher))
+
 	buf := make([]byte, base64.StdEncoding.DecodedLen(len(request.Cipher)))
 	n, err := base64.StdEncoding.Decode(buf, request.Cipher)
 	if err != nil {
@@ -96,6 +97,7 @@ func (s *base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptReque
 }
 
 func (s *base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
+	glog.Infof("Received Encrypt Request for DEK: %x", request.Plain)
 	s.encryptRequest <- request
 
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plain)))

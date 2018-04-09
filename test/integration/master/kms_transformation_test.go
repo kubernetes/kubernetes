@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -86,13 +85,21 @@ func TestKMSProvider(t *testing.T) {
 		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
 	}
 	defer pluginMock.cleanUp()
-	go pluginMock.grpcServer.Serve(pluginMock.listener)
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- pluginMock.grpcServer.Serve(pluginMock.listener)
+	}()
 
 	test, err := newTransformTest(t, kmsConfigYAML)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s", kmsConfigYAML)
 	}
 	defer test.cleanUp()
+
+	// As part of newTransformTest a new secret was created, so KMS Mock should have been exercised by this point.
+	if len(serveErr) != 0 {
+		t.Fatalf("KMSPlugin failed while serving requests: %v", <-serveErr)
+	}
 
 	secretETCDPath := test.getETCDPath()
 	var rawSecretAsSeenByETCD rawDEKKEKSecret
@@ -140,12 +147,14 @@ func TestKMSProvider(t *testing.T) {
 }
 
 func getDEKFromKMSPlugin(pluginMock *base64Plugin) ([]byte, error) {
-	select {
-	case e := <-pluginMock.encryptRequest:
-		return e.Plain, nil
-	case <-time.After(time.Second):
-		return nil, fmt.Errorf("timed-out while getting encryption request from KMS Plugin Mock")
+	// We expect KMS to already have seen an encryptRequest. Hence non-blocking call.
+	e, ok := <-pluginMock.encryptRequest
+
+	if !ok {
+		return nil, fmt.Errorf("failed to sense encryptRequest from KMS Plugin Mock")
 	}
+
+	return e.Plain, nil
 }
 
 func decryptPayload(key []byte, secret rawDEKKEKSecret, secretETCDPath string) ([]byte, error) {

@@ -35,6 +35,7 @@ import (
 	utiluuid "k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -44,12 +45,14 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 const (
+	PodStartupLatencyThreshold = 5 * time.Second
 	MinSaturationThreshold     = 2 * time.Minute
 	MinPodsPerSecondThroughput = 8
 	DensityPollInterval        = 10 * time.Second
@@ -65,6 +68,7 @@ type DensityTestConfig struct {
 	Configs            []testutils.RunObjectConfig
 	ClientSets         []clientset.Interface
 	InternalClientsets []internalclientset.Interface
+	ScaleClients       []scaleclient.ScalesGetter
 	PollInterval       time.Duration
 	PodCount           int
 	// What kind of resource we want to create
@@ -115,6 +119,7 @@ func (dtc *DensityTestConfig) deleteDaemonSets(numberOfClients int, testPhase *t
 		framework.ExpectNoError(framework.DeleteResourceAndPods(
 			dtc.ClientSets[i%numberOfClients],
 			dtc.InternalClientsets[i%numberOfClients],
+			dtc.ScaleClients[i%numberOfClients],
 			extensions.Kind("DaemonSet"),
 			dtc.DaemonConfigs[i].Namespace,
 			dtc.DaemonConfigs[i].Name,
@@ -167,8 +172,8 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		if numNodes <= 100 {
 			apiserverCPU = 1.8
 			apiserverMem = 1700 * (1024 * 1024)
-			controllerCPU = 0.5
-			controllerMem = 500 * (1024 * 1024)
+			controllerCPU = 0.6
+			controllerMem = 530 * (1024 * 1024)
 			schedulerCPU = 0.4
 			schedulerMem = 180 * (1024 * 1024)
 		}
@@ -319,7 +324,7 @@ func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPha
 			framework.ExpectNoError(err)
 		} else {
 			By(fmt.Sprintf("Cleaning up the %v and pods", kind))
-			err := framework.DeleteResourceAndPods(dtc.ClientSets[i%numberOfClients], dtc.InternalClientsets[i%numberOfClients], kind, namespace, name)
+			err := framework.DeleteResourceAndPods(dtc.ClientSets[i%numberOfClients], dtc.InternalClientsets[i%numberOfClients], dtc.ScaleClients[i%numberOfClients], kind, namespace, name)
 			framework.ExpectNoError(err)
 		}
 	}
@@ -382,7 +387,6 @@ var _ = SIGDescribe("Density", func() {
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, metrics)
-			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 		}
 
 		// Verify scheduler metrics.
@@ -397,6 +401,8 @@ var _ = SIGDescribe("Density", func() {
 
 		framework.PrintSummaries(summaries, testCaseBaseName)
 
+		// Fail if there were some high-latency requests.
+		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
 		// Fail if more than the allowed threshold of measurements were missing in the latencyTest.
 		Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(Equal(true))
 	})
@@ -581,7 +587,7 @@ var _ = SIGDescribe("Density", func() {
 					Client:               clients[i],
 					InternalClient:       internalClients[i],
 					ScalesGetter:         scalesClients[i],
-					Image:                framework.GetPauseImageName(f.ClientSet),
+					Image:                imageutils.GetPauseImageName(),
 					Name:                 name,
 					Namespace:            nsName,
 					Labels:               map[string]string{"type": "densityPod"},
@@ -612,11 +618,12 @@ var _ = SIGDescribe("Density", func() {
 			}
 
 			// Single client is running out of http2 connections in delete phase, hence we need more.
-			clients, internalClients, _, err = createClients(2)
+			clients, internalClients, scalesClients, err = createClients(2)
 
 			dConfig := DensityTestConfig{
 				ClientSets:         clients,
 				InternalClientsets: internalClients,
+				ScaleClients:       scalesClients,
 				Configs:            configs,
 				PodCount:           totalPods,
 				PollInterval:       DensityPollInterval,
@@ -738,7 +745,7 @@ var _ = SIGDescribe("Density", func() {
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
 					nsName := namespaces[i%len(namespaces)].Name
 					rcNameToNsMap[name] = nsName
-					go createRunningPodFromRC(&wg, c, name, nsName, framework.GetPauseImageName(f.ClientSet), additionalPodsPrefix, cpuRequest, memRequest)
+					go createRunningPodFromRC(&wg, c, name, nsName, imageutils.GetPauseImageName(), additionalPodsPrefix, cpuRequest, memRequest)
 					time.Sleep(200 * time.Millisecond)
 				}
 				wg.Wait()
@@ -829,16 +836,29 @@ var _ = SIGDescribe("Density", func() {
 				sort.Sort(framework.LatencySlice(schedToWatchLag))
 				sort.Sort(framework.LatencySlice(e2eLag))
 
-				framework.PrintLatencies(scheduleLag, "worst schedule latencies")
-				framework.PrintLatencies(startupLag, "worst run-after-schedule latencies")
-				framework.PrintLatencies(watchLag, "worst watch latencies")
-				framework.PrintLatencies(schedToWatchLag, "worst scheduled-to-end total latencies")
-				framework.PrintLatencies(e2eLag, "worst e2e total latencies")
+				framework.PrintLatencies(scheduleLag, "worst create-to-schedule latencies")
+				framework.PrintLatencies(startupLag, "worst schedule-to-run latencies")
+				framework.PrintLatencies(watchLag, "worst run-to-watch latencies")
+				framework.PrintLatencies(schedToWatchLag, "worst schedule-to-watch latencies")
+				framework.PrintLatencies(e2eLag, "worst e2e latencies")
+
+				// Capture latency metrics related to pod-startup.
+				podStartupLatency := &framework.PodStartupLatency{
+					CreateToScheduleLatency: framework.ExtractLatencyMetrics(scheduleLag),
+					ScheduleToRunLatency:    framework.ExtractLatencyMetrics(startupLag),
+					RunToWatchLatency:       framework.ExtractLatencyMetrics(watchLag),
+					ScheduleToWatchLatency:  framework.ExtractLatencyMetrics(schedToWatchLag),
+					E2ELatency:              framework.ExtractLatencyMetrics(e2eLag),
+				}
+				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatency := &framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLag)}
-				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
-				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
+				podStartupLatencyThreshold := framework.LatencyMetric{
+					Perc50: PodStartupLatencyThreshold,
+					Perc90: PodStartupLatencyThreshold,
+					Perc99: PodStartupLatencyThreshold,
+				}
+				framework.ExpectNoError(framework.VerifyLatencyWithinThreshold(podStartupLatencyThreshold, podStartupLatency.E2ELatency, "pod startup"))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 				latencyMeasurementPhase.End()

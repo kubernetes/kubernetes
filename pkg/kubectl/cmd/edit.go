@@ -71,9 +71,11 @@ var (
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &editor.EditOptions{
-		EditMode:        editor.NormalEditMode,
-		ValidateOptions: cmdutil.ValidateOptions{EnableValidation: true},
-		Include3rdParty: true,
+		EditMode:           editor.NormalEditMode,
+		Output:             "yaml",
+		WindowsLineEndings: runtime.GOOS == "windows",
+		ValidateOptions:    cmdutil.ValidateOptions{EnableValidation: true},
+		Include3rdParty:    true,
 	}
 	validArgs := cmdutil.ValidArgList(f)
 
@@ -98,10 +100,9 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	usage := "to use to edit the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddValidateOptionFlags(cmd, &options.ValidateOptions)
-	cmd.Flags().StringVarP(&options.Output, "output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().BoolVarP(&options.OutputPatch, "output-patch", "", false, "Output the patch if the resource is edited.")
-
-	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", runtime.GOOS == "windows",
+	cmd.Flags().StringVarP(&options.Output, "output", "o", options.Output, "Output format. One of: yaml|json.")
+	cmd.Flags().BoolVarP(&options.OutputPatch, "output-patch", "", options.OutputPatch, "Output the patch if the resource is edited.")
+	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", options.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &options.ApplyAnnotation)

@@ -225,107 +225,215 @@ func TestCreateSet(t *testing.T) {
 	}
 }
 
+var testCases = []struct {
+	entry                *Entry
+	set                  *IPSet
+	addCombinedOutputLog [][]string
+	delCombinedOutputLog []string
+}{
+	{ // case 0
+		entry: &Entry{
+			IP:       "192.168.1.1",
+			Port:     53,
+			Protocol: ProtocolUDP,
+			SetType:  HashIPPort,
+		},
+		set: &IPSet{
+			Name: "ZERO",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "ZERO", "192.168.1.1,udp:53"},
+			{"ipset", "add", "ZERO", "192.168.1.1,udp:53", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "ZERO", "192.168.1.1,udp:53"},
+	},
+	{ // case 1
+		entry: &Entry{
+			IP:       "192.168.1.2",
+			Port:     80,
+			Protocol: ProtocolTCP,
+			SetType:  HashIPPort,
+		},
+		set: &IPSet{
+			Name: "UN",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "UN", "192.168.1.2,tcp:80"},
+			{"ipset", "add", "UN", "192.168.1.2,tcp:80", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "UN", "192.168.1.2,tcp:80"},
+	},
+	{ // case 2
+		entry: &Entry{
+			IP:       "192.168.1.3",
+			Port:     53,
+			Protocol: ProtocolUDP,
+			SetType:  HashIPPortIP,
+			IP2:      "10.20.30.1",
+		},
+		set: &IPSet{
+			Name: "DEUX",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "DEUX", "192.168.1.3,udp:53,10.20.30.1"},
+			{"ipset", "add", "DEUX", "192.168.1.3,udp:53,10.20.30.1", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "DEUX", "192.168.1.3,udp:53,10.20.30.1"},
+	},
+	{ // case 3
+		entry: &Entry{
+			IP:       "192.168.1.4",
+			Port:     80,
+			Protocol: ProtocolTCP,
+			SetType:  HashIPPortIP,
+			IP2:      "10.20.30.2",
+		},
+		set: &IPSet{
+			Name: "TROIS",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "TROIS", "192.168.1.4,tcp:80,10.20.30.2"},
+			{"ipset", "add", "TROIS", "192.168.1.4,tcp:80,10.20.30.2", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "TROIS", "192.168.1.4,tcp:80,10.20.30.2"},
+	},
+	{ // case 4
+		entry: &Entry{
+			IP:       "192.168.1.5",
+			Port:     53,
+			Protocol: ProtocolUDP,
+			SetType:  HashIPPortNet,
+			Net:      "10.20.30.0/24",
+		},
+		set: &IPSet{
+			Name: "QUATRE",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "QUATRE", "192.168.1.5,udp:53,10.20.30.0/24"},
+			{"ipset", "add", "QUATRE", "192.168.1.5,udp:53,10.20.30.0/24", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "QUATRE", "192.168.1.5,udp:53,10.20.30.0/24"},
+	},
+	{ // case 5
+		entry: &Entry{
+			IP:       "192.168.1.6",
+			Port:     80,
+			Protocol: ProtocolTCP,
+			SetType:  HashIPPortNet,
+			Net:      "10.20.40.0/24",
+		},
+		set: &IPSet{
+			Name: "CINQ",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "CINQ", "192.168.1.6,tcp:80,10.20.40.0/24"},
+			{"ipset", "add", "CINQ", "192.168.1.6,tcp:80,10.20.40.0/24", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "CINQ", "192.168.1.6,tcp:80,10.20.40.0/24"},
+	},
+	{ // case 6
+		entry: &Entry{
+			Port:     80,
+			Protocol: ProtocolTCP,
+			SetType:  BitmapPort,
+		},
+		set: &IPSet{
+			Name: "SIX",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "SIX", "80"},
+			{"ipset", "add", "SIX", "80", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "SIX", "80"},
+	},
+}
+
 func TestAddEntry(t *testing.T) {
-	testEntry := &Entry{
-		IP:       "192.168.1.1",
-		Port:     53,
-		Protocol: ProtocolUDP,
-		SetType:  HashIPPort,
-	}
-
-	testSet := &IPSet{
-		Name: "FOOBAR",
-	}
-
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success
-			func() ([]byte, error) { return []byte{}, nil },
-			// Success
-			func() ([]byte, error) { return []byte{}, nil },
-			// Failure
-			func() ([]byte, error) {
-				return []byte("ipset v6.19: Set cannot be created: set with the same name already exists"), &fakeexec.FakeExitError{Status: 1}
+	for i := range testCases {
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+				// Success
+				func() ([]byte, error) { return []byte{}, nil },
+				// Success
+				func() ([]byte, error) { return []byte{}, nil },
+				// Failure
+				func() ([]byte, error) {
+					return []byte("ipset v6.19: Set cannot be created: set with the same name already exists"), &fakeexec.FakeExitError{Status: 1}
+				},
 			},
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := New(&fexec)
-	// Create with ignoreExistErr = false, expect success
-	err := runner.AddEntry(testEntry.String(), testSet, false)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "add", "FOOBAR", "192.168.1.1,udp:53") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Create with ignoreExistErr = true, expect success
-	err = runner.AddEntry(testEntry.String(), testSet, true)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll("ipset", "add", "FOOBAR", "192.168.1.1,udp:53", "-exist") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
-	}
-	// Create with ignoreExistErr = false, expect failure
-	err = runner.AddEntry(testEntry.String(), testSet, false)
-	if err == nil {
-		t.Errorf("expected failure, got nil")
+		}
+		fexec := fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			},
+		}
+		runner := New(&fexec)
+		// Create with ignoreExistErr = false, expect success
+		err := runner.AddEntry(testCases[i].entry.String(), testCases[i].set, false)
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if fcmd.CombinedOutputCalls != 1 {
+			t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		}
+		if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll(testCases[i].addCombinedOutputLog[0]...) {
+			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+		}
+		// Create with ignoreExistErr = true, expect success
+		err = runner.AddEntry(testCases[i].entry.String(), testCases[i].set, true)
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if fcmd.CombinedOutputCalls != 2 {
+			t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		}
+		if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(testCases[i].addCombinedOutputLog[1]...) {
+			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
+		}
+		// Create with ignoreExistErr = false, expect failure
+		err = runner.AddEntry(testCases[i].entry.String(), testCases[i].set, false)
+		if err == nil {
+			t.Errorf("expected failure, got nil")
+		}
 	}
 }
 
 func TestDelEntry(t *testing.T) {
-	// TODO: Test more set type
-	testEntry := &Entry{
-		IP:       "192.168.1.1",
-		Port:     53,
-		Protocol: ProtocolUDP,
-		SetType:  HashIPPort,
-	}
-
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success
-			func() ([]byte, error) { return []byte{}, nil },
-			// Failure
-			func() ([]byte, error) {
-				return []byte("ipset v6.19: Element cannot be deleted from the set: it's not added"), &fakeexec.FakeExitError{Status: 1}
+	for i := range testCases {
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+				// Success
+				func() ([]byte, error) { return []byte{}, nil },
+				// Failure
+				func() ([]byte, error) {
+					return []byte("ipset v6.19: Element cannot be deleted from the set: it's not added"), &fakeexec.FakeExitError{Status: 1}
+				},
 			},
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := New(&fexec)
+		}
+		fexec := fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			},
+		}
+		runner := New(&fexec)
 
-	err := runner.DelEntry(testEntry.String(), "FOOBAR")
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "del", "FOOBAR", "192.168.1.1,udp:53") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	err = runner.DelEntry(testEntry.String(), "FOOBAR")
-	if err == nil {
-		t.Errorf("expected failure, got nil")
+		err := runner.DelEntry(testCases[i].entry.String(), testCases[i].set.Name)
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if fcmd.CombinedOutputCalls != 1 {
+			t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		}
+		if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll(testCases[i].delCombinedOutputLog...) {
+			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+		}
+		err = runner.DelEntry(testCases[i].entry.String(), testCases[i].set.Name)
+		if err == nil {
+			t.Errorf("expected failure, got nil")
+		}
 	}
 }
 

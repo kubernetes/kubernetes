@@ -16,7 +16,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -50,7 +49,6 @@ go_library(
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",

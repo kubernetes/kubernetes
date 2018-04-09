@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -61,16 +63,26 @@ func TestSetEnvLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
+	outputFormat := "name"
+
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdEnv(tf, os.Stdin, buf, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := EnvOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
+	opts := EnvOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		Out:   buf,
-		Local: true}
+		Local: true,
+	}
 	err := opts.Complete(tf, cmd, []string{"env=prod"})
 	if err == nil {
 		err = opts.RunEnv(tf)
@@ -100,16 +112,26 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
+	outputFormat := "name"
+
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdEnv(tf, os.Stdin, buf, buf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := EnvOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
+	opts := EnvOptions{
+		PrintFlags: &printers.PrintFlags{
+			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+			NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+			OutputFormat: &outputFormat,
+		},
+		FilenameOptions: resource.FilenameOptions{
+			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
 		Out:   buf,
-		Local: true}
+		Local: true,
+	}
 	err := opts.Complete(tf, cmd, []string{"env=prod"})
 	if err == nil {
 		err = opts.RunEnv(tf)
@@ -482,11 +504,20 @@ func TestSetEnvRemote(t *testing.T) {
 				}),
 				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
+
+			outputFormat := "yaml"
+
 			out := new(bytes.Buffer)
 			cmd := NewCmdEnv(tf, out, out, out)
 			cmd.SetOutput(out)
-			cmd.Flags().Set("output", "yaml")
+			cmd.Flags().Set("output", outputFormat)
 			opts := EnvOptions{
+				PrintFlags: &printers.PrintFlags{
+					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
+					NamePrintFlags:     printers.NewNamePrintFlags(""),
+
+					OutputFormat: &outputFormat,
+				},
 				Out:   out,
 				Local: false}
 			err := opts.Complete(tf, cmd, input.args)

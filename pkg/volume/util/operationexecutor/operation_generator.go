@@ -672,7 +672,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 
 		// Remove all bind-mounts for subPaths
 		podDir := path.Join(podsDir, string(volumeToUnmount.PodUID))
-		if err := mounter.CleanSubPaths(podDir, volumeToUnmount.OuterVolumeSpecName); err != nil {
+		if err := mounter.CleanSubPaths(podDir, volumeToUnmount.InnerVolumeSpecName); err != nil {
 			return volumeToUnmount.GenerateError("error cleaning subPath mounts", err)
 		}
 

@@ -20,8 +20,6 @@ package scheduler
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -35,17 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
-	"k8s.io/kubernetes/test/integration/framework"
 )
 
 type testConfig struct {
@@ -347,26 +336,16 @@ func TestPVAffinityConflict(t *testing.T) {
 }
 
 func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
 	// Enable feature gates
 	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true,PersistentLocalVolumes=true")
 
-	// Build clientset and informers for controllers.
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	informers := informers.NewSharedInformerFactory(clientset, time.Second)
-
-	// Start master
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
-	ns := framework.CreateTestingNamespace(nsName, s, t).Name
-
 	controllerCh := make(chan struct{})
+
+	context := initTestScheduler(t, initTestMaster(t, nsName, nil), controllerCh, false, nil)
+
+	clientset := context.clientSet
+	ns := context.ns.Name
+	informers := context.informerFactory
 
 	// Start PV controller for volume binding.
 	params := persistentvolume.ControllerParameters{
@@ -387,40 +366,6 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
 	go ctrl.Run(controllerCh)
-
-	// Start scheduler
-	configurator := factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientset,
-		informers.Core().V1().Nodes(),
-		informers.Core().V1().Pods(),
-		informers.Core().V1().PersistentVolumes(),
-		informers.Core().V1().PersistentVolumeClaims(),
-		informers.Core().V1().ReplicationControllers(),
-		informers.Extensions().V1beta1().ReplicaSets(),
-		informers.Apps().V1beta1().StatefulSets(),
-		informers.Core().V1().Services(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
-		informers.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true, // Enable EqualCache by default.
-	)
-
-	eventBroadcaster := record.NewBroadcaster()
-	sched, err := scheduler.NewFromConfigurator(configurator, func(cfg *scheduler.Config) {
-		cfg.StopEverything = controllerCh
-		cfg.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
-	})
-	if err != nil {
-		t.Fatalf("Failed to create scheduler: %v.", err)
-	}
-
-	go sched.Run()
-
-	// Waiting for all controller sync.
-	informers.Start(controllerCh)
-	informers.WaitForCacheSync(controllerCh)
 
 	// Create shared objects
 	// Create nodes
@@ -470,9 +415,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 			clientset.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(nil, metav1.ListOptions{})
 			clientset.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
 			clientset.StorageV1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
-			clientset.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-			close(controllerCh)
-			closeFn()
+			cleanupTest(t, context)
 			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,LocalPersistentVolumes=false")
 		},
 	}

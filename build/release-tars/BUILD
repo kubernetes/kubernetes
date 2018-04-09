@@ -195,7 +195,6 @@ pkg_tar(
         "//docs:all-srcs",
         "//examples:all-srcs",
         "//hack/lib:all-srcs",
-        "//third_party/htpasswd:all-srcs",
     ],
     extension = "tar.gz",
     package_dir = "kubernetes",

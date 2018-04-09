@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -30,7 +31,6 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/integration"
 	"github.com/coreos/pkg/capnslog"
-	"golang.org/x/net/context"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

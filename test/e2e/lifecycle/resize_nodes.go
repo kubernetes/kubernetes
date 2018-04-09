@@ -30,8 +30,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const resizeNodeReadyTimeout = 2 * time.Minute
-
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	rc, err := c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -114,15 +112,18 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			numNodes, err := framework.NumberOfRegisteredNodes(c)
+			Expect(err).NotTo(HaveOccurred())
+			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
-			err = framework.ResizeGroup(group, replicas-1)
+			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
+			By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
+			err = framework.ResizeGroup(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForGroupSize(group, replicas-1)
+			err = framework.WaitForGroupSize(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForReadyNodes(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
@@ -142,15 +143,18 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			numNodes, err := framework.NumberOfRegisteredNodes(c)
+			Expect(err).NotTo(HaveOccurred())
+			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
-			err = framework.ResizeGroup(group, replicas+1)
+			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
+			By(fmt.Sprintf("increasing cluster size to %d", targetNumNodes))
+			err = framework.ResizeGroup(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForGroupSize(group, replicas+1)
+			err = framework.WaitForGroupSize(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForReadyNodes(c, int(replicas+1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())

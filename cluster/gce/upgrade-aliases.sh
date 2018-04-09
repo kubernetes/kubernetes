@@ -53,7 +53,7 @@ function detect-k8s-subnetwork() {
   local subnetwork_url=$(gcloud compute instances describe \
     ${KUBE_MASTER} --project=${PROJECT} --zone=${ZONE} \
     --format='value(networkInterfaces[0].subnetwork)')
-  if [ -n ${subnetwork_url} ]; then
+  if [[ -n ${subnetwork_url} ]]; then
     IP_ALIAS_SUBNETWORK=$(echo ${subnetwork_url##*/})
   fi
 }

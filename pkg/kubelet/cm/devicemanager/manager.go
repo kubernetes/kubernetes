@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -26,7 +27,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"k8s.io/api/core/v1"
@@ -187,11 +187,6 @@ func (m *ManagerImpl) removeContents(dir string) error {
 	}
 	return nil
 }
-
-const (
-	// kubeletDeviceManagerCheckpoint is the file name of device plugin checkpoint
-	kubeletDeviceManagerCheckpoint = "kubelet_internal_checkpoint"
-)
 
 // checkpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) checkpointFile() string {

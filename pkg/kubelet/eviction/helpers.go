@@ -21,11 +21,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -52,6 +54,9 @@ const (
 	resourceNodeFs v1.ResourceName = "nodefs"
 	// nodefs inodes, number.  internal to this module, used to account for local node root filesystem inodes.
 	resourceNodeFsInodes v1.ResourceName = "nodefsInodes"
+	// this prevents constantly updating the memcg notifier if synchronize
+	// is run frequently.
+	notifierRefreshInterval = 10 * time.Second
 )
 
 var (
@@ -1079,4 +1084,39 @@ func buildResourceToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, w
 		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{containerGC.DeleteAllUnusedContainers, imageGC.DeleteUnusedImages}
 	}
 	return resourceToReclaimFunc
+}
+
+// thresholdStopCh is a ThresholdStopCh which can only be closed after notifierRefreshInterval time has passed
+type thresholdStopCh struct {
+	lock      sync.Mutex
+	ch        chan struct{}
+	startTime time.Time
+	//  used to track time
+	clock clock.Clock
+}
+
+// NewInitialStopCh returns a ThresholdStopCh which can be closed immediately
+func NewInitialStopCh(clock clock.Clock) ThresholdStopCh {
+	return &thresholdStopCh{ch: make(chan struct{}), clock: clock}
+}
+
+// implements ThresholdStopCh.Reset
+func (t *thresholdStopCh) Reset() (closed bool) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	closed = t.clock.Since(t.startTime) > notifierRefreshInterval
+	if closed {
+		// close the old channel and reopen a new one
+		close(t.ch)
+		t.startTime = t.clock.Now()
+		t.ch = make(chan struct{})
+	}
+	return
+}
+
+// implements ThresholdStopCh.Ch
+func (t *thresholdStopCh) Ch() <-chan struct{} {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.ch
 }

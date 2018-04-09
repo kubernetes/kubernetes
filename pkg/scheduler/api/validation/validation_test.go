@@ -62,6 +62,10 @@ func TestValidatePolicy(t *testing.T) {
 			expected: nil,
 		},
 		{
+			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", PreemptVerb: "preempt"}}},
+			expected: nil,
+		},
+		{
 			policy: api.Policy{
 				ExtenderConfigs: []api.ExtenderConfig{
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},

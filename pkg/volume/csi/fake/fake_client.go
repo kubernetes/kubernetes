@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
-	grpctx "golang.org/x/net/context"
 )
 
 // IdentityClient is a CSI identity client used for testing
@@ -94,7 +93,7 @@ func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string) {
 }
 
 // NodePublishVolume implements CSI NodePublishVolume
-func (f *NodeClient) NodePublishVolume(ctx grpctx.Context, req *csipb.NodePublishVolumeRequest, opts ...grpc.CallOption) (*csipb.NodePublishVolumeResponse, error) {
+func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePublishVolumeRequest, opts ...grpc.CallOption) (*csipb.NodePublishVolumeResponse, error) {
 
 	if f.nextErr != nil {
 		return nil, f.nextErr

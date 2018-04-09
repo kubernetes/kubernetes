@@ -23,12 +23,15 @@ import (
 	"testing"
 	"time"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
+	fakescale "k8s.io/client-go/scale/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -41,10 +44,12 @@ func TestReplicationControllerStop(t *testing.T) {
 	name := "foo"
 	ns := "default"
 	tests := []struct {
-		Name            string
-		Objs            []runtime.Object
-		StopError       error
-		ExpectedActions []string
+		Name                      string
+		Objs                      []runtime.Object
+		ScaledDown                bool
+		StopError                 error
+		ExpectedActions           []string
+		ScaleClientExpectedAction []string
 	}{
 		{
 			Name: "OnlyOneRC",
@@ -63,8 +68,10 @@ func TestReplicationControllerStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			ScaledDown:                true,
+			StopError:                 nil,
+			ExpectedActions:           []string{"get", "list", "delete"},
+			ScaleClientExpectedAction: []string{"get", "update", "get", "get"},
 		},
 		{
 			Name: "NoOverlapping",
@@ -92,8 +99,10 @@ func TestReplicationControllerStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			ScaledDown:                true,
+			StopError:                 nil,
+			ExpectedActions:           []string{"get", "list", "delete"},
+			ScaleClientExpectedAction: []string{"get", "update", "get", "get"},
 		},
 		{
 			Name: "OverlappingError",
@@ -122,10 +131,10 @@ func TestReplicationControllerStop(t *testing.T) {
 					},
 				},
 			},
+			ScaledDown:      false, // scale resource was not scaled down due to overlapping controllers
 			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz, please manage deletion individually with --cascade=false."),
 			ExpectedActions: []string{"get", "list"},
 		},
-
 		{
 			Name: "OverlappingButSafeDelete",
 			Objs: []runtime.Object{
@@ -162,7 +171,7 @@ func TestReplicationControllerStop(t *testing.T) {
 					},
 				},
 			},
-
+			ScaledDown:      false, // scale resource was not scaled down due to overlapping controllers
 			StopError:       fmt.Errorf("Detected overlapping controllers for rc foo: baz,zaz, please manage deletion individually with --cascade=false."),
 			ExpectedActions: []string{"get", "list"},
 		},
@@ -194,42 +203,61 @@ func TestReplicationControllerStop(t *testing.T) {
 					},
 				},
 			},
-
+			ScaledDown:      false, // scale resource was not scaled down because there is still an additional replica
 			StopError:       nil,
 			ExpectedActions: []string{"get", "list", "delete"},
 		},
 	}
 
 	for _, test := range tests {
-		copiedForWatch := test.Objs[0].DeepCopyObject()
-		fake := fake.NewSimpleClientset(test.Objs...)
-		fakeWatch := watch.NewFake()
-		fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))
+		t.Run(test.Name, func(t *testing.T) {
+			copiedForWatch := test.Objs[0].DeepCopyObject()
+			scaleClient := createFakeScaleClient("replicationcontrollers", "foo", 3, nil)
+			fake := fake.NewSimpleClientset(test.Objs...)
+			fakeWatch := watch.NewFake()
+			fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))
 
-		go func() {
-			fakeWatch.Add(copiedForWatch)
-		}()
+			go func() {
+				fakeWatch.Add(copiedForWatch)
+			}()
 
-		reaper := ReplicationControllerReaper{fake.Core(), time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
-		if !reflect.DeepEqual(err, test.StopError) {
-			t.Errorf("%s unexpected error: %v", test.Name, err)
-			continue
-		}
-
-		actions := fake.Actions()
-		if len(actions) != len(test.ExpectedActions) {
-			t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ExpectedActions), len(actions))
-			continue
-		}
-		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource().GroupResource() != api.Resource("replicationcontrollers") {
-				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+			reaper := ReplicationControllerReaper{fake.Core(), time.Millisecond, time.Millisecond, scaleClient}
+			err := reaper.Stop(ns, name, 0, nil)
+			if !reflect.DeepEqual(err, test.StopError) {
+				t.Fatalf("unexpected error: %v", err)
 			}
-			if actions[i].GetVerb() != verb {
-				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
+
+			actions := fake.Actions()
+			if len(actions) != len(test.ExpectedActions) {
+				t.Fatalf("unexpected actions: %v, expected %d actions got %d", actions, len(test.ExpectedActions), len(actions))
 			}
-		}
+			for i, verb := range test.ExpectedActions {
+				if actions[i].GetResource().GroupResource() != api.Resource("replicationcontrollers") {
+					t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], verb)
+				}
+				if actions[i].GetVerb() != verb {
+					t.Errorf("unexpected action: %+v, expected %s-replicationController", actions[i], verb)
+				}
+			}
+			if test.ScaledDown {
+				scale, err := scaleClient.Scales(ns).Get(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, name)
+				if err != nil {
+					t.Error(err)
+				}
+				if scale.Spec.Replicas != 0 {
+					t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
+				}
+				actions := scaleClient.Actions()
+				if len(actions) != len(test.ScaleClientExpectedAction) {
+					t.Errorf("unexpected actions: %v, expected %d actions got %d", actions, len(test.ScaleClientExpectedAction), len(actions))
+				}
+				for i, verb := range test.ScaleClientExpectedAction {
+					if actions[i].GetVerb() != verb {
+						t.Errorf("unexpected action: %+v, expected %s", actions[i].GetVerb(), verb)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -237,15 +265,22 @@ func TestReplicaSetStop(t *testing.T) {
 	name := "foo"
 	ns := "default"
 	tests := []struct {
-		Name            string
-		Objs            []runtime.Object
-		StopError       error
-		ExpectedActions []string
+		Name                      string
+		Objs                      []runtime.Object
+		DiscoveryResources        []*metav1.APIResourceList
+		PathsResources            map[string]runtime.Object
+		ScaledDown                bool
+		StopError                 error
+		ExpectedActions           []string
+		ScaleClientExpectedAction []string
 	}{
 		{
 			Name: "OnlyOneRS",
 			Objs: []runtime.Object{
 				&extensions.ReplicaSetList{ // LIST
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: extensions.SchemeGroupVersion.String(),
+					},
 					Items: []extensions.ReplicaSet{
 						{
 							ObjectMeta: metav1.ObjectMeta{
@@ -260,8 +295,10 @@ func TestReplicaSetStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:       nil,
-			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
+			ScaledDown:                true,
+			StopError:                 nil,
+			ExpectedActions:           []string{"get", "delete"},
+			ScaleClientExpectedAction: []string{"get", "update", "get", "get"},
 		},
 		{
 			Name: "NoOverlapping",
@@ -291,8 +328,10 @@ func TestReplicaSetStop(t *testing.T) {
 					},
 				},
 			},
-			StopError:       nil,
-			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
+			ScaledDown:                true,
+			StopError:                 nil,
+			ExpectedActions:           []string{"get", "delete"},
+			ScaleClientExpectedAction: []string{"get", "update", "get", "get"},
 		},
 		// TODO: Implement tests for overlapping replica sets, similar to replication controllers,
 		// when the overlapping checks are implemented for replica sets.
@@ -300,7 +339,9 @@ func TestReplicaSetStop(t *testing.T) {
 
 	for _, test := range tests {
 		fake := fake.NewSimpleClientset(test.Objs...)
-		reaper := ReplicaSetReaper{fake.Extensions(), time.Millisecond, time.Millisecond}
+		scaleClient := createFakeScaleClient("replicasets", "foo", 3, nil)
+
+		reaper := ReplicaSetReaper{fake.Extensions(), time.Millisecond, time.Millisecond, scaleClient, schema.GroupResource{Group: "extensions", Resource: "replicasets"}}
 		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
@@ -318,6 +359,24 @@ func TestReplicaSetStop(t *testing.T) {
 			}
 			if actions[i].GetVerb() != verb {
 				t.Errorf("%s unexpected action: %+v, expected %s-replicaSet", test.Name, actions[i], verb)
+			}
+		}
+		if test.ScaledDown {
+			scale, err := scaleClient.Scales(ns).Get(schema.GroupResource{Group: "extensions", Resource: "replicasets"}, name)
+			if err != nil {
+				t.Error(err)
+			}
+			if scale.Spec.Replicas != 0 {
+				t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
+			}
+			actions := scaleClient.Actions()
+			if len(actions) != len(test.ScaleClientExpectedAction) {
+				t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ScaleClientExpectedAction), len(actions))
+			}
+			for i, verb := range test.ScaleClientExpectedAction {
+				if actions[i].GetVerb() != verb {
+					t.Errorf("%s unexpected action: %+v, expected %s", test.Name, actions[i].GetVerb(), verb)
+				}
 			}
 		}
 	}
@@ -439,10 +498,12 @@ func TestDeploymentStop(t *testing.T) {
 	}
 	trueVar := true
 	tests := []struct {
-		Name            string
-		Objs            []runtime.Object
-		StopError       error
-		ExpectedActions []string
+		Name                      string
+		Objs                      []runtime.Object
+		ScaledDown                bool
+		StopError                 error
+		ExpectedActions           []string
+		ScaleClientExpectedAction []string
 	}{
 		{
 			Name: "SimpleDeployment",
@@ -510,17 +571,20 @@ func TestDeploymentStop(t *testing.T) {
 					},
 				},
 			},
-			StopError: nil,
+			ScaledDown: true,
+			StopError:  nil,
 			ExpectedActions: []string{"get:deployments", "update:deployments",
 				"get:deployments", "list:replicasets", "get:replicasets",
-				"get:replicasets", "update:replicasets", "get:replicasets",
-				"get:replicasets", "delete:replicasets", "delete:deployments"},
+				"delete:replicasets", "delete:deployments"},
+			ScaleClientExpectedAction: []string{"get", "update", "get", "get"},
 		},
 	}
 
 	for _, test := range tests {
+		scaleClient := createFakeScaleClient("deployments", "foo", 3, nil)
+
 		fake := fake.NewSimpleClientset(test.Objs...)
-		reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
+		reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond, scaleClient, schema.GroupResource{Group: "extensions", Resource: "deployments"}}
 		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
@@ -542,6 +606,24 @@ func TestDeploymentStop(t *testing.T) {
 			}
 			if len(action) == 3 && actions[i].GetSubresource() != action[2] {
 				t.Errorf("%s unexpected subresource: %+v, expected %s", test.Name, actions[i], expAction)
+			}
+		}
+		if test.ScaledDown {
+			scale, err := scaleClient.Scales(ns).Get(schema.GroupResource{Group: "extensions", Resource: "replicaset"}, name)
+			if err != nil {
+				t.Error(err)
+			}
+			if scale.Spec.Replicas != 0 {
+				t.Errorf("a scale subresource has unexpected number of replicas, got %d expected 0", scale.Spec.Replicas)
+			}
+			actions := scaleClient.Actions()
+			if len(actions) != len(test.ScaleClientExpectedAction) {
+				t.Errorf("%s unexpected actions: %v, expected %d actions got %d", test.Name, actions, len(test.ScaleClientExpectedAction), len(actions))
+			}
+			for i, verb := range test.ScaleClientExpectedAction {
+				if actions[i].GetVerb() != verb {
+					t.Errorf("%s unexpected action: %+v, expected %s", test.Name, actions[i].GetVerb(), verb)
+				}
 			}
 		}
 	}
@@ -637,7 +719,7 @@ func TestSimpleStop(t *testing.T) {
 	}
 	for _, test := range tests {
 		fake := test.fake
-		reaper, err := ReaperFor(test.kind, fake)
+		reaper, err := ReaperFor(test.kind, fake, nil)
 		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
@@ -694,11 +776,62 @@ func TestDeploymentNotFoundError(t *testing.T) {
 		},
 	)
 	fake.AddReactor("get", "replicasets", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, ScaleError{ActualError: errors.NewNotFound(api.Resource("replicaset"), "doesn't-matter")}
+		return true, nil, errors.NewNotFound(api.Resource("replicaset"), "doesn't-matter")
 	})
 
-	reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
+	reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond, nil, schema.GroupResource{}}
 	if err := reaper.Stop(ns, name, 0, nil); err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
+}
+
+func createFakeScaleClient(resource string, resourceName string, replicas int, errorsOnVerb map[string]*kerrors.StatusError) *fakescale.FakeScaleClient {
+	shouldReturnAnError := func(verb string) (*kerrors.StatusError, bool) {
+		if anError, anErrorExists := errorsOnVerb[verb]; anErrorExists {
+			return anError, true
+		}
+		return &kerrors.StatusError{}, false
+	}
+	newReplicas := int32(replicas)
+	scaleClient := &fakescale.FakeScaleClient{}
+	scaleClient.AddReactor("get", resource, func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
+		action := rawAction.(testcore.GetAction)
+		if action.GetName() != resourceName {
+			return true, nil, fmt.Errorf("expected = %s, got = %s", resourceName, action.GetName())
+		}
+		if anError, should := shouldReturnAnError("get"); should {
+			return true, nil, anError
+		}
+		obj := &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      action.GetName(),
+				Namespace: action.GetNamespace(),
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: newReplicas,
+			},
+		}
+		return true, obj, nil
+	})
+	scaleClient.AddReactor("update", resource, func(rawAction testcore.Action) (handled bool, ret runtime.Object, err error) {
+		action := rawAction.(testcore.UpdateAction)
+		obj := action.GetObject().(*autoscalingv1.Scale)
+		if obj.Name != resourceName {
+			return true, nil, fmt.Errorf("expected = %s, got = %s", resourceName, obj.Name)
+		}
+		if anError, should := shouldReturnAnError("update"); should {
+			return true, nil, anError
+		}
+		newReplicas = obj.Spec.Replicas
+		return true, &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      obj.Name,
+				Namespace: action.GetNamespace(),
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: newReplicas,
+			},
+		}, nil
+	})
+	return scaleClient
 }

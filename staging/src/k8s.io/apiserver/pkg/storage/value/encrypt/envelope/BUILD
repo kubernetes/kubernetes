@@ -16,7 +16,6 @@ go_library(
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/hashicorp/golang-lru:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
