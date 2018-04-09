@@ -60,7 +60,7 @@ func (i *Instances) CurrentNodeName(ctx context.Context, hostname string) (types
 	if err != nil {
 		return "", err
 	}
-	return types.NodeName(md.Hostname), nil
+	return types.NodeName(md.Name), nil
 }
 
 // AddSSHKeyToAllInstances is not implemented for OpenStack
