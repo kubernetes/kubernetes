@@ -63,6 +63,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 
 	// Slow issue #13323 (8 min)
 	Describe("Resize [Slow]", func() {
+		var originalNodeCount int32
 		var skipped bool
 
 		BeforeEach(func() {
@@ -96,7 +97,8 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+
+			if err := framework.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
@@ -114,9 +116,9 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			name := "my-hostname-delete-node"
 			numNodes, err := framework.NumberOfRegisteredNodes(c)
 			Expect(err).NotTo(HaveOccurred())
-			replicas := int32(numNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
-			err = framework.VerifyPods(c, ns, name, true, replicas)
+			originalNodeCount = int32(numNodes)
+			common.NewRCByName(c, ns, name, originalNodeCount, nil)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
 			Expect(err).NotTo(HaveOccurred())
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
@@ -125,7 +127,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForReadyNodes(c, int(replicas-1), 10*time.Minute)
+			err = framework.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
@@ -133,7 +135,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			time.Sleep(time.Minute)
 
 			By("verifying whether the pods from the removed node are recreated")
-			err = framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -145,9 +147,9 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			common.NewSVCByName(c, ns, name)
 			numNodes, err := framework.NumberOfRegisteredNodes(c)
 			Expect(err).NotTo(HaveOccurred())
-			replicas := int32(numNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
-			err = framework.VerifyPods(c, ns, name, true, replicas)
+			originalNodeCount = int32(numNodes)
+			common.NewRCByName(c, ns, name, originalNodeCount, nil)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
 			Expect(err).NotTo(HaveOccurred())
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
@@ -156,13 +158,13 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForReadyNodes(c, int(replicas+1), 10*time.Minute)
+			err = framework.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
-			err = resizeRC(c, ns, name, replicas+1)
+			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
+			err = resizeRC(c, ns, name, originalNodeCount+1)
 			Expect(err).NotTo(HaveOccurred())
-			err = framework.VerifyPods(c, ns, name, true, replicas+1)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount+1)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
