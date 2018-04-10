@@ -34,8 +34,8 @@ func NewTokenGroupAdder(auth authenticator.Token, groups []string) authenticator
 	return &TokenGroupAdder{auth, groups}
 }
 
-func (g *TokenGroupAdder) AuthenticateToken(token string) (user.Info, bool, error) {
-	u, ok, err := g.Authenticator.AuthenticateToken(token)
+func (g *TokenGroupAdder) AuthenticateToken(audiences []string, token string) (user.Info, bool, error) {
+	u, ok, err := g.Authenticator.AuthenticateToken(audiences, token)
 	if err != nil || !ok {
 		return nil, ok, err
 	}

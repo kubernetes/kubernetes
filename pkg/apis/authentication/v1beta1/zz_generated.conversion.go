@@ -81,6 +81,7 @@ func Convert_authentication_TokenReview_To_v1beta1_TokenReview(in *authenticatio
 }
 
 func autoConvert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *v1beta1.TokenReviewSpec, out *authentication.TokenReviewSpec, s conversion.Scope) error {
+	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
 	out.Token = in.Token
 	return nil
 }
@@ -91,6 +92,7 @@ func Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *v1bet
 }
 
 func autoConvert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(in *authentication.TokenReviewSpec, out *v1beta1.TokenReviewSpec, s conversion.Scope) error {
+	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
 	out.Token = in.Token
 	return nil
 }

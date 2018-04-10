@@ -104,7 +104,7 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	return x509request.NewVerifier(opts, headerAuthenticator, sets.NewString(proxyClientNames...)), nil
 }
 
-func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(audiences []string, req *http.Request) (user.Info, bool, error) {
 	name := headerValue(req.Header, a.nameHeaders)
 	if len(name) == 0 {
 		return nil, false, nil

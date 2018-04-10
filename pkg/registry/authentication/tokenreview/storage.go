@@ -30,10 +30,11 @@ import (
 
 type REST struct {
 	tokenAuthenticator authenticator.Request
+	auds               []string
 }
 
-func NewREST(tokenAuthenticator authenticator.Request) *REST {
-	return &REST{tokenAuthenticator: tokenAuthenticator}
+func NewREST(auds []string, tokenAuthenticator authenticator.Request) *REST {
+	return &REST{auds: auds, tokenAuthenticator: tokenAuthenticator}
 }
 
 func (r *REST) New() runtime.Object {
@@ -57,12 +58,15 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createV
 	if r.tokenAuthenticator == nil {
 		return tokenReview, nil
 	}
+	if len(tokenReview.Spec.Audiences) == 0 {
+		tokenReview.Spec.Audiences = r.auds
+	}
 
 	// create a header that contains nothing but the token
 	fakeReq := &http.Request{Header: http.Header{}}
 	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
 
-	tokenUser, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
+	tokenUser, ok, err := r.tokenAuthenticator.AuthenticateRequest(tokenReview.Spec.Audiences, fakeReq)
 	tokenReview.Status.Authenticated = ok
 	if err != nil {
 		tokenReview.Status.Error = err.Error()

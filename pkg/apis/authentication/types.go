@@ -57,6 +57,7 @@ type TokenReview struct {
 
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
+	Audiences []string
 	// Token is the opaque bearer token.
 	Token string
 }

@@ -55,6 +55,8 @@ message TokenReview {
 
 // TokenReviewSpec is a description of the token authentication request.
 message TokenReviewSpec {
+  repeated string audiences = 2;
+
   // Token is the opaque bearer token.
   // +optional
   optional string token = 1;

@@ -30,7 +30,7 @@ const (
 )
 
 func NewAuthenticator() authenticator.Request {
-	return authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+	return authenticator.RequestFunc(func(audiences []string, req *http.Request) (user.Info, bool, error) {
 		return &user.DefaultInfo{Name: anonymousUser, Groups: []string{unauthenticatedGroup}}, true, nil
 	})
 }

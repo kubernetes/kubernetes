@@ -258,7 +258,7 @@ func hasCorrectIssuer(iss, tokenData string) bool {
 	return true
 }
 
-func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateToken(audiences []string, token string) (user.Info, bool, error) {
 	if !hasCorrectIssuer(a.issuerURL, token) {
 		return nil, false, nil
 	}

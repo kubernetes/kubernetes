@@ -283,6 +283,10 @@ func (cfg *Config) Complete(informers informers.SharedInformerFactory) Completed
 		c.ExtraConfig.EndpointReconcilerConfig.Reconciler = cfg.createEndpointReconciler()
 	}
 
+	if len(c.GenericConfig.Authentication.APIAudiences) == 0 {
+		c.GenericConfig.Authentication.APIAudiences = c.ExtraConfig.ServiceAccountAPIAudiences
+	}
+
 	return CompletedConfig{&c}
 }
 
@@ -311,15 +315,15 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// install legacy rest storage
 	if c.ExtraConfig.APIResourceConfigSource.VersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
-			StorageFactory:             c.ExtraConfig.StorageFactory,
-			ProxyTransport:             c.ExtraConfig.ProxyTransport,
-			KubeletClientConfig:        c.ExtraConfig.KubeletClientConfig,
-			EventTTL:                   c.ExtraConfig.EventTTL,
-			ServiceIPRange:             c.ExtraConfig.ServiceIPRange,
-			ServiceNodePortRange:       c.ExtraConfig.ServiceNodePortRange,
-			LoopbackClientConfig:       c.GenericConfig.LoopbackClientConfig,
-			ServiceAccountIssuer:       c.ExtraConfig.ServiceAccountIssuer,
-			ServiceAccountAPIAudiences: c.ExtraConfig.ServiceAccountAPIAudiences,
+			StorageFactory:       c.ExtraConfig.StorageFactory,
+			ProxyTransport:       c.ExtraConfig.ProxyTransport,
+			KubeletClientConfig:  c.ExtraConfig.KubeletClientConfig,
+			EventTTL:             c.ExtraConfig.EventTTL,
+			ServiceIPRange:       c.ExtraConfig.ServiceIPRange,
+			ServiceNodePortRange: c.ExtraConfig.ServiceNodePortRange,
+			LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig,
+			ServiceAccountIssuer: c.ExtraConfig.ServiceAccountIssuer,
+			APIAudiences:         c.GenericConfig.Authentication.APIAudiences,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}
@@ -332,7 +336,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
+		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},

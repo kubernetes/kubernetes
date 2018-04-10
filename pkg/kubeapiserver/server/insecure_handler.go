@@ -45,7 +45,7 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config, contex
 	} else {
 		handler = genericapifilters.WithLegacyAudit(handler, contextMapper, c.LegacyAuditWriter)
 	}
-	handler = genericapifilters.WithAuthentication(handler, contextMapper, insecureSuperuser{}, nil)
+	handler = genericapifilters.WithAuthentication(handler, contextMapper, []string{}, insecureSuperuser{}, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, contextMapper, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, contextMapper, c.LongRunningFunc)
@@ -132,7 +132,7 @@ func serveInsecurely(insecureServingInfo *InsecureServingInfo, insecureHandler h
 // but allows apiserver code to stop special-casing a nil user to skip authorization checks.
 type insecureSuperuser struct{}
 
-func (insecureSuperuser) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (insecureSuperuser) AuthenticateRequest([]string, *http.Request) (user.Info, bool, error) {
 	return &user.DefaultInfo{
 		Name:   "system:unsecured",
 		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},

@@ -39,7 +39,7 @@ func BuildHandlerChain(apiHandler http.Handler, c *CompletedConfig) http.Handler
 	failedHandler := genericapifilters.Unauthorized(requestContextMapper, legacyscheme.Codecs, false)
 
 	handler := genericapifilters.WithAuthorization(apiHandler, requestContextMapper, c.Authorization.Authorizer, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.APIAudiences, c.Authentication.Authenticator, failedHandler)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver, requestContextMapper)
 	handler = apirequest.WithRequestContext(handler, requestContextMapper)
 	handler = genericfilters.WithPanicRecovery(handler)

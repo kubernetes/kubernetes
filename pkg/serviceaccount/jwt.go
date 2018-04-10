@@ -131,7 +131,7 @@ type Validator interface {
 	// Validate validates a token and returns user information or an error.
 	// Validator can assume that the issuer and signature of a token are already
 	// verified when this function is called.
-	Validate(tokenData string, public *jwt.Claims, private interface{}) (namespace, name, uid string, err error)
+	Validate(auds []string, tokenData string, public *jwt.Claims, private interface{}) (namespace, name, uid string, err error)
 	// NewPrivateClaims returns a struct that the authenticator should
 	// deserialize the JWT payload into. The authenticator may then pass this
 	// struct back to the Validator as the 'private' argument to a Validate()
@@ -142,7 +142,7 @@ type Validator interface {
 
 var errMismatchedSigningMethod = errors.New("invalid signing method")
 
-func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, bool, error) {
+func (j *jwtTokenAuthenticator) AuthenticateToken(auds []string, tokenData string) (user.Info, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
@@ -174,7 +174,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
-	ns, name, uid, err := j.validator.Validate(tokenData, public, private)
+	ns, name, uid, err := j.validator.Validate(auds, tokenData, public, private)
 	if err != nil {
 		return nil, false, err
 	}

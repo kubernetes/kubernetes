@@ -61,6 +61,7 @@ type TokenReview struct {
 
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
+	Audiences []string `json:"audiences,omitempty" protobuf:"bytes,2,rep,name=audiences"`
 	// Token is the opaque bearer token.
 	// +optional
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`

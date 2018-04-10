@@ -69,7 +69,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		serviceaccount.JWTTokenAuthenticator(
 			iss,
 			[]interface{}{&pk},
-			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
+			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(gcs)),
 		),
 	)
 	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
