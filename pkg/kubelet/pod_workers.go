@@ -183,7 +183,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 		}
 		if err != nil {
 			// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
-			glog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
+			glog.Errorf("Error syncing pod %s, skipping: %v", format.Pod(update.Pod), err)
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}
