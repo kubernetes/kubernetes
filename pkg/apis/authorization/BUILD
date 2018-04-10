@@ -5,6 +5,41 @@ load(
     "go_library",
 )
 
+genrule(
+    name = "generate-deepcopy",
+    srcs = glob(["**/*.go"], exclude=["zz_generated.deepcopy.go"]) + [
+        "//vendor/k8s.io/code-generator/hack:boilerplate.go.txt",
+        "//:all-srcs",
+    ],
+    outs = ["zz_generated.deepcopy.go"],
+    tools = [
+        "//vendor/k8s.io/code-generator/cmd/deepcopy-gen",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+    ],
+    cmd = """
+      export O=$$PWD
+      export GOPATH=$$PWD/.go
+      export GOROOT=/usr/lib/google-golang
+      dcg=$$PWD/'$(location //vendor/k8s.io/code-generator/cmd/deepcopy-gen)'
+      mkdir -p $$GOPATH/src/k8s.io
+      touch $$GOPATH/BUILD.bazel
+      ln -snf $$PWD $$GOPATH/src/k8s.io/kubernetes
+      for i in $$(ls staging/src/k8s.io); do
+        ln -snf $$PWD/staging/src/k8s.io/$$i $$GOPATH/src/k8s.io/$$i
+      done
+      cd $$GOPATH/src/k8s.io/kubernetes
+      $$dcg \
+      -v 1 \
+      -i k8s.io/kubernetes/pkg/apis/authorization \
+      --bounding-dirs k8s.io/kubernetes,k8s.io/api \
+      -h $(location //vendor/k8s.io/code-generator/hack:boilerplate.go.txt) \
+      -O zz_generated.deepcopy
+      ls $$GOPATH/src/k8s.io/kubernetes/pkg/apis/authorization/zz_generated.deepcopy.go
+      ln pkg/apis/authorization/zz_generated.deepcopy.go $$O/'$(location zz_generated.deepcopy.go)'
+    """,
+    message = "generating",
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -23,7 +58,7 @@ go_library(
 
 filegroup(
     name = "package-srcs",
-    srcs = glob(["**"]),
+    srcs = glob(["**"], exclude=["**/zz_generated*.go"]),
     tags = ["automanaged"],
     visibility = ["//visibility:private"],
 )
