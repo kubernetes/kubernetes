@@ -326,7 +326,7 @@ kind: KubeProxyConfiguration
 
 * The `PodSecurityPolicy` API has been moved to the `policy/v1beta1` API group. The `PodSecurityPolicy` API in the `extensions/v1beta1` API group is deprecated and will be removed in a future release. Authorizations for using pod security policy resources should change to reference the `policy` API group after upgrading to 1.11. ([#54933](https://github.com/kubernetes/kubernetes/pull/54933), [@php-coder](https://github.com/php-coder))
 
-* Add `--enable-admission-plugin` `--disable-admission-plugin` flags and deprecate `--admission-control`. When using the separate flag, the order in which they're specified doesn't matter.  ([#58123](https://github.com/kubernetes/kubernetes/pull/58123), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
+* Add `--enable-admission-plugins` `--disable-admission-plugins` flags and deprecate `--admission-control`. When using the separate flag, the order in which they're specified doesn't matter.  ([#58123](https://github.com/kubernetes/kubernetes/pull/58123), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
 
 * The kubelet  --docker-disable-shared-pid flag, which runs docker containers with a process namespace that is shared between all containers in a pod, is now deprecated and will be removed in a future release. It is replaced by `v1.Pod.Spec.ShareProcessNamespace`, which configures this behavior. This field is alpha and can be enabled with --feature-gates=PodShareProcessNamespace=true. ([#58093](https://github.com/kubernetes/kubernetes/pull/58093), [@verb](https://github.com/verb))
 
@@ -1835,7 +1835,7 @@ filename | sha256 hash
 * Bump GCE metadata proxy to v0.1.9 to pick up security fixes. ([#58221](https://github.com/kubernetes/kubernetes/pull/58221), [@ihmccreery](https://github.com/ihmccreery))
 * kubeadm now supports CIDR notations in NO_PROXY environment variable ([#53895](https://github.com/kubernetes/kubernetes/pull/53895), [@kad](https://github.com/kad))
 * kubeadm now accept `--apiserver-extra-args`, `--controller-manager-extra-args` and `--scheduler-extra-args` to override / specify additional flags for control plane components ([#58080](https://github.com/kubernetes/kubernetes/pull/58080), [@simonferquel](https://github.com/simonferquel))
-* Add `--enable-admission-plugin` `--disable-admission-plugin` flags and deprecate `--admission-control`. ([#58123](https://github.com/kubernetes/kubernetes/pull/58123), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
+* Add `--enable-admission-plugins` `--disable-admission-plugins` flags and deprecate `--admission-control`. ([#58123](https://github.com/kubernetes/kubernetes/pull/58123), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
     * Afterwards, don't care about the orders specified in the flags.
 * "ExternalTrafficLocalOnly" has been removed from feature gate. It has been a GA feature since v1.7. ([#56948](https://github.com/kubernetes/kubernetes/pull/56948), [@MrHohn](https://github.com/MrHohn))
 * GCP: allow a master to not include a metadata concealment firewall rule (if it's not running the metadata proxy). ([#58104](https://github.com/kubernetes/kubernetes/pull/58104), [@ihmccreery](https://github.com/ihmccreery))
