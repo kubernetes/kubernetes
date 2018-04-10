@@ -177,13 +177,10 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	postUpgradeResourceStore := &GCPResourceStore{}
 	t.populateGCPResourceStore(postUpgradeResourceStore)
 
-	// Ignore certain fields in compute.Firewall that we know will change
-	// due to the upgrade/downgrade.
-	// TODO(rramkumar): Remove this once glbc 0.9.8 is released.
-	t.resourceStore.Fw.Allowed = nil
-	t.resourceStore.Fw.SourceRanges = nil
-	postUpgradeResourceStore.Fw.Allowed = nil
-	postUpgradeResourceStore.Fw.SourceRanges = nil
+	// Ignore compute.SslCertificates since we know it will change during an upgrade/downgrade.
+	// TODO(rramkumar): Remove this once glbc 1.1 is released.
+	t.resourceStore.SslList = nil
+	postUpgradeResourceStore.SslList = nil
 
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()
