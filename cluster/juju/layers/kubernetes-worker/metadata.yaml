@@ -28,6 +28,8 @@ requires:
     interface: kube-dns
   kube-control:
     interface: kube-control
+  aws:
+    interface: aws
 provides:
   cni:
     interface: kubernetes-cni

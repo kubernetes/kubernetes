@@ -1,6 +1,7 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
+  - 'layer:status'
   - 'layer:debug'
   - 'layer:snap'
   - 'layer:docker'
@@ -12,6 +13,7 @@ includes:
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
   - 'interface:kube-control'
+  - 'interface:aws'
 config:
   deletes:
     - install_from_upstream

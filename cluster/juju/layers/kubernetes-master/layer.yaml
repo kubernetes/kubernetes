@@ -1,6 +1,7 @@
 repo: https://github.com/kubernetes/kubernetes.git
 includes:
   - 'layer:basic'
+  - 'layer:status'
   - 'layer:snap'
   - 'layer:tls-client'
   - 'layer:leadership'
@@ -15,6 +16,7 @@ includes:
   - 'interface:kube-dns'
   - 'interface:kube-control'
   - 'interface:public-address'
+  - 'interface:aws'
 options:
   basic:
     packages:

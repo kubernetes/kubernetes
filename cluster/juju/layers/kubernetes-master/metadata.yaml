@@ -40,6 +40,8 @@ requires:
     interface: public-address
   ceph-storage:
     interface: ceph-admin
+  aws:
+    interface: aws
 resources:
   kubectl:
     type: file
