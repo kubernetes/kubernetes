@@ -42,7 +42,7 @@ var _ = instrumentation.SIGDescribe("Monitoring", func() {
 		framework.SkipUnlessClusterMonitoringModeIs("influxdb")
 	})
 
-	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
+	It("should verify monitoring pods and all cluster nodes are available on influxdb using heapster [Feature:InfluxdbMonitoring]", func() {
 		testMonitoringUsingHeapsterInfluxdb(f.ClientSet)
 	})
 })
