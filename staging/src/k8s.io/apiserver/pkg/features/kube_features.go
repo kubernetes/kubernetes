@@ -63,6 +63,12 @@ const (
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
 	APIListChunking utilfeature.Feature = "APIListChunking"
+
+	// owner: @apelisse, @lavalamp
+	// alpha: v1.11
+	//
+	// Server-side apply. Merging happens on the server.
+	ServerSideApply utilfeature.Feature = "ServerSideApply"
 )
 
 func init() {
@@ -78,4 +84,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 }
