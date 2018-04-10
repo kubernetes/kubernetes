@@ -24,11 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 )
 
 func EtcdUpgrade(target_storage, target_version string) error {
@@ -120,10 +116,11 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 }
 
 func locationParamGKE() string {
-	if TestContext.CloudConfig.Zone != "" {
-		return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
+	if TestContext.CloudConfig.MultiMaster {
+		// GKE Regional Clusters are being tested.
+		return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
 	}
-	return fmt.Sprintf("--region=%s", TestContext.CloudConfig.Region)
+	return fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone)
 }
 
 func appendContainerCommandGroupIfNeeded(args []string) []string {
@@ -214,7 +211,7 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
 	// GKE; the operation shouldn't return until they all are.
 	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.ClientSet, RestartNodeReadyAgainTimeout, TestContext.CloudConfig.NumNodes); err != nil {
+	if _, err := CheckNodesReady(f.ClientSet, TestContext.CloudConfig.NumNodes, RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil
@@ -228,7 +225,7 @@ func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, en
 	}
 	// Wait for it to complete and validate nodes are healthy.
 	Logf("Waiting up to %v for all nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout)
-	if _, err := CheckNodesReady(f.ClientSet, RestartNodeReadyAgainTimeout, TestContext.CloudConfig.NumNodes); err != nil {
+	if _, err := CheckNodesReady(f.ClientSet, TestContext.CloudConfig.NumNodes, RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil
@@ -271,64 +268,6 @@ func nodeUpgradeGKE(v string, img string) error {
 	waitForSSHTunnels()
 
 	return nil
-}
-
-// CheckNodesReady waits up to nt for expect nodes accessed by c to be ready,
-// returning an error if this doesn't happen in time. It returns the names of
-// nodes it finds.
-func CheckNodesReady(c clientset.Interface, nt time.Duration, expect int) ([]string, error) {
-	// First, keep getting all of the nodes until we get the number we expect.
-	var nodeList *v1.NodeList
-	var errLast error
-	start := time.Now()
-	found := wait.Poll(Poll, nt, func() (bool, error) {
-		// A rolling-update (GCE/GKE implementation of restart) can complete before the apiserver
-		// knows about all of the nodes. Thus, we retry the list nodes call
-		// until we get the expected number of nodes.
-		nodeList, errLast = c.CoreV1().Nodes().List(metav1.ListOptions{
-			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String()})
-		if errLast != nil {
-			return false, nil
-		}
-		if len(nodeList.Items) != expect {
-			errLast = fmt.Errorf("expected to find %d nodes but found only %d (%v elapsed)",
-				expect, len(nodeList.Items), time.Since(start))
-			Logf("%v", errLast)
-			return false, nil
-		}
-		return true, nil
-	}) == nil
-	nodeNames := make([]string, len(nodeList.Items))
-	for i, n := range nodeList.Items {
-		nodeNames[i] = n.ObjectMeta.Name
-	}
-	if !found {
-		return nodeNames, fmt.Errorf("couldn't find %d nodes within %v; last error: %v",
-			expect, nt, errLast)
-	}
-	Logf("Successfully found %d nodes", expect)
-
-	// Next, ensure in parallel that all the nodes are ready. We subtract the
-	// time we spent waiting above.
-	timeout := nt - time.Since(start)
-	result := make(chan bool, len(nodeList.Items))
-	for _, n := range nodeNames {
-		n := n
-		go func() { result <- WaitForNodeToBeReady(c, n, timeout) }()
-	}
-	failed := false
-	// TODO(mbforbes): Change to `for range` syntax once we support only Go
-	// >= 1.4.
-	for i := range nodeList.Items {
-		_ = i
-		if !<-result {
-			failed = true
-		}
-	}
-	if failed {
-		return nodeNames, fmt.Errorf("at least one node failed to be ready")
-	}
-	return nodeNames, nil
 }
 
 // MigTemplate (GCE-only) returns the name of the MIG template that the
