@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -236,7 +236,7 @@ var (
 	that exist off platform, on other clusters, or locally.`))
 
 	serviceExternalNameExample = templates.Examples(i18n.T(`
-	# Create a new ExternalName service named my-ns 
+	# Create a new ExternalName service named my-ns
 	kubectl create service externalname my-ns --external-name bar.com`))
 )
 
