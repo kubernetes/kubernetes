@@ -192,7 +192,7 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		pvclaims := make([]*v1.PersistentVolumeClaim, volumesPerPod)
 		for i := 0; i < volumesPerPod; i++ {
 			By("Creating PVC using the Storage Class")
-			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", sc[index%len(sc)]))
+			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", sc[index%len(sc)]))
 			Expect(err).NotTo(HaveOccurred())
 			pvclaims[i] = pvclaim
 		}

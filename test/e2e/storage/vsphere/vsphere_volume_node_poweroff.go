@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 		By("Creating PVC using the Storage Class")
-		pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, "1Gi", storageclass)
+		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
 		pvclaim, err := framework.CreatePVC(client, namespace, pvclaimSpec)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create PVC with err: %v", err))
 		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
