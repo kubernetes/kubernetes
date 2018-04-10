@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -101,6 +102,10 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 			}
 		}
 	}()
+	// If systemd is used, notify it that we reached the point of the certificate request.
+	// This will allow any configuration management to proceed with the CSR approval
+	// rather than hanging on the kubelet activation.
+	go daemon.SdNotify(false, "READY=1")
 	certData, err := csr.RequestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
 	if err != nil {
 		return err
