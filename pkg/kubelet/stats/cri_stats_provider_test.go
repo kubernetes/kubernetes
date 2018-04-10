@@ -18,6 +18,7 @@ package stats
 
 import (
 	"math/rand"
+	"runtime"
 	"testing"
 	"time"
 
@@ -38,7 +39,6 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
-	"runtime"
 )
 
 const (
@@ -207,9 +207,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIRootfsStats(assert, c1, containerStats1, nil)
 	checkCRILogsStats(assert, c1, &rootFsInfo, containerLogStats1)
 	checkCRINetworkStats(assert, p0.Network, infos[sandbox0.PodSandboxStatus.Id].Stats[0].Network)
-	if runtime.GOOS == "linux" {
-		checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
-	}
+	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
@@ -223,9 +221,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIRootfsStats(assert, c2, containerStats2, &imageFsInfo)
 	checkCRILogsStats(assert, c2, &rootFsInfo, containerLogStats2)
 	checkCRINetworkStats(assert, p1.Network, infos[sandbox1.PodSandboxStatus.Id].Stats[0].Network)
-	if runtime.GOOS == "linux" {
-		checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
-	}
+	checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
 
 	p2 := podStatsMap[statsapi.PodReference{Name: "sandbox2-name", UID: "sandbox2-uid", Namespace: "sandbox2-ns"}]
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
@@ -241,9 +237,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	checkCRILogsStats(assert, c3, &rootFsInfo, containerLogStats4)
 	checkCRINetworkStats(assert, p2.Network, infos[sandbox2.PodSandboxStatus.Id].Stats[0].Network)
-	if runtime.GOOS == "linux" {
-		checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
-	}
+	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -471,6 +465,9 @@ func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkSta
 }
 
 func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+	if runtime.GOOS != "linux" {
+		return
+	}
 	assert.Equal(cs.Timestamp.UnixNano(), actual.CPU.Time.UnixNano())
 	assert.Equal(cs.Cpu.Usage.Total, *actual.CPU.UsageCoreNanoSeconds)
 	assert.Equal(cs.CpuInst.Usage.Total, *actual.CPU.UsageNanoCores)
