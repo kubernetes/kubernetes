@@ -81,6 +81,12 @@ type KubeletConfiguration struct {
 	// TLSMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	TLSMinVersion string
+	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
+	// signing a serving certificate, the Kubelet will request a certificate from
+	// the certificates.k8s.io API. This requires an approver to approve the
+	// certificate signing requests. The RotateKubeletServerCertificate feature
+	// must be enabled.
+	ServerTLSBootstrap bool
 	// authentication specifies how requests to the Kubelet's server are authenticated
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
