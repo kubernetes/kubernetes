@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
-	genericcontrollerconfig "k8s.io/kubernetes/cmd/controller-manager/app"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -124,12 +124,16 @@ func Run(c *config.CompletedConfig) error {
 	// Start the controller manager HTTP server
 	stopCh := make(chan struct{})
 	if c.Generic.SecureServing != nil {
-		if err := genericcontrollerconfig.Serve(&c.Generic, c.Generic.SecureServing.Serve, stopCh); err != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
+		if err := c.Generic.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
 	if c.Generic.InsecureServing != nil {
-		if err := genericcontrollerconfig.Serve(&c.Generic, c.Generic.InsecureServing.Serve, stopCh); err != nil {
+		handler := genericcontrollermanager.NewBaseHandler(&c.Generic)
+		handler = genericcontrollermanager.BuildHandlerChain(handler, &c.Generic)
+		if err := c.Generic.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
@@ -381,7 +385,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
-	if err := genericcontrollerconfig.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
+	if err := genericcontrollermanager.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
 	}
 
