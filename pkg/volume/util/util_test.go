@@ -19,6 +19,7 @@ package util
 import (
 	"io/ioutil"
 	"os"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -973,6 +974,60 @@ func TestGetWindowsPath(t *testing.T) {
 		result := GetWindowsPath(test.path)
 		if result != test.expectedPath {
 			t.Errorf("GetWindowsPath(%v) returned (%v), want (%v)", test.path, result, test.expectedPath)
+		}
+	}
+}
+
+func TestMakeAbsolutePath(t *testing.T) {
+	tests := []struct {
+		goos         string
+		path         string
+		expectedPath string
+		name         string
+	}{
+		{
+			goos:         "linux",
+			path:         "non-absolute/path",
+			expectedPath: "/non-absolute/path",
+			name:         "linux non-absolute path",
+		},
+		{
+			goos:         "linux",
+			path:         "/absolute/path",
+			expectedPath: "/absolute/path",
+			name:         "linux absolute path",
+		},
+		{
+			goos:         "windows",
+			path:         "some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "basic windows",
+		},
+		{
+			goos:         "windows",
+			path:         "/some/path",
+			expectedPath: "c:/some/path",
+			name:         "linux path on windows",
+		},
+		{
+			goos:         "windows",
+			path:         "\\some\\path",
+			expectedPath: "c:\\some\\path",
+			name:         "windows path no drive",
+		},
+		{
+			goos:         "windows",
+			path:         "\\:\\some\\path",
+			expectedPath: "\\:\\some\\path",
+			name:         "windows path with colon",
+		},
+	}
+	for _, test := range tests {
+		if runtime.GOOS == test.goos {
+			path := MakeAbsolutePath(test.goos, test.path)
+			if path != test.expectedPath {
+				t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
+			}
 		}
 	}
 }

@@ -95,23 +95,6 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	return activePods
 }
 
-func makeAbsolutePath(goos, path string) string {
-	if goos != "windows" {
-		return "/" + path
-	}
-	// These are all for windows
-	// If there is a colon, give up.
-	if strings.Contains(path, ":") {
-		return path
-	}
-	// If there is a slash, but no drive, add 'c:'
-	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
-		return "c:" + path
-	}
-	// Otherwise, add 'c:\'
-	return "c:\\" + path
-}
-
 // makeBlockVolumes maps the raw block devices specified in the path of the container
 // Experimental
 func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVolumes kubecontainer.VolumeMap, blkutil volumepathhandler.BlockVolumePathHandler) ([]kubecontainer.DeviceInfo, error) {
@@ -240,7 +223,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			}
 		}
 		if !filepath.IsAbs(containerPath) {
-			containerPath = makeAbsolutePath(runtime.GOOS, containerPath)
+			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
 		}
 
 		propagation, err := translateMountPropagation(mount.MountPropagation)
