@@ -54,7 +54,7 @@ EOF
 
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
-  (umask 700;
+  (umask 077;
   local -r tmp_kube_env="/tmp/kube-env.yaml"
   curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
@@ -72,7 +72,7 @@ for k,v in yaml.load(sys.stdin).iteritems():
 
 function download-kube-master-certs {
   # Fetch kube-env from GCE metadata server.
-  (umask 700;
+  (umask 077;
   local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
   curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
     -H "X-Google-Metadata-Request: True" \
