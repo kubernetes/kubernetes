@@ -55,7 +55,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.DeploymentBasicV1Beta1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, "")
 	cmd.Flags().StringSlice("image", []string{}, "Image name to run.")
 	cmd.MarkFlagRequired("image")
 	return cmd
@@ -71,8 +71,17 @@ func generatorFromName(
 ) (kubectl.StructuredGenerator, bool) {
 
 	switch generatorName {
-	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
+	case cmdutil.DeploymentBasicAppsV1GeneratorName:
 		generator := &kubectl.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		return generator, true
+
+	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
+		generator := &kubectl.DeploymentBasicAppsGeneratorV1Beta1{
 			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
@@ -112,11 +121,17 @@ func createDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer,
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 
-	// It is possible we have to modify the user-provided generator name if
-	// the server does not have support for the requested generator.
-	generatorName, err = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
-	if err != nil {
-		return err
+	if len(generatorName) == 0 {
+		generatorName = cmdutil.DeploymentBasicAppsV1GeneratorName
+		generatorNameTemp, err := cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
+		if err != nil {
+			return err
+		}
+		if generatorNameTemp != generatorName {
+			cmdutil.Warning(cmdErr, generatorName, generatorNameTemp)
+		} else {
+			generatorName = generatorNameTemp
+		}
 	}
 
 	imageNames := cmdutil.GetFlagStringSlice(cmd, "image")
