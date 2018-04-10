@@ -452,7 +452,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		dsClient := c.AppsV1().DaemonSets(ns)
 		podClient := c.CoreV1().Pods(ns)
 		controllerRevisionClient := c.AppsV1().ControllerRevisions(ns)
-		err = deleteDaemonSetAndOrphanPods(dsClient, podClient, controllerRevisionClient, ds)
+		err = deleteDaemonSetAndOrphan(dsClient, podClient, controllerRevisionClient, ds)
 		Expect(err).NotTo(HaveOccurred())
 
 		framework.Logf("Create 2rd daemonset to adopt the pods (no restart) as long as template matches")
@@ -781,44 +781,46 @@ func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func() (bool
 	}
 }
 
-// deleteDaemonSetAndOrphanPods deletes the given DaemonSet and orphans all its dependents.
+// deleteDaemonSetAndOrphan deletes the given DaemonSet and orphans all its dependents.
 // It also checks that all dependents are orphaned, and the DaemonSet is deleted.
-func deleteDaemonSetAndOrphanPods(
+func deleteDaemonSetAndOrphan(
 	dsClient appstyped.DaemonSetInterface,
 	podClient corev1typed.PodInterface,
 	controllerRevisionClient appstyped.ControllerRevisionInterface,
 	ds *apps.DaemonSet) error {
-
-	ds, err := dsClient.Get(ds.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get daemonset %q: %v", ds.Name, err)
-	}
-
 	deletePropagationOrphanPolicy := metav1.DeletePropagationOrphan
 	deleteOptions := &metav1.DeleteOptions{
 		PropagationPolicy: &deletePropagationOrphanPolicy,
 		Preconditions:     metav1.NewUIDPreconditions(string(ds.UID)),
 	}
-	if err = dsClient.Delete(ds.Name, deleteOptions); err != nil {
+	if err := dsClient.Delete(ds.Name, deleteOptions); err != nil {
 		return fmt.Errorf("failed to delete daemonset %q: %v", ds.Name, err)
 	}
 
-	if err = checkDaemonSetDeleted(dsClient, ds.Name); err != nil {
+	if err := waitDaemonSetDeleted(dsClient, ds.Name); err != nil {
 		return err
 	}
 
-	if err = checkDaemonSetPodsOrphaned(podClient, ds.Name); err != nil {
+	labels := ds.Spec.Selector.MatchLabels
+	if err := waitDaemonSetPodsOrphaned(podClient, labels); err != nil {
 		return err
 	}
 
-	if err = checkDaemonSetHistoriesOrphaned(controllerRevisionClient, ds.Name); err != nil {
+	if err := waitDaemonSetHistoriesOrphaned(controllerRevisionClient, labels); err != nil {
 		return err
+	}
+
+	orphanedPodNum, err := getOrphanedPodNum(podClient, labels)
+	if err != nil {
+		return err
+	} else if orphanedPodNum == 0 {
+		return fmt.Errorf("number of orphaned pods is 0, but expected > 0")
 	}
 
 	return nil
 }
 
-func checkDaemonSetDeleted(dsClient appstyped.DaemonSetInterface, dsName string) error {
+func waitDaemonSetDeleted(dsClient appstyped.DaemonSetInterface, dsName string) error {
 	if err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
 		_, err := dsClient.Get(dsName, metav1.GetOptions{})
 		if !apierrs.IsNotFound(err) {
@@ -826,25 +828,24 @@ func checkDaemonSetDeleted(dsClient appstyped.DaemonSetInterface, dsName string)
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("daemonset %q does not get deleted: %v", dsName, err)
+		return fmt.Errorf("failed to verify whether daemonset %q has been deleted or not: %v", dsName, err)
 	}
 	return nil
 }
 
-func getPods(podClient corev1typed.PodInterface, labelMap map[string]string) (*v1.PodList, error) {
-	podSelector := labels.Set(labelMap).AsSelector()
-	options := metav1.ListOptions{LabelSelector: podSelector.String()}
+func listPods(podClient corev1typed.PodInterface, label map[string]string) (*v1.PodList, error) {
+	selector := labels.Set(label).AsSelector()
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 	pods, err := podClient.List(options)
 	if err != nil {
-		return nil, fmt.Errorf("failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
+		return nil, fmt.Errorf("failed to obtain a list of pods that match the pod labels %v: %v", label, err)
 	}
 	return pods, nil
 }
 
-func checkDaemonSetPodsOrphaned(podClient corev1typed.PodInterface, dsName string) error {
-	label := map[string]string{daemonsetNameLabel: dsName}
+func waitDaemonSetPodsOrphaned(podClient corev1typed.PodInterface, label map[string]string) error {
 	if err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
-		pods, err := getPods(podClient, label)
+		pods, err := listPods(podClient, label)
 		if err != nil {
 			return false, err
 		}
@@ -857,7 +858,7 @@ func checkDaemonSetPodsOrphaned(podClient corev1typed.PodInterface, dsName strin
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("daemonset pods are not orphaned: %v", err)
+		return fmt.Errorf("failed to verify whether daemonset pods has been orphaned or not: %v", err)
 	}
 	return nil
 }
@@ -872,8 +873,7 @@ func listDaemonSetHistories(controllerRevisionClient appstyped.ControllerRevisio
 	return historyList, nil
 }
 
-func checkDaemonSetHistoriesOrphaned(controllerRevisionClient appstyped.ControllerRevisionInterface, dsName string) error {
-	label := map[string]string{daemonsetNameLabel: dsName}
+func waitDaemonSetHistoriesOrphaned(controllerRevisionClient appstyped.ControllerRevisionInterface, label map[string]string) error {
 	if err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
 		histories, err := listDaemonSetHistories(controllerRevisionClient, label)
 		if err != nil {
@@ -888,7 +888,7 @@ func checkDaemonSetHistoriesOrphaned(controllerRevisionClient appstyped.Controll
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("daemonset histories are not orphaned: %v ", err)
+		return fmt.Errorf("failed to verify whether daemonset histories has been orphaned or not: %v", err)
 	}
 	return nil
 }
@@ -898,20 +898,20 @@ func waitDaemonSetAdoption(
 	controllerRevisionClient appstyped.ControllerRevisionInterface,
 	ds *apps.DaemonSet,
 	podNamePrefix string) error {
-	if err := checkDaemonSetPodsAdopted(podClient, ds.UID); err != nil {
+	if err := waitDaemonSetPodsAdopted(podClient, ds.UID); err != nil {
 		return err
 	}
-	if err := checkDaemonSetHistoriesAdopted(controllerRevisionClient, ds); err != nil {
+	if err := waitDaemonSetHistoriesAdopted(controllerRevisionClient, ds); err != nil {
 		return err
 	}
 	// Ensure no pod is re-created by checking their names
-	if err := checkDaemonSetPodsName(podClient, ds.Name, podNamePrefix); err != nil {
+	if err := checkDaemonSetPodsName(podClient, ds.Spec.Selector.MatchLabels, podNamePrefix); err != nil {
 		return err
 	}
 	return nil
 }
 
-func checkDaemonSetPodsAdopted(podClient corev1typed.PodInterface, dsUID types.UID) error {
+func waitDaemonSetPodsAdopted(podClient corev1typed.PodInterface, dsUID types.UID) error {
 	if err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
 		pods, err := podClient.List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
@@ -926,13 +926,13 @@ func checkDaemonSetPodsAdopted(podClient corev1typed.PodInterface, dsUID types.U
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("daemonset pods are not adopted: %v", err)
+		return fmt.Errorf("failed to verify whether daemonset pods has been orphaned or not: %v", err)
 	}
 	return nil
 }
 
-func checkDaemonSetHistoriesAdopted(controllerRevisionClient appstyped.ControllerRevisionInterface, ds *apps.DaemonSet) error {
-	label := map[string]string{daemonsetNameLabel: ds.Name}
+func waitDaemonSetHistoriesAdopted(controllerRevisionClient appstyped.ControllerRevisionInterface, ds *apps.DaemonSet) error {
+	label := ds.Spec.Selector.MatchLabels
 	if err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
 		histories, err := listDaemonSetHistories(controllerRevisionClient, label)
 		if err != nil {
@@ -947,22 +947,28 @@ func checkDaemonSetHistoriesAdopted(controllerRevisionClient appstyped.Controlle
 		}
 		return true, nil
 	}); err != nil {
-		return fmt.Errorf("daemonset histories are not adopted: %v", err)
+		return fmt.Errorf("failed to verify whether daemonset histories has been orphaned or not: %v", err)
 	}
 	return nil
 }
 
-func checkDaemonSetPodsName(podClient corev1typed.PodInterface, dsName, podNamePrefix string) error {
-	label := map[string]string{daemonsetNameLabel: dsName}
-	pods, err := getPods(podClient, label)
+func checkDaemonSetPodsName(podClient corev1typed.PodInterface, label map[string]string, podNamePrefix string) error {
+	pods, err := listPods(podClient, label)
 	if err != nil {
 		return err
 	}
 	for _, pod := range pods.Items {
-
 		if !strings.HasPrefix(pod.Name, podNamePrefix) {
 			return fmt.Errorf("pod %q does not have name prefix %q", pod.Name, podNamePrefix)
 		}
 	}
 	return nil
+}
+
+func getOrphanedPodNum(podClient corev1typed.PodInterface, label map[string]string) (int, error) {
+	pods, err := listPods(podClient, label)
+	if err != nil {
+		return 0, err
+	}
+	return len(pods.Items), nil
 }
