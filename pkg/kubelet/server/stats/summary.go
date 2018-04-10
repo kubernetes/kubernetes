@@ -99,7 +99,7 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		}
 		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			glog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			glog.V(5).Errorf("Failed to get system container stats for %q: %v", cont.name, err)
 			continue
 		}
 		// System containers don't have a filesystem associated with them.
