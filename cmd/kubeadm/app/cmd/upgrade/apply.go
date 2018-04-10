@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -86,8 +87,11 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 				cfg, err := upgrade.FetchConfigurationFromFile(flags.parent.cfgPath)
 				kubeadmutil.CheckErr(err)
 
-				if cfg.KubernetesVersion != "" {
-					flags.newK8sVersionStr = cfg.KubernetesVersion
+				version, _, err := unstructured.NestedString(cfg, "kubernetesVersion")
+				kubeadmutil.CheckErr(err)
+
+				if version != "" {
+					flags.newK8sVersionStr = version
 				}
 			}
 
