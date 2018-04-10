@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -371,7 +372,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 	return pod
 }
 
-func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths []string) {
+func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
 		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
@@ -752,4 +753,73 @@ func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	rand.Seed(time.Now().Unix())
 	Expect(nodesInfo).NotTo(BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
+}
+
+// invokeVCenterServiceControl invokes the given command for the given service
+// via service-control on the given vCenter host over SSH.
+func invokeVCenterServiceControl(command, service, host string) error {
+	sshCmd := fmt.Sprintf("service-control --%s %s", command, service)
+	framework.Logf("Invoking command %v on vCenter host %v", sshCmd, host)
+	result, err := framework.SSH(sshCmd, host, framework.TestContext.Provider)
+	if err != nil || result.Code != 0 {
+		framework.LogSSHResult(result)
+		return fmt.Errorf("couldn't execute command: %s on vCenter host: %v", sshCmd, err)
+	}
+	return nil
+}
+
+// expectVolumeToBeAttached checks if the given Volume is attached to the given
+// Node, else fails.
+func expectVolumeToBeAttached(nodeName, volumePath string) {
+	isAttached, err := diskIsAttached(volumePath, nodeName)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+}
+
+// expectVolumesToBeAttached checks if the given Volumes are attached to the
+// corresponding set of Nodes, else fails.
+func expectVolumesToBeAttached(pods []*v1.Pod, volumePaths []string) {
+	for i, pod := range pods {
+		nodeName := pod.Spec.NodeName
+		volumePath := volumePaths[i]
+		By(fmt.Sprintf("Verifying that volume %v is attached to node %v", volumePath, nodeName))
+		expectVolumeToBeAttached(nodeName, volumePath)
+	}
+}
+
+// expectFilesToBeAccessible checks if the given files are accessible on the
+// corresponding set of Nodes, else fails.
+func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []string) {
+	for i, pod := range pods {
+		podName := pod.Name
+		filePath := filePaths[i]
+		By(fmt.Sprintf("Verifying that file %v is accessible on pod %v", filePath, podName))
+		verifyFilesExistOnVSphereVolume(namespace, podName, filePath)
+	}
+}
+
+// writeContentToPodFile writes the given content to the specified file.
+func writeContentToPodFile(namespace, podName, filePath, content string) error {
+	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("echo '%s' > %s", content, filePath))
+	return err
+}
+
+// expectFileContentToMatch checks if a given file contains the specified
+// content, else fails.
+func expectFileContentToMatch(namespace, podName, filePath, content string) {
+	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
+}
+
+// expectFileContentsToMatch checks if the given contents match the ones present
+// in corresponding files on respective Pods, else fails.
+func expectFileContentsToMatch(namespace string, pods []*v1.Pod, filePaths []string, contents []string) {
+	for i, pod := range pods {
+		podName := pod.Name
+		filePath := filePaths[i]
+		By(fmt.Sprintf("Matching file content for %v on pod %v", filePath, podName))
+		expectFileContentToMatch(namespace, podName, filePath, contents[i])
+	}
 }

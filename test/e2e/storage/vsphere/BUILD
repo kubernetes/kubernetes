@@ -33,6 +33,7 @@ go_library(
         "vsphere_volume_ops_storm.go",
         "vsphere_volume_perf.go",
         "vsphere_volume_placement.go",
+        "vsphere_volume_vpxd_restart.go",
         "vsphere_volume_vsan_policy.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage/vsphere",
