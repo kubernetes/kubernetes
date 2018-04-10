@@ -138,7 +138,7 @@ func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
 }
 
 func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
-	field, found, err := nestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
+	field, found, err := NestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
 	if !found || err != nil {
 		return nil
 	}
