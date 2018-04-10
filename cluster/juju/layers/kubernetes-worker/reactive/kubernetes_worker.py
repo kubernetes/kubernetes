@@ -29,6 +29,7 @@ from socket import gethostname, getfqdn
 from charms import layer
 from charms.layer import snap
 from charms.reactive import hook
+from charms.reactive import endpoint_from_flag
 from charms.reactive import set_state, remove_state, is_state
 from charms.reactive import when, when_any, when_not
 
@@ -623,6 +624,9 @@ def configure_kubelet(dns, ingress_ip):
                     'to kubelet')
         kubelet_opts['feature-gates'] = 'DevicePlugins=true'
 
+    if is_state('endpoint.aws.ready'):
+        kubelet_opts['cloud-provider'] = 'aws'
+
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
 
@@ -738,7 +742,7 @@ def launch_default_ingress_controller():
                 "k8s.gcr.io/nginx-ingress-controller-arm64:0.9.0-beta.15"
         else:
             context['ingress_image'] = \
-                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
+                "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15"  # noqa
     if get_version('kubelet') < (1, 9):
         context['daemonset_api_version'] = 'extensions/v1beta1'
     else:
@@ -1067,3 +1071,39 @@ def remove_label(label):
     retry = 'Failed to remove label {0}. Will retry.'.format(label)
     if not persistent_call(cmd, retry):
         raise ApplyNodeLabelFailed(retry)
+
+
+@when('endpoint.aws.joined',
+      'kube-control.cluster_tag.available')
+@when_not('kubernetes-worker.aws-request-sent')
+def request_integration():
+    kube_control = endpoint_from_flag('kube-control.cluster_tag.available')
+    hookenv.status_set('maintenance', 'requesting aws integration')
+    aws = endpoint_from_flag('endpoint.aws.joined')
+    cluster_tag = kube_control.get_cluster_tag()
+    aws.tag_instance({
+        'KubernetesCluster': cluster_tag,
+    })
+    aws.tag_instance_security_group({
+        'KubernetesCluster': cluster_tag,
+    })
+    aws.tag_instance_subnet({
+        'KubernetesCluster': cluster_tag,
+    })
+    aws.enable_instance_inspection()
+    aws.enable_dns_management()
+    aws.enable_object_storage_management(['kubernetes-*'])
+    set_state('kubernetes-worker.aws-request-sent')
+    hookenv.status_set('waiting', 'waiting for aws integration')
+
+
+@when_not('endpoint.aws.joined')
+def clear_requested_integration():
+    remove_state('kubernetes-worker.aws-request-sent')
+
+
+@when('endpoint.aws.ready')
+@when_not('kubernetes-worker.restarted-for-aws')
+def restart_for_aws():
+    set_state('kubernetes-worker.restarted-for-aws')
+    set_state('kubernetes-worker.restart-needed')
