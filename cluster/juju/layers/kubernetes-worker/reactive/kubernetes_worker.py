@@ -722,6 +722,9 @@ def launch_default_ingress_controller():
         if context['arch'] == 's390x':
             context['defaultbackend_image'] = \
                 "k8s.gcr.io/defaultbackend-s390x:1.4"
+        elif context['arch'] == 'arm64':
+            context['defaultbackend_image'] = \
+                "k8s.gcr.io/defaultbackend-arm64:1.4"
         else:
             context['defaultbackend_image'] = \
                 "k8s.gcr.io/defaultbackend:1.4"
@@ -745,6 +748,9 @@ def launch_default_ingress_controller():
         if context['arch'] == 's390x':
             context['ingress_image'] = \
                 "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+        elif context['arch'] == 'arm64':
+            context['ingress_image'] = \
+                "gcr.io/google-containers/nginx-ingress-controller-arm64:0.9.0-beta.15" # noqa
         else:
             context['ingress_image'] = \
                 "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa
