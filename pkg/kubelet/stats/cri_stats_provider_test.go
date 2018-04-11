@@ -18,6 +18,7 @@ package stats
 
 import (
 	"math/rand"
+	"runtime"
 	"testing"
 	"time"
 
@@ -464,6 +465,9 @@ func checkCRINetworkStats(assert *assert.Assertions, actual *statsapi.NetworkSta
 }
 
 func checkCRIPodCPUAndMemoryStats(assert *assert.Assertions, actual statsapi.PodStats, cs *cadvisorapiv2.ContainerStats) {
+	if runtime.GOOS != "linux" {
+		return
+	}
 	assert.Equal(cs.Timestamp.UnixNano(), actual.CPU.Time.UnixNano())
 	assert.Equal(cs.Cpu.Usage.Total, *actual.CPU.UsageCoreNanoSeconds)
 	assert.Equal(cs.CpuInst.Usage.Total, *actual.CPU.UsageNanoCores)
