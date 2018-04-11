@@ -40,7 +40,7 @@ func (f *FakeCustomStore) Add(obj interface{}) error {
 // Update calls the custom Update function if defined
 func (f *FakeCustomStore) Update(obj interface{}) error {
 	if f.UpdateFunc != nil {
-		return f.Update(obj)
+		return f.UpdateFunc(obj)
 	}
 	return nil
 }
