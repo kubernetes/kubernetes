@@ -191,6 +191,7 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 		obj.DiscoveryTimeout = &metav1.Duration{
 			Duration: DefaultDiscoveryTimeout,
 		}
+	}
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}

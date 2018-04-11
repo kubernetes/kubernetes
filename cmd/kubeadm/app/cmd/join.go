@@ -102,7 +102,7 @@ var (
 
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{ClusterName: "kubernetes"}
+	cfg := &kubeadmapiext.NodeConfiguration{}
 	legacyscheme.Scheme.Default(cfg)
 
 	var skipPreFlight bool
