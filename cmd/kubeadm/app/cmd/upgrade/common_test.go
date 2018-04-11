@@ -47,7 +47,6 @@ func TestPrintConfiguration(t *testing.T) {
 	  path: ""
 	certificatesDir: ""
 	cloudProvider: ""
-	clusterName: ""
 	etcd:
 	  caFile: ""
 	  certFile: ""
@@ -86,7 +85,6 @@ func TestPrintConfiguration(t *testing.T) {
 	  path: ""
 	certificatesDir: ""
 	cloudProvider: ""
-	clusterName: ""
 	etcd:
 	  caFile: ""
 	  certFile: ""
@@ -130,7 +128,6 @@ func TestPrintConfiguration(t *testing.T) {
 	  path: ""
 	certificatesDir: ""
 	cloudProvider: ""
-	clusterName: ""
 	etcd:
 	  caFile: ""
 	  certFile: ""
