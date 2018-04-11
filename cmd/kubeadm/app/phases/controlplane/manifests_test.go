@@ -52,7 +52,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
 	k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
 
-	specs := GetStaticPodSpecs(cfg, k8sVersion)
+	specs := GetStaticPodSpecs(cfg, k8sVersion, true)
 
 	var assertions = []struct {
 		staticPodName string
@@ -90,12 +90,12 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 		createStaticPodFunction func(outDir string, cfg *kubeadmapi.MasterConfiguration) error
 		expectedFiles           []string
 	}{
-		{ // CreateInitStaticPodManifestFiles
-			createStaticPodFunction: CreateInitStaticPodManifestFiles,
+		{ // CreateInitStaticPodManifestFilesEtcdTLS
+			createStaticPodFunction: CreateInitStaticPodManifestFilesEtcdTLS,
 			expectedFiles:           []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
 		},
-		{ // CreateAPIServerStaticPodManifestFile
-			createStaticPodFunction: CreateAPIServerStaticPodManifestFile,
+		{ // CreateAPIServerStaticPodManifestFileTLS
+			createStaticPodFunction: CreateAPIServerStaticPodManifestFileTLS,
 			expectedFiles:           []string{kubeadmconstants.KubeAPIServer},
 		},
 		{ // CreateControllerManagerStaticPodManifestFile
@@ -170,7 +170,7 @@ func TestCreatePrivilegedContainerForOpenStack(t *testing.T) {
 		}
 
 		k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
-		specs := GetStaticPodSpecs(cfg, k8sVersion)
+		specs := GetStaticPodSpecs(cfg, k8sVersion, true)
 
 		for _, podname := range staticPodNames {
 			spec, _ := specs[podname]
@@ -700,7 +700,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getAPIServerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+		actual := getAPIServerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion), true)
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {

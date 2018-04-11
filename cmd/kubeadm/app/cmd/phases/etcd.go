@@ -87,7 +87,7 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 		short:    "Generates the static Pod manifest file for a local, single-node etcd instance",
 		long:     etcdLocalLongDesc,
 		examples: etcdLocalExample,
-		cmdFunc:  etcdphase.CreateLocalEtcdStaticPodManifestFile,
+		cmdFunc:  etcdphase.CreateLocalEtcdStaticPodManifestFileTLS,
 	}
 
 	// Creates the UX Command

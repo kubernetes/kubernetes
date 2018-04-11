@@ -106,13 +106,13 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 			short:    "Generates all static Pod manifest files necessary to establish the control plane",
 			long:     allControlplaneLongDesc,
 			examples: allControlplaneExample,
-			cmdFunc:  controlplanephase.CreateInitStaticPodManifestFiles,
+			cmdFunc:  controlplanephase.CreateInitStaticPodManifestFilesEtcdTLS,
 		},
 		{
 			use:     "apiserver",
 			short:   "Generates the API server static Pod manifest.",
 			long:    apiServerControlplaneLongDesc,
-			cmdFunc: controlplanephase.CreateAPIServerStaticPodManifestFile,
+			cmdFunc: controlplanephase.CreateAPIServerStaticPodManifestFileTLS,
 		},
 		{
 			use:     "controller-manager",

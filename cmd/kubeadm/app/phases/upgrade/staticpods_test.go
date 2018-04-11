@@ -342,11 +342,11 @@ func TestStaticPodControlPlane(t *testing.T) {
 		fmt.Printf("Wrote certs to %s\n", oldcfg.CertificatesDir)
 
 		// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
-		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
+		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg, false)
 		if err != nil {
 			t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
 		}
-		err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg)
+		err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg, false)
 		if err != nil {
 			t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
 		}

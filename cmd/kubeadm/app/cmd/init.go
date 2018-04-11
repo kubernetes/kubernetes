@@ -347,13 +347,13 @@ func (i *Init) Run(out io.Writer) error {
 	// PHASE 3: Bootstrap the control plane
 	glog.V(1).Infof("[init] bootstraping the control plane")
 	glog.V(1).Infof("[init] creating static pod manifest")
-	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
+	if err := controlplanephase.CreateInitStaticPodManifestFilesEtcdTLS(manifestDir, i.cfg); err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(i.cfg.Etcd.Endpoints) == 0 {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
-		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
+		if err := etcdphase.CreateLocalEtcdStaticPodManifestFileTLS(manifestDir, i.cfg); err != nil {
 			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 		}
 	}

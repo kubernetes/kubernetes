@@ -245,7 +245,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
 	// has occurred in any aspects.
-	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg); err != nil {
+	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg, false); err != nil {
 		return true, fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 	}
 
@@ -324,7 +324,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 
 	// Write the updated static Pod manifests into the temporary directory
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
-	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
+	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg, false)
 	if err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
