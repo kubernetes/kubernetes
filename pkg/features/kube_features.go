@@ -272,6 +272,14 @@ const (
 	// A node which has closer cpu,memory utilization and volume count is favoured by scheduler
 	// while making decisions.
 	BalanceAttachedNodeVolumes utilfeature.Feature = "BalanceAttachedNodeVolumes"
+
+	// owner: @ravig
+	// alpha: v1.11
+	//
+	// UsageBasedScheduling allows the scheduler to take exact CPU, memory usage on node while making scheduling
+	// decisions. As of now, this is feature is limited to best effort pods. Also note that this is dependent on
+	// metrics-server and when enabled will have detrimental effect on performance of scheduler.
+	UsageBasedScheduling utilfeature.Feature = "UsageBasedScheduling"
 )
 
 func init() {
@@ -319,6 +327,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
+	UsageBasedScheduling:                        {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

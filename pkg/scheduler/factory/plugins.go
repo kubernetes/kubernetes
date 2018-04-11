@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 
 	"github.com/golang/glog"
 )
@@ -47,6 +48,7 @@ type PluginFactoryArgs struct {
 	StorageClassInfo               predicates.StorageClassInfo
 	VolumeBinder                   *volumebinder.VolumeBinder
 	HardPodAffinitySymmetricWeight int32
+	MetricsClient                  *resourceclient.MetricsV1beta1Client
 }
 
 // PriorityMetadataProducerFactory produces PriorityMetadataProducer from the given args.

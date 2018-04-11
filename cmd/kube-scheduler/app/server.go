@@ -68,6 +68,7 @@ import (
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -381,6 +382,8 @@ type SchedulerServer struct {
 	HealthzServer *http.Server
 	// MetricsServer is optional.
 	MetricsServer *http.Server
+	// MetricsClient is optional. It used to get node level usage data.
+	MetricsClient *resourceclient.MetricsV1beta1Client
 }
 
 // NewSchedulerServer creates a runnable SchedulerServer from configuration.
@@ -400,7 +403,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 	}
 
 	// Prepare some Kube clients.
-	client, leaderElectionClient, eventClient, err := createClients(config.ClientConnection, master)
+	client, leaderElectionClient, eventClient, metricsClient, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
@@ -445,6 +448,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 		LeaderElection:                 leaderElectionConfig,
 		HealthzServer:                  healthzServer,
 		MetricsServer:                  metricsServer,
+		MetricsClient:                  metricsClient,
 	}, nil
 }
 
@@ -519,7 +523,7 @@ func makeMetricsServer(config *componentconfig.KubeSchedulerConfiguration) *http
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, clientset.Interface, v1core.EventsGetter, *resourceclient.MetricsV1beta1Client, error) {
 	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
 		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
@@ -530,7 +534,7 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.KubeConfigFile},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
@@ -541,20 +545,26 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	leaderElectionClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "leader-election"))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	eventClient, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	var metricsClient *resourceclient.MetricsV1beta1Client
+	if utilfeature.DefaultFeatureGate.Enabled(features.UsageBasedScheduling) {
+		metricsClient, err = resourceclient.NewForConfig(kubeConfig)
+	} else {
+		metricsClient = nil
 	}
 
-	return client, leaderElectionClient, eventClient.CoreV1(), nil
+	return client, leaderElectionClient, eventClient.CoreV1(), metricsClient, nil
 }
 
 // Run runs the SchedulerServer. This should never exit.
@@ -659,6 +669,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		s.MetricsClient,
 	)
 
 	source := s.AlgorithmSource

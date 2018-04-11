@@ -17,12 +17,17 @@ limitations under the License.
 package priorities
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 )
 
 // PriorityMetadataFactory is a factory to produce PriorityMetadata.
@@ -31,15 +36,21 @@ type PriorityMetadataFactory struct {
 	controllerLister  algorithm.ControllerLister
 	replicaSetLister  algorithm.ReplicaSetLister
 	statefulSetLister algorithm.StatefulSetLister
+	metricsClient     priorityutil.MetricsClient
 }
 
 // NewPriorityMetadataFactory creates a PriorityMetadataFactory.
-func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister) algorithm.PriorityMetadataProducer {
+func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controllerLister algorithm.ControllerLister, replicaSetLister algorithm.ReplicaSetLister, statefulSetLister algorithm.StatefulSetLister, metricsClient *resourceclient.MetricsV1beta1Client) algorithm.PriorityMetadataProducer {
+	var metricsNodeClient priorityutil.MetricsClient
+	if utilfeature.DefaultFeatureGate.Enabled(features.UsageBasedScheduling) {
+		metricsNodeClient = priorityutil.NewRESTMetricsClient(metricsClient)
+	}
 	factory := &PriorityMetadataFactory{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
 		replicaSetLister:  replicaSetLister,
 		statefulSetLister: statefulSetLister,
+		metricsClient:     metricsNodeClient,
 	}
 	return factory.PriorityMetadata
 }
@@ -52,6 +63,7 @@ type priorityMetadata struct {
 	podSelectors            []labels.Selector
 	controllerRef           *metav1.OwnerReference
 	podFirstServiceSelector labels.Selector
+	nodeUtilInfo            priorityutil.NodeMetricsInfo
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
@@ -67,7 +79,24 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 		controllerRef:           priorityutil.GetControllerRef(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
+		nodeUtilInfo:            getNodeUtilizationInfo(pmf.metricsClient),
 	}
+}
+
+// getNodeUtilizationInfo returns node utilization info for all nodes in the cluster based on current metrics.
+func getNodeUtilizationInfo(metricsNodeClient priorityutil.MetricsClient) priorityutil.NodeMetricsInfo {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UsageBasedScheduling) || metricsNodeClient == nil {
+		glog.V(5).Infof("Usage based scheduling is not enabled or metrics server is not running")
+		return nil
+	}
+	// TODO: @ravig - We can get the timestamp and use it for subsequent caching of node utilization information.
+	nodeUtilInfo, _, err := metricsNodeClient.GetResourceMetric()
+	if err != nil {
+		glog.V(5).Infof("Error extracting metrics from client %v", err)
+		return nil
+	}
+	glog.Infof("Node utilization info %v", nodeUtilInfo)
+	return nodeUtilInfo
 }
 
 // getFirstServiceSelector returns one selector of services the given pod.

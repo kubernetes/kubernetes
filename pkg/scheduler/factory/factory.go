@@ -63,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 )
 
 const (
@@ -133,6 +134,9 @@ type configFactory struct {
 
 	// always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
+
+	// To get node level statistics.
+	metricsClient *resourceclient.MetricsV1beta1Client
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -152,6 +156,7 @@ func NewConfigFactory(
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
 	enableEquivalenceClassCache bool,
+	metricsClient *resourceclient.MetricsV1beta1Client,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -294,6 +299,11 @@ func NewConfigFactory(
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
 		c.volumeBinder = volumebinder.NewVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer)
+	}
+
+	// Add metrics client only if usage based scheduling is enabled.
+	if utilfeature.DefaultFeatureGate.Enabled(features.UsageBasedScheduling) {
+		c.metricsClient = metricsClient
 	}
 
 	// Setup cache comparer
@@ -1153,6 +1163,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
+		MetricsClient:                  c.metricsClient,
 	}, nil
 }
 

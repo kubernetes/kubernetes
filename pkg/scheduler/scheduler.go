@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
 
 	"github.com/golang/glog"
 )
@@ -137,6 +138,9 @@ type Config struct {
 
 	// VolumeBinder handles PVC/PV binding for the pod.
 	VolumeBinder *volumebinder.VolumeBinder
+
+	// MetricsClient to get utilization for all nodes.
+	MetricsClient *resourceclient.MetricsV1beta1Client
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -440,6 +444,7 @@ func (sched *Scheduler) scheduleOne() {
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
+
 	suggestedHost, err := sched.schedule(pod)
 	if err != nil {
 		// schedule() may have failed because the pod would not fit on any host, so we try to

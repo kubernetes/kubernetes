@@ -161,6 +161,34 @@ func NodeRules() []rbac.PolicyRule {
 	return nodePolicyRules
 }
 
+func kubeSchedulerRules() []rbac.PolicyRule {
+	schedulerPolicyRules := []rbac.PolicyRule{
+		eventsRule(),
+
+		// this is for leaderlease access
+		// TODO: scope this to the kube-system namespace
+		rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+		rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
+
+		// fundamental resources
+		rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+		rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding", "bindings").RuleOrDie(),
+		rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+		// things that select pods
+		rbac.NewRule(Read...).Groups(legacyGroup).Resources("services", "replicationcontrollers").RuleOrDie(),
+		rbac.NewRule(Read...).Groups(appsGroup, extensionsGroup).Resources("replicasets").RuleOrDie(),
+		rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
+		// things that pods use or applies to them
+		rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+		rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.UsageBasedScheduling) {
+		schedulerPolicyRules = append(schedulerPolicyRules, rbac.NewRule("list", "get").Groups(resMetricsGroup).Resources("nodes").RuleOrDie())
+	}
+	return schedulerPolicyRules
+}
+
 // ClusterRoles returns the cluster roles to bootstrap an API server with
 func ClusterRoles() []rbac.ClusterRole {
 	roles := []rbac.ClusterRole{
@@ -414,27 +442,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		{
 			// a role to use for the kube-scheduler
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
-			Rules: []rbac.PolicyRule{
-				eventsRule(),
-
-				// this is for leaderlease access
-				// TODO: scope this to the kube-system namespace
-				rbac.NewRule("create").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
-				rbac.NewRule("get", "update", "patch", "delete").Groups(legacyGroup).Resources("endpoints").Names("kube-scheduler").RuleOrDie(),
-
-				// fundamental resources
-				rbac.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-				rbac.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-				rbac.NewRule("create").Groups(legacyGroup).Resources("pods/binding", "bindings").RuleOrDie(),
-				rbac.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-				// things that select pods
-				rbac.NewRule(Read...).Groups(legacyGroup).Resources("services", "replicationcontrollers").RuleOrDie(),
-				rbac.NewRule(Read...).Groups(appsGroup, extensionsGroup).Resources("replicasets").RuleOrDie(),
-				rbac.NewRule(Read...).Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
-				// things that pods use or applies to them
-				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
-				rbac.NewRule(Read...).Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
-			},
+			Rules:      kubeSchedulerRules(),
 		},
 		{
 			// a role to use for the kube-dns pod

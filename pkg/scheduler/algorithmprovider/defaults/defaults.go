@@ -43,7 +43,7 @@ func init() {
 		})
 	factory.RegisterPriorityMetadataProducerFactory(
 		func(args factory.PluginFactoryArgs) algorithm.PriorityMetadataProducer {
-			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
+			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister, args.MetricsClient)
 		})
 
 	registerAlgorithmProvider(defaultPredicates(), defaultPriorities())
@@ -200,7 +200,17 @@ func ApplyFeatureGates() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		factory.RegisterPriorityFunction2("ResourceLimitsPriority", priorities.ResourceLimitsPriorityMap, nil, 1)
 	}
-
+	if utilfeature.DefaultFeatureGate.Enabled(features.UsageBasedScheduling) {
+		factory.RegisterPriorityConfigFactory(
+			"LeastUsedNodebasedOnMetrics",
+			factory.PriorityConfigFactory{
+				MapReduceFunction: func(args factory.PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
+					return priorities.NewLeastUsedNodeBasedOnMetrics(args.MetricsClient)
+				},
+				Weight: 1,
+			},
+		)
+	}
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {

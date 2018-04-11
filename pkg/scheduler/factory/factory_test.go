@@ -533,6 +533,7 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		nil,
 	)
 }
 

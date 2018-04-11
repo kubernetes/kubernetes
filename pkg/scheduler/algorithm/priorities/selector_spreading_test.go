@@ -351,7 +351,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			schedulertesting.FakeServiceLister(test.services),
 			schedulertesting.FakeControllerLister(test.rcs),
 			schedulertesting.FakeReplicaSetLister(test.rss),
-			schedulertesting.FakeStatefulSetLister(test.sss))
+			schedulertesting.FakeStatefulSetLister(test.sss), nil)
 		mataData := mataDataProducer(test.pod, nodeNameToInfo)
 
 		ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, mataData)
@@ -586,7 +586,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			schedulertesting.FakeServiceLister(test.services),
 			schedulertesting.FakeControllerLister(test.rcs),
 			schedulertesting.FakeReplicaSetLister(test.rss),
-			schedulertesting.FakeStatefulSetLister(test.sss))
+			schedulertesting.FakeStatefulSetLister(test.sss), nil)
 		mataData := mataDataProducer(test.pod, nodeNameToInfo)
 		ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, mataData)
 		list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
@@ -771,7 +771,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 			schedulertesting.FakeServiceLister(test.services),
 			schedulertesting.FakeControllerLister(rcs),
 			schedulertesting.FakeReplicaSetLister(rss),
-			schedulertesting.FakeStatefulSetLister(sss))
+			schedulertesting.FakeStatefulSetLister(sss), nil)
 		mataData := mataDataProducer(test.pod, nodeNameToInfo)
 		ttp := priorityFunction(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, mataData)
 		list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
