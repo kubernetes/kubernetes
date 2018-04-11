@@ -311,7 +311,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			executeBacksideBacksideHTTPSTest(f, jig, "")
 		})
 
-		It("should support multiple TLS certs [Unreleased]", func() {
+		It("should support multiple TLS certs", func() {
 			By("Creating an ingress with no certs.")
 			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "multiple-certs"), ns, map[string]string{
 				framework.IngressStaticIPKey: ns,
@@ -418,8 +418,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
 		})
 
-		// TODO (gau): Remove [Unreleased] label once HTTP2 is in the next Ingress release
-		It("should be able to switch between HTTPS and HTTP2 modes [Unreleased]", func() {
+		It("should be able to switch between HTTPS and HTTP2 modes", func() {
 			httpsScheme := "request_scheme=https"
 
 			By("Create a basic HTTP2 ingress")
