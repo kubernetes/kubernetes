@@ -848,13 +848,13 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 			r, err := client.Get(url)
 			if err != nil {
 				loopCount--
-				return false, nil
+				return false, err
 			}
 			defer r.Body.Close()
 
 			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--
-				return false, nil
+				return false, fmt.Errorf("server responded with non-successful status: %s", r.Status)
 			}
 			return true, json.NewDecoder(r.Body).Decode(target)
 
