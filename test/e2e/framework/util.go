@@ -122,7 +122,7 @@ const (
 	slowPodStartTimeout = 15 * time.Minute
 
 	// How long to wait for a service endpoint to be resolvable.
-	ServiceStartTimeout = 1 * time.Minute
+	ServiceStartTimeout = 3 * time.Minute
 
 	// How often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
