@@ -152,9 +152,6 @@ func setOldKubeletConfig(f *framework.Framework, oldCfg *kubeletconfig.KubeletCo
 }
 
 func enableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.KubeletConfiguration) {
-	// Run only if the container runtime is not docker or remote (not rkt).
-	framework.RunIfContainerRuntimeIs("docker", "remote")
-
 	// Enable CPU Manager in Kubelet with static policy.
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)

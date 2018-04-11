@@ -198,7 +198,7 @@ type PodPair struct {
 
 // ContainerID is a type that identifies a container.
 type ContainerID struct {
-	// The type of the container runtime. e.g. 'docker', 'rkt'.
+	// The type of the container runtime. e.g. 'docker'.
 	Type string
 	// The identification of the container, this is comsumable by
 	// the underlying container runtime. (Note that the container
