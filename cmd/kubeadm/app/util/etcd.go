@@ -18,8 +18,10 @@ package util
 
 import (
 	"context"
-	"github.com/coreos/etcd/clientv3"
 	"time"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
 )
 
 // EtcdCluster is an interface to get etcd cluster related information
@@ -36,6 +38,37 @@ func (cluster LocalEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   ep,
 		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	resp, err := cli.Status(context.Background(), ep[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// GetSecureEtcdClusterStatus returns nil for status Up or error for status Down
+func (cluster LocalEtcdCluster) GetSecureEtcdClusterStatus() (*clientv3.StatusResponse, error) {
+	ep := []string{"https://localhost:2379"}
+	tlsInfo := transport.TLSInfo{
+		CertFile:      "/etc/kubernetes/pki/etcd/peer.crt",
+		KeyFile:       "/etc/kubernetes/pki/etcd/peer.key",
+		TrustedCAFile: "/etc/kubernetes/pki/etcd/ca.crt",
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   ep,
+		DialTimeout: 5 * time.Second,
+		TLS:         tlsConfig,
 	})
 	if err != nil {
 		return nil, err

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeletclient"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -37,16 +38,17 @@ import (
 type Waiter interface {
 	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
 	WaitForAPI() error
+	WaitForEtcd(secure bool) error
 	// WaitForPodsWithLabel waits for Pods in the kube-system namespace to become Ready
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForPodToDisappear waits for the given Pod in the kube-system namespace to be deleted
 	WaitForPodToDisappear(staticPodName string) error
-	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
-	WaitForStaticPodSingleHash(nodeName string, component string) (string, error)
-	// WaitForStaticPodHashChange waits for the given static pod component's static pod hash to get updated.
-	// By doing that we can be sure that the kubelet has restarted the given Static Pod
+	// WaitForStaticPodHash fetches static pod hash for the requested component
+	WaitForStaticPodHash(nodeName string, component string) (string, error)
+	// WaitForStaticPodHashChange waits for the given component's static pod hash to be updated.
+	// By doing that we can be sure that the kubelet has picked up the new static pod manifest.
 	WaitForStaticPodHashChange(nodeName, component, previousHash string) error
-	// WaitForMirrorPodHashChange waits for the given static pod component's static pod hash to get updated.
+	// WaitForMirrorPodHashChange waits for the given component's static pod hash to be updated.
 	// By doing that we can be sure that the kubelet has restarted the given Static Pod
 	WaitForMirrorPodHashChange(nodeName, component, previousHash string) error
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
@@ -134,6 +136,28 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	})
 }
 
+func (w *KubeWaiter) WaitForEtcd(secure bool) error {
+	return TryRunCommand(func() error {
+		etcdCluster := kubeadmutil.LocalEtcdCluster{}
+		if secure {
+			_, err := etcdCluster.GetSecureEtcdClusterStatus()
+			if err != nil {
+				fmt.Printf("[etcd-check] It seems like etcd isn't running or healthy.\n")
+				fmt.Printf("[etcd-check] failed with error: %v.\n", err)
+				return err
+			}
+		} else {
+			_, err := etcdCluster.GetEtcdClusterStatus()
+			if err != nil {
+				fmt.Printf("[etcd-check] It seems like etcd isn't running or healthy.\n")
+				fmt.Printf("[etcd-check] failed with error: %v.\n", err)
+				return err
+			}
+		}
+		return nil
+	}, 5)
+}
+
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
 	time.Sleep(initalTimeout)
@@ -183,8 +207,8 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 	return mirrorPodHashes, nil
 }
 
-// WaitForStaticPodSingleHash blocks until it timeouts or gets a hash for a single component and its Static Pod
-func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component string) (string, error) {
+// WaitForStaticPodHash blocks until it timeouts or gets a hash for a single component and its Static Pod
+func (w *KubeWaiter) WaitForStaticPodHash(nodeName string, component string) (string, error) {
 
 	componentPodHash := ""
 	var err error

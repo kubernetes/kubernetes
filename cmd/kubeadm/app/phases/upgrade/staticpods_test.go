@@ -37,9 +37,10 @@ import (
 )
 
 const (
-	waitForHashes        = "wait-for-hashes"
-	waitForHashChange    = "wait-for-hash-change"
-	waitForPodsWithLabel = "wait-for-pods-with-label"
+	waitForHashes           = "wait-for-hashes"
+	waitForStaticHashChange = "wait-for-static-hash-change"
+	waitForMirrorHashChange = "wait-for-mirror-hash-change"
+	waitForPodsWithLabel    = "wait-for-pods-with-label"
 
 	testConfiguration = `
 api:
@@ -94,6 +95,11 @@ func (w *fakeWaiter) WaitForAPI() error {
 	return nil
 }
 
+// WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
+func (w *fakeWaiter) WaitForEtcd(secure bool) error {
+	return nil
+}
+
 // WaitForPodsWithLabel just returns an error if set from errsToReturn
 func (w *fakeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 	return w.errsToReturn[waitForPodsWithLabel]
@@ -112,14 +118,19 @@ func (w *fakeWaiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]st
 	return map[string]string{}, w.errsToReturn[waitForHashes]
 }
 
-// WaitForStaticPodSingleHash returns an error if set from errsToReturn
-func (w *fakeWaiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) {
+// WaitForStaticPodHash returns an error if set from errsToReturn
+func (w *fakeWaiter) WaitForStaticPodHash(_ string, _ string) (string, error) {
 	return "", w.errsToReturn[waitForHashes]
 }
 
 // WaitForStaticPodHashChange returns an error if set from errsToReturn
 func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
-	return w.errsToReturn[waitForHashChange]
+	return w.errsToReturn[waitForStaticHashChange]
+}
+
+// WaitForMirrorPodHashChange returns an error if set from errsToReturn
+func (w *fakeWaiter) WaitForMirrorPodHashChange(_, _, _ string) error {
+	return w.errsToReturn[waitForMirrorHashChange]
 }
 
 // WaitForHealthyKubelet returns a dummy nil just to implement the interface
@@ -202,9 +213,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 	}{
 		{ // error-free case should succeed
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        nil,
-				waitForHashChange:    nil,
-				waitForPodsWithLabel: nil,
+				waitForHashes:           nil,
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    nil,
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
@@ -214,9 +226,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 		{ // any wait error should result in a rollback and an abort
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        fmt.Errorf("boo! failed"),
-				waitForHashChange:    nil,
-				waitForPodsWithLabel: nil,
+				waitForHashes:           fmt.Errorf("boo! failed"),
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    nil,
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
@@ -226,9 +239,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 		{ // any wait error should result in a rollback and an abort
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        nil,
-				waitForHashChange:    fmt.Errorf("boo! failed"),
-				waitForPodsWithLabel: nil,
+				waitForHashes:           nil,
+				waitForStaticHashChange: fmt.Errorf("boo! failed"),
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    nil,
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
@@ -238,9 +252,23 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 		{ // any wait error should result in a rollback and an abort
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        nil,
-				waitForHashChange:    nil,
-				waitForPodsWithLabel: fmt.Errorf("boo! failed"),
+				waitForHashes:           nil,
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: fmt.Errorf("boo! failed"),
+				waitForPodsWithLabel:    nil,
+			},
+			moveFileFunc: func(oldPath, newPath string) error {
+				return os.Rename(oldPath, newPath)
+			},
+			expectedErr:          true,
+			manifestShouldChange: false,
+		},
+		{ // any wait error should result in a rollback and an abort
+			waitErrsToReturn: map[string]error{
+				waitForHashes:           nil,
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    fmt.Errorf("boo! failed"),
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
@@ -250,9 +278,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 		{ // any path-moving error should result in a rollback and an abort
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        nil,
-				waitForHashChange:    nil,
-				waitForPodsWithLabel: nil,
+				waitForHashes:           nil,
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    nil,
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				// fail for kube-apiserver move
@@ -266,9 +295,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 		{ // any path-moving error should result in a rollback and an abort
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        nil,
-				waitForHashChange:    nil,
-				waitForPodsWithLabel: nil,
+				waitForHashes:           nil,
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    nil,
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				// fail for kube-controller-manager move
@@ -282,9 +312,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 		{ // any path-moving error should result in a rollback and an abort; even though this is the last component (kube-apiserver and kube-controller-manager healthy)
 			waitErrsToReturn: map[string]error{
-				waitForHashes:        nil,
-				waitForHashChange:    nil,
-				waitForPodsWithLabel: nil,
+				waitForHashes:           nil,
+				waitForStaticHashChange: nil,
+				waitForMirrorHashChange: nil,
+				waitForPodsWithLabel:    nil,
 			},
 			moveFileFunc: func(oldPath, newPath string) error {
 				// fail for kube-scheduler move

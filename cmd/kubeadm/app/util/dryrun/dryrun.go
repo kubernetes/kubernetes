@@ -85,6 +85,12 @@ func (w *Waiter) WaitForAPI() error {
 	return nil
 }
 
+// WaitForEtcd just returns a dummy nil, to indicate that the program should just proceed
+func (w *Waiter) WaitForEtcd(secure bool) error {
+	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
+	return nil
+}
+
 // WaitForPodsWithLabel just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
 	fmt.Printf("[dryrun] Would wait for the Pods with the label %q in the %s namespace to become Running\n", kvLabel, metav1.NamespaceSystem)
@@ -115,9 +121,9 @@ func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string
 	}, nil
 }
 
-// WaitForStaticPodSingleHash returns an empty hash
+// WaitForStaticPodHash returns an empty hash
 // but the empty strings there are needed
-func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) {
+func (w *Waiter) WaitForStaticPodHash(_ string, _ string) (string, error) {
 	return "", nil
 }
 
