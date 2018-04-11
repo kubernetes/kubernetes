@@ -13,6 +13,7 @@ go_library(
         "image_locality.go",
         "interpod_affinity.go",
         "least_requested.go",
+        "least_used_based_on_metrics.go",
         "metadata.go",
         "most_requested.go",
         "node_affinity.go",
@@ -43,6 +44,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1:go_default_library",
     ],
 )
 
@@ -53,6 +55,7 @@ go_test(
         "image_locality_test.go",
         "interpod_affinity_test.go",
         "least_requested_test.go",
+        "least_used_based_on_metrics_test.go",
         "metadata_test.go",
         "most_requested_test.go",
         "node_affinity_test.go",
@@ -75,7 +78,12 @@ go_test(
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/client-go/testing:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1:go_default_library",
     ],
 )
 

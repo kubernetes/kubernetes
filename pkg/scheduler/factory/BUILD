@@ -88,6 +88,7 @@ go_library(
         "//vendor/k8s.io/client-go/listers/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/listers/storage/v1:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1:go_default_library",
     ],
 )
 
