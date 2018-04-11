@@ -2075,11 +2075,6 @@
 			"Rev": "f31442d60e51465c69811e2107ae978868dbea5c"
 		},
 		{
-			"ImportPath": "github.com/kr/pty",
-			"Comment": "release.r56-29-gf7ee69f",
-			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
-		},
-		{
 			"ImportPath": "github.com/kr/text",
 			"Rev": "6807e777504f54ad073ecef66747de158294b639"
 		},
