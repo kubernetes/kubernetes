@@ -1183,7 +1183,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		printLabelsMultiline(w, "Labels", pv.Labels)
 		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
 		w.Write(LEVEL_0, "Finalizers:\t%v\n", pv.ObjectMeta.Finalizers)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
+		w.Write(LEVEL_0, "StorageClass:\t%s\n", pv.Spec.StorageClassName)
 		if pv.ObjectMeta.DeletionTimestamp != nil {
 			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestamp(*pv.ObjectMeta.DeletionTimestamp))
 		} else {

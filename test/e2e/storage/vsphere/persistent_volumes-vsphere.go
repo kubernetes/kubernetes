@@ -87,11 +87,10 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 				},
 				Prebind: nil,
 			}
+			noClass := ""
 			pvcConfig = framework.PersistentVolumeClaimConfig{
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "",
-				},
-				Selector: selector,
+				Selector:         selector,
+				StorageClassName: &noClass,
 			}
 		}
 		By("Creating the PV and PVC")

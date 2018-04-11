@@ -252,7 +252,7 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
 	}
-	className := v1helper.GetPersistentVolumeClass(pv)
+	className := pv.Spec.StorageClassName
 	if className == "" {
 		return nil, fmt.Errorf("Volume has no storage class")
 	}
