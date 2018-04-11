@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -78,11 +79,13 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			// Ensure the user is root
+			glog.V(1).Infof("running preflight checks")
 			err = runPreflightChecks(flags.parent.ignorePreflightErrorsSet)
 			kubeadmutil.CheckErr(err)
 
 			// If the version is specified in config file, pick up that value.
 			if flags.parent.cfgPath != "" {
+				glog.V(1).Infof("fetching configuration from file", flags.parent.cfgPath)
 				cfg, err := upgrade.FetchConfigurationFromFile(flags.parent.cfgPath)
 				kubeadmutil.CheckErr(err)
 
@@ -136,16 +139,20 @@ func NewCmdApply(parentFlags *cmdUpgradeFlags) *cobra.Command {
 func RunApply(flags *applyFlags) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
+	glog.V(1).Infof("[upgrade/apply] verifying health of cluster")
+	glog.V(1).Infof("[upgrade/apply] retrieving configuration from cluster")
 	upgradeVars, err := enforceRequirements(flags.parent, flags.dryRun, flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
 
 	// Grab the external, versioned configuration and convert it to the internal type for usage here later
+	glog.V(1).Infof("[upgrade/apply] converting configuration for internal use")
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 	legacyscheme.Scheme.Convert(upgradeVars.cfg, internalcfg, nil)
 
 	// Validate requested and validate actual version
+	glog.V(1).Infof("[upgrade/apply] validating requested and actual version")
 	if err := configutil.NormalizeKubernetesVersion(internalcfg); err != nil {
 		return err
 	}
@@ -163,6 +170,7 @@ func RunApply(flags *applyFlags) error {
 	}
 
 	// Enforce the version skew policies
+	glog.V(1).Infof("[upgrade/version] enforcing version skew policies")
 	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
 		return fmt.Errorf("[upgrade/version] FATAL: %v", err)
 	}
@@ -176,28 +184,31 @@ func RunApply(flags *applyFlags) error {
 
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
+	glog.V(1).Infof("[upgrade/apply] creating prepuller")
 	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, internalcfg)
 	upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout)
 
 	// Now; perform the upgrade procedure
+	glog.V(1).Infof("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, upgradeVars.client, upgradeVars.waiter, internalcfg); err != nil {
 		return fmt.Errorf("[upgrade/apply] FATAL: %v", err)
 	}
 
 	// Upgrade RBAC rules and addons.
+	glog.V(1).Infof("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(upgradeVars.client, internalcfg, flags.newK8sVersion, flags.dryRun); err != nil {
 		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %v", err)
 	}
 
 	if flags.dryRun {
-		fmt.Println("[dryrun] Finished dryrunning successfully!")
+		glog.Infoln("[dryrun] Finished dryrunning successfully!")
 		return nil
 	}
 
-	fmt.Println("")
-	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
-	fmt.Println("")
-	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets in turn.")
+	glog.Infoln("")
+	glog.Infof("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
+	glog.Infoln("")
+	glog.Infoln("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets in turn.")
 
 	return nil
 }
@@ -219,7 +230,7 @@ func SetImplicitFlags(flags *applyFlags) error {
 // EnforceVersionPolicies makes sure that the version the user specified is valid to upgrade to
 // There are both fatal and skippable (with --force) errors
 func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGetter) error {
-	fmt.Printf("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
+	glog.Infof("[upgrade/version] You have chosen to change the cluster version to %q\n", flags.newK8sVersionStr)
 
 	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, flags.newK8sVersionStr, flags.newK8sVersion, flags.parent.allowExperimentalUpgrades, flags.parent.allowRCUpgrades)
 	if versionSkewErrs != nil {
@@ -234,7 +245,7 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 				return fmt.Errorf("The --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag", kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified
-			fmt.Printf("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
+			glog.Infof("[upgrade/version] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 		}
 	}
 	return nil
@@ -244,10 +255,12 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.MasterConfiguration) error {
 
 	// Check if the cluster is self-hosted and act accordingly
+	glog.V(1).Infoln("checking if cluster is self-hosted")
 	if upgrade.IsControlPlaneSelfHosted(client) {
 		fmt.Printf("[upgrade/apply] Upgrading your Self-Hosted control plane to version %q...\n", flags.newK8sVersionStr)
 
 		// Upgrade the self-hosted cluster
+		glog.V(1).Infoln("[upgrade/apply] ugrading self-hosted cluster")
 		return upgrade.SelfHostedControlPlane(client, waiter, internalcfg, flags.newK8sVersion)
 	}
 

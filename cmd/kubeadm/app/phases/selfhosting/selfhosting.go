@@ -21,6 +21,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,11 +55,12 @@ const (
 //      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
 func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, waiter apiclient.Waiter, dryRun bool) error {
-
+	glog.V(1).Infoln("creating self hosted control plane")
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
 	// Here the map of different mutators to use for the control plane's PodSpec is stored
+	glog.V(1).Infoln("getting mutators")
 	mutators := GetMutatorsFromFeatureGates(cfg.FeatureGates)
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
@@ -124,7 +127,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 			return err
 		}
 
-		fmt.Printf("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
+		glog.Infof("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
 	}
 	return nil
 }

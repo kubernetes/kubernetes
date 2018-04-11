@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -93,7 +94,7 @@ type Reset struct {
 
 // NewReset instantiate Reset struct
 func NewReset(ignorePreflightErrors sets.String, certsDir, criSocketPath string) (*Reset, error) {
-	fmt.Println("[preflight] Running pre-flight checks.")
+	glog.Infoln("[preflight] running pre-flight checks")
 
 	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return nil, err
@@ -109,27 +110,30 @@ func NewReset(ignorePreflightErrors sets.String, certsDir, criSocketPath string)
 func (r *Reset) Run(out io.Writer) error {
 
 	// Try to stop the kubelet service
+	glog.V(1).Infof("[reset] getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[reset] WARNING: The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
-		fmt.Println("[reset] WARNING: Please ensure kubelet is stopped manually.")
+		glog.Warningln("[reset] the kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
+		glog.Warningln("[reset] please ensure kubelet is stopped manually")
 	} else {
-		fmt.Println("[reset] Stopping the kubelet service.")
+		glog.Infoln("[reset] stopping the kubelet service")
 		if err := initSystem.ServiceStop("kubelet"); err != nil {
-			fmt.Printf("[reset] WARNING: The kubelet service could not be stopped by kubeadm: [%v]\n", err)
-			fmt.Println("[reset] WARNING: Please ensure kubelet is stopped manually.")
+			glog.Warningf("[reset] the kubelet service could not be stopped by kubeadm: [%v]\n", err)
+			glog.Warningln("[reset] please ensure kubelet is stopped manually")
 		}
 	}
 
 	// Try to unmount mounted directories under /var/lib/kubelet in order to be able to remove the /var/lib/kubelet directory later
-	fmt.Printf("[reset] Unmounting mounted directories in %q\n", "/var/lib/kubelet")
+	glog.Infof("[reset] unmounting mounted directories in %q\n", "/var/lib/kubelet")
 	umountDirsCmd := "awk '$2 ~ path {print $2}' path=/var/lib/kubelet /proc/mounts | xargs -r umount"
+
+	glog.V(1).Infof("[reset] executing command %q", umountDirsCmd)
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
-		fmt.Printf("[reset] Failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
+		glog.Errorf("[reset] failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
 	}
 
-	fmt.Println("[reset] Removing kubernetes-managed containers.")
+	glog.Infoln("[reset] removing kubernetes-managed containers")
 	dockerCheck := preflight.ServiceCheck{Service: "docker", CheckIfActive: true}
 	execer := utilsexec.New()
 
@@ -140,21 +144,25 @@ func (r *Reset) Run(out io.Writer) error {
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
+	glog.V(1).Infof("[reset] checking for etcd manifest")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
+		glog.V(1).Infof("Found one at %s", etcdManifestPath)
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
-		fmt.Printf("[reset] No etcd manifest found in %q. Assuming external etcd.\n", etcdManifestPath)
+		glog.Infof("[reset] no etcd manifest found in %q. Assuming external etcd\n", etcdManifestPath)
 	}
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories
-	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", dirsToClean)
+	glog.Infof("[reset] deleting contents of stateful directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
+		glog.V(1).Infof("[reset] deleting content of %s", dir)
 		cleanDir(dir)
 	}
 
 	// Remove contents from the config and pki directories
+	glog.V(1).Infoln("[reset] removing contents from the config and pki directories")
 	if r.certsDir != kubeadmapiext.DefaultCertificatesDir {
-		fmt.Printf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", r.certsDir)
+		glog.Warningf("[reset] WARNING: cleaning a non-default certificates directory: %q\n", r.certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
 
@@ -173,40 +181,46 @@ func reset(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketP
 func resetWithDocker(execer utilsexec.Interface, dockerCheck preflight.Checker) {
 	if _, errors := dockerCheck.Check(); len(errors) == 0 {
 		if err := execer.Command("sh", "-c", "docker ps -a --filter name=k8s_ -q | xargs -r docker rm --force --volumes").Run(); err != nil {
-			fmt.Println("[reset] Failed to stop the running containers.")
+			glog.Errorln("[reset] Failed to stop the running containers")
 		}
 	} else {
-		fmt.Println("[reset] Docker doesn't seem to be running. Skipping the removal of running Kubernetes containers.")
+		glog.Infoln("[reset] docker doesn't seem to be running. Skipping the removal of running Kubernetes containers")
 	}
 }
 
 func resetWithCrictl(execer utilsexec.Interface, dockerCheck preflight.Checker, criSocketPath, crictlPath string) {
 	if criSocketPath != "" {
-		fmt.Printf("[reset] Cleaning up running containers using crictl with socket %s\n", criSocketPath)
+		glog.Infof("[reset] cleaning up running containers using crictl with socket %s\n", criSocketPath)
+		glog.V(1).Infoln("[reset] listing running pods using crictl")
+
 		listcmd := fmt.Sprintf(crictlSandboxesParamsFormat, crictlPath, criSocketPath)
+		glog.V(1).Infof("[reset] executing comand %q", listcmd)
 		output, err := execer.Command(listcmd).CombinedOutput()
 		if err != nil {
-			fmt.Println("[reset] Failed to list running pods using crictl. Trying using docker instead.")
+			glog.Infoln("[reset] failed to list running pods using crictl. Trying using docker instead")
 			resetWithDocker(execer, dockerCheck)
 			return
 		}
 		sandboxes := strings.Split(string(output), " ")
+		glog.V(1).Infoln("[reset] stopping and removing running containers using crictl")
 		for _, s := range sandboxes {
 			stopcmd := fmt.Sprintf(crictlStopParamsFormat, crictlPath, criSocketPath, s)
+			glog.V(1).Infof("[reset] executing command %q", stopcmd)
 			if err := execer.Command(stopcmd).Run(); err != nil {
-				fmt.Println("[reset] Failed to stop the running containers using crictl. Trying using docker instead.")
+				glog.Infoln("[reset] failed to stop the running containers using crictl. Trying using docker instead")
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
 			removecmd := fmt.Sprintf(crictlRemoveParamsFormat, crictlPath, criSocketPath, s)
+			glog.V(1).Infof("[reset] executing command %q", removecmd)
 			if err := execer.Command(removecmd).Run(); err != nil {
-				fmt.Println("[reset] Failed to remove the running containers using crictl. Trying using docker instead.")
+				glog.Infoln("[reset] failed to remove the running containers using crictl. Trying using docker instead")
 				resetWithDocker(execer, dockerCheck)
 				return
 			}
 		}
 	} else {
-		fmt.Println("[reset] CRI socket path not provided for crictl. Trying docker instead.")
+		glog.Infoln("[reset] CRI socket path not provided for crictl. Trying docker instead")
 		resetWithDocker(execer, dockerCheck)
 	}
 }
@@ -242,10 +256,10 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ManifestsSubDirName),
 		pkiPathDir,
 	}
-	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
+	glog.Infof("[reset] deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := cleanDir(dir); err != nil {
-			fmt.Printf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			glog.Errorf("[reset] failed to remove directory: %q [%v]\n", dir, err)
 		}
 	}
 
@@ -256,10 +270,10 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
-	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
+	glog.Infof("[reset] deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
 		if err := os.RemoveAll(path); err != nil {
-			fmt.Printf("[reset] Failed to remove file: %q [%v]\n", path, err)
+			glog.Errorf("[reset] failed to remove file: %q [%v]\n", path, err)
 		}
 	}
 }

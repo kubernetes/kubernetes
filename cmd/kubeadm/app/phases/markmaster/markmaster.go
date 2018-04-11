@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +37,9 @@ import (
 func MarkMaster(client clientset.Interface, masterName string, taint bool) error {
 
 	if taint {
-		fmt.Printf("[markmaster] Will mark node %s as master by adding a label and a taint\n", masterName)
+		glog.Infof("[markmaster] will mark node %s as master by adding a label and a taint\n", masterName)
 	} else {
-		fmt.Printf("[markmaster] Will mark node %s as master by adding a label\n", masterName)
+		glog.Infof("[markmaster] will mark node %s as master by adding a label\n", masterName)
 	}
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
