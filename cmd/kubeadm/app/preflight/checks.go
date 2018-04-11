@@ -375,7 +375,7 @@ func (ipc InPathCheck) Check() (warnings, errs []error) {
 		// Return as a warning:
 		warningMessage := fmt.Sprintf("%s not found in system path", ipc.executable)
 		if ipc.suggestion != "" {
-			warningMessage += fmt.Sprintf("\nSuggestion: %s", ipc.suggestion)
+			warningMessage += fmt.Sprintf("\n\tSuggestion: %s", ipc.suggestion)
 		}
 		return []error{errors.New(warningMessage)}, nil
 	}

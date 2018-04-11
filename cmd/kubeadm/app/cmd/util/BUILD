@@ -34,7 +34,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/cmd/util/factory:all-srcs",
+        "//cmd/kubeadm/app/cmd/util/phases:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

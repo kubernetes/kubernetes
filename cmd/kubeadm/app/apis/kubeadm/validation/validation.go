@@ -82,7 +82,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	allErrs = append(allErrs, ValidateTokenUsages(c.TokenUsages, field.NewPath("tokenUsages"))...)
 	allErrs = append(allErrs, ValidateTokenGroups(c.TokenUsages, c.TokenGroups, field.NewPath("tokenGroups"))...)
-	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
+	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, c.KubernetesVersion, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
 	allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
 	if features.Enabled(c.FeatureGates, features.DynamicKubeletConfig) {
@@ -369,7 +369,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 }
 
 // ValidateFeatureGates validates provided feature gates
-func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) field.ErrorList {
+func ValidateFeatureGates(featureGates map[string]bool, kubernetesVersion string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	validFeatures := features.Keys(features.InitFeatureGates)
 
@@ -379,6 +379,10 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 			allErrs = append(allErrs, field.Invalid(fldPath, featureGates,
 				fmt.Sprintf("%s is not a valid feature name. Valid features are: %s", k, validFeatures)))
 		}
+	}
+
+	if err := features.ValidateVersion(features.InitFeatureGates, featureGates, kubernetesVersion); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, featureGates, err.Error()))
 	}
 
 	return allErrs
