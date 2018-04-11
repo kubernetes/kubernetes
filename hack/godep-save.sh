@@ -88,6 +88,10 @@ kube::log::status "Updating BUILD files"
 # missing dependencies that aren't included by godep.
 find vendor/ -type f \( -name BUILD -o -name BUILD.bazel -o -name WORKSPACE \) \
   -exec rm -f {} \;
+CURATED_VENDOR_BUILDFILES=(
+  "vendor/github.com/kubernetes/repo-infra/kazel/BUILD"
+)
+git checkout HEAD -- "${CURATED_VENDOR_BUILDFILES[@]}"
 hack/update-bazel.sh >/dev/null
 
 kube::log::status "Updating LICENSES file"
