@@ -91,11 +91,7 @@ spec:
       hostNetwork: true
       serviceAccountName: kube-proxy
       tolerations:
-      - key: {{ .MasterTaintKey }}
-        effect: NoSchedule
-      - key: {{ .CloudTaintKey }}
-        value: "true"
-        effect: NoSchedule
+      - operator: Exists
       volumes:
       - name: kube-proxy
         configMap:
