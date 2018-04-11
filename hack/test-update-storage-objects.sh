@@ -97,7 +97,7 @@ function cleanup() {
 trap cleanup EXIT SIGINT
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
-make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/attachlease
+make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/migrate
 
 kube::etcd::start
 echo "${ETCD_VERSION}" > "${ETCD_DIR}/version.txt"
