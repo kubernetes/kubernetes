@@ -283,7 +283,6 @@ filegroup(
         "//vendor/github.com/kardianos/osext:all-srcs",
         "//vendor/github.com/kr/fs:all-srcs",
         "//vendor/github.com/kr/pretty:all-srcs",
-        "//vendor/github.com/kr/pty:all-srcs",
         "//vendor/github.com/kr/text:all-srcs",
         "//vendor/github.com/kubernetes/repo-infra/kazel:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/api:all-srcs",
