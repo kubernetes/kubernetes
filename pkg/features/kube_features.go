@@ -34,7 +34,7 @@ const (
 	AppArmor utilfeature.Feature = "AppArmor"
 
 	// owner: @mtaufen
-	// alpha: v1.4
+	// beta: v1.10
 	DynamicKubeletConfig utilfeature.Feature = "DynamicKubeletConfig"
 
 	// owner: @pweil-
