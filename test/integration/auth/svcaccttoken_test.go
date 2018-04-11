@@ -81,7 +81,11 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
 		),
 	)
-	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 

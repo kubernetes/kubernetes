@@ -360,7 +360,11 @@ func CreateKubeAPIServerConfig(
 			}
 		}
 
-		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		issuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to build token generator: %v", err)
+			return
+		}
 		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
 		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
