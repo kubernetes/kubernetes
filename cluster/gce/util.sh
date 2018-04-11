@@ -1817,35 +1817,38 @@ function delete-network() {
 }
 
 function delete-subnetworks() {
-  if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
-    # If running in custom mode network we need to delete subnets
-    mode="$(check-network-mode)"
-    if [[ "${mode}" == "CUSTOM" ]]; then
-      if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
-        echo "Deleting default subnets..."
-        # This value should be kept in sync with number of regions.
-        local parallelism=9
-        gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
-          xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
-      elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
-        echo "Deleting custom subnet..."
-        gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true
-      fi
+  # If running in custom mode network we need to delete subnets manually.
+  mode="$(check-network-mode)"
+  if [[ "${mode}" == "CUSTOM" ]]; then
+    if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
+      echo "Deleting default subnets..."
+      # This value should be kept in sync with number of regions.
+      local parallelism=9
+      gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
+        xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
+    elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
+      echo "Deleting custom subnet..."
+      gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true
     fi
     return
   fi
 
-  # Only delete automatically created subnets.
-  if [[ ${IP_ALIAS_SUBNETWORK} == ${INSTANCE_PREFIX}-subnet-default ]]; then
-    echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-    if [[ -n $(gcloud beta compute networks subnets describe \
+  # If we reached here, it means we're not using custom network.
+  # So the only thing we need to check is if IP-aliases was turned
+  # on and we created a subnet for it. If so, we should delete it.
+  if [[ ${ENABLE_IP_ALIASES:-} == "true" ]]; then
+    # Only delete the subnet if we created it (i.e it's not pre-existing).
+    if [[ -z "${KUBE_GCE_IP_ALIAS_SUBNETWORK:-}" ]]; then
+      echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
+      if [[ -n $(gcloud beta compute networks subnets describe \
+            --project "${NETWORK_PROJECT}" \
+            --region ${REGION} \
+            ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
+        gcloud beta --quiet compute networks subnets delete \
           --project "${NETWORK_PROJECT}" \
           --region ${REGION} \
-          ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-      gcloud beta --quiet compute networks subnets delete \
-        --project "${NETWORK_PROJECT}" \
-        --region ${REGION} \
-        ${IP_ALIAS_SUBNETWORK}
+          ${IP_ALIAS_SUBNETWORK}
+      fi
     fi
   fi
 }
