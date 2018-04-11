@@ -24,7 +24,7 @@ import (
 	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
 
 func getLoNetwork(binDirs []string) *cniNetwork {

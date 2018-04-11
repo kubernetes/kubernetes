@@ -24,16 +24,14 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
-	"k8s.io/kubernetes/pkg/kubelet/network/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 )
@@ -91,29 +89,6 @@ type PodNetworkStatus struct {
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
 }
 
-// LegacyHost implements the methods required by network plugins that
-// were directly invoked by the kubelet. Implementations of this interface
-// that do not wish to support these features can simply return false
-// to SupportsLegacyFeatures.
-type LegacyHost interface {
-	// Get the pod structure by its name, namespace
-	// Only used for hostport management and bw shaping
-	GetPodByName(namespace, name string) (*v1.Pod, bool)
-
-	// GetKubeClient returns a client interface
-	// Only used in testing
-	GetKubeClient() clientset.Interface
-
-	// GetContainerRuntime returns the container runtime that implements the containers (e.g. docker/rkt)
-	// Only used for hostport management
-	GetRuntime() kubecontainer.Runtime
-
-	// SupportsLegacyFeatures returns true if the network host support GetPodByName, KubeClient interface and kubelet
-	// runtime interface. These interfaces will no longer be implemented by CRI shims.
-	// This function helps network plugins to choose their behavior based on runtime.
-	SupportsLegacyFeatures() bool
-}
-
 // Host is an interface that plugins can use to access the kubelet.
 // TODO(#35457): get rid of this backchannel to the kubelet. The scope of
 // the back channel is restricted to host-ports/testing, and restricted
@@ -126,12 +101,6 @@ type Host interface {
 
 	// PortMappingGetter is a getter for sandbox port mapping information.
 	PortMappingGetter
-
-	// LegacyHost contains methods that trap back into the Kubelet. Dependence
-	// *do not* add more dependencies in this interface. In a post-cri world,
-	// network plugins will be invoked by the runtime shim, and should only
-	// require GetNetNS and GetPodPortMappings.
-	LegacyHost
 }
 
 // NamespaceGetter is an interface to retrieve namespace information for a given

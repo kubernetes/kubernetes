@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -33,14 +32,13 @@ import (
 	"github.com/golang/glog"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilebtables "k8s.io/kubernetes/pkg/util/ebtables"
@@ -299,9 +297,7 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 }
 
 // setup sets up networking through CNI using the given ns/name and sandbox ID.
-// TODO: Don't pass the pod to this method, it only needs it for bandwidth
-// shaping and hostport management.
-func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *v1.Pod, annotations map[string]string) error {
+func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
 	// Disable DAD so we skip the kernel delay on bringing up new interfaces.
 	if err := plugin.disableContainerDAD(id); err != nil {
 		glog.V(3).Infof("Failed to disable DAD in container: %v", err)
@@ -364,35 +360,20 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		}
 	}
 
-	// The host can choose to not support "legacy" features. The remote
-	// shim doesn't support it (#35457), but the kubelet does.
-	if plugin.host.SupportsLegacyFeatures() {
-		// Open any hostport the pod's containers want
-		activePodPortMappings, err := plugin.getPodPortMappings()
-		if err != nil {
+	// TODO: replace with CNI port-forwarding plugin
+	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
+	if err != nil {
+		return err
+	}
+	if portMappings != nil && len(portMappings) > 0 {
+		if err := plugin.hostportManager.Add(id.ID, &hostport.PodPortMapping{
+			Namespace:    namespace,
+			Name:         name,
+			PortMappings: portMappings,
+			IP:           ip4,
+			HostNetwork:  false,
+		}, BridgeName); err != nil {
 			return err
-		}
-
-		newPodPortMapping := hostport.ConstructPodPortMapping(pod, ip4)
-		if err := plugin.hostportSyncer.OpenPodHostportsAndSync(newPodPortMapping, BridgeName, activePodPortMappings); err != nil {
-			return err
-		}
-	} else {
-		// TODO: replace with CNI port-forwarding plugin
-		portMappings, err := plugin.host.GetPodPortMappings(id.ID)
-		if err != nil {
-			return err
-		}
-		if portMappings != nil && len(portMappings) > 0 {
-			if err := plugin.hostportManager.Add(id.ID, &hostport.PodPortMapping{
-				Namespace:    namespace,
-				Name:         name,
-				PortMappings: portMappings,
-				IP:           ip4,
-				HostNetwork:  false,
-			}, BridgeName); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
@@ -407,37 +388,16 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
 	}()
 
-	// TODO: Entire pod object only required for bw shaping and hostport.
-	pod, ok := plugin.host.GetPodByName(namespace, name)
-	if !ok {
-		return fmt.Errorf("pod %q cannot be found", name)
-	}
-
 	if err := plugin.Status(); err != nil {
 		return fmt.Errorf("Kubenet cannot SetUpPod: %v", err)
 	}
 
-	if err := plugin.setup(namespace, name, id, pod, annotations); err != nil {
+	if err := plugin.setup(namespace, name, id, annotations); err != nil {
 		// Make sure everything gets cleaned up on errors
 		podIP, _ := plugin.podIPs[id]
 		if err := plugin.teardown(namespace, name, id, podIP); err != nil {
 			// Not a hard error or warning
 			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
-		}
-
-		// TODO(#34278): Figure out if we need IP GC through the cri.
-		// The cri should always send us teardown events for stale sandboxes,
-		// this obviates the need for GC in the common case, for kubenet.
-		if plugin.host.SupportsLegacyFeatures() {
-
-			// TODO: Remove this hack once we've figured out how to retrieve the netns
-			// of an exited container. Currently, restarting docker will leak a bunch of
-			// ips. This will exhaust available ip space unless we cleanup old ips. At the
-			// same time we don't want to try GC'ing them periodically as that could lead
-			// to a performance regression in starting pods. So on each setup failure, try
-			// GC on the assumption that the kubelet is going to retry pod creation, and
-			// when it does, there will be ips.
-			plugin.ipamGarbageCollection()
 		}
 		return err
 	}
@@ -475,29 +435,17 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 		}
 	}
 
-	// The host can choose to not support "legacy" features. The remote
-	// shim doesn't support it (#35457), but the kubelet does.
-	if plugin.host.SupportsLegacyFeatures() {
-		activePodPortMapping, err := plugin.getPodPortMappings()
-		if err == nil {
-			err = plugin.hostportSyncer.SyncHostports(BridgeName, activePodPortMapping)
-		}
-		if err != nil {
+	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
+	if err != nil {
+		errList = append(errList, err)
+	} else if portMappings != nil && len(portMappings) > 0 {
+		if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
+			Namespace:    namespace,
+			Name:         name,
+			PortMappings: portMappings,
+			HostNetwork:  false,
+		}); err != nil {
 			errList = append(errList, err)
-		}
-	} else {
-		portMappings, err := plugin.host.GetPodPortMappings(id.ID)
-		if err != nil {
-			errList = append(errList, err)
-		} else if portMappings != nil && len(portMappings) > 0 {
-			if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
-				Namespace:    namespace,
-				Name:         name,
-				PortMappings: portMappings,
-				HostNetwork:  false,
-			}); err != nil {
-				errList = append(errList, err)
-			}
 		}
 	}
 	return utilerrors.NewAggregate(errList)
@@ -597,119 +545,6 @@ func (plugin *kubenetNetworkPlugin) checkRequiredCNIPluginsInOneDir(dir string) 
 		}
 	}
 	return true
-}
-
-// getNonExitedPods returns a list of pods that have at least one running container.
-func (plugin *kubenetNetworkPlugin) getNonExitedPods() ([]*kubecontainer.Pod, error) {
-	ret := []*kubecontainer.Pod{}
-	pods, err := plugin.host.GetRuntime().GetPods(true)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve pods from runtime: %v", err)
-	}
-	for _, p := range pods {
-		if podIsExited(p) {
-			continue
-		}
-		ret = append(ret, p)
-	}
-	return ret, nil
-}
-
-func (plugin *kubenetNetworkPlugin) getPodPortMappings() ([]*hostport.PodPortMapping, error) {
-	pods, err := plugin.getNonExitedPods()
-	if err != nil {
-		return nil, err
-	}
-	activePodPortMappings := make([]*hostport.PodPortMapping, 0)
-	for _, p := range pods {
-		containerID, err := plugin.host.GetRuntime().GetPodContainerID(p)
-		if err != nil {
-			continue
-		}
-		ipString, ok := plugin.podIPs[containerID]
-		if !ok {
-			continue
-		}
-		podIP := net.ParseIP(ipString)
-		if podIP == nil {
-			continue
-		}
-		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-			activePodPortMappings = append(activePodPortMappings, hostport.ConstructPodPortMapping(pod, podIP))
-		}
-	}
-	return activePodPortMappings, nil
-}
-
-// ipamGarbageCollection will release unused IP.
-// kubenet uses the CNI bridge plugin, which stores allocated ips on file. Each
-// file created under defaultIPAMDir has the format: ip/container-hash. So this
-// routine looks for hashes that are not reported by the currently running docker,
-// and invokes DelNetwork on each one. Note that this will only work for the
-// current CNI bridge plugin, because we have no way of finding the NetNs.
-func (plugin *kubenetNetworkPlugin) ipamGarbageCollection() {
-	glog.V(2).Infof("Starting IP garbage collection")
-
-	ipamDir := filepath.Join(defaultIPAMDir, KubenetPluginName)
-	files, err := ioutil.ReadDir(ipamDir)
-	if err != nil {
-		glog.Errorf("Failed to list files in %q: %v", ipamDir, err)
-		return
-	}
-
-	// gather containerIDs for allocated ips
-	ipContainerIdMap := make(map[string]string)
-	for _, file := range files {
-		// skip non checkpoint file
-		if ip := net.ParseIP(file.Name()); ip == nil {
-			continue
-		}
-
-		content, err := ioutil.ReadFile(filepath.Join(ipamDir, file.Name()))
-		if err != nil {
-			glog.Errorf("Failed to read file %v: %v", file, err)
-		}
-		ipContainerIdMap[file.Name()] = strings.TrimSpace(string(content))
-	}
-
-	// gather infra container IDs of current running Pods
-	runningContainerIDs := utilsets.String{}
-	pods, err := plugin.getNonExitedPods()
-	if err != nil {
-		glog.Errorf("Failed to get pods: %v", err)
-		return
-	}
-	for _, pod := range pods {
-		containerID, err := plugin.host.GetRuntime().GetPodContainerID(pod)
-		if err != nil {
-			glog.Warningf("Failed to get infra containerID of %q/%q: %v", pod.Namespace, pod.Name, err)
-			continue
-		}
-
-		runningContainerIDs.Insert(strings.TrimSpace(containerID.ID))
-	}
-
-	// release leaked ips
-	for ip, containerID := range ipContainerIdMap {
-		// if the container is not running, release IP
-		if runningContainerIDs.Has(containerID) {
-			continue
-		}
-		// CNI requires all config to be presented, although only containerID is needed in this case
-		rt := &libcni.RuntimeConf{
-			ContainerID: containerID,
-			IfName:      network.DefaultInterfaceName,
-			// TODO: How do we find the NetNs of an exited container? docker inspect
-			// doesn't show us the pid, so we probably need to checkpoint
-			NetNS: "",
-		}
-
-		glog.V(2).Infof("Releasing IP %q allocated to %q.", ip, containerID)
-		// CNI bridge plugin should try to release IP and then return
-		if err := plugin.cniConfig.DelNetwork(plugin.netConfig, rt); err != nil {
-			glog.Errorf("Error while releasing IP: %v", err)
-		}
-	}
 }
 
 // podIsExited returns true if the pod is exited (all containers inside are exited).

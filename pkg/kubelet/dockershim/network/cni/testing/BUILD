@@ -7,9 +7,13 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/network/hostport/testing",
-    deps = ["//pkg/kubelet/network/hostport:go_default_library"],
+    srcs = ["mock_cni.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing",
+    deps = [
+        "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/stretchr/testify/mock:go_default_library",
+    ],
 )
 
 filegroup(
