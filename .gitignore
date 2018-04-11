@@ -16,6 +16,10 @@
 # Vscode files
 .vscode
 
+# Sublime text files
+*.sublime-project
+*.sublime-workspace
+
 # This is where the result of the go build goes
 /output*/
 /_output*/
