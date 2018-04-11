@@ -12,6 +12,8 @@ go_library(
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/cloud:go_default_library",
+        "//pkg/controller/nodeipam:go_default_library",
+        "//pkg/controller/nodeipam/ipam:go_default_library",
         "//pkg/controller/route:go_default_library",
         "//pkg/controller/service:go_default_library",
         "//pkg/util/configz:go_default_library",

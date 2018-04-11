@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
+	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -208,6 +210,38 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, rootClientBuilde
 	// TODO: move this setup into Config
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, resyncPeriod(c)())
+
+	var clusterCIDR, serviceCIDR *net.IPNet
+	if c.Generic.ComponentConfig.AllocateNodeCIDRs {
+		var err error
+		if len(strings.TrimSpace(c.Generic.ComponentConfig.ClusterCIDR)) != 0 {
+			_, clusterCIDR, err = net.ParseCIDR(c.Generic.ComponentConfig.ClusterCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", c.Generic.ComponentConfig.ClusterCIDR, err)
+			}
+		}
+		if len(strings.TrimSpace(c.Generic.ComponentConfig.ServiceCIDR)) != 0 {
+			_, serviceCIDR, err = net.ParseCIDR(c.Generic.ComponentConfig.ServiceCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", c.Generic.ComponentConfig.ServiceCIDR, err)
+			}
+		}
+
+		nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
+			sharedInformers.Core().V1().Nodes(),
+			cloud,
+			client("node-controller"),
+			clusterCIDR,
+			serviceCIDR,
+			int(c.Generic.ComponentConfig.NodeCIDRMaskSize),
+			c.Generic.ComponentConfig.AllocateNodeCIDRs,
+			ipam.CIDRAllocatorType(c.Generic.ComponentConfig.CIDRAllocatorType),
+		)
+		if err != nil {
+			glog.Fatalf("Failed to start the node ipam controller: %v", err)
+		}
+		go nodeIpamController.Run(stop)
+	}
 
 	// Start the CloudNodeController
 	nodeController := cloudcontrollers.NewCloudNodeController(
