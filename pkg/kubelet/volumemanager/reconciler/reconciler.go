@@ -593,7 +593,8 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			volume.mounter,
 			volume.blockVolumeMapper,
 			volume.outerVolumeSpecName,
-			volume.volumeGidValue)
+			volume.volumeGidValue,
+			volume.volumeSpec)
 		if err != nil {
 			glog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
 			continue
