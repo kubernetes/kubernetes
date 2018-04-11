@@ -5,6 +5,24 @@ load(
     "go_library",
 )
 
+genrule(
+    name = "bindata",
+    srcs = [
+        "//translations:all-srcs",
+    ],
+    outs = ["bindata.go"],
+    cmd = """
+$(location //vendor/github.com/jteeuwen/go-bindata/go-bindata:go-bindata) \
+  -nometadata -nocompress -o "$(OUTS)" -pkg generated \
+  -prefix $$(pwd) \
+  -ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
+  $(SRCS)
+""",
+    tools = [
+        "//vendor/github.com/jteeuwen/go-bindata/go-bindata",
+    ],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [

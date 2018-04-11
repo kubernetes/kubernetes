@@ -30,7 +30,7 @@ genrule(
 $(location //vendor/github.com/jteeuwen/go-bindata/go-bindata:go-bindata) \
   -nometadata -o "$(OUTS)" -pkg generated \
   -prefix $$(pwd) \
-  -ignore .jpg -ignore .png -ignore .md \
+  -ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
   $(SRCS)
 """,
     tools = [
