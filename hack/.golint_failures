@@ -541,6 +541,7 @@ staging/src/k8s.io/apiserver/pkg/endpoints/handlers
 staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation
 staging/src/k8s.io/apiserver/pkg/endpoints/metrics
 staging/src/k8s.io/apiserver/pkg/endpoints/openapi/testing
+staging/src/k8s.io/apiserver/pkg/endpoints/request
 staging/src/k8s.io/apiserver/pkg/endpoints/testing
 staging/src/k8s.io/apiserver/pkg/features
 staging/src/k8s.io/apiserver/pkg/registry/generic

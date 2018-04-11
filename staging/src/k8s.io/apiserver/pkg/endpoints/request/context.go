@@ -18,7 +18,7 @@ package request
 
 import (
 	"context"
-	stderrs "errors"
+	"errors"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,7 +83,7 @@ func NewDefaultContext() Context {
 func WithValue(parent Context, key interface{}, val interface{}) Context {
 	internalCtx, ok := parent.(context.Context)
 	if !ok {
-		panic(stderrs.New("Invalid context type"))
+		panic(errors.New("Invalid context type"))
 	}
 	return context.WithValue(internalCtx, key, val)
 }
