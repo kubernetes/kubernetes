@@ -148,7 +148,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode kubeletc
 	}
 
 	plugin.loConfig, err = libcni.ConfFromBytes([]byte(`{
-  "cniVersion": "0.1.0",
+  "cniVersion": "0.3.1",
   "name": "kubenet-loopback",
   "type": "loopback"
 }`))
@@ -207,7 +207,7 @@ func findMinMTU() (*net.Interface, error) {
 }
 
 const NET_CONFIG_TEMPLATE = `{
-  "cniVersion": "0.1.0",
+  "cniVersion": "0.3.1",
   "name": "kubenet",
   "type": "bridge",
   "bridge": "%s",
@@ -218,10 +218,13 @@ const NET_CONFIG_TEMPLATE = `{
   "hairpinMode": %t,
   "ipam": {
     "type": "host-local",
-    "subnet": "%s",
-    "gateway": "%s",
-    "routes": [
-      { "dst": "0.0.0.0/0" }
+    "ranges": [
+      [
+        {
+          "subnet": "%s",
+          "gateway": "%s"
+        }
+      ]
     ]
   }
 }`
