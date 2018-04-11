@@ -53,14 +53,14 @@ var (
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
-		# Start a single instance of hazelcast and let the container expose port 5701 .
-		kubectl run hazelcast --image=hazelcast --port=5701
+		# Start a single instance of nginx and let the container expose port 8080.
+		kubectl run nginx --image=nginx --port=8080
 
-		# Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
-		kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
+		# Start a single instance of nginx and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
+		kubectl run nginx --image=nginx --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
-		# Start a single instance of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
-		kubectl run hazelcast --image=nginx --labels="app=hazelcast,env=prod"
+		# Start a single instance of nginx and set labels "app=nginx" and "env=prod" in the container.
+		kubectl run nginx --image=nginx --labels="app=nginx,env=prod"
 
 		# Start a replicated instance of nginx.
 		kubectl run nginx --image=nginx --replicas=5
