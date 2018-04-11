@@ -55,6 +55,7 @@ go_library(
         "plugin.go",
         "portforward.go",
         "proxy.go",
+        "record_flags.go",
         "replace.go",
         "rollingupdate.go",
         "run.go",
