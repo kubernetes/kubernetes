@@ -44,11 +44,11 @@ func TestChaos(t *testing.T) {
 	}))
 	defer server.Close()
 	client := http.Client{
-		Transport: NewChaosRoundTripper(http.DefaultTransport, TestLogChaos{t}, ErrSimulatedConnectionResetByPeer),
+		Transport: NewChaosRoundTripper(http.DefaultTransport, TestLogChaos{t}, RandomSimulatedErr),
 	}
 	resp, err := client.Get(server.URL)
-	if unwrapURLError(err) != ErrSimulatedConnectionResetByPeer.error {
-		t.Fatalf("expected reset by peer: %v", err)
+	if unwrapURLError(err) != RandomSimulatedErr.error {
+		t.Fatalf("expected err: %v", err)
 	}
 	if resp != nil {
 		t.Fatalf("expected no response object: %#v", resp)
@@ -64,7 +64,7 @@ func TestPartialChaos(t *testing.T) {
 	client := http.Client{
 		Transport: NewChaosRoundTripper(
 			http.DefaultTransport, TestLogChaos{t},
-			seed.P(0.5, ErrSimulatedConnectionResetByPeer),
+			seed.P(0.5, RandomSimulatedErr),
 		),
 	}
 	success, fail := 0, 0
