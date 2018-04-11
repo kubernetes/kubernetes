@@ -136,6 +136,7 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	})
 }
 
+// WaitForEtcd blocks until it timeouts or gets a status response from etcd
 func (w *KubeWaiter) WaitForEtcd(secure bool) error {
 	return TryRunCommand(func() error {
 		etcdCluster := kubeadmutil.LocalEtcdCluster{}
