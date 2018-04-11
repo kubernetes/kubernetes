@@ -108,12 +108,12 @@ func TestNodeIPParam(t *testing.T) {
 		},
 		{
 			nodeIP:   "127.0.0.1",
-			success:  false,
+			success:  true,
 			testName: "IPv4 loopback address",
 		},
 		{
 			nodeIP:   "::1",
-			success:  false,
+			success:  true,
 			testName: "IPv6 loopback address",
 		},
 		{
@@ -128,12 +128,12 @@ func TestNodeIPParam(t *testing.T) {
 		},
 		{
 			nodeIP:   "169.254.0.1",
-			success:  false,
+			success:  true,
 			testName: "IPv4 link-local unicast address",
 		},
 		{
 			nodeIP:   "fe80::0202:b3ff:fe1e:8329",
-			success:  false,
+			success:  true,
 			testName: "IPv6 link-local unicast address",
 		},
 		{
