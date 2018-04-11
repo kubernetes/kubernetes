@@ -95,7 +95,7 @@ func MergeAPIResourceConfigs(
 
 		tokens := strings.Split(key, "/")
 		if len(tokens) != 2 {
-			continue
+			return nil, fmt.Errorf("invalid key %s", key)
 		}
 		groupVersion, err := schema.ParseGroupVersion(key)
 		if err != nil {
@@ -106,12 +106,11 @@ func MergeAPIResourceConfigs(
 		if !registry.IsRegistered(groupVersion.Group) {
 			continue
 		}
-
 		// Verify that the groupVersion is registered into registry.
 		if !registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
-		enabled, err := getRuntimeConfigValue(overrides, key, false)
+		enabled, err := GetRuntimeConfigValue(overrides, key, false)
 		if err != nil {
 			return nil, err
 		}
@@ -122,46 +121,11 @@ func MergeAPIResourceConfigs(
 		}
 	}
 
-	// Iterate through all group/version/resource overrides specified in runtimeConfig.
-	for key := range overrides {
-		tokens := strings.Split(key, "/")
-		if len(tokens) != 3 {
-			continue
-		}
-		groupVersionString := tokens[0] + "/" + tokens[1]
-		resource := tokens[2]
-		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
-		if err != nil {
-			return nil, fmt.Errorf("invalid key %s", key)
-		}
-		// Exclude group not registered into the registry.
-		if !registry.IsRegistered(groupVersion.Group) {
-			continue
-		}
-
-		// Verify that the groupVersion is registered into registry.
-		if !registry.IsRegisteredVersion(groupVersion) {
-			return nil, fmt.Errorf("group version %s has not been registered", groupVersion.String())
-		}
-
-		if !resourceConfig.AnyResourcesForVersionEnabled(groupVersion) {
-			return nil, fmt.Errorf("%v is disabled, you cannot configure its resources individually", groupVersion)
-		}
-
-		enabled, err := getRuntimeConfigValue(overrides, key, false)
-		if err != nil {
-			return nil, err
-		}
-		if enabled {
-			resourceConfig.EnableResources(groupVersion.WithResource(resource))
-		} else {
-			resourceConfig.DisableResources(groupVersion.WithResource(resource))
-		}
-	}
 	return resourceConfig, nil
 }
 
-func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+// GetRuntimeConfigValue takes in a key and returns its value with a default.
+func GetRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
 	flagValue, ok := overrides[apiKey]
 	if ok {
 		if flagValue == "" {
@@ -184,7 +148,7 @@ func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
 			continue
 		}
 		tokens := strings.Split(key, "/")
-		if len(tokens) != 2 && len(tokens) != 3 {
+		if len(tokens) < 2 {
 			return groups, fmt.Errorf("runtime-config invalid key %s", key)
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]

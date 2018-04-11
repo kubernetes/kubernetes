@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourceconfig
+package kubeapiserver
 
 import (
 	"reflect"
@@ -28,7 +28,7 @@ import (
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 )
 
-func TestParseRuntimeConfig(t *testing.T) {
+func TestMergeAPIResourceConfigs(t *testing.T) {
 	registry := newFakeRegistry()
 	extensionsGroupVersion := extensionsapiv1beta1.SchemeGroupVersion
 	apiv1GroupVersion := v1.SchemeGroupVersion
@@ -192,6 +192,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			err: false,
 		},
 	}
+
 	for index, test := range testCases {
 		t.Log(registry.RegisteredGroupVersions())
 		actualDisablers, err := MergeAPIResourceConfigs(test.defaultResourceConfig(), test.runtimeConfig, registry)
@@ -203,7 +204,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 
 		expectedConfig := test.expectedAPIConfig()
 		if err == nil && !reflect.DeepEqual(actualDisablers, expectedConfig) {
-			t.Fatalf("%v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", test.runtimeConfig, actualDisablers, expectedConfig)
+			t.Fatalf("case %v: unexpected apiResourceDisablers. Actual: %v\n expected: %v", index, actualDisablers.GroupVersionResourceConfigs, expectedConfig.GroupVersionResourceConfigs)
 		}
 	}
 }

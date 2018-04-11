@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -25,33 +26,73 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
-// APIEnablementOptions holds the APIEnablement options.
-// It is a wrap of generic APIEnablementOptions.
+// APIEnablementOptions contains the options for enabling or disabling group/version
+// and group/version/resource. The latter is added here compared to the generic API server
+// APIEnablementOptions.
 type APIEnablementOptions struct {
-	GenericAPIEnablement *genericoptions.APIEnablementOptions
+	RuntimeConfig utilflag.ConfigurationMap
 }
 
 func NewAPIEnablementOptions() *APIEnablementOptions {
 	return &APIEnablementOptions{
-		GenericAPIEnablement: genericoptions.NewAPIEnablementOptions(),
+		RuntimeConfig: make(utilflag.ConfigurationMap),
 	}
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *APIEnablementOptions) AddFlags(fs *pflag.FlagSet) {
-	s.GenericAPIEnablement.AddFlags(fs)
+	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
+		"A set of key=value pairs that describe runtime configuration that may be passed "+
+		"to apiserver. <group>/<version> (or <version> for the core group) key can be used to "+
+		"turn on/off specific api versions. <group>/<version>/<resource> (or <version>/<resource> "+
+		"for the core group) can be used to turn on/off specific resources. api/all is special key"+
+		"to control all api versions, be careful setting it false, unless you know what you do. "+
+		"api/legacy is deprecated, we will remove it in the future, so stop using it.")
 }
 
-// Validate verifies flags passed to kube-apiserver APIEnablementOptions.
-// It calls GenericAPIEnablement.Validate.
+// Validate validates RuntimeConfig with a list of APIServers' registries.
+// Validate will filter out the known groups of each registry.
+// If anything is left over after that, an error is returned.
 func (s *APIEnablementOptions) Validate(registries ...genericoptions.GroupRegisty) []error {
 	if s == nil {
 		return nil
 	}
 
-	errors := s.GenericAPIEnablement.Validate(registries...)
+	errors := []error{}
+	legacyRuntimeConfig := make(utilflag.ConfigurationMap)
+	genericRuntimeConfig := make(utilflag.ConfigurationMap)
+	for key := range s.RuntimeConfig {
+		tokens := strings.Split(key, "/")
+		switch len(tokens) {
+		case 2:
+			genericRuntimeConfig[key] = s.RuntimeConfig[key]
+		case 3:
+			legacyRuntimeConfig[key] = s.RuntimeConfig[key]
+		default:
+			return append(errors, fmt.Errorf("invliad key %s", key))
+		}
+	}
+
+	groups, err := resourceconfig.ParseGroups(legacyRuntimeConfig)
+	if err != nil {
+		return append(errors, err)
+	}
+
+	for _, registry := range registries {
+		// filter out known groups
+		groups = genericoptions.UnknownGroups(groups, registry)
+	}
+	if len(groups) != 0 {
+		errors = append(errors, fmt.Errorf("unknown api groups %s", strings.Join(groups, ",")))
+	}
+
+	// make use of generic APIServer's APIEnablementOptions validate
+	genericAPIEnablementOptions := genericoptions.APIEnablementOptions{RuntimeConfig: genericRuntimeConfig}
+	errors = genericAPIEnablementOptions.Validate(registries...)
 
 	return errors
 }
@@ -62,17 +103,19 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 		return nil
 	}
 
-	err := s.GenericAPIEnablement.ApplyTo(c, defaultResourceConfig, registry)
+	mergedResourceConfig, err := kubeapiserver.MergeAPIResourceConfigs(defaultResourceConfig, s.RuntimeConfig, registry)
+	c.MergedResourceConfig = mergedResourceConfig
 
 	return err
 }
 
-// ConvertLegacyGroup remove useless "api/legacy" and convert the legacy group "v1".
+// ConvertLegacyGroup remove useless "api/legacy" and convert the core group version "v1".
 func (s *APIEnablementOptions) ConvertLegacyGroup() {
-	if s == nil || s.GenericAPIEnablement == nil {
+	if s == nil {
 		return
 	}
-	overrides := s.GenericAPIEnablement.RuntimeConfig
+
+	overrides := s.RuntimeConfig
 	// remove api/legacy, it is useless.
 	delete(overrides, "api/legacy")
 

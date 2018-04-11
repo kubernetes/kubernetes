@@ -17,11 +17,15 @@ limitations under the License.
 package kubeapiserver
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -49,4 +53,57 @@ func NewStorageFactory(
 	resourceEncodingConfig := resourceconfig.MergeGroupEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
 	resourceEncodingConfig = resourceconfig.MergeResourceEncodingConfigs(resourceEncodingConfig, resourceEncodingOverrides)
 	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, SpecialDefaultResourcePrefixes), nil
+}
+
+// MergeAPIResourceConfigs merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
+// Exclude the groups not registered in registry, and check if version is
+// not registered in group, then it will fail.
+func MergeAPIResourceConfigs(
+	defaultAPIResourceConfig *serverstorage.ResourceConfig,
+	resourceConfigOverrides utilflag.ConfigurationMap,
+	registry resourceconfig.GroupVersionRegistry,
+) (*serverstorage.ResourceConfig, error) {
+	resourceConfig := defaultAPIResourceConfig
+
+	// Iterate through all group/version/resource overrides specified in runtimeConfig.
+	for key := range resourceConfigOverrides {
+		tokens := strings.Split(key, "/")
+		if len(tokens) != 3 {
+			continue
+		}
+		groupVersionString := tokens[0] + "/" + tokens[1]
+		resource := tokens[2]
+		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
+		if err != nil {
+			return nil, fmt.Errorf("invalid key %s", key)
+		}
+		// Exclude group not registered into the registry.
+		if !registry.IsRegistered(groupVersion.Group) {
+			continue
+		}
+
+		// Verify that the groupVersion is registered into registry.
+		if !registry.IsRegisteredVersion(groupVersion) {
+			return nil, fmt.Errorf("group version %s has not been registered", groupVersion.String())
+		}
+
+		if !resourceConfig.AnyResourcesForVersionEnabled(groupVersion) {
+			return nil, fmt.Errorf("%v is disabled, you cannot configure its resources individually", groupVersion)
+		}
+
+		enabled, err := resourceconfig.GetRuntimeConfigValue(resourceConfigOverrides, key, false)
+		if err != nil {
+			return nil, err
+		}
+		if enabled {
+			resourceConfig.EnableResources(groupVersion.WithResource(resource))
+		} else {
+			resourceConfig.DisableResources(groupVersion.WithResource(resource))
+		}
+
+		// to avoid resourceconfig.MergeAPIResourceConfigs falling over it.
+		delete(resourceConfigOverrides, key)
+	}
+
+	return resourceconfig.MergeAPIResourceConfigs(resourceConfig, resourceConfigOverrides, registry)
 }
