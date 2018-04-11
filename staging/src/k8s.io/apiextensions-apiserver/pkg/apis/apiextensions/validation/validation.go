@@ -277,20 +277,20 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv)...)
 
 	if len(schema.AllOf) != 0 {
-		for _, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf"), ssv)...)
+		for i, jsonSchema := range schema.AllOf {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv)...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
-		for _, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf"), ssv)...)
+		for i, jsonSchema := range schema.OneOf {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv)...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
-		for _, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf"), ssv)...)
+		for i, jsonSchema := range schema.AnyOf {
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv)...)
 		}
 	}
 
@@ -303,8 +303,8 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	if schema.Items != nil {
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv)...)
 		if len(schema.Items.JSONSchemas) != 0 {
-			for _, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items"), ssv)...)
+			for i, jsonSchema := range schema.Items.JSONSchemas {
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv)...)
 			}
 		}
 	}
