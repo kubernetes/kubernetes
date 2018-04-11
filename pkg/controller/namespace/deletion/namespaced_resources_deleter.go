@@ -19,7 +19,6 @@ package deletion
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -47,17 +46,15 @@ func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
 	d := &namespacedResourcesDeleter{
-		nsClient:   nsClient,
-		clientPool: clientPool,
-		podsGetter: podsGetter,
-		opCache: &operationNotSupportedCache{
-			m: make(map[operationKey]bool),
-		},
+		nsClient:                nsClient,
+		clientPool:              clientPool,
+		podsGetter:              podsGetter,
+		operationNotSupported:   make(map[operationKey]bool),
 		discoverResourcesFn:     discoverResourcesFn,
 		finalizerToken:          finalizerToken,
 		deleteNamespaceWhenDone: deleteNamespaceWhenDone,
 	}
-	d.initOpCache()
+	d.initOperationNotSupported()
 	return d
 }
 
@@ -72,8 +69,8 @@ type namespacedResourcesDeleter struct {
 	// Interface to get PodInterface.
 	podsGetter v1clientset.PodsGetter
 	// Cache of what operations are not supported on each group version resource.
-	opCache             *operationNotSupportedCache
-	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
+	operationNotSupported map[operationKey]bool
+	discoverResourcesFn   func() ([]*metav1.APIResourceList, error)
 	// The finalizer token that should be removed from the namespace
 	// when all resources in that namespace have been deleted.
 	finalizerToken v1.FinalizerName
@@ -160,8 +157,8 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	return nil
 }
 
-func (d *namespacedResourcesDeleter) initOpCache() {
-	// pre-fill opCache with the discovery info
+func (d *namespacedResourcesDeleter) initOperationNotSupported() {
+	// pre-fill OperationNotSupported with the discovery info
 	//
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
 	resources, err := d.discoverResourcesFn()
@@ -189,7 +186,7 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 
 			for _, op := range []operation{operationList, operationDeleteCollection} {
 				if !verbs.Has(string(op)) {
-					d.opCache.setNotSupported(operationKey{operation: op, gvr: gvr})
+					d.operationNotSupported[operationKey{operation: op, gvr: gvr}] = true
 				}
 			}
 			deletableGroupVersionResources = append(deletableGroupVersionResources, gvr)
@@ -234,26 +231,6 @@ const (
 type operationKey struct {
 	operation operation
 	gvr       schema.GroupVersionResource
-}
-
-// operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
-// if the operationKey maps to true, it means the operation is not supported.
-type operationNotSupportedCache struct {
-	lock sync.RWMutex
-	m    map[operationKey]bool
-}
-
-// isSupported returns true if the operation is supported
-func (o *operationNotSupportedCache) isSupported(key operationKey) bool {
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-	return !o.m[key]
-}
-
-func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
-	o.lock.Lock()
-	defer o.lock.Unlock()
-	o.m[key] = true
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
@@ -334,7 +311,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
-	if !d.opCache.isSupported(key) {
+	if d.operationNotSupported[key] {
 		glog.V(5).Infof("namespace controller - deleteCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return false, nil
 	}
@@ -360,7 +337,6 @@ func (d *namespacedResourcesDeleter) deleteCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		d.opCache.setNotSupported(key)
 		return false, nil
 	}
 
@@ -378,7 +354,7 @@ func (d *namespacedResourcesDeleter) listCollection(
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
 	key := operationKey{operation: operationList, gvr: gvr}
-	if !d.opCache.isSupported(key) {
+	if d.operationNotSupported[key] {
 		glog.V(5).Infof("namespace controller - listCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return nil, false, nil
 	}
@@ -401,7 +377,6 @@ func (d *namespacedResourcesDeleter) listCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		d.opCache.setNotSupported(key)
 		return nil, false, nil
 	}
 
