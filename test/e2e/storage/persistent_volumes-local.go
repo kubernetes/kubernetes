@@ -1337,6 +1337,8 @@ func createVolumeConfigMap(config *localTestConfig) {
 
 func createProvisionerDaemonset(config *localTestConfig) {
 	provisionerPrivileged := true
+	mountProp := v1.MountPropagationHostToContainer
+
 	provisioner := &extv1beta1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
@@ -1387,8 +1389,9 @@ func createProvisionerDaemonset(config *localTestConfig) {
 									MountPath: "/etc/provisioner/config/",
 								},
 								{
-									Name:      "local-disks",
-									MountPath: provisionerDefaultMountRoot,
+									Name:             "local-disks",
+									MountPath:        provisionerDefaultMountRoot,
+									MountPropagation: &mountProp,
 								},
 							},
 						},
