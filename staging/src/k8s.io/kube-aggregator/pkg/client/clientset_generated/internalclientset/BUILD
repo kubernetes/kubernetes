@@ -13,7 +13,6 @@ go_library(
     ],
     importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
