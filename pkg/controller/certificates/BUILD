@@ -53,7 +53,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["certificate_controller_test.go"],
+    srcs = [
+        "certificate_controller_test.go",
+        "certificate_controller_utils_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/controller:go_default_library",
@@ -62,5 +65,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
