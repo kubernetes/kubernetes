@@ -64,6 +64,7 @@ go_library(
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/github.com/sirupsen/logrus:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
