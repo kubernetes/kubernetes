@@ -501,16 +501,6 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		roles = append(roles, rbac.ClusterRole{
-			// a role making the csrapprover controller approve a node server CSR requested by the node itself
-			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:certificatesigningrequests:selfnodeserver"},
-			Rules: []rbac.PolicyRule{
-				rbac.NewRule("create").Groups(certificatesGroup).Resources("certificatesigningrequests/selfnodeserver").RuleOrDie(),
-			},
-		})
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		roles = append(roles, rbac.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
