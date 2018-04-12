@@ -118,15 +118,15 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if !reflect.DeepEqual(meta1.matchingAntiAffinityTerms, meta2.matchingAntiAffinityTerms) {
 		return fmt.Errorf("matchingAntiAffinityTerms are not euqal")
 	}
-	sortNodePodMap(meta1.matchingAffinityPods)
-	sortNodePodMap(meta2.matchingAffinityPods)
-	if !reflect.DeepEqual(meta1.matchingAffinityPods, meta2.matchingAffinityPods) {
-		return fmt.Errorf("matchingAffinityPods are not euqal")
+	sortNodePodMap(meta1.nodeNameToMatchingAffinityPods)
+	sortNodePodMap(meta2.nodeNameToMatchingAffinityPods)
+	if !reflect.DeepEqual(meta1.nodeNameToMatchingAffinityPods, meta2.nodeNameToMatchingAffinityPods) {
+		return fmt.Errorf("nodeNameToMatchingAffinityPods are not euqal")
 	}
-	sortNodePodMap(meta1.matchingAntiAffinityPods)
-	sortNodePodMap(meta2.matchingAntiAffinityPods)
-	if !reflect.DeepEqual(meta1.matchingAntiAffinityPods, meta2.matchingAntiAffinityPods) {
-		return fmt.Errorf("matchingAntiAffinityPods are not euqal")
+	sortNodePodMap(meta1.nodeNameToMatchingAntiAffinityPods)
+	sortNodePodMap(meta2.nodeNameToMatchingAntiAffinityPods)
+	if !reflect.DeepEqual(meta1.nodeNameToMatchingAntiAffinityPods, meta2.nodeNameToMatchingAntiAffinityPods) {
+		return fmt.Errorf("nodeNameToMatchingAntiAffinityPods are not euqal")
 	}
 	if meta1.serviceAffinityInUse {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
@@ -473,7 +473,7 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				},
 			},
 		},
-		matchingAffinityPods: map[string][]*v1.Pod{
+		nodeNameToMatchingAffinityPods: map[string][]*v1.Pod{
 			"nodeA": {
 				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
 					Spec: v1.PodSpec{NodeName: "nodeA"},
@@ -490,7 +490,7 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				},
 			},
 		},
-		matchingAntiAffinityPods: map[string][]*v1.Pod{
+		nodeNameToMatchingAntiAffinityPods: map[string][]*v1.Pod{
 			"nodeN": {
 				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
 					Spec: v1.PodSpec{NodeName: "nodeN"},

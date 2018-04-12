@@ -1423,7 +1423,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	}
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		// Check all affinity terms.
-		matchingPods := predicateMeta.matchingAffinityPods
+		matchingPods := predicateMeta.nodeNameToMatchingAffinityPods
 		for _, term := range GetPodAffinityTerms(affinity.PodAffinity) {
 			termMatches, err := c.anyMatchingPodInTopology(pod, matchingPods, nodeInfo, &term)
 			if err != nil {
@@ -1445,7 +1445,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 		}
 
 		// Check all anti-affinity terms.
-		matchingPods = predicateMeta.matchingAntiAffinityPods
+		matchingPods = predicateMeta.nodeNameToMatchingAntiAffinityPods
 		for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
 			termMatches, err := c.anyMatchingPodInTopology(pod, matchingPods, nodeInfo, &term)
 			if err != nil || termMatches {

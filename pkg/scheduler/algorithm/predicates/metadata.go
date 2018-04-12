@@ -56,10 +56,10 @@ type predicateMetadata struct {
 	matchingAntiAffinityTerms map[string][]matchingPodAntiAffinityTerm
 	// A map of node name to a list of Pods on the node that can potentially match
 	// the affinity rules of the "pod".
-	matchingAffinityPods map[string][]*v1.Pod
+	nodeNameToMatchingAffinityPods map[string][]*v1.Pod
 	// A map of node name to a list of Pods on the node that can potentially match
 	// the anti-affinity rules of the "pod".
-	matchingAntiAffinityPods           map[string][]*v1.Pod
+	nodeNameToMatchingAntiAffinityPods map[string][]*v1.Pod
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
@@ -123,13 +123,13 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		return nil
 	}
 	predicateMetadata := &predicateMetadata{
-		pod:                       pod,
-		podBestEffort:             isPodBestEffort(pod),
-		podRequest:                GetResourceRequest(pod),
-		podPorts:                  schedutil.GetContainerPorts(pod),
-		matchingAntiAffinityTerms: matchingTerms,
-		matchingAffinityPods:      affinityPods,
-		matchingAntiAffinityPods:  antiAffinityPods,
+		pod:                                pod,
+		podBestEffort:                      isPodBestEffort(pod),
+		podRequest:                         GetResourceRequest(pod),
+		podPorts:                           schedutil.GetContainerPorts(pod),
+		matchingAntiAffinityTerms:          matchingTerms,
+		nodeNameToMatchingAffinityPods:     affinityPods,
+		nodeNameToMatchingAntiAffinityPods: antiAffinityPods,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		glog.V(10).Infof("Precompute: %v", predicateName)
@@ -152,17 +152,23 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod) error {
 	podNodeName := deletedPod.Spec.NodeName
 	if affinity != nil && len(podNodeName) > 0 {
 		if affinity.PodAffinity != nil {
-			for i, p := range meta.matchingAffinityPods[podNodeName] {
+			for i, p := range meta.nodeNameToMatchingAffinityPods[podNodeName] {
 				if p == deletedPod {
-					meta.matchingAffinityPods[podNodeName] = append(meta.matchingAffinityPods[podNodeName][:i], meta.matchingAffinityPods[podNodeName][i+1:]...)
+					s := meta.nodeNameToMatchingAffinityPods[podNodeName]
+					s[i] = s[len(s)-1]
+					s = s[:len(s)-1]
+					meta.nodeNameToMatchingAffinityPods[podNodeName] = s
 					break
 				}
 			}
 		}
 		if affinity.PodAntiAffinity != nil {
-			for i, p := range meta.matchingAntiAffinityPods[podNodeName] {
+			for i, p := range meta.nodeNameToMatchingAntiAffinityPods[podNodeName] {
 				if p == deletedPod {
-					meta.matchingAntiAffinityPods[podNodeName] = append(meta.matchingAntiAffinityPods[podNodeName][:i], meta.matchingAntiAffinityPods[podNodeName][i+1:]...)
+					s := meta.nodeNameToMatchingAntiAffinityPods[podNodeName]
+					s[i] = s[len(s)-1]
+					s = s[:len(s)-1]
+					meta.nodeNameToMatchingAntiAffinityPods[podNodeName] = s
 					break
 				}
 			}
@@ -210,32 +216,32 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 			meta.matchingAntiAffinityTerms[addedPodFullName] = podMatchingTerms
 		}
 	}
-	// Add the pod to matchingAffinityPods and matchingAntiAffinityPods if needed.
+	// Add the pod to nodeNameToMatchingAffinityPods and nodeNameToMatchingAntiAffinityPods if needed.
 	affinity := meta.pod.Spec.Affinity
 	podNodeName := addedPod.Spec.NodeName
 	if affinity != nil && len(podNodeName) > 0 {
 		if targetPodMatchesAffinityOfPod(meta.pod, addedPod) {
 			found := false
-			for _, p := range meta.matchingAffinityPods[podNodeName] {
+			for _, p := range meta.nodeNameToMatchingAffinityPods[podNodeName] {
 				if p == addedPod {
 					found = true
 					break
 				}
 			}
 			if !found {
-				meta.matchingAffinityPods[podNodeName] = append(meta.matchingAffinityPods[podNodeName], addedPod)
+				meta.nodeNameToMatchingAffinityPods[podNodeName] = append(meta.nodeNameToMatchingAffinityPods[podNodeName], addedPod)
 			}
 		}
 		if targetPodMatchesAntiAffinityOfPod(meta.pod, addedPod) {
 			found := false
-			for _, p := range meta.matchingAntiAffinityPods[podNodeName] {
+			for _, p := range meta.nodeNameToMatchingAntiAffinityPods[podNodeName] {
 				if p == addedPod {
 					found = true
 					break
 				}
 			}
 			if !found {
-				meta.matchingAntiAffinityPods[podNodeName] = append(meta.matchingAntiAffinityPods[podNodeName], addedPod)
+				meta.nodeNameToMatchingAntiAffinityPods[podNodeName] = append(meta.nodeNameToMatchingAntiAffinityPods[podNodeName], addedPod)
 			}
 		}
 	}
@@ -266,13 +272,13 @@ func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 	for k, v := range meta.matchingAntiAffinityTerms {
 		newPredMeta.matchingAntiAffinityTerms[k] = append([]matchingPodAntiAffinityTerm(nil), v...)
 	}
-	newPredMeta.matchingAffinityPods = make(map[string][]*v1.Pod)
-	for k, v := range meta.matchingAffinityPods {
-		newPredMeta.matchingAffinityPods[k] = append([]*v1.Pod(nil), v...)
+	newPredMeta.nodeNameToMatchingAffinityPods = make(map[string][]*v1.Pod)
+	for k, v := range meta.nodeNameToMatchingAffinityPods {
+		newPredMeta.nodeNameToMatchingAffinityPods[k] = append([]*v1.Pod(nil), v...)
 	}
-	newPredMeta.matchingAntiAffinityPods = make(map[string][]*v1.Pod)
-	for k, v := range meta.matchingAntiAffinityPods {
-		newPredMeta.matchingAntiAffinityPods[k] = append([]*v1.Pod(nil), v...)
+	newPredMeta.nodeNameToMatchingAntiAffinityPods = make(map[string][]*v1.Pod)
+	for k, v := range meta.nodeNameToMatchingAntiAffinityPods {
+		newPredMeta.nodeNameToMatchingAntiAffinityPods[k] = append([]*v1.Pod(nil), v...)
 	}
 	newPredMeta.serviceAffinityMatchingPodServices = append([]*v1.Service(nil),
 		meta.serviceAffinityMatchingPodServices...)
