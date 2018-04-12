@@ -2102,7 +2102,7 @@
 		},
 		{
 			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
-			"Rev": "2a736b4fba317cf3038e3cbd06899b544b875fae"
+			"Rev": "d9bb9fdc907665c61c228baa64fed9b91c7dc1b0"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api",
