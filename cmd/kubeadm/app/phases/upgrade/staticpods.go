@@ -28,6 +28,7 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -206,7 +207,9 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
 	}
 	// Checking health state of etcd before proceeding with the upgrade
-	etcdCluster := util.LocalEtcdCluster{}
+	etcdCluster := etcdutil.EtcdCluster{
+		Endpoints: []string{"127.0.0.1:2379"},
+	}
 	etcdStatus, err := etcdCluster.GetEtcdClusterStatus()
 	if err != nil {
 		return true, fmt.Errorf("etcd cluster is not healthy: %v", err)
@@ -224,7 +227,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	if err != nil {
 		return true, fmt.Errorf("failed to parse the desired etcd version(%s): %v", desiredEtcdVersion.String(), err)
 	}
-	currentEtcdVersion, err := version.ParseSemantic(etcdStatus.Version)
+	currentEtcdVersion, err := version.ParseSemantic(etcdStatus.Versions[0])
 	if err != nil {
 		return true, fmt.Errorf("failed to parse the current etcd version(%s): %v", currentEtcdVersion.String(), err)
 	}
