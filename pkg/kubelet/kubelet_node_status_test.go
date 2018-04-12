@@ -879,7 +879,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		require.True(t, actions[1].Matches("patch", "nodes"))
 		require.Equal(t, actions[1].GetSubresource(), "status")
 
-		updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+		updatedNode, err := kubeClient.CoreV1().Nodes().Get(testKubeletHostname, metav1.GetOptions{})
 		require.NoError(t, err, "can't apply node status patch")
 
 		for i, cond := range updatedNode.Status.Conditions {
@@ -891,7 +891,6 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 		// Version skew workaround. See: https://github.com/kubernetes/kubernetes/issues/16961
 		lastIndex := len(updatedNode.Status.Conditions) - 1
-
 		assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[lastIndex].Type, "NodeReady should be the last condition")
 		assert.NotEmpty(t, updatedNode.Status.Conditions[lastIndex].Message)
 
