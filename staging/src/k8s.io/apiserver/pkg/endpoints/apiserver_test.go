@@ -1577,8 +1577,8 @@ func TestExport(t *testing.T) {
 		t.Errorf("Expected: exported, saw: %s", itemOut.Other)
 	}
 
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if selfLinker.called {
+		t.Errorf("Shouldn't set self link")
 	}
 }
 
