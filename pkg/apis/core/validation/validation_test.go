@@ -3422,6 +3422,7 @@ func TestValidateVolumes(t *testing.T) {
 
 	for i, tc := range testCases {
 		names, errs := ValidateVolumes([]core.Volume{tc.vol}, field.NewPath("field"))
+		volumeNames := ConvertVolumeSourceMapToVolumeNamesMap(names)
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
 		} else if len(errs) > 1 {
@@ -3437,7 +3438,7 @@ func TestValidateVolumes(t *testing.T) {
 				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
 			}
 		} else {
-			if len(names) != 1 || !IsMatchedVolume(tc.vol.Name, names) {
+			if len(names) != 1 || !IsMatchedVolume(tc.vol.Name, volumeNames) {
 				t.Errorf("[%d: %q] wrong names result: %v", i, tc.name, names)
 			}
 		}
@@ -4596,7 +4597,8 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "xyz", DevicePath: "/foofoo"},
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
-	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field")); len(errs) != 0 {
+	volumeNames := ConvertVolumeSourceMapToVolumeNamesMap(vols)
+	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), volumeNames, &container, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -4619,7 +4621,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), volumeNames, &container, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -4674,8 +4676,9 @@ func TestValidateDisabledSubpath(t *testing.T) {
 		},
 	}
 
+	volumeNames := ConvertVolumeSourceMapToVolumeNamesMap(vols)
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), volumeNames, &container, field.NewPath("field"))
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -4814,8 +4817,9 @@ func TestValidateMountPropagation(t *testing.T) {
 		t.Errorf("Invalid test volume - expected success %v", v2err)
 		return
 	}
+	volumeNames := ConvertVolumeSourceMapToVolumeNamesMap(vols2)
 	for i, test := range tests {
-		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, volumeNames, test.container, field.NewPath("field"))
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}
@@ -5163,7 +5167,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, false, volumeDevices, nil, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -5390,7 +5394,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, false, volumeDevices, nil, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -5424,7 +5428,7 @@ func TestValidateInitContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateContainers(successCase, true, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, true, volumeDevices, nil, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -5450,7 +5454,7 @@ func TestValidateInitContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, true, volumeDevices, nil, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -5822,7 +5826,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for i := range successCases {
-		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
+		if errs := ValidatePodSpec(&successCases[i], nil, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -6003,7 +6007,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -6023,7 +6027,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range featuregatedCases {
-		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}

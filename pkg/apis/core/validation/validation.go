@@ -376,7 +376,7 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 	return vols, allErrs
 }
 
-func IsMatchedVolume(name string, volumes map[string]core.VolumeSource) bool {
+func IsMatchedVolume(name string, volumes map[string]bool) bool {
 	if _, ok := volumes[name]; ok {
 		return true
 	} else {
@@ -2223,7 +2223,7 @@ func GetVolumeDeviceMap(devices []core.VolumeDevice) map[string]string {
 	return voldevices
 }
 
-func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]string, volumes map[string]core.VolumeSource, container *core.Container, fldPath *field.Path) field.ErrorList {
+func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]string, volumes map[string]bool, container *core.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	mountpoints := sets.NewString()
 
@@ -2503,10 +2503,10 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 	return allErrors
 }
 
-func validateInitContainers(containers, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
+func validateInitContainers(containers, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, volumeNames map[string]bool, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(containers) > 0 {
-		allErrs = append(allErrs, validateContainers(containers, true, deviceVolumes, fldPath)...)
+		allErrs = append(allErrs, validateContainers(containers, true, deviceVolumes, volumeNames, fldPath)...)
 	}
 
 	allNames := sets.String{}
@@ -2534,7 +2534,7 @@ func validateInitContainers(containers, otherContainers []core.Container, device
 	return allErrs
 }
 
-func validateContainers(containers []core.Container, isInitContainers bool, volumes map[string]core.VolumeSource, fldPath *field.Path) field.ErrorList {
+func validateContainers(containers []core.Container, isInitContainers bool, volumes map[string]core.VolumeSource, volumeNames map[string]bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
@@ -2585,7 +2585,7 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
 		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
-		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, &ctr, idxPath.Child("volumeMounts"))...)
+		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumeNames, &ctr, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, idxPath.Child("volumeDevices"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
@@ -2894,7 +2894,7 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, nil, field.NewPath("spec"))...)
 
 	// we do additional validation only pertinent for pods and not pod templates
 	// this was done to preserve backwards compatibility
@@ -2925,13 +2925,22 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
-func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func ValidatePodSpec(spec *core.PodSpec, volumeClaimTemplates []core.PersistentVolumeClaim, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	volumeNames := make(map[string]bool)
 
 	vols, vErrs := ValidateVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, false, vols, fldPath.Child("containers"))...)
-	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, fldPath.Child("initContainers"))...)
+	for volumeName := range vols {
+		volumeNames[volumeName] = true
+	}
+	for _, volumeClaimTemplate := range volumeClaimTemplates {
+		volumeNames[volumeClaimTemplate.Name] = true
+	}
+
+	// allErrs = append(allErrs, validateVolumeClaimTemplates(volumeClaimTemplates, fldPath.Child("volumeClaimTemplates"))...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, false, vols, volumeNames, fldPath.Child("containers"))...)
+	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, volumeNames, fldPath.Child("initContainers"))...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
@@ -3531,7 +3540,7 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 // ValidatePodTemplate tests if required fields in the pod template are set.
 func ValidatePodTemplate(pod *core.PodTemplate) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, field.NewPath("template"))...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, nil, field.NewPath("template"))...)
 	return allErrs
 }
 
@@ -3539,7 +3548,7 @@ func ValidatePodTemplate(pod *core.PodTemplate) field.ErrorList {
 // that cannot be changed.
 func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, field.NewPath("template"))...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, nil, field.NewPath("template"))...)
 	return allErrs
 }
 
@@ -3891,7 +3900,7 @@ func ValidatePodTemplateSpecForRC(template *core.PodTemplateSpec, selectorMap ma
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		allErrs = append(allErrs, ValidatePodTemplateSpec(template, fldPath)...)
+		allErrs = append(allErrs, ValidatePodTemplateSpec(template, nil, fldPath)...)
 		if replicas > 1 {
 			allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(template.Spec.Volumes, fldPath.Child("spec", "volumes"))...)
 		}
@@ -3917,12 +3926,12 @@ func ValidateReplicationControllerSpec(spec *core.ReplicationControllerSpec, fld
 }
 
 // ValidatePodTemplateSpec validates the spec of a pod template
-func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, fldPath *field.Path) field.ErrorList {
+func ValidatePodTemplateSpec(spec *core.PodTemplateSpec, volumeClaimTemplates []core.PersistentVolumeClaim, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
+	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, volumeClaimTemplates, fldPath.Child("spec"))...)
 	return allErrs
 }
 
@@ -5098,4 +5107,13 @@ func IsDecremented(update, old *int32) bool {
 		return false
 	}
 	return *update < *old
+}
+
+func ConvertVolumeSourceMapToVolumeNamesMap(volumeSourceMap map[string]core.VolumeSource) map[string]bool {
+	volumeNames := make(map[string]bool)
+	for k := range volumeSourceMap {
+		volumeNames[k] = true
+	}
+
+	return volumeNames
 }

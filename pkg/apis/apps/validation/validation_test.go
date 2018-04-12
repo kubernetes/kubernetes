@@ -38,8 +38,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			},
+				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "FallbackToLogsOnError"}}},
 		},
 	}
 
@@ -910,4 +909,201 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateStatefulSetVolumesAndVolumeMounts(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	volumeClaimTemplate := api.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "vol1"}}
+	volumeClaimTemplate2 := api.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "vol2"}}
+	containerWithTwoMount := api.Container{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "FallbackToLogsOnError",
+		VolumeMounts: []api.VolumeMount{
+			{Name: "vol1", MountPath: "path1"},
+			{Name: "vol2", MountPath: "path2"},
+		},
+	}
+	containerWithOneMount := api.Container{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "FallbackToLogsOnError",
+		VolumeMounts: []api.VolumeMount{
+			{Name: "vol1", MountPath: "path1"},
+		},
+	}
+	containerWithNoMount := api.Container{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "FallbackToLogsOnError"}
+
+	validPodTemplateSpec1 := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{{Name: "vol1",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+				},
+			}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{containerWithOneMount},
+		},
+	}
+	validPodTemplateSpec2 := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{{Name: "vol2",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+				},
+			}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{containerWithTwoMount},
+		},
+	}
+	validPodTemplateSpec3 := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{containerWithTwoMount},
+		},
+	}
+	validPodTemplateSpec4 := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PodSpec{
+			Volumes: []api.Volume{
+				{Name: "vol1",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+				{Name: "vol2",
+					VolumeSource: api.VolumeSource{
+						EmptyDir: &api.EmptyDirVolumeSource{},
+					},
+				},
+			},
+
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{containerWithTwoMount},
+		},
+	}
+	validPodTemplateSpec5 := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{containerWithNoMount},
+		},
+	}
+	validPodTemplateSpec6 := api.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: validLabels,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{containerWithOneMount},
+		},
+	}
+
+	successCases := []apps.StatefulSet{
+		{
+			// One Volume, no VolumeClaimTemplate, one Mount
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplateSpec1,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		{
+			// One Volume, one VolumeClaimTemplate, two Mounts
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.OrderedReadyPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplateSpec2,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{volumeClaimTemplate},
+			},
+		},
+		{
+			// Two VolumeClaimTemplate, two Mounts
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.OrderedReadyPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplateSpec3,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{volumeClaimTemplate, volumeClaimTemplate2},
+			},
+		},
+		{
+			// Two Volumes, Two Mounts
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplateSpec4,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		{
+			// No Volumes,  No VolumeClaimTemplates, No Mounts
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplateSpec5,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+	}
+
+	for i, successCase := range successCases {
+		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
+			if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	failureCases := []apps.StatefulSet{
+		{
+			// One Mount, no Volumes or VolumeClaimTemplates
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplateSpec6,
+				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			},
+		},
+		{
+			// Two Mount,  one VolumeClaimTemplates,  no Volume
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.OrderedReadyPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:             validPodTemplateSpec3,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				VolumeClaimTemplates: []api.PersistentVolumeClaim{volumeClaimTemplate},
+			},
+		},
+	}
+	for i, failureCase := range failureCases {
+		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
+			if errs := ValidateStatefulSet(&failureCase); len(errs) == 0 {
+				t.Errorf("expected failure: %v", errs)
+			}
+		})
+	}
+
 }

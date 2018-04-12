@@ -40,25 +40,22 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 }
 
 // Validates the given template and ensures that it is in accordance with the desired selector.
-func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path) field.ErrorList {
+func ValidatePodTemplateSpecForStatefulSet(spec *apps.StatefulSetSpec, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if template == nil {
+	if spec == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else {
 		if !selector.Empty() {
 			// Verify that the StatefulSet selector matches the labels in template.
-			labels := labels.Set(template.Labels)
+			labels := labels.Set(spec.Template.Labels)
 			if !selector.Matches(labels) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), spec.Template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		// TODO: Add validation for PodSpec, currently this will check volumes, which we know will
-		// fail. We should really check that the union of the given volumes and volumeClaims match
-		// volume mounts in the containers.
-		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
-		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
-		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, spec.VolumeClaimTemplates, fldPath)...)
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Template.Labels, fldPath.Child("labels"))...)
+		allErrs = append(allErrs, apivalidation.ValidateAnnotations(spec.Template.Annotations, fldPath.Child("annotations"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(spec.Template.Annotations, &spec.Template.Spec, fldPath.Child("annotations"))...)
 	}
 	return allErrs
 }
@@ -116,7 +113,7 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path) fi
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, fldPath.Child("template"))...)
+		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(spec, selector, fldPath.Child("template"))...)
 	}
 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
