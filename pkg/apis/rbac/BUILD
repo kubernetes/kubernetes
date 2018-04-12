@@ -1,3 +1,5 @@
+load("//build:deepcopy.bzl", "k8s_deepcopy")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
@@ -57,3 +59,5 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])

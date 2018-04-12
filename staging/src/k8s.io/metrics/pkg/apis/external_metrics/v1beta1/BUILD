@@ -1,3 +1,5 @@
+load("//build:deepcopy.bzl", "k8s_deepcopy")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
@@ -45,3 +47,5 @@ filegroup(
     name = "go_default_library_protos",
     srcs = ["generated.proto"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])

@@ -1,3 +1,5 @@
+load("//build:deepcopy.bzl", "k8s_deepcopy")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
@@ -12,10 +14,7 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/apiserver/pkg/endpoints/openapi/testing",
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-    ],
+    deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )
 
 filegroup(
@@ -30,3 +29,5 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])

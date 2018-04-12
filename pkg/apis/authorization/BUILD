@@ -6,8 +6,6 @@ package(
 load("//build:deepcopy.bzl", "k8s_deepcopy")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-k8s_deepcopy()
-
 go_library(
     name = "go_default_library",
     srcs = [
@@ -26,10 +24,7 @@ go_library(
 
 filegroup(
     name = "package-srcs",
-    srcs = glob(
-        ["**"],
-        exclude = ["**/zz_generated*.go"],
-    ),
+    srcs = glob(["**"]),
     tags = ["automanaged"],
     visibility = ["//visibility:private"],
 )
@@ -46,3 +41,5 @@ filegroup(
     ],
     tags = ["automanaged"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])
