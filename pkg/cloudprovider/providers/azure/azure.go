@@ -166,8 +166,12 @@ func GetServicePrincipalToken(config *Config, env *azure.Environment) (*adal.Ser
 
 	if config.UseManagedIdentityExtension {
 		glog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
+		msiEndpoint, err := adal.GetMSIVMEndpoint()
+		if err != nil {
+			return nil, fmt.Errorf("Getting the managed service identity endpoint: %v", err)
+		}
 		return adal.NewServicePrincipalTokenFromMSI(
-			*oauthConfig,
+			msiEndpoint,
 			env.ServiceManagementEndpoint)
 	}
 
