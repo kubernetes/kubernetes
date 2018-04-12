@@ -1350,7 +1350,9 @@ type fakeRateLimitingQueue struct {
 }
 
 func (f *fakeRateLimitingQueue) AddRateLimited(item interface{}) {}
-func (f *fakeRateLimitingQueue) Forget(item interface{})         {}
+func (f *fakeRateLimitingQueue) Forget(item interface{}) {
+	f.requeues = 0
+}
 func (f *fakeRateLimitingQueue) NumRequeues(item interface{}) int {
 	return f.requeues
 }
