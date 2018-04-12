@@ -34,10 +34,11 @@ import (
 
 func Test_generatorFromName(t *testing.T) {
 	const (
-		nonsenseName   = "not-a-real-generator-name"
-		basicName      = cmdutil.DeploymentBasicV1Beta1GeneratorName
-		basicAppsName  = cmdutil.DeploymentBasicAppsV1Beta1GeneratorName
-		deploymentName = "deployment-name"
+		nonsenseName         = "not-a-real-generator-name"
+		basicName            = cmdutil.DeploymentBasicV1Beta1GeneratorName
+		basicAppsV1Beta1Name = cmdutil.DeploymentBasicAppsV1Beta1GeneratorName
+		basicAppsV1Name      = cmdutil.DeploymentBasicAppsV1GeneratorName
+		deploymentName       = "deployment-name"
 	)
 	imageNames := []string{"image-1", "image-2"}
 
@@ -58,7 +59,20 @@ func Test_generatorFromName(t *testing.T) {
 		assert.Equal(t, expectedGenerator, generator)
 	}
 
-	generator, ok = generatorFromName(basicAppsName, imageNames, deploymentName)
+	generator, ok = generatorFromName(basicAppsV1Beta1Name, imageNames, deploymentName)
+	assert.True(t, ok)
+
+	{
+		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1Beta1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		assert.Equal(t, expectedGenerator, generator)
+	}
+
+	generator, ok = generatorFromName(basicAppsV1Name, imageNames, deploymentName)
 	assert.True(t, ok)
 
 	{
@@ -78,13 +92,13 @@ func TestCreateDeployment(t *testing.T) {
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
-
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
 			}, nil
 		}),
 	}
@@ -97,7 +111,7 @@ func TestCreateDeployment(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("image", "hollywood/jonny.depp:v2")
 	cmd.Run(cmd, []string{depName})
-	expectedOutput := "deployment.extensions/" + depName + "\n"
+	expectedOutput := "deployment.apps/" + depName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

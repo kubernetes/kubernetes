@@ -23,9 +23,6 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 
-	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -218,48 +215,28 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		hasResource, err := cmdutil.HasResource(clientset.Discovery(), batchv1beta1.SchemeGroupVersion.WithResource("cronjobs"))
-		if err != nil {
-			return err
-		}
-		if hasResource {
-			generatorName = cmdutil.CronJobV1Beta1GeneratorName
-		} else {
-			generatorName = cmdutil.CronJobV2Alpha1GeneratorName
-		}
+		generatorName = cmdutil.CronJobV1Beta1GeneratorName
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
-			// TODO: we need to deprecate this along with extensions/v1beta1.Deployments
-			// in favor of the new generator for apps/v1beta1.Deployments
-			hasResource, err := cmdutil.HasResource(clientset.Discovery(), extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"))
-			if err != nil {
-				return err
-			}
-			if hasResource {
-				generatorName = cmdutil.DeploymentV1Beta1GeneratorName
-			} else {
-				generatorName = cmdutil.RunV1GeneratorName
-			}
+			generatorName = cmdutil.DeploymentV1Beta1GeneratorName
 		case api.RestartPolicyOnFailure:
-			hasResource, err := cmdutil.HasResource(clientset.Discovery(), batchv1.SchemeGroupVersion.WithResource("jobs"))
-			if err != nil {
-				return err
-			}
-			if hasResource {
-				generatorName = cmdutil.JobV1GeneratorName
-			} else {
-				generatorName = cmdutil.RunPodV1GeneratorName
-			}
+			generatorName = cmdutil.JobV1GeneratorName
 		case api.RestartPolicyNever:
 			generatorName = cmdutil.RunPodV1GeneratorName
 		}
-	}
 
-	generatorName, err = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
-	if err != nil {
-		return err
+		// Falling back because the generator was not provided and the default one could be unavailable.
+		generatorNameTemp, err := cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
+		if err != nil {
+			return err
+		}
+		if generatorNameTemp != generatorName {
+			cmdutil.Warning(cmdErr, generatorName, generatorNameTemp)
+		} else {
+			generatorName = generatorNameTemp
+		}
 	}
 
 	generators := f.Generators("run")
