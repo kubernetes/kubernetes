@@ -109,6 +109,11 @@ func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface
 		return nil, err
 	}
 
+	// The more groups you have, the more discovery requests you need to make.
+	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
+	// double it just so we don't end up here again for a while.  This config is only used for discovery.
+	cfg.Burst = 100
+
 	if f.cacheDir != "" {
 		wt := cfg.WrapTransport
 		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
