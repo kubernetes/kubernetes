@@ -1140,7 +1140,7 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 		return allErrs
 	}
 
-	supportedMountPropagations := sets.NewString(string(core.MountPropagationBidirectional), string(core.MountPropagationHostToContainer))
+	supportedMountPropagations := sets.NewString(string(core.MountPropagationBidirectional), string(core.MountPropagationHostToContainer), string(core.MountPropagationNone))
 	if !supportedMountPropagations.Has(string(*mountPropagation)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath, *mountPropagation, supportedMountPropagations.List()))
 	}
