@@ -17,10 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"reflect"
 	"testing"
+
+	"github.com/coreos/etcd/clientv3"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 type fakeVersionGetter struct {
@@ -430,7 +431,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						KubeVersion:    "v1.11.0-alpha.2",
 						KubeadmVersion: "v1.11.0-alpha.2",
 						DNSVersion:     "1.14.9",
-						EtcdVersion:    "3.1.12",
+						EtcdVersion:    "3.2.18",
 					},
 				},
 			},

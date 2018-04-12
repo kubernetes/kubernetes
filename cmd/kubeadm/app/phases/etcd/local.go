@@ -88,6 +88,7 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
 		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
 		"peer-client-cert-auth": "true",
+		"snapshot-count":        "10000",
 	}
 
 	command := []string{"etcd"}
