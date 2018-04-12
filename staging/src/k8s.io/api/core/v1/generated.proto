@@ -302,6 +302,34 @@ message CephFSVolumeSource {
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
+message CinderPersistentVolumeSource {
+  // volume id used to identify the volume in cinder
+  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  optional string volumeID = 1;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // +optional
+  optional string fsType = 2;
+
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // +optional
+  optional bool readOnly = 3;
+
+  // Optional: points to a secret object containing parameters used to connect
+  // to OpenStack.
+  // +optional
+  optional SecretReference secretRef = 4;
+}
+
+// Represents a cinder volume resource in Openstack.
+// A Cinder volume must exist before mounting to a container.
+// The volume must also be in the same region as the kubelet.
+// Cinder volumes support ownership management and SELinux relabeling.
 message CinderVolumeSource {
   // volume id used to identify the volume in cinder
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
@@ -319,6 +347,11 @@ message CinderVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
+
+  // Optional: points to a secret object containing parameters used to connect
+  // to OpenStack.
+  // +optional
+  optional LocalObjectReference secretRef = 4;
 }
 
 // ClientIPConfig represents the configurations of Client IP based session affinity.
@@ -2358,7 +2391,7 @@ message PersistentVolumeSource {
   // Cinder represents a cinder volume attached and mounted on kubelets host machine
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
-  optional CinderVolumeSource cinder = 8;
+  optional CinderPersistentVolumeSource cinder = 8;
 
   // CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
   // +optional
