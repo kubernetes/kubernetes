@@ -4486,6 +4486,20 @@ run_kubectl_all_namespace_tests() {
   # Command
   kubectl get pods --all-namespaces --namespace=default
 
+  ### Check --all-namespaces option shows namespaces
+  # Create objects in multiple namespaces
+  kubectl create "${kube_flags[@]}" namespace all-ns-test-1
+  kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-1
+  kubectl create "${kube_flags[@]}" namespace all-ns-test-2
+  kubectl create "${kube_flags[@]}" serviceaccount test -n all-ns-test-2
+  # Ensure listing across namespaces displays the namespace
+  output_message=$(kubectl get serviceaccounts --all-namespaces "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "all-ns-test-1"
+  kube::test::if_has_string "${output_message}" "all-ns-test-2"
+  # Clean up
+  kubectl delete "${kube_flags[@]}" namespace all-ns-test-1
+  kubectl delete "${kube_flags[@]}" namespace all-ns-test-2
+
   ### Clean up
   # Pre-condition: valid-pod exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
