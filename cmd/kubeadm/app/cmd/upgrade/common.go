@@ -70,14 +70,17 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 		cfg.KubernetesVersion = newK8sVersion
 	}
 
+	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
+	if flags.featureGatesString != "" {
+		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
+		if err != nil {
+			return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+		}
+	}
+
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
 		printConfiguration(cfg, os.Stdout)
-	}
-
-	cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
-	if err != nil {
-		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}
 
 	return &upgradeVariables{
