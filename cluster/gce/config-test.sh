@@ -109,6 +109,10 @@ NODE_IP_RANGE="$(get-node-ip-range)"
 
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
+if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
+  RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
+fi
+
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
