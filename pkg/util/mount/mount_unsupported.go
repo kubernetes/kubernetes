@@ -21,11 +21,15 @@ package mount
 import (
 	"errors"
 	"os"
+
+	"github.com/golang/glog"
 )
 
 type Mounter struct {
 	mounterPath string
 }
+
+var unsupportedErr = errors.New("util/mount on this platform is not supported")
 
 // New returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
@@ -37,21 +41,21 @@ func New(mounterPath string) Interface {
 }
 
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	return nil
+	return unsupportedErr
 }
 
 func (mounter *Mounter) Unmount(target string) error {
-	return nil
+	return unsupportedErr
 }
 
 // GetMountRefs finds all other references to the device referenced
 // by mountPath; returns a list of paths.
 func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	return []string{}, nil
+	return []string{}, unsupportedErr
 }
 
 func (mounter *Mounter) List() ([]MountPoint, error) {
-	return []MountPoint{}, nil
+	return []MountPoint{}, unsupportedErr
 }
 
 func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
@@ -63,27 +67,27 @@ func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
 }
 
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	return true, nil
+	return true, unsupportedErr
 }
 
 func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return "", nil
+	return "", unsupportedErr
 }
 
 func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
-	return "", nil
+	return "", unsupportedErr
 }
 
 func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
+	return false, unsupportedErr
 }
 
 func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
+	return true, unsupportedErr
 }
 
 func (mounter *Mounter) MakeRShared(path string) error {
-	return nil
+	return unsupportedErr
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
@@ -91,33 +95,34 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 }
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, nil
+	return true, unsupportedErr
 }
 
 func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	return FileType("fake"), errors.New("not implemented")
+	return FileType("fake"), unsupportedErr
 }
 
 func (mounter *Mounter) MakeDir(pathname string) error {
-	return nil
+	return unsupportedErr
 }
 
 func (mounter *Mounter) MakeFile(pathname string) error {
-	return nil
+	return unsupportedErr
 }
 
 func (mounter *Mounter) ExistsPath(pathname string) bool {
+	glog.Errorf("%s", unsupportedErr)
 	return true
 }
 
 func (mounter *Mounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
-	return subPath.Path, nil, nil
+	return subPath.Path, nil, unsupportedErr
 }
 
 func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
-	return nil
+	return unsupportedErr
 }
 
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	return nil
+	return unsupportedErr
 }
