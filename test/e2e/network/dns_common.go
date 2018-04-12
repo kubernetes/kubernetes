@@ -110,6 +110,9 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	default:
 		panic(fmt.Errorf("invalid target: " + target))
 	}
+	if strings.HasSuffix(dnsName, "in-addr.arpa") || strings.HasSuffix(dnsName, "in-addr.arpa.") {
+		cmd = append(cmd, []string{"-t", "ptr"}...)
+	}
 	cmd = append(cmd, dnsName)
 
 	stdout, stderr, err := t.f.ExecWithOptions(framework.ExecOptions{
@@ -266,8 +269,8 @@ func generateDNSServerPod(aRecords map[string]string) *v1.Pod {
 	return pod
 }
 
-func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
-	t.dnsServerPod = generateDNSServerPod(aRecords)
+func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
+	t.dnsServerPod = pod
 
 	var err error
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(t.dnsServerPod)
@@ -278,6 +281,40 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(
 		t.dnsServerPod.Name, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
+	t.createDNSPodFromObj(generateDNSServerPod(aRecords))
+}
+
+func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "e2e-dns-configmap-dns-server-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "dns",
+					Image: imageutils.GetE2EImage(imageutils.DNSMasq),
+					Command: []string{
+						"/usr/sbin/dnsmasq",
+						"-u", "root",
+						"-k",
+						"--log-facility", "-",
+						"--host-record=my.test,192.0.2.123",
+						"-q",
+					},
+				},
+			},
+			DNSPolicy: "Default",
+		},
+	}
+
+	t.createDNSPodFromObj(pod)
 }
 
 func (t *dnsTestCommon) deleteDNSServerPod() {
