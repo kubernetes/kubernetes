@@ -74,7 +74,7 @@ type SubjectOptions struct {
 	Groups          []string
 	ServiceAccounts []string
 
-	PrintObj func(obj runtime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 }
 
 func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
@@ -124,9 +124,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	o.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, o.Out)
-	}
+	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -251,7 +249,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(info.Object); err != nil {
+			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
@@ -264,7 +262,7 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 		info.Refresh(obj, true)
 
-		return o.PrintObj(info.AsVersioned())
+		return o.PrintObj(info.AsVersioned(), o.Out)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
