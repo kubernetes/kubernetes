@@ -2857,9 +2857,12 @@ func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.G
 
 // Returns true if all the specified pods are scheduled, else returns false.
 func podsWithLabelScheduled(c clientset.Interface, ns string, label labels.Selector) (bool, error) {
-	PodStore := testutils.NewPodStore(c, ns, label, fields.Everything())
-	defer PodStore.Stop()
-	pods := PodStore.List()
+	ps, err := testutils.NewPodStore(c, ns, label, fields.Everything())
+	if err != nil {
+		return false, err
+	}
+	defer ps.Stop()
+	pods := ps.List()
 	if len(pods) == 0 {
 		return false, nil
 	}
@@ -3019,7 +3022,7 @@ func DeleteResourceAndPods(clientset clientset.Interface, internalClientset inte
 	if err != nil {
 		return err
 	}
-	ps, err := podStoreForSelector(clientset, ns, selector)
+	ps, err := testutils.NewPodStore(clientset, ns, selector, fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -3068,7 +3071,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		return err
 	}
 
-	ps, err := podStoreForSelector(c, ns, selector)
+	ps, err := testutils.NewPodStore(c, ns, selector, fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -3112,19 +3115,6 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 	}
 	return nil
-}
-
-// podStoreForSelector creates a PodStore that monitors pods from given namespace matching given selector.
-// It waits until the reflector does a List() before returning.
-func podStoreForSelector(c clientset.Interface, ns string, selector labels.Selector) (*testutils.PodStore, error) {
-	ps := testutils.NewPodStore(c, ns, selector, fields.Everything())
-	err := wait.Poll(100*time.Millisecond, 2*time.Minute, func() (bool, error) {
-		if len(ps.Reflector.LastSyncResourceVersion()) != 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-	return ps, err
 }
 
 // waitForPodsInactive waits until there are no active pods left in the PodStore.
