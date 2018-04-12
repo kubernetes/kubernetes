@@ -2495,8 +2495,8 @@ if [[ -n "${KUBE_USER:-}" ]]; then
 fi
 
 # generate the controller manager and scheduler tokens here since they are only used on the master.
-KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+KUBE_CONTROLLER_MANAGER_TOKEN="${KUBE_CONTROLLER_MANAGER_TOKEN:-$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)}"
+KUBE_SCHEDULER_TOKEN="${KUBE_SCHEDULER_TOKEN:-$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)}"
 
 setup-os-params
 config-ip-firewall
