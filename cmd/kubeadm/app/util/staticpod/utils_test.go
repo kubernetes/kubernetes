@@ -111,7 +111,7 @@ func TestComponentPod(t *testing.T) {
 
 	for _, rt := range tests {
 		c := v1.Container{Name: rt.name}
-		actual := ComponentPod(c, []v1.Volume{})
+		actual := ComponentPod(c, map[string]v1.Volume{})
 		if !reflect.DeepEqual(rt.expected, actual) {
 			t.Errorf(
 				"failed componentPod:\n\texpected: %v\n\t  actual: %v",
@@ -196,6 +196,35 @@ func TestNewVolumeMount(t *testing.T) {
 				actual,
 			)
 		}
+	}
+}
+func TestVolumeMapToSlice(t *testing.T) {
+	testVolumes := map[string]v1.Volume{
+		"foo": {
+			Name: "foo",
+		},
+	}
+	volumeSlice := VolumeMapToSlice(testVolumes)
+	if len(volumeSlice) != 1 {
+		t.Errorf("Expected slice length of 1, got %d", len(volumeSlice))
+	}
+	if volumeSlice[0].Name != "foo" {
+		t.Errorf("Expected volume name \"foo\", got %s", volumeSlice[0].Name)
+	}
+}
+
+func TestVolumeMountMapToSlice(t *testing.T) {
+	testVolumeMounts := map[string]v1.VolumeMount{
+		"foo": {
+			Name: "foo",
+		},
+	}
+	volumeMountSlice := VolumeMountMapToSlice(testVolumeMounts)
+	if len(volumeMountSlice) != 1 {
+		t.Errorf("Expected slice length of 1, got %d", len(volumeMountSlice))
+	}
+	if volumeMountSlice[0].Name != "foo" {
+		t.Errorf("Expected volume mount name \"foo\", got %s", volumeMountSlice[0].Name)
 	}
 }
 
