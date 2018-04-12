@@ -41,6 +41,8 @@ pushd "${KUBE_ROOT}" >/dev/null
 
 # These are files for e2e tests.
 BINDATA_OUTPUT="test/e2e/generated/bindata.go"
+# IMPORTANT: if you make any changes to these arguments, you must also update
+# test/e2e/generated/BUILD and/or build/bindata.bzl.
 go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
 	"test/e2e/testing-manifests/..." \
@@ -63,6 +65,8 @@ rm -f "${BINDATA_OUTPUT}.tmp"
 
 # These are files for runtime code
 BINDATA_OUTPUT="pkg/generated/bindata.go"
+# IMPORTANT: if you make any changes to these arguments, you must also update
+# pkg/generated/BUILD and/or build/bindata.bzl.
 go-bindata -nometadata -nocompress -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
 	"translations/..."

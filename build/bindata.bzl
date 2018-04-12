@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# genrule wrapper around the go-bindata utility.
+# Genrule wrapper around the go-bindata utility.
+# IMPORTANT: Any changes to this rule may also require changes to hack/generate-bindata.sh.
 def go_bindata(
     name, srcs, outs,
     compress=True,

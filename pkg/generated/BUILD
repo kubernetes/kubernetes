@@ -6,6 +6,7 @@ load(
 )
 load("//build:bindata.bzl", "go_bindata")
 
+# IMPORTANT: if you make any changes here, you must also update hack/generate-bindata.sh.
 go_bindata(
     name = "bindata",
     srcs = [
