@@ -35,8 +35,9 @@ type dnsFederationsConfigMapTest struct {
 
 var _ = SIGDescribe("DNS configMap federations", func() {
 
+	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+
 	It("should be able to change federation configuration [Slow][Serial]", func() {
-		t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
 		t.c = t.f.ClientSet
 		t.run()
 	})
@@ -220,15 +221,21 @@ func (t *dnsPtrFwdTest) run() {
 
 var _ = SIGDescribe("DNS configMap nameserver", func() {
 
-	It("should be able to change stubDomain configuration [Slow][Serial]", func() {
+	Context("Change stubDomain", func() {
 		nsTest := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
-		nsTest.c = nsTest.f.ClientSet
-		nsTest.run()
+
+		It("should be able to change stubDomain configuration [Slow][Serial]", func() {
+			nsTest.c = nsTest.f.ClientSet
+			nsTest.run()
+		})
 	})
 
-	It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
+	Context("Forward PTR lookup", func() {
 		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDnsTestCommon()}
-		fwdTest.c = fwdTest.f.ClientSet
-		fwdTest.run()
+
+		It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
+			fwdTest.c = fwdTest.f.ClientSet
+			fwdTest.run()
+		})
 	})
 })
