@@ -72,3 +72,10 @@ go_library(
     srcs = ["e2e.go"],
     importpath = "k8s.io/kubernetes/hack",
 )
+
+sh_binary(
+    name = "update-mirror",
+    srcs = ["update-workspace-mirror.sh"],
+    args = ["$(location @workspace_urls//:urls.txt)"],
+    data = ["@workspace_urls//:urls.txt"],
+)
