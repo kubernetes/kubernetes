@@ -202,7 +202,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 // performEtcdStaticPodUpgrade performs upgrade of etcd, it returns bool which indicates fatal error or not and the actual error.
 func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, recoverManifests map[string]string) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
-	if len(cfg.Etcd.Endpoints) != 0 {
+	if cfg.Etcd.ExternalEtcd != nil {
 		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
 	}
 	// Checking health state of etcd before proceeding with the upgrade
@@ -214,7 +214,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
-	runningEtcdDir := cfg.Etcd.DataDir
+	runningEtcdDir := cfg.Etcd.StaticEtcd.DataDir
 	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
 		return true, fmt.Errorf("failed to back up etcd data: %v", err)
 	}
@@ -370,7 +370,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 func rollbackEtcdData(cfg *kubeadmapi.MasterConfiguration, origErr error, pathMgr StaticPodPathManager) error {
 	errs := []error{origErr}
 	backupEtcdDir := pathMgr.BackupEtcdDir()
-	runningEtcdDir := cfg.Etcd.DataDir
+	runningEtcdDir := cfg.Etcd.StaticEtcd.DataDir
 	err := util.CopyDir(backupEtcdDir, runningEtcdDir)
 
 	if err != nil {

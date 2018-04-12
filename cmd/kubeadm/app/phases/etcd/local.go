@@ -54,17 +54,17 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
-		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.StaticEtcd.DataDir, &pathType),
 		certsVolumeName: staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType),
 	}
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
 		Command:         getEtcdCommand(cfg),
-		Image:           images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.Image),
+		Image:           images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, cfg.KubernetesVersion, cfg.Etcd.StaticEtcd.Image),
 		ImagePullPolicy: cfg.ImagePullPolicy,
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts: []v1.VolumeMount{
-			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false),
+			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.StaticEtcd.DataDir, false),
 			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 		},
 		LivenessProbe: staticpodutil.EtcdProbe(
@@ -76,21 +76,30 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 
 // getEtcdCommand builds the right etcd command from the given config object
 func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
-	defaultArguments := map[string]string{
-		"listen-client-urls":    "https://127.0.0.1:2379",
-		"advertise-client-urls": "https://127.0.0.1:2379",
-		"data-dir":              cfg.Etcd.DataDir,
-		"cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
-		"key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
-		"trusted-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"client-cert-auth":      "true",
-		"peer-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
-		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
-		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"peer-client-cert-auth": "true",
+	defaultArguments := map[string]string{}
+	if *cfg.Etcd.StaticEtcd.TLS {
+		defaultArguments = map[string]string{
+			"listen-client-urls":    "https://127.0.0.1:2379",
+			"advertise-client-urls": "https://127.0.0.1:2379",
+			"data-dir":              cfg.Etcd.StaticEtcd.DataDir,
+			"cert-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
+			"key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
+			"trusted-ca-file":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+			"client-cert-auth":      "true",
+			"peer-cert-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
+			"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
+			"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+			"peer-client-cert-auth": "true",
+		}
+	} else {
+		defaultArguments = map[string]string{
+			"listen-client-urls":    "http://127.0.0.1:2379",
+			"advertise-client-urls": "http://127.0.0.1:2379",
+			"data-dir":              cfg.Etcd.StaticEtcd.DataDir,
+		}
 	}
 
 	command := []string{"etcd"}
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Etcd.ExtraArgs)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Etcd.StaticEtcd.ExtraArgs)...)
 	return command
 }
