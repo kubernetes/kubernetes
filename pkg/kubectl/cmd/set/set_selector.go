@@ -55,7 +55,7 @@ type SelectorOptions struct {
 	out              io.Writer
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
-	PrintObj func(runtime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 
 	builder *resource.Builder
 	mapper  meta.RESTMapper
@@ -162,9 +162,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	o.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, o.out)
-	}
+	o.PrintObj = printer.PrintObj
 
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
@@ -208,7 +206,7 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			return o.PrintObj(info.Object)
+			return o.PrintObj(info.Object, o.out)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -225,7 +223,7 @@ func (o *SelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		return o.PrintObj(patch.Info.AsVersioned())
+		return o.PrintObj(patch.Info.AsVersioned(), o.out)
 	})
 }
 

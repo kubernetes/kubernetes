@@ -117,7 +117,7 @@ type EnvOptions struct {
 	From              string
 	Prefix            string
 
-	PrintObj func(runtime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 
 	Builder *resource.Builder
 	Infos   []*resource.Info
@@ -226,9 +226,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	o.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, o.Out)
-	}
+	o.PrintObj = printer.PrintObj
 
 	if o.List && len(o.Output) > 0 {
 		return cmdutil.UsageErrorf(o.Cmd, "--list and --output may not be specified together")
@@ -437,7 +435,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -456,7 +454,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			return fmt.Errorf("at least one environment variable must be provided")
 		}
 
-		if err := o.PrintObj(info.AsVersioned()); err != nil {
+		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
 			return err
 		}
 	}
