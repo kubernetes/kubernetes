@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+// +k8s:deepcopy-gen=package
+// +k8s:conversion-gen=k8s.io/sample-apiserver/pkg/apis/wardle
 
-import (
-	"testing"
-
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
-	wardlefuzzer "k8s.io/sample-apiserver/pkg/apis/wardle/fuzzer"
-)
-
-func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, wardlefuzzer.Funcs)
-}
+// Package v1beta1 is the v1beta1 version of the API.
+// +groupName=wardle.k8s.io
+package v1beta1

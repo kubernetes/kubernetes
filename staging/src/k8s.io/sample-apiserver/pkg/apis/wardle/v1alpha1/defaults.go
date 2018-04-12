@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package v1alpha1
 
 import (
-	"testing"
-
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
-	wardlefuzzer "k8s.io/sample-apiserver/pkg/apis/wardle/fuzzer"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, wardlefuzzer.Funcs)
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_FlunderSpec(obj *FlunderSpec) {
+	if (obj.ReferenceType == nil || len(*obj.ReferenceType) == 0) && len(obj.Reference) != 0 {
+		t := FlunderReferenceType
+		obj.ReferenceType = &t
+	}
 }
