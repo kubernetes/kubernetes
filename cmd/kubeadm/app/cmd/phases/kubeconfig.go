@@ -189,7 +189,6 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig (instead of client certificates)")
 			cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 		}
-		cmd.Flags().StringVar(&cfg.ClusterName, "cluster-name", cfg.ClusterName, "Specify the cluster name.")
 
 		subCmds = append(subCmds, cmd)
 	}

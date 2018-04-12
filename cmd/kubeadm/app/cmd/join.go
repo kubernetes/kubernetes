@@ -154,9 +154,6 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfigurat
 		&cfg.NodeName, "node-name", "",
 		"Specify the node name.")
 	flagSet.StringVar(
-		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
-		"Specify the cluster name.")
-	flagSet.StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
 		"A token used for TLS bootstrapping.")
 	flagSet.StringSliceVar(
