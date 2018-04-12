@@ -4,23 +4,16 @@ load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
 )
+load("//build:bindata.bzl", "go_bindata")
 
-genrule(
+go_bindata(
     name = "bindata",
     srcs = [
         "//translations:all-srcs",
     ],
     outs = ["bindata.go"],
-    cmd = """
-$(location //vendor/github.com/jteeuwen/go-bindata/go-bindata:go-bindata) \
-  -nometadata -nocompress -o "$(OUTS)" -pkg generated \
-  -prefix $$(pwd) \
-  -ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
-  $(SRCS)
-""",
-    tools = [
-        "//vendor/github.com/jteeuwen/go-bindata/go-bindata",
-    ],
+    compress = False,
+    include_metadata = False,
 )
 
 go_library(
