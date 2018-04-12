@@ -75443,6 +75443,30 @@
      }
     }
    },
+   "io.k8s.api.core.v1.CinderPersistentVolumeSource": {
+    "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "type": "string"
+     },
+     "readOnly": {
+      "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "type": "boolean"
+     },
+     "secretRef": {
+      "description": "Optional: points to a secret object that has enough information to connect to OpenStack. The secret data can contain fields from the \"[Global]\" section of the cloud configuration file. The values of these fields essentially override the values from the main configuration file set up by the administrator. This is helpful for example to customize the \"domain-id\", \"tenant-id\", \"user-id\" and \"password\" for specific pod(s)",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SecretReference"
+     },
+     "volumeID": {
+      "description": "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.CinderVolumeSource": {
     "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
     "required": [
@@ -75456,6 +75480,10 @@
      "readOnly": {
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
       "type": "boolean"
+     },
+     "secretRef": {
+      "description": "Optional: points to a secret object that has enough information to connect to OpenStack. The secret data can contain fields from the \"[Global]\" section of the cloud configuration file. The values of these fields essentially override the values from the main configuration file set up by the administrator. This is helpful for example to customize the \"domain-id\", \"tenant-id\", \"user-id\" and \"password\" for specific pod(s)",
+      "$ref": "#/definitions/io.k8s.api.core.v1.LocalObjectReference"
      },
      "volumeID": {
       "description": "volume id used to identify the volume in cinder More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
@@ -77865,7 +77893,7 @@
      },
      "cinder": {
       "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-      "$ref": "#/definitions/io.k8s.api.core.v1.CinderVolumeSource"
+      "$ref": "#/definitions/io.k8s.api.core.v1.CinderPersistentVolumeSource"
      },
      "claimRef": {
       "description": "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",

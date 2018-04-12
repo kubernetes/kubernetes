@@ -7315,6 +7315,13 @@ If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Po
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: points to a secret object that has enough information to connect to OpenStack. The secret data can contain fields from the "[Global]" section of the cloud configuration file. The values of these fields essentially override the values from the main configuration file set up by the administrator. This is helpful for example to customize the "domain-id", "tenant-id", "user-id" and "password" for specific pod(s)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
