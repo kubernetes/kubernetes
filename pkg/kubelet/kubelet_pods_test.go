@@ -55,6 +55,7 @@ func TestMakeMounts(t *testing.T) {
 	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
+	propagationNone := v1.MountPropagationNone
 
 	testCases := map[string]struct {
 		container      v1.Container
@@ -79,9 +80,10 @@ func TestMakeMounts(t *testing.T) {
 						MountPropagation: &propagationHostToContainer,
 					},
 					{
-						MountPath: "/mnt/path3",
-						Name:      "disk",
-						ReadOnly:  true,
+						MountPath:        "/mnt/path3",
+						Name:             "disk",
+						ReadOnly:         true,
+						MountPropagation: &propagationNone,
 					},
 					{
 						MountPath: "/mnt/path4",
@@ -110,7 +112,7 @@ func TestMakeMounts(t *testing.T) {
 					HostPath:       "/mnt/disk",
 					ReadOnly:       true,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
 				},
 				{
 					Name:           "disk4",
@@ -118,7 +120,7 @@ func TestMakeMounts(t *testing.T) {
 					HostPath:       "/mnt/host",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
 				},
 				{
 					Name:           "disk5",
@@ -126,7 +128,7 @@ func TestMakeMounts(t *testing.T) {
 					HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
 				},
 			},
 			expectErr: false,
@@ -185,7 +187,7 @@ func TestMakeMounts(t *testing.T) {
 					HostPath:       "/mnt/host",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
 				},
 			},
 			expectErr: false,
