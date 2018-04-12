@@ -1619,7 +1619,7 @@ type scaleUpStatus struct {
 // Try to get timestamp from status.
 // Status configmap is not parsing-friendly, so evil regexpery follows.
 func getStatusTimestamp(status string) (time.Time, error) {
-	timestampMatcher, err := regexp.Compile("Cluster-autoscaler status at \\s*([0-9\\-]+ [0-9]+:[0-9]+:[0-9]+\\.[0-9]+ \\+[0-9]+ [A-Za-z]+):")
+	timestampMatcher, err := regexp.Compile("Cluster-autoscaler status at \\s*([0-9\\-]+ [0-9]+:[0-9]+:[0-9]+\\.[0-9]+ \\+[0-9]+ [A-Za-z]+)")
 	if err != nil {
 		return time.Time{}, err
 	}
