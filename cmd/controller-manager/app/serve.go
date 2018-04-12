@@ -40,9 +40,9 @@ type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh 
 func Serve(c *CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
-	if c.ComponentConfig.EnableProfiling {
+	if c.ComponentConfig.Debugging.EnableProfiling {
 		routes.Profiling{}.Install(mux)
-		if c.ComponentConfig.EnableContentionProfiling {
+		if c.ComponentConfig.Debugging.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
