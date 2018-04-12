@@ -83,7 +83,7 @@ func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status 
 }
 
 func TestReadConfig(t *testing.T) {
-	_, err := readConfig(nil)
+	_, err := readConfig(nil, nil, "", "")
 	if err == nil {
 		t.Errorf("Should fail when no config is provided: %s", err)
 	}
@@ -104,6 +104,7 @@ func TestReadConfig(t *testing.T) {
  auth-url = http://auth.url
  user-id = user
  tenant-name = demo
+ domain-name = default
  [LoadBalancer]
  create-monitor = yes
  monitor-delay = 1m
@@ -115,7 +116,7 @@ func TestReadConfig(t *testing.T) {
  ignore-volume-az = yes
  [Metadata]
  search-order = configDrive, metadataService
- `))
+ `), nil, "", "")
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
 	}
@@ -465,8 +466,10 @@ func TestNodeAddresses(t *testing.T) {
 }
 
 func TestNewOpenStack(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
+	var cfg Config
+
+	configFromEnv(&cfg)
+	if !checkGlobalInfo(cfg) {
 		t.Skip("No config found in environment")
 	}
 
@@ -477,8 +480,10 @@ func TestNewOpenStack(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
+	var cfg Config
+
+	configFromEnv(&cfg)
+	if !checkGlobalInfo(cfg) {
 		t.Skip("No config found in environment")
 	}
 
@@ -541,8 +546,10 @@ func TestZones(t *testing.T) {
 var diskPathRegexp = regexp.MustCompile("/dev/disk/(?:by-id|by-path)/")
 
 func TestVolumes(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
+	var cfg Config
+
+	configFromEnv(&cfg)
+	if !checkGlobalInfo(cfg) {
 		t.Skip("No config found in environment")
 	}
 

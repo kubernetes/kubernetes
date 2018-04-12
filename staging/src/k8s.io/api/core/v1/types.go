@@ -202,7 +202,7 @@ type PersistentVolumeSource struct {
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
-	Cinder *CinderVolumeSource `json:"cinder,omitempty" protobuf:"bytes,8,opt,name=cinder"`
+	Cinder *CinderPersistentVolumeSource `json:"cinder,omitempty" protobuf:"bytes,8,opt,name=cinder"`
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
 	// +optional
 	CephFS *CephFSPersistentVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,9,opt,name=cephfs"`
@@ -728,6 +728,43 @@ type CinderVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// Optional: points to a secret object that has enough information to connect
+	// to OpenStack. The secret data can contain fields from the "[Global]" section
+	// of the cloud configuration file. The values of these fields essentially
+	// override the values from the main configuration file set up by the
+	// administrator. This is helpful for example to customize the "domain-id",
+	// "tenant-id", "user-id" and "password" for specific pod(s)
+	// +optional
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,4,opt,name=secretRef"`
+}
+
+// Represents a cinder volume resource in Openstack.
+// A Cinder volume must exist before mounting to a container.
+// The volume must also be in the same region as the kubelet.
+// Cinder volumes support ownership management and SELinux relabeling.
+type CinderPersistentVolumeSource struct {
+	// volume id used to identify the volume in cinder
+	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// Optional: points to a secret object that has enough information to connect
+	// to OpenStack. The secret data can contain fields from the "[Global]" section
+	// of the cloud configuration file. The values of these fields essentially
+	// override the values from the main configuration file set up by the
+	// administrator. This is helpful for example to customize the "domain-id",
+	// "tenant-id", "user-id" and "password" for specific pod(s)
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,4,opt,name=secretRef"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod

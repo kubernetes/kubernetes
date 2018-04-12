@@ -17,10 +17,10 @@ limitations under the License.
 package cinder
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -34,11 +34,6 @@ import (
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-)
-
-const (
-	// DefaultCloudConfigPath is the default path for cloud configuration
-	DefaultCloudConfigPath = "/etc/kubernetes/cloud-config"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -94,12 +89,12 @@ func (plugin *cinderPlugin) GetPluginName() string {
 }
 
 func (plugin *cinderPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
 	}
 
-	return volumeSource.VolumeID, nil
+	return volumeID, nil
 }
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
@@ -124,18 +119,57 @@ func (plugin *cinderPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	}
 }
 
+func (plugin *cinderPlugin) getSecretNameAndNamespace(spec *volume.Spec) (string, string, error) {
+	defaultNamespace := ""
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ClaimRef != nil {
+		defaultNamespace = spec.PersistentVolume.Spec.ClaimRef.Namespace
+	}
+	if spec.Volume != nil && spec.Volume.Cinder != nil {
+		localSecretRef := spec.Volume.Cinder.SecretRef
+		if localSecretRef != nil {
+			return localSecretRef.Name, defaultNamespace, nil
+		}
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.Cinder != nil {
+		secretRef := spec.PersistentVolume.Spec.Cinder.SecretRef
+		if secretRef != nil {
+			return secretRef.Name, secretRef.Namespace, nil
+		}
+	} else {
+		return "", "", fmt.Errorf("Spec does not reference a Cinder volume type")
+	}
+	name := ""
+	namespace := ""
+	if spec.PersistentVolume != nil {
+		class, err := util.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
+		if err == nil && class != nil {
+			for k, v := range class.Parameters {
+				switch strings.ToLower(k) {
+				case "secretname":
+					name = v
+				case "secretnamespace":
+					namespace = v
+				}
+			}
+		}
+	}
+	return name, namespace, nil
+}
+
 func (plugin *cinderPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod.UID, &DiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager cdManager, mounter mount.Interface) (volume.Mounter, error) {
-	cinder, readOnly, err := getVolumeSource(spec)
+	pdName, fsType, readOnly, err := getVolumeInfo(spec)
 	if err != nil {
 		return nil, err
 	}
 
-	pdName := cinder.VolumeID
-	fsType := cinder.FSType
+	secretName, secretNs, err := plugin.getSecretNameAndNamespace(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	return &cinderVolumeMounter{
 		cinderVolume: &cinderVolume{
@@ -146,6 +180,8 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			manager:         manager,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			secretName:      secretName,
+			secretNs:        secretNs,
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
@@ -176,12 +212,20 @@ func (plugin *cinderPlugin) newDeleterInternal(spec *volume.Spec, manager cdMana
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Cinder is nil")
 	}
+
+	secretName, secretNs, err := plugin.getSecretNameAndNamespace(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	return &cinderVolumeDeleter{
 		&cinderVolume{
-			volName: spec.Name(),
-			pdName:  spec.PersistentVolume.Spec.Cinder.VolumeID,
-			manager: manager,
-			plugin:  plugin,
+			volName:    spec.Name(),
+			pdName:     spec.PersistentVolume.Spec.Cinder.VolumeID,
+			manager:    manager,
+			plugin:     plugin,
+			secretName: secretName,
+			secretNs:   secretNs,
 		}}, nil
 }
 
@@ -199,31 +243,12 @@ func (plugin *cinderPlugin) newProvisionerInternal(options volume.VolumeOptions,
 	}, nil
 }
 
-func (plugin *cinderPlugin) getCloudProvider() (BlockStorageProvider, error) {
-	cloud := plugin.host.GetCloudProvider()
-	if cloud == nil {
-		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			var config *os.File
-			config, err = os.Open(DefaultCloudConfigPath)
-			if err != nil {
-				return nil, fmt.Errorf("unable to load OpenStack configuration from default path : %v", err)
-			}
-			defer config.Close()
-			cloud, err = cloudprovider.GetCloudProvider(openstack.ProviderName, config)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create OpenStack cloud provider from default path : %v", err)
-			}
-		} else {
-			return nil, fmt.Errorf("OpenStack cloud provider was not initialized properly : %v", err)
-		}
+func (plugin *cinderPlugin) getCloudProvider(name string, namespace string) (BlockStorageProvider, error) {
+	cloud, err := openstack.NewOpenStack(plugin.host.GetKubeClient(), name, namespace)
+	if err != nil {
+		return nil, err
 	}
-
-	switch cloud := cloud.(type) {
-	case *openstack.OpenStack:
-		return cloud, nil
-	default:
-		return nil, errors.New("invalid cloud provider: expected OpenStack")
-	}
+	return cloud, nil
 }
 
 func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -248,21 +273,27 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 var _ volume.ExpandableVolumePlugin = &cinderPlugin{}
 
 func (plugin *cinderPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
-	cinder, _, err := getVolumeSource(spec)
-	if err != nil {
-		return oldSize, err
-	}
-	cloud, err := plugin.getCloudProvider()
+	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return oldSize, err
 	}
 
-	expandedSize, err := cloud.ExpandVolume(cinder.VolumeID, oldSize, newSize)
+	secretName, secretNs, err := plugin.getSecretNameAndNamespace(spec)
 	if err != nil {
 		return oldSize, err
 	}
 
-	glog.V(2).Infof("volume %s expanded to new size %d successfully", cinder.VolumeID, int(newSize.Value()))
+	cloud, err := plugin.getCloudProvider(secretName, secretNs)
+	if err != nil {
+		return oldSize, err
+	}
+
+	expandedSize, err := cloud.ExpandVolume(volumeID, oldSize, newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
+	glog.V(2).Infof("volume %s expanded to new size %d successfully", volumeID, int(newSize.Value()))
 	return expandedSize, nil
 }
 
@@ -310,6 +341,8 @@ type cinderVolume struct {
 	blockDeviceMounter mount.Interface
 	plugin             *cinderPlugin
 	volume.MetricsProvider
+	secretName string
+	secretNs   string
 }
 
 func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
@@ -528,7 +561,7 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 				v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				Cinder: &v1.CinderVolumeSource{
+				Cinder: &v1.CinderPersistentVolumeSource{
 					VolumeID: volumeID,
 					FSType:   fstype,
 					ReadOnly: false,
@@ -544,13 +577,13 @@ func (c *cinderVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	return pv, nil
 }
 
-func getVolumeSource(spec *volume.Spec) (*v1.CinderVolumeSource, bool, error) {
+func getVolumeInfo(spec *volume.Spec) (string, string, bool, error) {
 	if spec.Volume != nil && spec.Volume.Cinder != nil {
-		return spec.Volume.Cinder, spec.Volume.Cinder.ReadOnly, nil
+		return spec.Volume.Cinder.VolumeID, spec.Volume.Cinder.FSType, spec.Volume.Cinder.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.Cinder != nil {
-		return spec.PersistentVolume.Spec.Cinder, spec.ReadOnly, nil
+		return spec.PersistentVolume.Spec.Cinder.VolumeID, spec.PersistentVolume.Spec.Cinder.FSType, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Cinder volume type")
+	return "", "", false, fmt.Errorf("Spec does not reference a Cinder volume type")
 }
