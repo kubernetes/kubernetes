@@ -10,7 +10,10 @@ go_test(
     name = "go_default_test",
     srcs = ["roundtrip_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/fuzzer:go_default_library",
+    ],
 )
 
 go_library(
@@ -24,6 +27,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1:go_default_library",
     ],
 )
 

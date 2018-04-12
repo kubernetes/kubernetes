@@ -23,13 +23,15 @@ import (
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1alpha1"
+	wardlev1beta1 "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	WardleV1alpha1() wardlev1alpha1.WardleV1alpha1Interface
+	WardleV1beta1() wardlev1beta1.WardleV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Wardle() wardlev1alpha1.WardleV1alpha1Interface
+	Wardle() wardlev1beta1.WardleV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -37,6 +39,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	wardleV1alpha1 *wardlev1alpha1.WardleV1alpha1Client
+	wardleV1beta1  *wardlev1beta1.WardleV1beta1Client
 }
 
 // WardleV1alpha1 retrieves the WardleV1alpha1Client
@@ -44,10 +47,15 @@ func (c *Clientset) WardleV1alpha1() wardlev1alpha1.WardleV1alpha1Interface {
 	return c.wardleV1alpha1
 }
 
+// WardleV1beta1 retrieves the WardleV1beta1Client
+func (c *Clientset) WardleV1beta1() wardlev1beta1.WardleV1beta1Interface {
+	return c.wardleV1beta1
+}
+
 // Deprecated: Wardle retrieves the default version of WardleClient.
 // Please explicitly pick a version.
-func (c *Clientset) Wardle() wardlev1alpha1.WardleV1alpha1Interface {
-	return c.wardleV1alpha1
+func (c *Clientset) Wardle() wardlev1beta1.WardleV1beta1Interface {
+	return c.wardleV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -70,6 +78,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.wardleV1beta1, err = wardlev1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -83,6 +95,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.wardleV1alpha1 = wardlev1alpha1.NewForConfigOrDie(c)
+	cs.wardleV1beta1 = wardlev1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -92,6 +105,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.wardleV1alpha1 = wardlev1alpha1.New(c)
+	cs.wardleV1beta1 = wardlev1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
