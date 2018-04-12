@@ -275,6 +275,10 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	}
 
 	if attach {
+		if remove {
+			defer removeCreatedObjects(f, createdObjects, cmdOut)
+		}
+
 		quiet := cmdutil.GetFlagBool(cmd, "quiet")
 		opts := &AttachOptions{
 			StreamOptions: StreamOptions{
@@ -321,37 +325,6 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 			}
 		}
 
-		if remove {
-			for _, obj := range createdObjects {
-				namespace, err = obj.Mapping.MetadataAccessor.Namespace(obj.Object)
-				if err != nil {
-					return err
-				}
-				var name string
-				name, err = obj.Mapping.MetadataAccessor.Name(obj.Object)
-				if err != nil {
-					return err
-				}
-				r := f.NewBuilder().
-					Internal().
-					ContinueOnError().
-					NamespaceParam(namespace).DefaultNamespace().
-					ResourceNames(obj.Mapping.Resource, name).
-					Flatten().
-					Do()
-				// Note: we pass in "true" for the "quiet" parameter because
-				// ReadResult will only print one thing based on the "quiet"
-				// flag, and that's the "pod xxx deleted" message. If they
-				// asked for us to remove the pod (via --rm) then telling them
-				// its been deleted is unnecessary since that's what they asked
-				// for. We should only print something if the "rm" fails.
-				err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, true)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
 		// after removal is done, return successfully if we are not interested in the exit code
 		if !waitForExitCode {
 			return nil
@@ -388,6 +361,39 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	}
 
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func removeCreatedObjects(f cmdutil.Factory, createdObjects []*RunObject, cmdOut io.Writer) error {
+	for _, obj := range createdObjects {
+		namespace, err := obj.Mapping.MetadataAccessor.Namespace(obj.Object)
+		if err != nil {
+			return err
+		}
+		var name string
+		name, err = obj.Mapping.MetadataAccessor.Name(obj.Object)
+		if err != nil {
+			return err
+		}
+		r := f.NewBuilder().
+			Internal().
+			ContinueOnError().
+			NamespaceParam(namespace).DefaultNamespace().
+			ResourceNames(obj.Mapping.Resource, name).
+			Flatten().
+			Do()
+		// Note: we pass in "true" for the "quiet" parameter because
+		// ReadResult will only print one thing based on the "quiet"
+		// flag, and that's the "pod xxx deleted" message. If they
+		// asked for us to remove the pod (via --rm) then telling them
+		// its been deleted is unnecessary since that's what they asked
+		// for. We should only print something if the "rm" fails.
+		err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, false, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // waitForPod watches the given pod until the exitCondition is true
