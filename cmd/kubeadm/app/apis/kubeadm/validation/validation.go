@@ -75,8 +75,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateAuthorizationModes(c.AuthorizationModes, field.NewPath("authorization-modes"))...)
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("api-server-cert-altnames"))...)
-	allErrs = append(allErrs, ValidateCertSANs(c.Etcd.ServerCertSANs, field.NewPath("etcd-server-cert-altnames"))...)
-	allErrs = append(allErrs, ValidateCertSANs(c.Etcd.PeerCertSANs, field.NewPath("etcd-peer-cert-altnames"))...)
+	allErrs = append(allErrs, ValidateEtcd(c, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificates-dir"))...)
 	allErrs = append(allErrs, ValidateNodeName(c.NodeName, field.NewPath("node-name"))...)
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
@@ -87,6 +86,27 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateProxy(c, field.NewPath("kube-proxy"))...)
 	if features.Enabled(c.FeatureGates, features.DynamicKubeletConfig) {
 		allErrs = append(allErrs, ValidateKubeletConfiguration(&c.KubeletConfiguration, field.NewPath("kubeletConfiguration"))...)
+	}
+	return allErrs
+}
+
+// ValidateEtcd validates etcd configuration and collects all encountered errors
+func ValidateEtcd(c *kubeadm.MasterConfiguration, fldPath *field.Path) field.ErrorList {
+	// TODO validate that only one etcd config option is set and validate required fields for
+	// each type
+	allErrs := field.ErrorList{}
+
+	if c.Etcd.StaticEtcd == nil && c.Etcd.SelfHostedEtcd == nil && c.Etcd.ExternalEtcd == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "One of StaticEtcd, SelfHostedEtcd, or External must be set"))
+	}
+	if (c.Etcd.StaticEtcd != nil && (c.Etcd.SelfHostedEtcd != nil || c.Etcd.ExternalEtcd != nil)) ||
+		(c.Etcd.SelfHostedEtcd != nil && (c.Etcd.StaticEtcd != nil || c.Etcd.ExternalEtcd != nil)) ||
+		(c.Etcd.ExternalEtcd != nil && (c.Etcd.SelfHostedEtcd != nil || c.Etcd.StaticEtcd != nil)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "Only one of StaticEtcd, SelfHostedEtcd, or External must be set"))
+	}
+	if c.Etcd.StaticEtcd != nil {
+		allErrs = append(allErrs, ValidateCertSANs(c.Etcd.StaticEtcd.ServerCertSANs, field.NewPath("etcd-server-cert-altnames"))...)
+		allErrs = append(allErrs, ValidateCertSANs(c.Etcd.StaticEtcd.PeerCertSANs, field.NewPath("etcd-peer-cert-altnames"))...)
 	}
 	return allErrs
 }

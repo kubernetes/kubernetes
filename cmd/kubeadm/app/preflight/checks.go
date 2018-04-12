@@ -730,7 +730,7 @@ type etcdVersionResponse struct {
 
 // ExternalEtcdVersionCheck checks if version of external etcd meets the demand of kubeadm
 type ExternalEtcdVersionCheck struct {
-	Etcd kubeadmapi.Etcd
+	Etcd kubeadmapi.ExternalEtcdConfig
 }
 
 // Name will return ExternalEtcdVersion as name for ExternalEtcdVersionCheck
@@ -923,25 +923,25 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
 
-	if len(cfg.Etcd.Endpoints) == 0 {
-		// Only do etcd related checks when no external endpoints were specified
+	if cfg.Etcd.StaticEtcd != nil {
 		checks = append(checks,
 			PortOpenCheck{port: 2379},
-			DirAvailableCheck{Path: cfg.Etcd.DataDir},
+			DirAvailableCheck{Path: cfg.Etcd.StaticEtcd.DataDir},
 		)
-	} else {
-		// Only check etcd version when external endpoints are specified
-		if cfg.Etcd.CAFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CAFile})
+	} else if cfg.Etcd.SelfHostedEtcd != nil {
+
+	} else if cfg.Etcd.ExternalEtcd != nil {
+		if cfg.Etcd.ExternalEtcd.CAFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.ExternalEtcd.CAFile})
 		}
-		if cfg.Etcd.CertFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CertFile})
+		if cfg.Etcd.ExternalEtcd.CertFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.ExternalEtcd.CertFile})
 		}
-		if cfg.Etcd.KeyFile != "" {
-			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.KeyFile})
+		if cfg.Etcd.ExternalEtcd.KeyFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.ExternalEtcd.KeyFile})
 		}
 		checks = append(checks,
-			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
+			ExternalEtcdVersionCheck{Etcd: *cfg.Etcd.ExternalEtcd},
 		)
 	}
 

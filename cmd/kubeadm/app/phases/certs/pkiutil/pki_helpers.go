@@ -307,7 +307,7 @@ func GetEtcdAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNames, e
 		IPs:      []net.IP{net.IPv4(127, 0, 0, 1)},
 	}
 
-	appendSANsToAltNames(altNames, cfg.Etcd.ServerCertSANs, kubeadmconstants.EtcdServerCertName)
+	appendSANsToAltNames(altNames, cfg.Etcd.StaticEtcd.ServerCertSANs, kubeadmconstants.EtcdServerCertName)
 
 	return altNames, nil
 }
@@ -329,7 +329,7 @@ func GetEtcdPeerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltName
 		IPs:      []net.IP{advertiseAddress},
 	}
 
-	appendSANsToAltNames(altNames, cfg.Etcd.PeerCertSANs, kubeadmconstants.EtcdPeerCertName)
+	appendSANsToAltNames(altNames, cfg.Etcd.StaticEtcd.PeerCertSANs, kubeadmconstants.EtcdPeerCertName)
 
 	return altNames, nil
 }

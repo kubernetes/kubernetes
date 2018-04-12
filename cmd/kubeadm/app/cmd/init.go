@@ -350,9 +350,9 @@ func (i *Init) Run(out io.Writer) error {
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
-	// Add etcd static pod spec only if external etcd is not configured
-	if len(i.cfg.Etcd.Endpoints) == 0 {
-		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
+	// Add etcd static pod spec only if static etcd is configured
+	if i.cfg.Etcd.StaticEtcd != nil {
+		glog.V(1).Infof("[init] static etcd pod is configured. Creating manifest for local etcd static pod")
 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
 			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 		}
@@ -393,7 +393,7 @@ func (i *Init) Run(out io.Writer) error {
 			"APIServerImage":         images.GetCoreImage(kubeadmconstants.KubeAPIServer, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"ControllerManagerImage": images.GetCoreImage(kubeadmconstants.KubeControllerManager, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
 			"SchedulerImage":         images.GetCoreImage(kubeadmconstants.KubeScheduler, i.cfg.GetControlPlaneImageRepository(), i.cfg.KubernetesVersion, i.cfg.UnifiedControlPlaneImage),
-			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.Image),
+			"EtcdImage":              images.GetCoreImage(kubeadmconstants.Etcd, i.cfg.ImageRepository, i.cfg.KubernetesVersion, i.cfg.Etcd.StaticEtcd.Image),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)

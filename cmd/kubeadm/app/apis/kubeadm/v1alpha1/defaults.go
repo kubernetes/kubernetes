@@ -52,17 +52,18 @@ const (
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 	// DefaultCRISocket defines the default cri socket
 	DefaultCRISocket = "/var/run/dockershim.sock"
-
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
-	// DefaultEtcdClusterSize defines the default cluster size when using the etcd-operator
-	DefaultEtcdClusterSize = 3
-	// DefaultEtcdOperatorVersion defines the default version of the etcd-operator to use
-	DefaultEtcdOperatorVersion = "v0.6.0"
+	// DefaultEtcdStaticTLS defines the default tls setting for etcd static pods
+	DefaultEtcdStaticTLS = true
 	// DefaultEtcdCertDir represents the directory where PKI assets are stored for self-hosted etcd
 	DefaultEtcdCertDir = "/etc/kubernetes/pki/etcd"
-	// DefaultEtcdClusterServiceName is the default name of the service backing the etcd cluster
-	DefaultEtcdClusterServiceName = "etcd-cluster"
+	// DefaultEtcdSelfHostedClusterSize defines the default cluster size when using the etcd-operator
+	DefaultEtcdSelfHostedClusterSize = 3
+	// DefaultEtcdSelfHostedOperatorVersion defines the default version of the etcd-operator to use
+	DefaultEtcdSelfHostedOperatorVersion = "v0.6.0"
+	// DefaultEtcdSelfHostedClusterServiceName is the default name of the service backing the etcd cluster
+	DefaultEtcdSelfHostedClusterServiceName = "etcd-cluster"
 	// DefaultProxyBindAddressv4 is the default bind address when the advertise address is v4
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
@@ -132,11 +133,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.ImageRepository = DefaultImageRepository
 	}
 
-	if obj.Etcd.DataDir == "" {
-		obj.Etcd.DataDir = DefaultEtcdDataDir
-	}
+	SetDefaultsEtcd(obj)
 
-	SetDefaultsEtcdSelfHosted(obj)
 	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
 		SetDefaults_KubeletConfiguration(obj)
 	}
@@ -188,23 +186,31 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	}
 }
 
-// SetDefaultsEtcdSelfHosted sets defaults for self-hosted etcd if used
-func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
-	if obj.Etcd.SelfHosted != nil {
-		if obj.Etcd.SelfHosted.ClusterServiceName == "" {
-			obj.Etcd.SelfHosted.ClusterServiceName = DefaultEtcdClusterServiceName
+func SetDefaultsEtcd(obj *MasterConfiguration) {
+	if obj.Etcd.StaticEtcd != nil {
+		if obj.Etcd.StaticEtcd.TLS == nil {
+			obj.Etcd.StaticEtcd.TLS = new(bool)
+			*obj.Etcd.StaticEtcd.TLS = DefaultEtcdStaticTLS
+		}
+		if obj.Etcd.StaticEtcd.DataDir == "" {
+			obj.Etcd.StaticEtcd.DataDir = DefaultEtcdDataDir
+		}
+		if obj.Etcd.StaticEtcd.CertificatesDir == "" {
+			obj.Etcd.StaticEtcd.CertificatesDir = DefaultEtcdCertDir
 		}
 
-		if obj.Etcd.SelfHosted.EtcdVersion == "" {
-			obj.Etcd.SelfHosted.EtcdVersion = constants.DefaultEtcdVersion
+	} else if obj.Etcd.SelfHostedEtcd != nil {
+		if obj.Etcd.SelfHostedEtcd.ClusterServiceName == "" {
+			obj.Etcd.SelfHostedEtcd.ClusterServiceName = DefaultEtcdSelfHostedClusterServiceName
 		}
-
-		if obj.Etcd.SelfHosted.OperatorVersion == "" {
-			obj.Etcd.SelfHosted.OperatorVersion = DefaultEtcdOperatorVersion
+		if obj.Etcd.SelfHostedEtcd.EtcdVersion == "" {
+			obj.Etcd.SelfHostedEtcd.EtcdVersion = constants.DefaultEtcdVersion
 		}
-
-		if obj.Etcd.SelfHosted.CertificatesDir == "" {
-			obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
+		if obj.Etcd.SelfHostedEtcd.OperatorVersion == "" {
+			obj.Etcd.SelfHostedEtcd.OperatorVersion = DefaultEtcdSelfHostedOperatorVersion
+		}
+		if obj.Etcd.SelfHostedEtcd.CertificatesDir == "" {
+			obj.Etcd.SelfHostedEtcd.CertificatesDir = DefaultEtcdCertDir
 		}
 	}
 }

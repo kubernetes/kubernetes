@@ -159,17 +159,30 @@ type Networking struct {
 	DNSDomain string
 }
 
-// Etcd contains elements describing Etcd configuration.
+// Etcd represents the etcd configuration
 type Etcd struct {
-	// Endpoints of etcd members. Useful for using external etcd.
-	// If not provided, kubeadm will run etcd in a static pod.
-	Endpoints []string
-	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
-	CAFile string
-	// CertFile is an SSL certification file used to secure etcd communication.
-	CertFile string
-	// KeyFile is an SSL key file used to secure etcd communication.
-	KeyFile string
+	EtcdConfig
+}
+
+// EtcdConfig represents the etcd configuration
+// Only one of it's members may be specified
+type EtcdConfig struct {
+	// StaticEtcd represents the configuration for etcd configured as a local static pod
+	// +optional
+	StaticEtcd *StaticEtcdConfig
+	// ExternalEtcd represents the configuration for an existing and external etcd
+	// +optional
+	ExternalEtcd *ExternalEtcdConfig
+	// SelfHostedEtcd represents the configuration for self-hosted etcd
+	// +optional
+	SelfHostedEtcd *SelfHostedEtcdConfig
+}
+
+// StaticEtcdConfig represents a locally hosted etcd run as a static pod
+type StaticEtcdConfig struct {
+	// CertificatesDir represents the directory where all etcd TLS assets are stored.
+	// Defaults to "/etc/kubernetes/pki/etcd".
+	CertificatesDir string
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".
 	DataDir string
@@ -180,18 +193,28 @@ type Etcd struct {
 	// If empty, automatically populated by kubeadm using the image
 	// repository and default etcd version.
 	Image string
-	// SelfHosted holds configuration for self-hosting etcd.
-	SelfHosted *SelfHostedEtcd
-	// ServerCertSANs sets extra Subject Alternative Names for the etcd server
-	// signing cert. This is currently used for the etcd static-pod.
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	ServerCertSANs []string
-	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer
-	// signing cert. This is currently used for the etcd static-pod.
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
 	PeerCertSANs []string
+	// TLS represents whether tls should be enabled for etcd.
+	// Defaults to "true".
+	TLS *bool
 }
 
-// SelfHostedEtcd describes options required to configure self-hosted etcd.
-type SelfHostedEtcd struct {
+// ExternalEtcdConfig represents a locally hosted etcd run as a static pod
+type ExternalEtcdConfig struct {
+	Endpoints []string
+	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
+	CAFile string
+	// CertFile is an SSL certification file used to secure etcd communication.
+	CertFile string
+	// KeyFile is an SSL key file used to secure etcd communication.
+	KeyFile string
+}
+
+// SelfHostedEtcdConfig describes options required to configure self-hosted etcd.
+type SelfHostedEtcdConfig struct {
 	// CertificatesDir represents the directory where all etcd TLS assets are stored.
 	// Defaults to "/etc/kubernetes/pki/etcd".
 	CertificatesDir string
@@ -201,6 +224,10 @@ type SelfHostedEtcd struct {
 	EtcdVersion string
 	// OperatorVersion is the version of the etcd-operator to use.
 	OperatorVersion string
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
+	ServerCertSANs []string
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
+	PeerCertSANs []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
