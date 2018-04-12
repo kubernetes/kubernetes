@@ -37,6 +37,8 @@ go install ./vendor/github.com/kubernetes/repo-infra/kazel
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 
+gazelle-fix() {
+
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
@@ -48,5 +50,39 @@ gazelle fix \
 # staging/. Instead we just fix the bad paths with sed.
 find staging -name BUILD -o -name BUILD.bazel | \
   xargs ${SED} -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
+}
+
+gazelle-fix
 
 kazel
+
+cd "${KUBE_ROOT}"
+go install github.com/bazelbuild/buildtools/buildozer
+echo looking for needs $KUBE_ROOT...
+want=$(find . -iname *.go | (xargs grep -l '+k8s:deepcopy-gen=' || true) | xargs -n 1 dirname | sort -u | sed -e 's|^./||')
+echo silly files $want
+deepcopies="$(find . -iname zz_generated.deepcopy.go | xargs -n 1 dirname | sort -u | sed -e 's|^./||')"
+have="$(find . -name BUILD -or -name BUILD.bazel | xargs grep -l k8s_deepcopy)"
+echo Deleting existing k8s_deepcopy commands... $have
+echo $have | xargs sed -e '/^k8s_deepcopy/d' -i ''
+echo "Adding k8s_deepcopy() rule"
+for w in $want; do
+  if [[ $w == "vendor/k8s.io/code-generator/cmd/deepcopy-gen" || \
+        $w == "staging/src/k8s.io/code-generator/cmd/deepcopy-gen" ]]; then
+	  echo ignoring deepcopy-gen binary
+	  continue
+  fi
+  if [[ -f $w/BUILD.bazel ]]; then
+	  echo 'k8s_deepcopy(outs=["zz_generated.deepcopy.go"])' >> $w/BUILD
+	  buildozer 'new_load //build:deepcopy.bzl k8s_deepcopy' //$w:__pkg__
+  elif  [[ -f $w/BUILD ]]; then
+	  echo 'k8s_deepcopy(outs=["zz_generated.deepcopy.go"])' >> $w/BUILD
+  else
+	  echo cannot find build file for $w
+	  continue
+  fi
+  buildozer 'new_load //build:deepcopy.bzl k8s_deepcopy' //$w:__pkg__
+done
+echo Deleting zz_generated.deepcopy.go files
+echo $deepcopies | xargs -n 1 -I '{}' rm {}/zz_generated.deepcopy.go
+gazelle-fix
