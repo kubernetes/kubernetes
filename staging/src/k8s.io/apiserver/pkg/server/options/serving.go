@@ -51,6 +51,10 @@ type SecureServingOptions struct {
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
 	SNICertKeys []utilflag.NamedCertKey
+
+	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
+	// A value of zero means to use the default provided by golang's HTTP/2 support.
+	HTTP2MaxStreamsPerConnection int
 }
 
 type CertKey struct {
@@ -142,6 +146,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
 		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
+
+	fs.IntVar(&s.HTTP2MaxStreamsPerConnection, "http2-max-streams-per-connection", s.HTTP2MaxStreamsPerConnection, ""+
+		"The limit that the server gives to clients for "+
+		"the maximum number of streams in an HTTP/2 connection. "+
+		"Zero means to use golang's default.")
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
@@ -173,6 +182,7 @@ func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
 	}
 
 	c.SecureServingInfo.Listener = s.Listener
+	c.SecureServingInfo.HTTP2MaxStreamsPerConnection = s.HTTP2MaxStreamsPerConnection
 
 	// create self-signed cert+key with the fake server.LoopbackClientServerNameOverride and
 	// let the server return it when the loopback client connects.
