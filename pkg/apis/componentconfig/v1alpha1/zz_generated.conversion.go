@@ -309,6 +309,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSche
 	out.EnableProfiling = in.EnableProfiling
 	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.FailureDomains = in.FailureDomains
+	out.DisablePreemption = in.DisablePreemption
 	return nil
 }
 
@@ -334,6 +335,7 @@ func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSche
 	out.EnableProfiling = in.EnableProfiling
 	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.FailureDomains = in.FailureDomains
+	out.DisablePreemption = in.DisablePreemption
 	return nil
 }
 

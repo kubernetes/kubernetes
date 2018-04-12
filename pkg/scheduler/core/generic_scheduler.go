@@ -98,6 +98,7 @@ type genericScheduler struct {
 	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
+	disablePreemption        bool
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -1107,7 +1108,9 @@ func NewGenericScheduler(
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
-	alwaysCheckAllPredicates bool) algorithm.ScheduleAlgorithm {
+	alwaysCheckAllPredicates bool,
+	disablePreemption bool,
+) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
 		equivalenceCache:         eCache,
@@ -1121,5 +1124,6 @@ func NewGenericScheduler(
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
+		disablePreemption:        disablePreemption,
 	}
 }

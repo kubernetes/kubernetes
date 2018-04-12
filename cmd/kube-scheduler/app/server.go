@@ -381,6 +381,8 @@ type SchedulerServer struct {
 	HealthzServer *http.Server
 	// MetricsServer is optional.
 	MetricsServer *http.Server
+	// Disable pod preemption or not.
+	DisablePreemption bool
 }
 
 // NewSchedulerServer creates a runnable SchedulerServer from configuration.
@@ -445,6 +447,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 		LeaderElection:                 leaderElectionConfig,
 		HealthzServer:                  healthzServer,
 		MetricsServer:                  metricsServer,
+		DisablePreemption:              config.DisablePreemption,
 	}, nil
 }
 
@@ -659,6 +662,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 		storageClassInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		s.DisablePreemption,
 	)
 
 	source := s.AlgorithmSource
@@ -716,5 +720,7 @@ func (s *SchedulerServer) SchedulerConfig() (*scheduler.Config, error) {
 	}
 	// Additional tweaks to the config produced by the configurator.
 	config.Recorder = s.Recorder
+
+	config.DisablePreemption = s.DisablePreemption
 	return config, nil
 }

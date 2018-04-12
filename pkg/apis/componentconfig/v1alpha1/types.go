@@ -106,6 +106,9 @@ type KubeSchedulerConfiguration struct {
 
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	FailureDomains string `json:"failureDomains"`
+
+	// DisablePreemption disables the pod preemption feature.
+	DisablePreemption bool `json:"disablePreemption"`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

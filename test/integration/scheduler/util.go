@@ -85,6 +85,7 @@ func createConfiguratorWithPodInformer(
 		informerFactory.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		false,
 	)
 }
 
