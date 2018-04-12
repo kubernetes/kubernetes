@@ -190,7 +190,7 @@ func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a ClientAuth
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "myOrg1", "myOrg2")
+	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "test-cluster", "myOrg1", "myOrg2")
 
 	// Asserts spec data are propagated to the kubeconfig
 	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
@@ -202,7 +202,7 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 	caCert, _ := certstestutil.SetupCertificateAuthorithy(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a Token
-	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456")
+	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456", "test-cluster")
 
 	// Asserts spec data are propagated to the kubeconfig
 	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
@@ -216,9 +216,9 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
 
 	// build kubeconfigs (to be used to test kubeconfigs equality/not equality)
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myOrg1", "myOrg2")
-	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "myOrg1", "myOrg2")
-	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "myOrg2")
+	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "test-cluster", "myOrg2")
 
 	var tests = []struct {
 		existingKubeConfig *clientcmdapi.Config
@@ -447,7 +447,7 @@ func TestWriteKubeConfig(t *testing.T) {
 }
 
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With ClientAuth
-func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, APIServer, clientName string, organizations ...string) *clientcmdapi.Config {
+func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey, APIServer, clientName, clustername string, organizations ...string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
 		APIServer:  APIServer,
@@ -458,7 +458,7 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}
@@ -467,7 +467,7 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 }
 
 // setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With Token
-func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APIServer, clientName, token string) *clientcmdapi.Config {
+func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APIServer, clientName, token, clustername string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
 		APIServer:  APIServer,
@@ -477,7 +477,7 @@ func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APISe
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}

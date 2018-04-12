@@ -119,7 +119,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguration, k
 		}
 
 		// builds the KubeConfig object
-		config, err := buildKubeConfigFromSpec(spec)
+		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
 		if err != nil {
 			return err
 		}
@@ -188,14 +188,14 @@ func getKubeConfigSpecs(cfg *kubeadmapi.MasterConfiguration) (map[string]*kubeCo
 }
 
 // buildKubeConfigFromSpec creates a kubeconfig object for the given kubeConfigSpec
-func buildKubeConfigFromSpec(spec *kubeConfigSpec) (*clientcmdapi.Config, error) {
+func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientcmdapi.Config, error) {
 
 	// If this kubeconfig should use token
 	if spec.TokenAuth != nil {
 		// create a kubeconfig with a token
 		return kubeconfigutil.CreateWithToken(
 			spec.APIServer,
-			"kubernetes",
+			clustername,
 			spec.ClientName,
 			certutil.EncodeCertPEM(spec.CACert),
 			spec.TokenAuth.Token,
@@ -216,7 +216,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec) (*clientcmdapi.Config, error)
 	// create a kubeconfig with the client certs
 	return kubeconfigutil.CreateWithCerts(
 		spec.APIServer,
-		"kubernetes",
+		clustername,
 		spec.ClientName,
 		certutil.EncodeCertPEM(spec.CACert),
 		certutil.EncodePrivateKeyPEM(clientKey),
@@ -293,7 +293,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.MasterConfigur
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
 // WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
@@ -319,14 +319,14 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.MasterConfiguration
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
 // writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.
-func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec) error {
+func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string) error {
 
 	// builds the KubeConfig object
-	config, err := buildKubeConfigFromSpec(spec)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		return err
 	}
