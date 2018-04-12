@@ -42,7 +42,7 @@ var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 func New(extensions spec.Extensions) (rest.TableConvertor, error) {
 	headers := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
-		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
+		{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
 	}
 	c := &convertor{
 		headers: headers,
