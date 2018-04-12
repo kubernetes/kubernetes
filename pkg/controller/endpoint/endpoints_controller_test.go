@@ -753,7 +753,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			Ports:     []v1.EndpointPort{{Port: 0, Protocol: "TCP"}},
+			Ports:     []v1.EndpointPort{},
 		}},
 	})
 	endpointsHandler.ValidateRequestCount(t, 1)

@@ -454,8 +454,8 @@ func (e *EndpointController) syncService(key string) error {
 		// Allow headless service not to have ports.
 		if len(service.Spec.Ports) == 0 {
 			if service.Spec.ClusterIP == api.ClusterIPNone {
-				epp := v1.EndpointPort{Port: 0, Protocol: v1.ProtocolTCP}
-				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
+				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, nil, tolerateUnreadyEndpoints)
+				// No need to repack subsets for headless service without ports.
 			}
 		} else {
 			for i := range service.Spec.Ports {
@@ -470,14 +470,14 @@ func (e *EndpointController) syncService(key string) error {
 				}
 
 				var readyEps, notReadyEps int
-				epp := v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
+				epp := &v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
 			}
+			subsets = endpoints.RepackSubsets(subsets)
 		}
 	}
-	subsets = endpoints.RepackSubsets(subsets)
 
 	// See if there's actually an update here.
 	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
@@ -561,20 +561,24 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 }
 
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
-	epp v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
+	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int = 0
 	var notReadyEps int = 0
+	ports := []v1.EndpointPort{}
+	if epp != nil {
+		ports = append(ports, *epp)
+	}
 	if tolerateUnreadyEndpoints || podutil.IsPodReady(pod) {
 		subsets = append(subsets, v1.EndpointSubset{
 			Addresses: []v1.EndpointAddress{epa},
-			Ports:     []v1.EndpointPort{epp},
+			Ports:     ports,
 		})
 		readyEps++
 	} else if shouldPodBeInEndpoints(pod) {
 		glog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
-			Ports:             []v1.EndpointPort{epp},
+			Ports:             ports,
 		})
 		notReadyEps++
 	}
