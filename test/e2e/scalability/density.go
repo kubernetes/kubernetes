@@ -224,8 +224,10 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 
 func logPodStartupStatus(c clientset.Interface, expectedPods int, observedLabels map[string]string, period time.Duration, stopCh chan struct{}) {
 	label := labels.SelectorFromSet(labels.Set(observedLabels))
-	podStore := testutils.NewPodStore(c, metav1.NamespaceAll, label, fields.Everything())
+	podStore, err := testutils.NewPodStore(c, metav1.NamespaceAll, label, fields.Everything())
+	framework.ExpectNoError(err)
 	defer podStore.Stop()
+
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 	for {

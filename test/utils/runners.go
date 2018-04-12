@@ -697,8 +697,11 @@ func (config *RCConfig) start() error {
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 
-	PodStore := NewPodStore(config.Client, config.Namespace, label, fields.Everything())
-	defer PodStore.Stop()
+	ps, err := NewPodStore(config.Client, config.Namespace, label, fields.Everything())
+	if err != nil {
+		return err
+	}
+	defer ps.Stop()
 
 	interval := config.PollInterval
 	if interval <= 0 {
@@ -714,7 +717,7 @@ func (config *RCConfig) start() error {
 	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
-		pods := PodStore.List()
+		pods := ps.List()
 		startupStatus := ComputeRCStartupStatus(pods, config.Replicas)
 
 		pods = startupStatus.Created
@@ -814,11 +817,14 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 // matching pod exists.
 func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
 	running := false
-	PodStore := NewPodStore(c, ns, label, fields.Everything())
-	defer PodStore.Stop()
+	ps, err := NewPodStore(c, ns, label, fields.Everything())
+	if err != nil {
+		return err
+	}
+	defer ps.Stop()
 waitLoop:
 	for start := time.Now(); time.Since(start) < 10*time.Minute; time.Sleep(5 * time.Second) {
-		pods := PodStore.List()
+		pods := ps.List()
 		if len(pods) == 0 {
 			continue waitLoop
 		}
@@ -1258,11 +1264,14 @@ func (config *DaemonConfig) Run() error {
 		timeout = 5 * time.Minute
 	}
 
-	podStore := NewPodStore(config.Client, config.Namespace, labels.SelectorFromSet(nameLabel), fields.Everything())
-	defer podStore.Stop()
+	ps, err := NewPodStore(config.Client, config.Namespace, labels.SelectorFromSet(nameLabel), fields.Everything())
+	if err != nil {
+		return err
+	}
+	defer ps.Stop()
 
 	err = wait.Poll(time.Second, timeout, func() (bool, error) {
-		pods := podStore.List()
+		pods := ps.List()
 
 		nodeHasDaemon := sets.NewString()
 		for _, pod := range pods {
