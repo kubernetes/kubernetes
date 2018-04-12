@@ -293,7 +293,7 @@ func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.MasterConfiguration) error {
 	}
 	defer os.RemoveAll(dryRunManifestDir)
 
-	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, internalcfg); err != nil {
+	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, internalcfg, false); err != nil {
 		return err
 	}
 

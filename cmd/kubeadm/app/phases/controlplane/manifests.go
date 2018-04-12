@@ -50,33 +50,43 @@ const (
 	defaultV19AdmissionControl    = "NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 )
 
+// CreateInitStaticPodManifestFilesEtcdTLS will write all static pod manifest files needed to bring up the control plane.
+func CreateInitStaticPodManifestFilesEtcdTLS(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return CreateInitStaticPodManifestFiles(manifestDir, cfg, true)
+}
+
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration, etcdTLS bool) error {
 	glog.V(1).Infoln("[controlplane] creating static pod files")
-	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return createStaticPodFiles(manifestDir, cfg, etcdTLS, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+}
+
+// CreateAPIServerStaticPodManifestFileTLS will write APIserver static pod manifest file.
+func CreateAPIServerStaticPodManifestFileTLS(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	return CreateAPIServerStaticPodManifestFile(manifestDir, cfg, true)
 }
 
 // CreateAPIServerStaticPodManifestFile will write APIserver static pod manifest file.
-func CreateAPIServerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+func CreateAPIServerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration, etcdTLS bool) error {
 	glog.V(1).Infoln("creating APIserver static pod files")
-	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer)
+	return createStaticPodFiles(manifestDir, cfg, etcdTLS, kubeadmconstants.KubeAPIServer)
 }
 
 // CreateControllerManagerStaticPodManifestFile will write  controller manager static pod manifest file.
 func CreateControllerManagerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
 	glog.V(1).Infoln("creating controller manager static pod files")
-	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeControllerManager)
+	return createStaticPodFiles(manifestDir, cfg, false, kubeadmconstants.KubeControllerManager)
 }
 
 // CreateSchedulerStaticPodManifestFile will write scheduler static pod manifest file.
 func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
 	glog.V(1).Infoln("creating scheduler static pod files")
-	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeScheduler)
+	return createStaticPodFiles(manifestDir, cfg, false, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current MasterConfiguration
 // NB. this methods holds the information about how kubeadm creates static pod manifests.
-func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]v1.Pod {
+func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version, etcdTLS bool) map[string]v1.Pod {
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
@@ -86,7 +96,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 			Name:            kubeadmconstants.KubeAPIServer,
 			Image:           images.GetCoreImage(kubeadmconstants.KubeAPIServer, cfg.GetControlPlaneImageRepository(), cfg.KubernetesVersion, cfg.UnifiedControlPlaneImage),
 			ImagePullPolicy: cfg.ImagePullPolicy,
-			Command:         getAPIServerCommand(cfg, k8sVersion),
+			Command:         getAPIServerCommand(cfg, k8sVersion, etcdTLS),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
 			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeAPIServer, int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
@@ -130,7 +140,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.
 }
 
 // createStaticPodFiles creates all the requested static pod files.
-func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration, componentNames ...string) error {
+func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration, etcdTLS bool, componentNames ...string) error {
 	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
@@ -139,7 +149,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 
 	// gets the StaticPodSpecs, actualized for the current MasterConfiguration
 	glog.V(1).Infoln("[controlplane] getting StaticPodSpecs")
-	specs := GetStaticPodSpecs(cfg, k8sVersion)
+	specs := GetStaticPodSpecs(cfg, k8sVersion, etcdTLS)
 
 	// creates required static pod specs
 	for _, componentName := range componentNames {
@@ -161,7 +171,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 }
 
 // getAPIServerCommand builds the right API server command from the given config object and version
-func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) []string {
+func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version, etcdTLS bool) []string {
 	defaultArguments := map[string]string{
 		"advertise-address":               cfg.API.AdvertiseAddress,
 		"insecure-port":                   "0",
@@ -212,11 +222,15 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		}
 	} else {
 		// Default to etcd static pod on localhost
-		etcdEndpointsArg := "--etcd-servers=https://127.0.0.1:2379"
-		etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName))
-		etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName))
-		etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName))
-		command = append(command, etcdEndpointsArg, etcdCAFileArg, etcdClientFileArg, etcdKeyFileArg)
+		if etcdTLS {
+			etcdEndpointsArg := "--etcd-servers=https://127.0.0.1:2379"
+			etcdCAFileArg := fmt.Sprintf("--etcd-cafile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName))
+			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName))
+			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName))
+			command = append(command, etcdEndpointsArg, etcdCAFileArg, etcdClientFileArg, etcdKeyFileArg)
+		} else {
+			command = append(command, "--etcd-servers=http://127.0.0.1:2379")
+		}
 
 		// Warn for unused user supplied variables
 		if cfg.Etcd.CAFile != "" {

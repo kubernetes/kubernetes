@@ -162,7 +162,7 @@ func BuildUpgradedDaemonSetsFromConfig(cfg *kubeadmapi.MasterConfiguration, k8sV
 	// Here the map of different mutators to use for the control plane's podspec is stored
 	mutators := selfhosting.GetMutatorsFromFeatureGates(cfg.FeatureGates)
 	// Get the new PodSpecs to use
-	controlPlanePods := controlplane.GetStaticPodSpecs(cfg, k8sVersion)
+	controlPlanePods := controlplane.GetStaticPodSpecs(cfg, k8sVersion, true)
 	// Store the created DaemonSets in this map
 	controlPlaneDaemonSets := map[string]*apps.DaemonSet{}
 

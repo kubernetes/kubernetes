@@ -37,7 +37,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 	}
 
 	// Executes GetEtcdPodSpec
-	spec := GetEtcdPodSpec(cfg)
+	spec := GetEtcdPodSpec(cfg, true)
 
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
@@ -45,7 +45,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 	}
 }
 
-func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
+func TestCreateLocalEtcdStaticPodManifestFileTLS(t *testing.T) {
 
 	// Create temp folder for the test case
 	tmpdir := testutil.SetupTempDir(t)
@@ -58,7 +58,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 
 	// Execute createStaticPodFunction
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err := CreateLocalEtcdStaticPodManifestFile(manifestPath, cfg)
+	err := CreateLocalEtcdStaticPodManifestFileTLS(manifestPath, cfg)
 	if err != nil {
 		t.Errorf("Error executing CreateEtcdStaticPodManifestFile: %v", err)
 	}
@@ -72,11 +72,13 @@ func TestGetEtcdCommand(t *testing.T) {
 	var tests = []struct {
 		cfg      *kubeadmapi.MasterConfiguration
 		expected []string
+		tls      bool
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
 			},
+			tls: true,
 			expected: []string{
 				"etcd",
 				"--listen-client-urls=https://127.0.0.1:2379",
@@ -94,6 +96,18 @@ func TestGetEtcdCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{DataDir: "/var/lib/etcd"},
+			},
+			tls: false,
+			expected: []string{
+				"etcd",
+				"--listen-client-urls=http://127.0.0.1:2379",
+				"--advertise-client-urls=http://127.0.0.1:2379",
+				"--data-dir=/var/lib/etcd",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{
 					DataDir: "/var/lib/etcd",
 					ExtraArgs: map[string]string{
@@ -102,6 +116,7 @@ func TestGetEtcdCommand(t *testing.T) {
 					},
 				},
 			},
+			tls: true,
 			expected: []string{
 				"etcd",
 				"--listen-client-urls=https://10.0.1.10:2379",
@@ -121,6 +136,7 @@ func TestGetEtcdCommand(t *testing.T) {
 			cfg: &kubeadmapi.MasterConfiguration{
 				Etcd: kubeadmapi.Etcd{DataDir: "/etc/foo"},
 			},
+			tls: true,
 			expected: []string{
 				"etcd",
 				"--listen-client-urls=https://127.0.0.1:2379",
@@ -139,7 +155,7 @@ func TestGetEtcdCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getEtcdCommand(rt.cfg)
+		actual := getEtcdCommand(rt.cfg, rt.tls)
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
