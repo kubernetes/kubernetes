@@ -110,7 +110,7 @@ func (l *linuxStandardInit) Init() error {
 		}
 	}
 	for _, path := range l.config.Config.MaskPaths {
-		if err := maskPath(path); err != nil {
+		if err := maskPath(path, l.config.Config.MountLabel); err != nil {
 			return err
 		}
 	}
