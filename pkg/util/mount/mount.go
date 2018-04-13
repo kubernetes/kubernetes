@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 )
 
 type FileType string
@@ -233,13 +232,6 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
-func isNotDirErr(err error) bool {
-	if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENOTDIR {
-		return true
-	}
-	return false
-}
-
 // IsNotMountPoint determines if a directory is a mountpoint.
 // It should return ErrNotExist when the directory does not exist.
 // This method uses the List() of all mountpoints
@@ -255,7 +247,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		notMnt = true
 		notMntErr = nil
 	}
-	if notMntErr != nil && isNotDirErr(notMntErr) {
+	if notMntErr != nil {
 		return notMnt, notMntErr
 	}
 	// identified as mountpoint, so return this fact
