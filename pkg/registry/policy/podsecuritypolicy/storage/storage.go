@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -25,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy"
+	"k8s.io/kubernetes/pkg/registry/policy/podsecuritypolicy"
 )
 
 // REST implements a RESTStorage for PodSecurityPolicies.
@@ -38,7 +37,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &policy.PodSecurityPolicy{} },
 		NewListFunc:              func() runtime.Object { return &policy.PodSecurityPolicyList{} },
-		DefaultQualifiedResource: extensions.Resource("podsecuritypolicies"),
+		DefaultQualifiedResource: policy.Resource("podsecuritypolicies"),
 
 		CreateStrategy:      podsecuritypolicy.Strategy,
 		UpdateStrategy:      podsecuritypolicy.Strategy,
