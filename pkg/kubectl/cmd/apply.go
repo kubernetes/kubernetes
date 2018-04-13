@@ -302,9 +302,11 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if !dryRun {
 				// Then create the resource and skip the three-way merge
-				if err := createAndRefresh(info); err != nil {
+				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
+				info.Refresh(obj, true)
 				if uid, err := info.Mapping.UID(info.Object); err != nil {
 					return err
 				} else {

@@ -801,6 +801,70 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 	return ds
 }
 
+// podsShouldBeOnNode figures out the DaemonSet pods to be created and deleted on the given node:
+//   - nodesNeedingDaemonPods: the pods need to start on the node
+//   - podsToDelete: the Pods need to be deleted on the node
+//   - failedPodsObserved: the number of failed pods on node
+//   - err: unexpected error
+func (dsc *DaemonSetsController) podsShouldBeOnNode(
+	node *v1.Node,
+	nodeToDaemonPods map[string][]*v1.Pod,
+	ds *apps.DaemonSet,
+) (nodesNeedingDaemonPods, podsToDelete []string, failedPodsObserved int, err error) {
+
+	wantToRun, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
+	if err != nil {
+		return
+	}
+
+	daemonPods, exists := nodeToDaemonPods[node.Name]
+	dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
+	dsc.removeSuspendedDaemonPods(node.Name, dsKey)
+
+	switch {
+	case wantToRun && !shouldSchedule:
+		// If daemon pod is supposed to run, but can not be scheduled, add to suspended list.
+		dsc.addSuspendedDaemonPods(node.Name, dsKey)
+	case shouldSchedule && !exists:
+		// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
+		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
+	case shouldContinueRunning:
+		// If a daemon pod failed, delete it
+		// If there's non-daemon pods left on this node, we will create it in the next sync loop
+		var daemonPodsRunning []*v1.Pod
+		for _, pod := range daemonPods {
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
+			if pod.Status.Phase == v1.PodFailed {
+				msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
+				glog.V(2).Infof(msg)
+				// Emit an event so that it's discoverable to users.
+				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
+				podsToDelete = append(podsToDelete, pod.Name)
+				failedPodsObserved++
+			} else {
+				daemonPodsRunning = append(daemonPodsRunning, pod)
+			}
+		}
+		// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
+		// Sort the daemon pods by creation time, so the oldest is preserved.
+		if len(daemonPodsRunning) > 1 {
+			sort.Sort(podByCreationTimestamp(daemonPodsRunning))
+			for i := 1; i < len(daemonPodsRunning); i++ {
+				podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
+			}
+		}
+	case !shouldContinueRunning && exists:
+		// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
+		for _, pod := range daemonPods {
+			podsToDelete = append(podsToDelete, pod.Name)
+		}
+	}
+
+	return nodesNeedingDaemonPods, podsToDelete, failedPodsObserved, nil
+}
+
 // manage manages the scheduling and running of Pods of ds on nodes.
 // After figuring out which nodes should run a Pod of ds but not yet running one and
 // which nodes should not run a Pod of ds but currently running one, it calls function
@@ -821,55 +885,16 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, hash string) error {
 	var nodesNeedingDaemonPods, podsToDelete []string
 	var failedPodsObserved int
 	for _, node := range nodeList {
-		wantToRun, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		nodesNeedingDaemonPodsOnNode, podsToDeleteOnNode, failedPodsObservedOnNode, err := dsc.podsShouldBeOnNode(
+			node, nodeToDaemonPods, ds)
+
 		if err != nil {
 			continue
 		}
 
-		daemonPods, exists := nodeToDaemonPods[node.Name]
-		dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
-		dsc.removeSuspendedDaemonPods(node.Name, dsKey)
-
-		switch {
-		case wantToRun && !shouldSchedule:
-			// If daemon pod is supposed to run, but can not be scheduled, add to suspended list.
-			dsc.addSuspendedDaemonPods(node.Name, dsKey)
-		case shouldSchedule && !exists:
-			// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
-			nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
-		case shouldContinueRunning:
-			// If a daemon pod failed, delete it
-			// If there's non-daemon pods left on this node, we will create it in the next sync loop
-			var daemonPodsRunning []*v1.Pod
-			for _, pod := range daemonPods {
-				if pod.DeletionTimestamp != nil {
-					continue
-				}
-				if pod.Status.Phase == v1.PodFailed {
-					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
-					glog.V(2).Infof(msg)
-					// Emit an event so that it's discoverable to users.
-					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
-					podsToDelete = append(podsToDelete, pod.Name)
-					failedPodsObserved++
-				} else {
-					daemonPodsRunning = append(daemonPodsRunning, pod)
-				}
-			}
-			// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
-			// Sort the daemon pods by creation time, so the oldest is preserved.
-			if len(daemonPodsRunning) > 1 {
-				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
-				for i := 1; i < len(daemonPodsRunning); i++ {
-					podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
-				}
-			}
-		case !shouldContinueRunning && exists:
-			// If daemon pod isn't supposed to run on node, but it is, delete all daemon pods on node.
-			for _, pod := range daemonPods {
-				podsToDelete = append(podsToDelete, pod.Name)
-			}
-		}
+		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, nodesNeedingDaemonPodsOnNode...)
+		podsToDelete = append(podsToDelete, podsToDeleteOnNode...)
+		failedPodsObserved += failedPodsObservedOnNode
 	}
 
 	// Label new pods using the hash label value of the current history when creating them

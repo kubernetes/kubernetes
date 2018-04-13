@@ -73,8 +73,6 @@ const (
 	failNamespaceLabelKey   = "fail-closed-webhook"
 	failNamespaceLabelValue = "yes"
 	failNamespaceName       = "fail-closed-namesapce"
-	disallowedCrdLabelKey   = "disallowed-crd"
-	disallowedCrdLabelValue = "yes"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -1139,13 +1137,18 @@ func registerValidatingWebhookForCRD(f *framework.Framework, context *certContex
 
 	namespace := f.Namespace.Name
 	configName := crdWebhookConfigName
+
+	// This webhook will deny the creation of CustomResourceDefinitions which have the
+	// label "webhook-e2e-test":"webhook-disallow"
+	// NOTE: Because tests are run in parallel and in an unpredictable order, it is critical
+	// that no other test attempts to create CRD with that label.
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "deny-crd.k8s.io",
+				Name: "deny-crd-with-unwanted-label.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
@@ -1154,20 +1157,11 @@ func registerValidatingWebhookForCRD(f *framework.Framework, context *certContex
 						Resources:   []string{"customresourcedefinitions"},
 					},
 				}},
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      disallowedCrdLabelKey,
-							Operator: metav1.LabelSelectorOpIn,
-							Values:   []string{disallowedCrdLabelValue},
-						},
-					},
-				},
 				ClientConfig: v1beta1.WebhookClientConfig{
 					Service: &v1beta1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
-						Path:      strPtr("/always-deny"),
+						Path:      strPtr("/crd"),
 					},
 					CABundle: context.signingCert,
 				},
@@ -1209,8 +1203,10 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	}
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   testcrd.GetMetaName(),
-			Labels: map[string]string{disallowedCrdLabelKey: disallowedCrdLabelValue},
+			Name: testcrd.GetMetaName(),
+			Labels: map[string]string{
+				"webhook-e2e-test": "webhook-disallow",
+			},
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 			Group:   testcrd.ApiGroup,
@@ -1228,7 +1224,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	// create CRD
 	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 	Expect(err).NotTo(BeNil())
-	expectedErrMsg := "this webhook denies all requests"
+	expectedErrMsg := "the crd contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}

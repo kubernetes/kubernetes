@@ -55,7 +55,6 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/kuberuntime:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
-        "//pkg/kubelet/network:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",

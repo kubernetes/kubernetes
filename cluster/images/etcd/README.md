@@ -1,17 +1,30 @@
-### etcd
+### k8s.gcr.io/etcd docker image
 
-This is a small etcd image used in Kubernetes setups where `etcd` is deployed as a docker image.
+Provides docker images containing etcd and etcdctl binaries for multiple etcd
+version as well as a migration operator utility for upgrading and downgrading
+etcd--it's data directory in particular--to a target version.
 
-For `amd64`, official `etcd` and `etcdctl` binaries are downloaded from Github to maintain official support.
-For other architectures, `etcd` is cross-compiled from source. Arch-specific `busybox` images serve as base images.
+#### Versioning
 
-### Upgrading and Downgrading
+Each `k8s.gcr.io/etcd` docker image is tagged with an version string of the form
+`<etcd-version>-<image-revision>`, e.g. `3.0.17-0`.  The etcd version is the
+SemVer of latest etcd version available in the image. The image revision
+distinguishes between docker images with the same lastest etcd version but
+changes (bug fixes and backward compatible improvements) to the migration
+utility bundled with the image.
 
-To upgrade to a newer etcd version, or to downgrade to the previous minor
-version, always run `/usr/local/bin/migrate-if-needed.sh` before starting the
-etcd server.
+In addition to the latest etcd version, each `k8s.gcr.io/etcd` image contains
+etcd and etcdctl binaries for older versions of etcd. These are used by the
+migration operator utility when performing downgrades and multi-step upgrades,
+but can also be used as the etcd target version.
 
-`migrate-if-needed.sh` writes a `version.txt` file to track the "current" version
+#### Usage
+
+Always run `/usr/local/bin/migrate` (or the
+`/usr/local/bin/migrate-if-needed.sh` wrapper script) before starting the etcd
+server.
+
+`migrate` writes a `version.txt` file to track the "current" version
 of etcd that was used to persist data to disk. A "target" version may also be provided
 by the `TARGET_STORAGE` (e.g. "etcd3") and `TARGET_VERSION` (e.g. "3.2.11" )
 environment variables. If the persisted version differs from the target version,
@@ -23,15 +36,30 @@ in steps to each minor version until the target version is reached.
 
 Downgrades to the previous minor version of the 3.x series and from 3.0 to 2.3.7 are supported.
 
+#### Permissions
+
+By default, `migrate` will write data directory files with default permissions
+according to the umask it is run with. When run in the published
+`k8s.gcr.io/etcd` images the default umask is 0022 which will result in 0755
+directory permissions and 0644 file permissions.
+
+#### Cross building
+
+For `amd64`, official `etcd` and `etcdctl` binaries are downloaded from Github
+to maintain official support.  For other architectures, `etcd` is cross-compiled
+from source. Arch-specific `busybox` images serve as base images.
+
 #### How to release
 
-First, run the migration and rollback tests.
+First, update `ETCD_VERSION` and `REVSION` in the `Makefile`.
+
+Next, build and test the image:
 
 ```console
 $ make build test
 ```
 
-Next, build and push the docker images for all supported architectures.
+Last, build and push the docker images for all supported architectures.
 
 ```console
 # Build for linux/amd64 (default)

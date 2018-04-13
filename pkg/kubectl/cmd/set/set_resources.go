@@ -79,7 +79,7 @@ type ResourcesOptions struct {
 
 	DryRun bool
 
-	PrintObj func(runtime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 
 	Limits               string
 	Requests             string
@@ -155,9 +155,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	o.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, o.Out)
-	}
+	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -262,7 +260,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -285,7 +283,7 @@ func (o *ResourcesOptions) Run() error {
 		}
 		info.Refresh(obj, true)
 
-		if err := o.PrintObj(info.AsVersioned()); err != nil {
+		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
 			return err
 		}
 	}

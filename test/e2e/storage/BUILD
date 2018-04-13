@@ -29,7 +29,6 @@ go_library(
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -76,6 +75,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

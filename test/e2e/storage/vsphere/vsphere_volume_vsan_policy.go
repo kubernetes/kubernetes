@@ -278,7 +278,7 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
@@ -310,7 +310,7 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
@@ -329,7 +329,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 
 	var pvclaims []*v1.PersistentVolumeClaim

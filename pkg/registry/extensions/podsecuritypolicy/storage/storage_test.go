@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	// Ensure that extensions/v1beta1 package is initialized.
-	_ "k8s.io/api/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	// Ensure that policy/v1beta1 package is initialized.
+	_ "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +33,7 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "policy")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
@@ -43,23 +43,23 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	return NewREST(restOptions), server
 }
 
-func validNewPodSecurityPolicy() *extensions.PodSecurityPolicy {
-	return &extensions.PodSecurityPolicy{
+func validNewPodSecurityPolicy() *policy.PodSecurityPolicy {
+	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
-		Spec: extensions.PodSecurityPolicySpec{
-			SELinux: extensions.SELinuxStrategyOptions{
-				Rule: extensions.SELinuxStrategyRunAsAny,
+		Spec: policy.PodSecurityPolicySpec{
+			SELinux: policy.SELinuxStrategyOptions{
+				Rule: policy.SELinuxStrategyRunAsAny,
 			},
-			RunAsUser: extensions.RunAsUserStrategyOptions{
-				Rule: extensions.RunAsUserStrategyRunAsAny,
+			RunAsUser: policy.RunAsUserStrategyOptions{
+				Rule: policy.RunAsUserStrategyRunAsAny,
 			},
-			FSGroup: extensions.FSGroupStrategyOptions{
-				Rule: extensions.FSGroupStrategyRunAsAny,
+			FSGroup: policy.FSGroupStrategyOptions{
+				Rule: policy.FSGroupStrategyRunAsAny,
 			},
-			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
+				Rule: policy.SupplementalGroupsStrategyRunAsAny,
 			},
 		},
 	}
@@ -76,7 +76,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		psp,
 		// invalid
-		&extensions.PodSecurityPolicy{
+		&policy.PodSecurityPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: "name with spaces"},
 		},
 	)
@@ -92,7 +92,7 @@ func TestUpdate(t *testing.T) {
 		validNewPodSecurityPolicy(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.PodSecurityPolicy)
+			object := obj.(*policy.PodSecurityPolicy)
 			object.Labels = map[string]string{"a": "b"}
 			return object
 		},

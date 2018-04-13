@@ -32,8 +32,8 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 )
 

@@ -13,7 +13,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.1.12') }}",
+    "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.2.18-0') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
@@ -29,7 +29,7 @@
         "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '3.1.12') }}"
+        "value": "{{ pillar.get('etcd_version', '3.2.18') }}"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
@@ -37,8 +37,17 @@
       { "name": "INITIAL_CLUSTER",
         "value": "{{ etcd_cluster }}"
       },
+      { "name": "LISTEN_PEER_URLS",
+        "value": "{{ etcd_protocol }}://{{ host_ip }}:{{ server_port }}"
+      },
+      { "name": "INITIAL_ADVERTISE_PEER_URLS",
+        "value": "{{ etcd_protocol }}://{{ hostname }}:{{ server_port }}"
+      },
       { "name": "ETCD_CREDS",
         "value": "{{ etcd_creds }}"
+      },
+      { "name": "ETCD_SNAPSHOT_COUNT",
+        "value": "10000"
       }
         ],
     "livenessProbe": {

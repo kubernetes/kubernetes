@@ -113,7 +113,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass)
+	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
 	Expect(err).NotTo(HaveOccurred())
 

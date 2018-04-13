@@ -367,6 +367,22 @@ data:
       read_from_head true
       tag node-problem-detector
     </source>
+    
+    <source>
+      @id kernel
+      @type systemd
+      filters [{ "_TRANSPORT": "kernel" }]
+      <storage>
+        @type local
+        persistent true
+      </storage>
+      <entry>
+        fields_strip_underscores true
+        fields_lowercase true
+      </entry>
+      read_from_head true
+      tag kernel
+    </source>
 
   forward.input.conf: |-
     # Takes the messages sent over TCP

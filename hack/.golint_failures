@@ -139,6 +139,7 @@ pkg/kubectl/categories
 pkg/kubectl/cmd
 pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/config
+pkg/kubectl/cmd/create
 pkg/kubectl/cmd/rollout
 pkg/kubectl/cmd/set
 pkg/kubectl/cmd/templates
@@ -172,6 +173,14 @@ pkg/kubelet/custommetrics
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/cm
 pkg/kubelet/dockershim/libdocker
+pkg/kubelet/dockershim/network
+pkg/kubelet/dockershim/network/cni
+pkg/kubelet/dockershim/network/cni/testing
+pkg/kubelet/dockershim/network/hairpin
+pkg/kubelet/dockershim/network/hostport
+pkg/kubelet/dockershim/network/hostport/testing
+pkg/kubelet/dockershim/network/kubenet
+pkg/kubelet/dockershim/network/testing
 pkg/kubelet/dockershim/testing
 pkg/kubelet/events
 pkg/kubelet/images
@@ -179,14 +188,6 @@ pkg/kubelet/kuberuntime
 pkg/kubelet/leaky
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
-pkg/kubelet/network
-pkg/kubelet/network/cni
-pkg/kubelet/network/cni/testing
-pkg/kubelet/network/hairpin
-pkg/kubelet/network/hostport
-pkg/kubelet/network/hostport/testing
-pkg/kubelet/network/kubenet
-pkg/kubelet/network/testing
 pkg/kubelet/pleg
 pkg/kubelet/pod
 pkg/kubelet/pod/testing
@@ -541,6 +542,7 @@ staging/src/k8s.io/apiserver/pkg/endpoints/handlers
 staging/src/k8s.io/apiserver/pkg/endpoints/handlers/negotiation
 staging/src/k8s.io/apiserver/pkg/endpoints/metrics
 staging/src/k8s.io/apiserver/pkg/endpoints/openapi/testing
+staging/src/k8s.io/apiserver/pkg/endpoints/request
 staging/src/k8s.io/apiserver/pkg/endpoints/testing
 staging/src/k8s.io/apiserver/pkg/features
 staging/src/k8s.io/apiserver/pkg/registry/generic

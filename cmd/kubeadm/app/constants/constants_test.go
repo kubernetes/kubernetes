@@ -18,9 +18,10 @@ package constants
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/util/version"
 	"strings"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {

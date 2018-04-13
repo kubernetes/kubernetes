@@ -31,6 +31,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -64,94 +65,107 @@ const (
 	nodeAffinityLabelKey = "kubernetes.io/hostname"
 )
 
+type testPV struct {
+	name        string
+	scMode      storagev1.VolumeBindingMode
+	preboundPVC string
+	node        string
+}
+
+type testPVC struct {
+	name       string
+	scMode     storagev1.VolumeBindingMode
+	preboundPV string
+}
+
 func TestVolumeBinding(t *testing.T) {
 	config := setupCluster(t, "volume-scheduling", 2)
 	defer config.teardown()
 
 	cases := map[string]struct {
 		pod  *v1.Pod
-		pvs  []*v1.PersistentVolume
-		pvcs []*v1.PersistentVolumeClaim
+		pvs  []*testPV
+		pvcs []*testPVC
 		// Create these, but they should not be bound in the end
-		unboundPvcs []*v1.PersistentVolumeClaim
-		unboundPvs  []*v1.PersistentVolume
+		unboundPvcs []*testPVC
+		unboundPvs  []*testPV
 		shouldFail  bool
 	}{
 		"immediate can bind": {
 			pod:  makePod("pod-i-canbind", config.ns, []string{"pvc-i-canbind"}),
-			pvs:  []*v1.PersistentVolume{makePV(t, "pv-i-canbind", classImmediate, "", "", node1)},
-			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-i-canbind", config.ns, &classImmediate, "")},
+			pvs:  []*testPV{{"pv-i-canbind", modeImmediate, "", node1}},
+			pvcs: []*testPVC{{"pvc-i-canbind", modeImmediate, ""}},
 		},
 		"immediate cannot bind": {
 			pod:         makePod("pod-i-cannotbind", config.ns, []string{"pvc-i-cannotbind"}),
-			unboundPvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-i-cannotbind", config.ns, &classImmediate, "")},
+			unboundPvcs: []*testPVC{{"pvc-i-cannotbind", modeImmediate, ""}},
 			shouldFail:  true,
 		},
 		"immediate pvc prebound": {
 			pod:  makePod("pod-i-pvc-prebound", config.ns, []string{"pvc-i-prebound"}),
-			pvs:  []*v1.PersistentVolume{makePV(t, "pv-i-pvc-prebound", classImmediate, "", "", node1)},
-			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-i-prebound", config.ns, &classImmediate, "pv-i-pvc-prebound")},
+			pvs:  []*testPV{{"pv-i-pvc-prebound", modeImmediate, "", node1}},
+			pvcs: []*testPVC{{"pvc-i-prebound", modeImmediate, "pv-i-pvc-prebound"}},
 		},
 		"immediate pv prebound": {
 			pod:  makePod("pod-i-pv-prebound", config.ns, []string{"pvc-i-pv-prebound"}),
-			pvs:  []*v1.PersistentVolume{makePV(t, "pv-i-prebound", classImmediate, "pvc-i-pv-prebound", config.ns, node1)},
-			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-i-pv-prebound", config.ns, &classImmediate, "")},
+			pvs:  []*testPV{{"pv-i-prebound", modeImmediate, "pvc-i-pv-prebound", node1}},
+			pvcs: []*testPVC{{"pvc-i-pv-prebound", modeImmediate, ""}},
 		},
 		"wait can bind": {
 			pod:  makePod("pod-w-canbind", config.ns, []string{"pvc-w-canbind"}),
-			pvs:  []*v1.PersistentVolume{makePV(t, "pv-w-canbind", classWait, "", "", node1)},
-			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-w-canbind", config.ns, &classWait, "")},
+			pvs:  []*testPV{{"pv-w-canbind", modeWait, "", node1}},
+			pvcs: []*testPVC{{"pvc-w-canbind", modeWait, ""}},
 		},
 		"wait cannot bind": {
 			pod:         makePod("pod-w-cannotbind", config.ns, []string{"pvc-w-cannotbind"}),
-			unboundPvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-w-cannotbind", config.ns, &classWait, "")},
+			unboundPvcs: []*testPVC{{"pvc-w-cannotbind", modeWait, ""}},
 			shouldFail:  true,
 		},
 		"wait pvc prebound": {
 			pod:  makePod("pod-w-pvc-prebound", config.ns, []string{"pvc-w-prebound"}),
-			pvs:  []*v1.PersistentVolume{makePV(t, "pv-w-pvc-prebound", classWait, "", "", node1)},
-			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-w-prebound", config.ns, &classWait, "pv-w-pvc-prebound")},
+			pvs:  []*testPV{{"pv-w-pvc-prebound", modeWait, "", node1}},
+			pvcs: []*testPVC{{"pvc-w-prebound", modeWait, "pv-w-pvc-prebound"}},
 		},
 		"wait pv prebound": {
 			pod:  makePod("pod-w-pv-prebound", config.ns, []string{"pvc-w-pv-prebound"}),
-			pvs:  []*v1.PersistentVolume{makePV(t, "pv-w-prebound", classWait, "pvc-w-pv-prebound", config.ns, node1)},
-			pvcs: []*v1.PersistentVolumeClaim{makePVC("pvc-w-pv-prebound", config.ns, &classWait, "")},
+			pvs:  []*testPV{{"pv-w-prebound", modeWait, "pvc-w-pv-prebound", node1}},
+			pvcs: []*testPVC{{"pvc-w-pv-prebound", modeWait, ""}},
 		},
 		"wait can bind two": {
 			pod: makePod("pod-w-canbind-2", config.ns, []string{"pvc-w-canbind-2", "pvc-w-canbind-3"}),
-			pvs: []*v1.PersistentVolume{
-				makePV(t, "pv-w-canbind-2", classWait, "", "", node2),
-				makePV(t, "pv-w-canbind-3", classWait, "", "", node2),
+			pvs: []*testPV{
+				{"pv-w-canbind-2", modeWait, "", node2},
+				{"pv-w-canbind-3", modeWait, "", node2},
 			},
-			pvcs: []*v1.PersistentVolumeClaim{
-				makePVC("pvc-w-canbind-2", config.ns, &classWait, ""),
-				makePVC("pvc-w-canbind-3", config.ns, &classWait, ""),
+			pvcs: []*testPVC{
+				{"pvc-w-canbind-2", modeWait, ""},
+				{"pvc-w-canbind-3", modeWait, ""},
 			},
-			unboundPvs: []*v1.PersistentVolume{
-				makePV(t, "pv-w-canbind-5", classWait, "", "", node1),
+			unboundPvs: []*testPV{
+				{"pv-w-canbind-5", modeWait, "", node1},
 			},
 		},
 		"wait cannot bind two": {
 			pod: makePod("pod-w-cannotbind-2", config.ns, []string{"pvc-w-cannotbind-1", "pvc-w-cannotbind-2"}),
-			unboundPvcs: []*v1.PersistentVolumeClaim{
-				makePVC("pvc-w-cannotbind-1", config.ns, &classWait, ""),
-				makePVC("pvc-w-cannotbind-2", config.ns, &classWait, ""),
+			unboundPvcs: []*testPVC{
+				{"pvc-w-cannotbind-1", modeWait, ""},
+				{"pvc-w-cannotbind-2", modeWait, ""},
 			},
-			unboundPvs: []*v1.PersistentVolume{
-				makePV(t, "pv-w-cannotbind-1", classWait, "", "", node2),
-				makePV(t, "pv-w-cannotbind-2", classWait, "", "", node1),
+			unboundPvs: []*testPV{
+				{"pv-w-cannotbind-1", modeWait, "", node2},
+				{"pv-w-cannotbind-2", modeWait, "", node1},
 			},
 			shouldFail: true,
 		},
 		"mix immediate and wait": {
 			pod: makePod("pod-mix-bound", config.ns, []string{"pvc-w-canbind-4", "pvc-i-canbind-2"}),
-			pvs: []*v1.PersistentVolume{
-				makePV(t, "pv-w-canbind-4", classWait, "", "", node1),
-				makePV(t, "pv-i-canbind-2", classImmediate, "", "", node1),
+			pvs: []*testPV{
+				{"pv-w-canbind-4", modeWait, "", node1},
+				{"pv-i-canbind-2", modeImmediate, "", node1},
 			},
-			pvcs: []*v1.PersistentVolumeClaim{
-				makePVC("pvc-w-canbind-4", config.ns, &classWait, ""),
-				makePVC("pvc-i-canbind-2", config.ns, &classImmediate, ""),
+			pvcs: []*testPVC{
+				{"pvc-w-canbind-4", modeWait, ""},
+				{"pvc-i-canbind-2", modeImmediate, ""},
 			},
 		},
 	}
@@ -159,26 +173,41 @@ func TestVolumeBinding(t *testing.T) {
 	for name, test := range cases {
 		glog.Infof("Running test %v", name)
 
+		// Create two StorageClasses
+		suffix := rand.String(4)
+		classes := map[storagev1.VolumeBindingMode]*storagev1.StorageClass{}
+		classes[modeImmediate] = makeStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate)
+		classes[modeWait] = makeStorageClass(fmt.Sprintf("wait-%v", suffix), &modeWait)
+		for _, sc := range classes {
+			if _, err := config.client.StorageV1().StorageClasses().Create(sc); err != nil {
+				t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
+			}
+		}
+
 		// Create PVs
-		for _, pv := range test.pvs {
+		for _, pvConfig := range test.pvs {
+			pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
 			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
 		}
 
-		for _, pv := range test.unboundPvs {
+		for _, pvConfig := range test.unboundPvs {
+			pv := makePV(pvConfig.name, classes[pvConfig.scMode].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
 			if _, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
 		}
 
 		// Create PVCs
-		for _, pvc := range test.pvcs {
+		for _, pvcConfig := range test.pvcs {
+			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
 		}
-		for _, pvc := range test.unboundPvcs {
+		for _, pvcConfig := range test.unboundPvcs {
+			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scMode].Name, pvcConfig.preboundPV)
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(pvc); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
@@ -200,23 +229,22 @@ func TestVolumeBinding(t *testing.T) {
 
 		// Validate PVC/PV binding
 		for _, pvc := range test.pvcs {
-			validatePVCPhase(t, config.client, pvc, v1.ClaimBound)
+			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound)
 		}
 		for _, pvc := range test.unboundPvcs {
-			validatePVCPhase(t, config.client, pvc, v1.ClaimPending)
+			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimPending)
 		}
 		for _, pv := range test.pvs {
-			validatePVPhase(t, config.client, pv, v1.VolumeBound)
+			validatePVPhase(t, config.client, pv.name, v1.VolumeBound)
 		}
 		for _, pv := range test.unboundPvs {
-			validatePVPhase(t, config.client, pv, v1.VolumeAvailable)
+			validatePVPhase(t, config.client, pv.name, v1.VolumeAvailable)
 		}
 
 		// TODO: validate events on Pods and PVCs
 
-		config.client.CoreV1().Pods(config.ns).DeleteCollection(deleteOption, metav1.ListOptions{})
-		config.client.CoreV1().PersistentVolumeClaims(config.ns).DeleteCollection(deleteOption, metav1.ListOptions{})
-		config.client.CoreV1().PersistentVolumes().DeleteCollection(deleteOption, metav1.ListOptions{})
+		// Force delete objects, but they still may not be immediately removed
+		deleteTestObjects(config.client, config.ns, deleteOption)
 	}
 }
 
@@ -229,7 +257,7 @@ func TestVolumeBindingStress(t *testing.T) {
 	pvs := []*v1.PersistentVolume{}
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < podLimit*volsPerPod; i++ {
-		pv := makePV(t, fmt.Sprintf("pv-stress-%v", i), classWait, "", "", node1)
+		pv := makePV(fmt.Sprintf("pv-stress-%v", i), classWait, "", "", node1)
 		pvc := makePVC(fmt.Sprintf("pvc-stress-%v", i), config.ns, &classWait, "")
 
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
@@ -267,10 +295,10 @@ func TestVolumeBindingStress(t *testing.T) {
 
 	// Validate PVC/PV binding
 	for _, pvc := range pvcs {
-		validatePVCPhase(t, config.client, pvc, v1.ClaimBound)
+		validatePVCPhase(t, config.client, pvc.Name, config.ns, v1.ClaimBound)
 	}
 	for _, pv := range pvs {
-		validatePVPhase(t, config.client, pv, v1.VolumeBound)
+		validatePVPhase(t, config.client, pv.Name, v1.VolumeBound)
 	}
 
 	// TODO: validate events on Pods and PVCs
@@ -280,7 +308,7 @@ func TestPVAffinityConflict(t *testing.T) {
 	config := setupCluster(t, "volume-scheduling", 3)
 	defer config.teardown()
 
-	pv := makePV(t, "local-pv", classImmediate, "", "", node1)
+	pv := makePV("local-pv", classImmediate, "", "", node1)
 	pvc := makePVC("local-pvc", config.ns, &classImmediate, "")
 
 	// Create PV
@@ -411,14 +439,18 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int) *testConfig {
 		ns:     ns,
 		stop:   controllerCh,
 		teardown: func() {
-			clientset.CoreV1().Pods(ns).DeleteCollection(nil, metav1.ListOptions{})
-			clientset.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(nil, metav1.ListOptions{})
-			clientset.CoreV1().PersistentVolumes().DeleteCollection(nil, metav1.ListOptions{})
-			clientset.StorageV1().StorageClasses().DeleteCollection(nil, metav1.ListOptions{})
+			deleteTestObjects(clientset, ns, nil)
 			cleanupTest(t, context)
 			utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,LocalPersistentVolumes=false")
 		},
 	}
+}
+
+func deleteTestObjects(client clientset.Interface, ns string, option *metav1.DeleteOptions) {
+	client.CoreV1().Pods(ns).DeleteCollection(option, metav1.ListOptions{})
+	client.CoreV1().PersistentVolumeClaims(ns).DeleteCollection(option, metav1.ListOptions{})
+	client.CoreV1().PersistentVolumes().DeleteCollection(option, metav1.ListOptions{})
+	client.StorageV1().StorageClasses().DeleteCollection(option, metav1.ListOptions{})
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
@@ -431,7 +463,7 @@ func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1
 	}
 }
 
-func makePV(t *testing.T, name, scName, pvcName, ns, node string) *v1.PersistentVolume {
+func makePV(name, scName, pvcName, ns, node string) *v1.PersistentVolume {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -528,25 +560,25 @@ func makePod(name, ns string, pvcs []string) *v1.Pod {
 	}
 }
 
-func validatePVCPhase(t *testing.T, client clientset.Interface, pvc *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase) {
-	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+func validatePVCPhase(t *testing.T, client clientset.Interface, pvcName string, ns string, phase v1.PersistentVolumeClaimPhase) {
+	claim, err := client.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
 	if err != nil {
-		t.Errorf("Failed to get PVC %v/%v: %v", pvc.Namespace, pvc.Name, err)
+		t.Errorf("Failed to get PVC %v/%v: %v", ns, pvcName, err)
 	}
 
 	if claim.Status.Phase != phase {
-		t.Errorf("PVC %v/%v phase not %v, got %v", pvc.Namespace, pvc.Name, phase, claim.Status.Phase)
+		t.Errorf("PVC %v/%v phase not %v, got %v", ns, pvcName, phase, claim.Status.Phase)
 	}
 }
 
-func validatePVPhase(t *testing.T, client clientset.Interface, pv *v1.PersistentVolume, phase v1.PersistentVolumePhase) {
-	pv, err := client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, phase v1.PersistentVolumePhase) {
+	pv, err := client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
 	if err != nil {
-		t.Errorf("Failed to get PV %v: %v", pv.Name, err)
+		t.Errorf("Failed to get PV %v: %v", pvName, err)
 	}
 
 	if pv.Status.Phase != phase {
-		t.Errorf("PV %v phase not %v, got %v", pv.Name, phase, pv.Status.Phase)
+		t.Errorf("PV %v phase not %v, got %v", pvName, phase, pv.Status.Phase)
 	}
 }
 

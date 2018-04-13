@@ -53,7 +53,7 @@ func TestEnabledPluginNames(t *testing.T) {
 			setDefaultOffPlugins:      sets.NewString(),
 		},
 
-		// scenario 3: use default off plugins and specified by enable-admission-plugin with RecommendedPluginOrder
+		// scenario 3: use default off plugins and specified by enable-admission-plugins with RecommendedPluginOrder
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginB", "pluginC", "pluginD"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
@@ -61,7 +61,7 @@ func TestEnabledPluginNames(t *testing.T) {
 			setEnablePlugins:          []string{"pluginD", "pluginC"},
 		},
 
-		// scenario 4: use default off plugins and specified by disable-admission-plugin with RecommendedPluginOrder
+		// scenario 4: use default off plugins and specified by disable-admission-plugins with RecommendedPluginOrder
 		{
 			expectedPluginNames:       []string{"pluginB"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
@@ -69,7 +69,7 @@ func TestEnabledPluginNames(t *testing.T) {
 			setDisablePlugins:         []string{"pluginA"},
 		},
 
-		// scenario 5: use default off plugins and specified by enable-admission-plugin and disable-admission-plugin with RecommendedPluginOrder
+		// scenario 5: use default off plugins and specified by enable-admission-plugins and disable-admission-plugins with RecommendedPluginOrder
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginC"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
@@ -142,39 +142,39 @@ func TestValidate(t *testing.T) {
 			expectedResult: true,
 		},
 
-		// scenario 1: set both `--enable-admission-plugin` `--disable-admission-plugin`
+		// scenario 1: set both `--enable-admission-plugins` `--disable-admission-plugins`
 		{
 			setEnablePlugins:  []string{"pluginA", "pluginB"},
 			setDisablePlugins: []string{"pluginC"},
 			expectedResult:    true,
 		},
 
-		// scenario 2: set invalid `--enable-admission-plugin` `--disable-admission-plugin`
+		// scenario 2: set invalid `--enable-admission-plugins` `--disable-admission-plugins`
 		{
 			setEnablePlugins:  []string{"pluginA", "pluginB"},
 			setDisablePlugins: []string{"pluginB"},
 			expectedResult:    false,
 		},
 
-		// scenario 3: set only invalid `--enable-admission-plugin`
+		// scenario 3: set only invalid `--enable-admission-plugins`
 		{
 			setEnablePlugins: []string{"pluginA", "pluginE"},
 			expectedResult:   false,
 		},
 
-		// scenario 4: set only invalid `--disable-admission-plugin`
+		// scenario 4: set only invalid `--disable-admission-plugins`
 		{
 			setDisablePlugins: []string{"pluginA", "pluginE"},
 			expectedResult:    false,
 		},
 
-		// scenario 5: set valid `--enable-admission-plugin`
+		// scenario 5: set valid `--enable-admission-plugins`
 		{
 			setEnablePlugins: []string{"pluginA", "pluginB"},
 			expectedResult:   true,
 		},
 
-		// scenario 6: set valid `--disable-admission-plugin`
+		// scenario 6: set valid `--disable-admission-plugins`
 		{
 			setDisablePlugins: []string{"pluginA"},
 			expectedResult:    true,

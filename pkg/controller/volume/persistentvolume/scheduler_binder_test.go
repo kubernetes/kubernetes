@@ -383,11 +383,6 @@ func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *bindin
 	return &bindingInfo{pvc: pvc, pv: pv}
 }
 
-func makeStringPtr(str string) *string {
-	s := fmt.Sprintf("%v", str)
-	return &s
-}
-
 func TestFindPodVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		// Inputs

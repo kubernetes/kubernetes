@@ -73,7 +73,7 @@ type serviceAccountConfig struct {
 	infos                  []*resource.Info
 	serviceAccountName     string
 
-	PrintObj func(runtime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
@@ -127,9 +127,7 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	if err != nil {
 		return err
 	}
-	saConfig.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, saConfig.out)
-	}
+	saConfig.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -180,7 +178,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			continue
 		}
 		if saConfig.local || saConfig.dryRun {
-			if err := saConfig.PrintObj(patch.Info.AsVersioned()); err != nil {
+			if err := saConfig.PrintObj(patch.Info.AsVersioned(), saConfig.out); err != nil {
 				return err
 			}
 			continue
@@ -199,7 +197,7 @@ func (saConfig *serviceAccountConfig) Run() error {
 			}
 		}
 
-		if err := saConfig.PrintObj(info.AsVersioned()); err != nil {
+		if err := saConfig.PrintObj(info.AsVersioned(), saConfig.out); err != nil {
 			return err
 		}
 	}

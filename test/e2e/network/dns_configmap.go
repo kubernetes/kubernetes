@@ -34,10 +34,11 @@ type dnsFederationsConfigMapTest struct {
 }
 
 var _ = SIGDescribe("DNS configMap federations", func() {
+
 	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
-	BeforeEach(func() { t.c = t.f.ClientSet })
 
 	It("should be able to change federation configuration [Slow][Serial]", func() {
+		t.c = t.f.ClientSet
 		t.run()
 	})
 })
@@ -185,11 +186,56 @@ func (t *dnsNameserverTest) run() {
 		moreForeverTestTimeout)
 }
 
-var _ = SIGDescribe("DNS configMap nameserver", func() {
-	t := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
-	BeforeEach(func() { t.c = t.f.ClientSet })
+type dnsPtrFwdTest struct {
+	dnsTestCommon
+}
 
-	It("should be able to change stubDomain configuration [Slow][Serial]", func() {
-		t.run()
+func (t *dnsPtrFwdTest) run() {
+	t.init()
+
+	t.createUtilPod()
+	defer t.deleteUtilPod()
+
+	t.createDNSServerWithPtrRecord()
+	defer t.deleteDNSServerPod()
+
+	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
+	}})
+
+	moreForeverTestTimeout := 2 * 60 * time.Second
+
+	t.checkDNSRecordFrom(
+		"123.2.0.192.in-addr.arpa",
+		func(actual []string) bool { return len(actual) == 1 && actual[0] == "my.test." },
+		"dnsmasq",
+		moreForeverTestTimeout)
+
+	t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
+	t.checkDNSRecordFrom(
+		"123.2.0.192.in-addr.arpa",
+		func(actual []string) bool { return len(actual) == 0 },
+		"dnsmasq",
+		moreForeverTestTimeout)
+}
+
+var _ = SIGDescribe("DNS configMap nameserver", func() {
+
+	Context("Change stubDomain", func() {
+		nsTest := &dnsNameserverTest{dnsTestCommon: newDnsTestCommon()}
+
+		It("should be able to change stubDomain configuration [Slow][Serial]", func() {
+			nsTest.c = nsTest.f.ClientSet
+			nsTest.run()
+		})
+	})
+
+	Context("Forward PTR lookup", func() {
+		fwdTest := &dnsPtrFwdTest{dnsTestCommon: newDnsTestCommon()}
+
+		It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
+			fwdTest.c = fwdTest.f.ClientSet
+			fwdTest.run()
+		})
 	})
 })

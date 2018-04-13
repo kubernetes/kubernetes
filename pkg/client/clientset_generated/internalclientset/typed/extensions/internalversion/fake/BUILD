@@ -14,7 +14,6 @@ go_library(
         "fake_deployment_expansion.go",
         "fake_extensions_client.go",
         "fake_ingress.go",
-        "fake_podsecuritypolicy.go",
         "fake_replicaset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake",

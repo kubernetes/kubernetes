@@ -76,8 +76,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
-	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -238,7 +236,6 @@ type Dependencies struct {
 	KubeClient              clientset.Interface
 	ExternalKubeClient      clientset.Interface
 	Mounter                 mount.Interface
-	NetworkPlugins          []network.NetworkPlugin
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
 	PodConfig               *config.PodConfig
@@ -545,19 +542,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		glog.Infof("Experimental host user namespace defaulting is enabled.")
 	}
 
-	hairpinMode, err := effectiveHairpinMode(kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode), containerRuntime, crOptions.NetworkPluginName)
-	if err != nil {
-		// This is a non-recoverable error. Returning it up the callstack will just
-		// lead to retries of the same failure, so just fail hard.
-		glog.Fatalf("Invalid hairpin mode: %v", err)
-	}
-	glog.Infof("Hairpin mode set to %q", hairpinMode)
-
-	plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, crOptions.NetworkPluginName, &criNetworkHost{&networkHost{klet}, &network.NoopPortMappingGetter{}}, hairpinMode, nonMasqueradeCIDR, int(crOptions.NetworkPluginMTU))
-	if err != nil {
-		return nil, err
-	}
-	klet.networkPlugin = plug
 	machineInfo, err := klet.cadvisor.MachineInfo()
 	if err != nil {
 		return nil, err
@@ -581,31 +565,20 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// TODO: These need to become arguments to a standalone docker shim.
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       hairpinMode,
-		NonMasqueradeCIDR: nonMasqueradeCIDR,
-		PluginName:        crOptions.NetworkPluginName,
-		PluginConfDir:     crOptions.CNIConfDir,
-		PluginBinDirs:     cni.SplitDirs(crOptions.CNIBinDir),
-		MTU:               int(crOptions.NetworkPluginMTU),
+		HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
+		NonMasqueradeCIDR:  nonMasqueradeCIDR,
+		PluginName:         crOptions.NetworkPluginName,
+		PluginConfDir:      crOptions.CNIConfDir,
+		PluginBinDirString: crOptions.CNIBinDir,
+		MTU:                int(crOptions.NetworkPluginMTU),
 	}
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
-
-	// Remote runtime shim just cannot talk back to kubelet, so it doesn't
-	// support bandwidth shaping or hostports till #35457. To enable legacy
-	// features, replace with networkHost.
-	var nl *NoOpLegacyHost
-	pluginSettings.LegacyRuntimeHost = nl
 
 	if containerRuntime == "rkt" {
 		glog.Fatalln("rktnetes has been deprecated in favor of rktlet. Please see https://github.com/kubernetes-incubator/rktlet for more information.")
 	}
 
-	// kubelet defers to the runtime shim to setup networking. Setting
-	// this to nil will prevent it from trying to invoke the plugin.
-	// It's easier to always probe and initialize plugins till cri
-	// becomes the default.
-	klet.networkPlugin = nil
 	// if left at nil, that means it is unneeded
 	var legacyLogProvider kuberuntime.LegacyLogProvider
 
@@ -939,9 +912,6 @@ type Kubelet struct {
 
 	// Volume plugins.
 	volumePluginMgr *volume.VolumePluginMgr
-
-	// Network plugin.
-	networkPlugin network.NetworkPlugin
 
 	// Handles container probing.
 	probeManager prober.Manager
@@ -1330,7 +1300,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
 		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
 	}
-	go wait.Until(kl.syncNetworkStatus, 30*time.Second, wait.NeverStop)
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
 	// Start loop to sync iptables util rules

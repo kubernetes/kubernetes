@@ -72,6 +72,8 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
+# preserve etcd data. you also need to set ETCD_DIR.
+PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 # enable Pod priority and preemption
@@ -141,7 +143,7 @@ fi
 
 # warn if users are running with swap allowed
 if [ "${FAIL_SWAP_ON}" == "false" ]; then
-    echo "WARNING : The kubelet is configured to not fail if swap is enabled; production deployments should disable swap."
+    echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
 fi
 
 if [ "$(id -u)" != "0" ]; then
@@ -378,8 +380,9 @@ cleanup()
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
-
+  if [[ "${PRESERVE_ETCD}" == "false" ]]; then
+    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  fi
   exit 0
 }
 

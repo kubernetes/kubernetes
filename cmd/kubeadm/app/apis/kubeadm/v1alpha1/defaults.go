@@ -52,6 +52,8 @@ const (
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
 	// DefaultCRISocket defines the default cri socket
 	DefaultCRISocket = "/var/run/dockershim.sock"
+	// DefaultClusterName defines the default cluster name
+	DefaultClusterName = "kubernetes"
 
 	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
 	DefaultEtcdDataDir = "/var/lib/etcd"
@@ -136,6 +138,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.Etcd.DataDir = DefaultEtcdDataDir
 	}
 
+	if obj.ClusterName == "" {
+		obj.ClusterName = DefaultClusterName
+	}
+
 	SetDefaultsEtcdSelfHosted(obj)
 	if features.Enabled(obj.FeatureGates, features.DynamicKubeletConfig) {
 		SetDefaults_KubeletConfiguration(obj)
@@ -185,6 +191,9 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 		obj.DiscoveryTimeout = &metav1.Duration{
 			Duration: DefaultDiscoveryTimeout,
 		}
+	}
+	if obj.ClusterName == "" {
+		obj.ClusterName = DefaultClusterName
 	}
 }
 

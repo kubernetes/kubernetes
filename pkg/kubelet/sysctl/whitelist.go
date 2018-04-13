@@ -22,7 +22,7 @@ import (
 
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	policyvalidation "k8s.io/kubernetes/pkg/apis/policy/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -64,11 +64,11 @@ func NewWhitelist(patterns []string, annotationKey string) (*patternWhitelist, e
 	}
 
 	for _, s := range patterns {
-		if !extvalidation.IsValidSysctlPattern(s) {
+		if !policyvalidation.IsValidSysctlPattern(s) {
 			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
 				s,
 				validation.SysctlMaxLength,
-				extvalidation.SysctlPatternFmt,
+				policyvalidation.SysctlPatternFmt,
 			)
 		}
 		if strings.HasSuffix(s, "*") {

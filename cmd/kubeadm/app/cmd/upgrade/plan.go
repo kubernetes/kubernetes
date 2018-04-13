@@ -23,6 +23,7 @@ import (
 	"sort"
 	"text/tabwriter"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -55,6 +56,8 @@ func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 // RunPlan takes care of outputting available versions to upgrade to for the user
 func RunPlan(parentFlags *cmdUpgradeFlags) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
+	glog.V(1).Infof("[upgrade/plan] verifying health of cluster")
+	glog.V(1).Infof("[upgrade/plan] retrieving configuration from cluster")
 	upgradeVars, err := enforceRequirements(parentFlags, false, "")
 	if err != nil {
 		return err
@@ -64,6 +67,7 @@ func RunPlan(parentFlags *cmdUpgradeFlags) error {
 	etcdCluster := kubeadmutil.LocalEtcdCluster{}
 
 	// Compute which upgrade possibilities there are
+	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
 	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades, etcdCluster, upgradeVars.cfg.FeatureGates)
 	if err != nil {
 		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
@@ -104,7 +108,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, featureGate
 					firstPrinted = true
 					continue
 				}
-				fmt.Fprintf(tabw, "\t\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
+				fmt.Fprintf(tabw, "\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
 			}
 			// We should flush the writer here at this stage; as the columns will now be of the right size, adjusted to the above content
 			tabw.Flush()

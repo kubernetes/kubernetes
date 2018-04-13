@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -105,7 +106,7 @@ func ScaleRCByLabels(clientset clientset.Interface, scalesGetter scaleclient.Sca
 			return err
 		}
 		if replicas == 0 {
-			ps, err := podStoreForSelector(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector))
+			ps, err := testutils.NewPodStore(clientset, rc.Namespace, labels.SelectorFromSet(rc.Spec.Selector), fields.Everything())
 			if err != nil {
 				return err
 			}

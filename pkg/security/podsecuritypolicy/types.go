@@ -19,7 +19,7 @@ package podsecuritypolicy
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
@@ -54,7 +54,7 @@ type Provider interface {
 type StrategyFactory interface {
 	// CreateStrategies creates the strategies that a provider will use.  The namespace argument
 	// should be the namespace of the object being checked (the pod's namespace).
-	CreateStrategies(psp *extensions.PodSecurityPolicy, namespace string) (*ProviderStrategies, error)
+	CreateStrategies(psp *policy.PodSecurityPolicy, namespace string) (*ProviderStrategies, error)
 }
 
 // ProviderStrategies is a holder for all strategies that the provider requires to be populated.

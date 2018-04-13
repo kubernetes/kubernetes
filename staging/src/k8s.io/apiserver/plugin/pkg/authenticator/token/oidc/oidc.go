@@ -98,6 +98,10 @@ type Options struct {
 	// https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 	SupportedSigningAlgs []string
 
+	// RequiredClaims, if specified, causes the OIDCAuthenticator to verify that all the
+	// required claims key value pairs are present in the ID Token.
+	RequiredClaims map[string]string
+
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
 }
@@ -109,6 +113,7 @@ type Authenticator struct {
 	usernamePrefix string
 	groupsClaim    string
 	groupsPrefix   string
+	requiredClaims map[string]string
 
 	// Contains an *oidc.IDTokenVerifier. Do not access directly use the
 	// idTokenVerifier method.
@@ -218,6 +223,7 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		usernamePrefix: opts.UsernamePrefix,
 		groupsClaim:    opts.GroupsClaim,
 		groupsPrefix:   opts.GroupsPrefix,
+		requiredClaims: opts.RequiredClaims,
 		cancel:         cancel,
 	}
 
@@ -323,6 +329,23 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 			info.Groups[i] = a.groupsPrefix + group
 		}
 	}
+
+	// check to ensure all required claims are present in the ID token and have matching values.
+	for claim, value := range a.requiredClaims {
+		if !c.hasClaim(claim) {
+			return nil, false, fmt.Errorf("oidc: required claim %s not present in ID token", claim)
+		}
+
+		// NOTE: Only string values are supported as valid required claim values.
+		var claimValue string
+		if err := c.unmarshalClaim(claim, &claimValue); err != nil {
+			return nil, false, fmt.Errorf("oidc: parse claim %s: %v", claim, err)
+		}
+		if claimValue != value {
+			return nil, false, fmt.Errorf("oidc: required claim %s value does not match. Got = %s, want = %s", claim, claimValue, value)
+		}
+	}
+
 	return info, true, nil
 }
 

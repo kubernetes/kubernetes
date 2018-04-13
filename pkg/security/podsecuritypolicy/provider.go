@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -36,7 +36,7 @@ const (
 
 // simpleProvider is the default implementation of Provider.
 type simpleProvider struct {
-	psp        *extensions.PodSecurityPolicy
+	psp        *policy.PodSecurityPolicy
 	strategies *ProviderStrategies
 }
 
@@ -44,7 +44,7 @@ type simpleProvider struct {
 var _ Provider = &simpleProvider{}
 
 // NewSimpleProvider creates a new Provider instance.
-func NewSimpleProvider(psp *extensions.PodSecurityPolicy, namespace string, strategyFactory StrategyFactory) (Provider, error) {
+func NewSimpleProvider(psp *policy.PodSecurityPolicy, namespace string, strategyFactory StrategyFactory) (Provider, error) {
 	if psp == nil {
 		return nil, fmt.Errorf("NewSimpleProvider requires a PodSecurityPolicy")
 	}
@@ -144,7 +144,7 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 	// if we're using the non-root strategy set the marker that this container should not be
 	// run as root which will signal to the kubelet to do a final check either on the runAsUser
 	// or, if runAsUser is not set, the image UID will be checked.
-	if sc.RunAsNonRoot() == nil && sc.RunAsUser() == nil && s.psp.Spec.RunAsUser.Rule == extensions.RunAsUserStrategyMustRunAsNonRoot {
+	if sc.RunAsNonRoot() == nil && sc.RunAsUser() == nil && s.psp.Spec.RunAsUser.Rule == policy.RunAsUserStrategyMustRunAsNonRoot {
 		nonRoot := true
 		sc.SetRunAsNonRoot(&nonRoot)
 	}
@@ -226,7 +226,7 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod, fldPath *field.Path) field.Er
 				continue
 			}
 
-			if fsType == extensions.HostPath {
+			if fsType == policy.HostPath {
 				if !psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path) {
 					allErrs = append(allErrs, field.Invalid(
 						field.NewPath("spec", "volumes").Index(i).Child("hostPath", "pathPrefix"), v.HostPath.Path,
@@ -234,7 +234,7 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod, fldPath *field.Path) field.Er
 				}
 			}
 
-			if fsType == extensions.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
+			if fsType == policy.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
 				found := false
 				driver := v.FlexVolume.Driver
 				for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
@@ -333,7 +333,7 @@ func (s *simpleProvider) GetPSPName() string {
 	return s.psp.Name
 }
 
-func hostPortRangesToString(ranges []extensions.HostPortRange) string {
+func hostPortRangesToString(ranges []policy.HostPortRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}

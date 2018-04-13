@@ -109,6 +109,11 @@ func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface
 		return nil, err
 	}
 
+	// The more groups you have, the more discovery requests you need to make.
+	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
+	// double it just so we don't end up here again for a while.  This config is only used for discovery.
+	cfg.Burst = 100
+
 	if f.cacheDir != "" {
 		wt := cfg.WrapTransport
 		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
@@ -465,6 +470,7 @@ const (
 	DeploymentAppsV1Beta1GeneratorName      = "deployment/apps.v1beta1"
 	DeploymentBasicV1Beta1GeneratorName     = "deployment-basic/v1beta1"
 	DeploymentBasicAppsV1Beta1GeneratorName = "deployment-basic/apps.v1beta1"
+	DeploymentBasicAppsV1GeneratorName      = "deployment-basic/apps.v1"
 	JobV1GeneratorName                      = "job/v1"
 	CronJobV2Alpha1GeneratorName            = "cronjob/v2alpha1"
 	CronJobV1Beta1GeneratorName             = "cronjob/v1beta1"
@@ -506,9 +512,10 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	case "deployment":
 		// Create Deployment has only StructuredGenerators and no
 		// param-based Generators.
-		// The StructuredGenerators are as follows (as of 2017-07-17):
+		// The StructuredGenerators are as follows (as of 2018-03-16):
 		// DeploymentBasicV1Beta1GeneratorName -> kubectl.DeploymentBasicGeneratorV1
-		// DeploymentBasicAppsV1Beta1GeneratorName -> kubectl.DeploymentBasicAppsGeneratorV1
+		// DeploymentBasicAppsV1Beta1GeneratorName -> kubectl.DeploymentBasicAppsGeneratorV1Beta1
+		// DeploymentBasicAppsV1GeneratorName -> kubectl.DeploymentBasicAppsGeneratorV1
 		generator = map[string]kubectl.Generator{}
 	case "run":
 		generator = map[string]kubectl.Generator{
@@ -557,14 +564,53 @@ func FallbackGeneratorNameIfNecessary(
 	cmdErr io.Writer,
 ) (string, error) {
 	switch generatorName {
+	case DeploymentAppsV1Beta1GeneratorName:
+		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
+			return FallbackGeneratorNameIfNecessary(DeploymentV1Beta1GeneratorName, discoveryClient, cmdErr)
+		}
+	case DeploymentV1Beta1GeneratorName:
+		hasResource, err := HasResource(discoveryClient, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
+			return RunV1GeneratorName, nil
+		}
+	case DeploymentBasicAppsV1GeneratorName:
+		hasResource, err := HasResource(discoveryClient, appsv1.SchemeGroupVersion.WithResource("deployments"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
+			return FallbackGeneratorNameIfNecessary(DeploymentBasicAppsV1Beta1GeneratorName, discoveryClient, cmdErr)
+		}
 	case DeploymentBasicAppsV1Beta1GeneratorName:
 		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
 		if err != nil {
 			return "", err
 		}
 		if !hasResource {
-			warning(cmdErr, DeploymentBasicAppsV1Beta1GeneratorName, DeploymentBasicV1Beta1GeneratorName)
 			return DeploymentBasicV1Beta1GeneratorName, nil
+		}
+	case JobV1GeneratorName:
+		hasResource, err := HasResource(discoveryClient, batchv1.SchemeGroupVersion.WithResource("jobs"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
+			return RunPodV1GeneratorName, nil
+		}
+	case CronJobV1Beta1GeneratorName:
+		hasResource, err := HasResource(discoveryClient, batchv1beta1.SchemeGroupVersion.WithResource("cronjobs"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
+			return FallbackGeneratorNameIfNecessary(CronJobV2Alpha1GeneratorName, discoveryClient, cmdErr)
 		}
 	case CronJobV2Alpha1GeneratorName:
 		hasResource, err := HasResource(discoveryClient, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs"))
@@ -572,15 +618,14 @@ func FallbackGeneratorNameIfNecessary(
 			return "", err
 		}
 		if !hasResource {
-			warning(cmdErr, CronJobV2Alpha1GeneratorName, JobV1GeneratorName)
 			return JobV1GeneratorName, nil
 		}
 	}
 	return generatorName, nil
 }
 
-func warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
-	fmt.Fprintf(cmdErr, "WARNING: New deployments generator %q specified, "+
+func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
+	fmt.Fprintf(cmdErr, "WARNING: New generator %q specified, "+
 		"but it isn't available. "+
 		"Falling back to %q.\n",
 		newGeneratorName,

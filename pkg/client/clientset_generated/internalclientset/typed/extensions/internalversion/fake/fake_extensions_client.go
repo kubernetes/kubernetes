@@ -40,10 +40,6 @@ func (c *FakeExtensions) Ingresses(namespace string) internalversion.IngressInte
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensions) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
-	return &FakePodSecurityPolicies{c}
-}
-
 func (c *FakeExtensions) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
 }

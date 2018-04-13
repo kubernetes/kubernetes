@@ -53,7 +53,7 @@ type ImageOptions struct {
 	Cmd          *cobra.Command
 	ResolveImage func(in string) (string, error)
 
-	PrintObj func(runtime.Object) error
+	PrintObj printers.ResourcePrinterFunc
 
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
@@ -136,9 +136,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return err
 	}
 
-	o.PrintObj = func(obj runtime.Object) error {
-		return printer.PrintObj(obj, o.Out)
-	}
+	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -258,7 +256,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.Local || o.DryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned()); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -283,7 +281,7 @@ func (o *ImageOptions) Run() error {
 
 		info.Refresh(obj, true)
 
-		if err := o.PrintObj(info.AsVersioned()); err != nil {
+		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
 			return err
 		}
 	}

@@ -37,6 +37,7 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	"net/url"
@@ -99,6 +100,7 @@ func (CRICheck) Name() string {
 
 // Check validates the container runtime through the CRI.
 func (criCheck CRICheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating the container runtime through the CRI")
 	crictlPath, err := criCheck.exec.LookPath("crictl")
 	if err != nil {
 		errors = append(errors, fmt.Errorf("unable to find command crictl: %s", err))
@@ -130,6 +132,7 @@ func (sc ServiceCheck) Name() string {
 
 // Check validates if the service is enabled and active.
 func (sc ServiceCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating if the service is enabled and active")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		return []error{err}, nil
@@ -170,6 +173,7 @@ func (FirewalldCheck) Name() string {
 
 // Check validates if the firewall is enabled and active.
 func (fc FirewalldCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating if the firewall is enabled and active")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		return []error{err}, nil
@@ -206,6 +210,7 @@ func (poc PortOpenCheck) Name() string {
 
 // Check validates if the particular port is available.
 func (poc PortOpenCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("validating availability of port %d", poc.port)
 	errors = []error{}
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
@@ -242,6 +247,7 @@ func (dac DirAvailableCheck) Name() string {
 
 // Check validates if a directory does not exist or empty.
 func (dac DirAvailableCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("validating the existence and emptiness of directory %s", dac.Path)
 	errors = []error{}
 	// If it doesn't exist we are good:
 	if _, err := os.Stat(dac.Path); os.IsNotExist(err) {
@@ -279,6 +285,7 @@ func (fac FileAvailableCheck) Name() string {
 
 // Check validates if the given file does not already exist.
 func (fac FileAvailableCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("validating the existence of file %s", fac.Path)
 	errors = []error{}
 	if _, err := os.Stat(fac.Path); err == nil {
 		errors = append(errors, fmt.Errorf("%s already exists", fac.Path))
@@ -302,6 +309,7 @@ func (fac FileExistingCheck) Name() string {
 
 // Check validates if the given file already exists.
 func (fac FileExistingCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("validating the existence of file %s", fac.Path)
 	errors = []error{}
 	if _, err := os.Stat(fac.Path); err != nil {
 		errors = append(errors, fmt.Errorf("%s doesn't exist", fac.Path))
@@ -326,6 +334,7 @@ func (fcc FileContentCheck) Name() string {
 
 // Check validates if the given file contains the given content.
 func (fcc FileContentCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("validating the contents of file %s", fcc.Path)
 	f, err := os.Open(fcc.Path)
 	if err != nil {
 		return nil, []error{fmt.Errorf("%s does not exist", fcc.Path)}
@@ -366,6 +375,7 @@ func (ipc InPathCheck) Name() string {
 
 // Check validates if the given executable is present in the path.
 func (ipc InPathCheck) Check() (warnings, errs []error) {
+	glog.V(1).Infof("validating the presence of executable %s", ipc.executable)
 	_, err := ipc.exec.LookPath(ipc.executable)
 	if err != nil {
 		if ipc.mandatory {
@@ -395,6 +405,7 @@ func (HostnameCheck) Name() string {
 
 // Check validates if hostname match dns sub domain regex.
 func (hc HostnameCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("validating if hostname match dns sub domain")
 	errors = []error{}
 	warnings = []error{}
 	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
@@ -424,7 +435,7 @@ func (hst HTTPProxyCheck) Name() string {
 
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
-
+	glog.V(1).Infof("validating if the connectivity type is via proxy or direct")
 	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
 
 	req, err := http.NewRequest("GET", u, nil)
@@ -460,7 +471,7 @@ func (HTTPProxyCIDRCheck) Name() string {
 // Check validates http connectivity to first IP address in the CIDR.
 // If it is not directly connected and goes via proxy it will produce warning.
 func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
-
+	glog.V(1).Infoln("validating http connectivity to first IP address in the CIDR")
 	if len(subnet.CIDR) == 0 {
 		return nil, nil
 	}
@@ -511,6 +522,7 @@ func (ExtraArgsCheck) Name() string {
 
 // Check validates additional arguments of the control plane components.
 func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating additional arguments of the control plane components")
 	argsCheck := func(name string, args map[string]string, f *pflag.FlagSet) []error {
 		errs := []error{}
 		for k, v := range args {
@@ -558,6 +570,7 @@ func (SystemVerificationCheck) Name() string {
 
 // Check runs all individual checks
 func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("running all checks")
 	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
 	// Run the system verification check, but write to out buffered writer instead of stdout
 	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
@@ -615,7 +628,7 @@ func (KubernetesVersionCheck) Name() string {
 
 // Check validates kubernetes and kubeadm versions
 func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
-
+	glog.V(1).Infoln("validating kubernetes and kubeadm version")
 	// Skip this check for "super-custom builds", where apimachinery/the overall codebase version is not set.
 	if strings.HasPrefix(kubever.KubeadmVersion, "v0.0.0") {
 		return nil, nil
@@ -656,6 +669,7 @@ func (KubeletVersionCheck) Name() string {
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating kubelet version")
 	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
 		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
@@ -686,6 +700,7 @@ func (SwapCheck) Name() string {
 
 // Check validates whether swap is enabled or not
 func (swc SwapCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating whether swap is enabled or not")
 	f, err := os.Open("/proc/swaps")
 	if err != nil {
 		// /proc/swaps not available, thus no reasons to warn
@@ -725,6 +740,7 @@ func (ExternalEtcdVersionCheck) Name() string {
 
 // Check validates external etcd version
 func (evc ExternalEtcdVersionCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infoln("validating the external etcd version")
 	var config *tls.Config
 	var err error
 	if config, err = evc.configRootCAs(config); err != nil {
@@ -832,13 +848,13 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 			r, err := client.Get(url)
 			if err != nil {
 				loopCount--
-				return false, nil
+				return false, err
 			}
 			defer r.Body.Close()
 
 			if r != nil && r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--
-				return false, nil
+				return false, fmt.Errorf("server responded with non-successful status: %s", r.Status)
 			}
 			return true, json.NewDecoder(r.Body).Decode(target)
 
@@ -858,6 +874,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfi
 	}
 
 	// check if we can use crictl to perform checks via the CRI
+	glog.V(1).Infoln("checking if we can use crictl to perform checks via the CRI")
 	criCtlChecker := InPathCheck{
 		executable: "crictl",
 		mandatory:  false,
@@ -1079,13 +1096,13 @@ func TryStartKubelet(ignorePreflightErrors sets.String) {
 	// If we notice that the kubelet service is inactive, try to start it
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		fmt.Println("[preflight] No supported init system detected, won't ensure kubelet is running.")
+		glog.Infoln("[preflight] no supported init system detected, won't ensure kubelet is running.")
 	} else if initSystem.ServiceExists("kubelet") && !initSystem.ServiceIsActive("kubelet") {
 
-		fmt.Println("[preflight] Starting the kubelet service")
+		glog.Infoln("[preflight] starting the kubelet service")
 		if err := initSystem.ServiceStart("kubelet"); err != nil {
-			fmt.Printf("[preflight] WARNING: Unable to start the kubelet service: [%v]\n", err)
-			fmt.Println("[preflight] WARNING: Please ensure kubelet is running manually.")
+			glog.Warningf("[preflight] unable to start the kubelet service: [%v]\n", err)
+			glog.Warningf("[preflight] please ensure kubelet is running manually.")
 		}
 	}
 }

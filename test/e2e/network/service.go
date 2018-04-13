@@ -499,7 +499,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
 		// requires cloud load-balancer support
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
@@ -1426,7 +1426,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should be able to create an internal type load balancer [Slow] [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs("azure", "gke", "gce")
 
@@ -1568,28 +1568,32 @@ var _ = SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(f, cs, svc, true)
 	})
 
-	It("should have session affinity work for LoadBalancer service with ESIPP on [Slow]", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		execAffinityTestForLBService(f, cs, svc, false)
 	})
 
-	It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow]", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		execAffinityTestForLBService(f, cs, svc, true)
 	})
 
-	It("should have session affinity work for LoadBalancer service with ESIPP off [Slow]", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 		execAffinityTestForLBService(f, cs, svc, false)
 	})
 
-	It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow]", func() {
+	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
@@ -1597,7 +1601,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 })
 
-// TODO: Get rid of [DisabledForLargeClusters] tag when issue #52495 is fixed.
+// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	loadBalancerCreateTimeout := framework.LoadBalancerCreateTimeoutDefault
