@@ -4030,25 +4030,38 @@ run_job_tests() {
   # Post-condition: namespace 'test-jobs' is created.
   kube::test::get_object_assert 'namespaces/test-jobs' "{{$id_field}}" 'test-jobs'
 
-  ### Create a cronjob in a specific namespace
+  ### Create a cronjob/v1beta1 in a specific namespace
   kubectl run pi --schedule="59 23 31 2 *" --namespace=test-jobs --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: assertion object exists
   kube::test::get_object_assert 'cronjob/pi --namespace=test-jobs' "{{$id_field}}" 'pi'
 
-  ### Create a job in dry-run mode
+  ### Create a job from cronjob/v1beta1 in dry-run mode
   output_message=$(kubectl create job test-job --from=cronjob/pi --dry-run=true --namespace=test-jobs -o name)
   # Post-condition: The text 'job.batch/test-job' should be part of the output
   kube::test::if_has_string "${output_message}" 'job.batch/test-job'
   # Post-condition: The test-job wasn't created actually
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}{{end}}" ''
 
-  ### Create a job in a specific namespace
+  ### Create a job from cronjob/v1beta1 in a specific namespace
   kubectl create job test-job --from=cronjob/pi --namespace=test-jobs
   # Post-Condition: assertion object exists
   kube::test::get_object_assert 'job/test-job --namespace=test-jobs' "{{$id_field}}" 'test-job'
+
+  ### Create a cronjob/v2alpha1 in a specific namespace
+  kubectl run foo --schedule="59 23 31 2 *" --namespace=test-jobs --generator=cronjob/v2alpha1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: assertion object exists
+  kube::test::get_object_assert 'cronjob/foo --namespace=test-jobs' "{{$id_field}}" 'foo'
+
+  ### Create a job from cronjob/v2alpha1 in a specific namespace
+  kubectl create job bar --from=cronjob/foo --namespace=test-jobs
+  # Post-Condition: assertion object exists
+  kube::test::get_object_assert 'job/bar --namespace=test-jobs' "{{$id_field}}" 'bar'
+
   #Clean up
   kubectl delete job test-job --namespace=test-jobs
   kubectl delete cronjob pi --namespace=test-jobs
+  kubectl delete job bar --namespace=test-jobs
+  kubectl delete cronjob foo --namespace=test-jobs
   kubectl delete namespace test-jobs
 
   set +o nounset
