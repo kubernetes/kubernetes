@@ -103,6 +103,14 @@ func TestPodAndContainerAttach(t *testing.T) {
 			obj:                   attachPod(),
 		},
 		{
+			name:                  "ephemeral container in flag",
+			options:               &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "debugger"}, GetPodTimeout: 30},
+			args:                  []string{"foo"},
+			expectedPodName:       "foo",
+			expectedContainerName: "debugger",
+			obj:                   attachPod(),
+		},
+		{
 			name:            "non-existing container",
 			options:         &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
 			args:            []string{"foo"},
@@ -136,7 +144,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			test.options.Resources = test.args
 
 			if err := test.options.Validate(); err != nil {
-				if !strings.Contains(err.Error(), test.expectError) {
+				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
 					t.Errorf("unexpected error: expected %q, got %q", test.expectError, err)
 				}
 				return
@@ -153,7 +161,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 				},
 			})
 			if err != nil {
-				if !strings.Contains(err.Error(), test.expectError) {
+				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
 					t.Errorf("unexpected error: expected %q, got %q", err, test.expectError)
 				}
 				return
@@ -165,7 +173,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 
 			container, err := test.options.containerToAttachTo(attachPod())
 			if err != nil {
-				if !strings.Contains(err.Error(), test.expectError) {
+				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
 					t.Errorf("unexpected error: expected %q, got %q", err, test.expectError)
 				}
 				return
@@ -412,6 +420,13 @@ func attachPod() *corev1.Pod {
 			InitContainers: []corev1.Container{
 				{
 					Name: "initfoo",
+				},
+			},
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name: "debugger",
+					},
 				},
 			},
 		},
