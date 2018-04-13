@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
+
 _generate = """
   # location of prebuilt deepcopy generator
   dcg=$$PWD/'$(location //vendor/k8s.io/code-generator/cmd/deepcopy-gen)'
@@ -19,65 +21,93 @@ _generate = """
   # original pwd
   export O=$$PWD
 
-  # gopath/goroot for genrule
-  export GOPATH=$$PWD/._go
-  export GOROOT=/usr/lib/google-golang
+  # split each GOPATH entry by :
+  gopaths=($$(IFS=: ; echo $$GOPATH))
 
-  # symlink in source to new gopath
-  # TODO(fejta): figure out what subset of this nonsense is necessary
-  mkdir -p $$GOPATH/src/k8s.io
-  ln -snf $$PWD $$GOPATH/src/k8s.io/kubernetes
-  touch $$GOPATH/BUILD.bazel # avoid cycle of the above symlink
+  srcpath="$${gopaths[0]}"
+  dstpath="$${gopaths[1]}"
+  if [[ "$$dstpath" != "$$GENGOPATH" ]]; then
+    env | sort
+    echo "Envionrmental assumptions failed: GENGOPATH is no the second GOPATH"
+    exit 1
+  fi
+
+  # Ensure all the vendor/staging code is in the expected locations
   for i in $$(ls vendor/k8s.io); do
-    ln -snf $$PWD/vendor/k8s.io/$$i $$GOPATH/src/k8s.io/$$i
-    ln -snf $$PWD/vendor/k8s.io/$$i $$GOPATH/src/k8s.io/kubernetes/vendor/k8s.io/$$i
+    ln -snf $$PWD/vendor/k8s.io/$$i $$dstpath/src/k8s.io/$$i
   done
   # symlink in all the staging dirs
   for i in $$(ls staging/src/k8s.io); do
-    ln -snf $$PWD/staging/src/k8s.io/$$i $$GOPATH/src/k8s.io/$$i
-    ln -snf $$PWD/staging/src/k8s.io/$$i $$GOPATH/src/k8s.io/kubernetes/vendor/k8s.io/$$i
+    ln -snf $$PWD/staging/src/k8s.io/$$i $$dstpath/src/k8s.io/$$i
   done
 
-  cd $$GOPATH/src/k8s.io/kubernetes
 
   # Find all packages that request deepcopy-generation, except for the deepcopy-gen tool itself
   files=()
+  GO="$$GOROOT/bin/go"
   for p in $$(find . -name *.go | \
       (xargs grep -l '+k8s:deepcopy-gen=' || true) | \
       (xargs -n 1 dirname || true) | sort -u | \
-      sed -e 's|./staging/src/||' | xargs go list | grep -v k8s.io/code-generator/cmd/deepcopy-gen); do
+      sed -e 's|./staging/src/||' | xargs "$$GO" list | grep -v k8s.io/code-generator/cmd/deepcopy-gen); do
     files+=("$$p")
   done
   packages="$$(IFS="," ; echo "$${files[*]}")"  # Create comma-separated list of packages expected by tool
   echo "Generating: $${files[*]}..."
   $$dcg \
-  -v 1 \
-  -i "$$packages" \
-  --bounding-dirs k8s.io/kubernetes,k8s.io/api \
-  -h $(location //vendor/k8s.io/code-generator/hack:boilerplate.go.txt) \
-  -O zz_generated.deepcopy
+    -v 1 \
+    -i "$$packages" \
+    --bounding-dirs k8s.io/kubernetes,k8s.io/api \
+    -h $(location //vendor/k8s.io/code-generator/hack:boilerplate.go.txt) \
+    -O zz_generated.deepcopy
 
-  for p in "$${files[@]}"; do
-    found=false
-    for s in "" "k8s.io/kubernetes/vendor/" "staging/src/"; do
-      if [[ -f "$$GOPATH/src/$$s$$p/zz_generated.deepcopy.go" ]]; then
-        found=true
-        if [[ $$s == "k8s.io/kubernetes/vendor/" ]]; then
-          grep -A 1 import $$GOPATH/src/$$s$$p/zz_generated.deepcopy.go
+  # Ensure we generated each file
+  if [[ -n "$${DEBUG:-}" ]]; then
+    for p in "$${files[@]}"; do
+      found=false
+      for s in "" "k8s.io/kubernetes/vendor/" "staging/src/"; do
+        echo $$s
+        if [[ -f "$$srcpath/src/$$s$$p/zz_generated.deepcopy.go" ]]; then
+          found=true
+          if [[ $$s == "k8s.io/kubernetes/vendor/" ]]; then
+            grep -A 1 import $$srcpath/src/$$s$$p/zz_generated.deepcopy.go
+          fi
+          echo FOUND: $$s$$p
+          break
         fi
-        echo FOUND: $$s$$p
-        break
+      done
+      if [[ $$found == false ]]; then
+        echo FAILED: $$p
+        exit 1
       fi
     done
-    if [[ $$found == false ]]; then
-      echo FAILED: $$p
-      exit 1
+  fi
+
+  # what device is this on
+  lsdev() {
+    if [[  -d "$$1" ]]; then
+      t="$$1"
+    else
+      t=$$(dirname "$$1")
     fi
-  done
+    df "$$t" | sed -n '2{s/ .*$$//;p;}'
+  }
+
+  # ln on same device, cp on diff devices
+  lncp() {
+    device=$$(lsdev "$$1")
+    for i in "$$@"; do
+      if [[ "$$(lsdev "$$i")" != "$$device" ]]; then
+        cp -f "$$@"
+        return 0
+      fi
+    done
+    ln -f "$$@"
+  }
 
   # detect if the out file does not exist or changed
   move-out() {
-    dst="$$O/$(@D)/$$1/zz_generated.deepcopy.go"
+    D="$(OUTS)"
+    dst="$$O/$${D%%/genfiles/*}/genfiles/build/$$1/zz_generated.deepcopy.go"
     options=(
       "k8s.io/kubernetes/$$1"
       "$${1/vendor\//}"
@@ -85,7 +115,7 @@ _generate = """
     )
     found=false
     for o in "$${options[@]}"; do
-      src="$$GOPATH/src/$$o/zz_generated.deepcopy.go"
+      src="$$srcpath/src/$$o/zz_generated.deepcopy.go"
       if [[ ! -f "$$src" ]]; then
         continue
       fi
@@ -96,27 +126,29 @@ _generate = """
       echo "NOT FOUND: $$1 in any of the $${options[@]}"
       exit 1
     fi
-    echo SRC: $$src
-    echo DST: $$dst
-    if [[ ! -f "$$src" ]]; then
-     echo PROBLEM $$src
-     ls $$(dirname $$src)
-     echo odd
-     exit 1
-    fi
 
     if [[ ! -f "$$dst" ]]; then
-      echo "MISSING: $$dst"
       mkdir -p "$$(dirname "$$dst")"
-      ln "$$src" "$$dst"
-    elif ! cmp -s "$$src" "$$dst"; then
+      lncp "$$src" "$$dst"
+      echo ... generated $$1/zz_generated.deepcopy.go
+      return 0
+    fi
+
+    # TODO(fejta): see if we will ever hit this codepath
+    echo ' ********** OMG ************* '
+    if ! cmp -s "$$src" "$$dst"; then
       # link it back to the expected location
       echo "UPDATE: $$dst (src $$? old)"
       ln -f "$$src" "$$dst"
     else
       echo "GOOD NEWS: using cached version of $$dst"
     fi
+    exit 1
   }
+
+  ####################################
+  # append move-out calls below here #
+  ####################################
 """
 
 _link = """
@@ -179,12 +211,13 @@ def k8s_deepcopy_all(name, packages):
   cmd = _generate + '\n'.join(['move-out %s' % p for p in packages])
 
   # Rule which generates a set of out files given a set of input src and tool files
-  native.genrule(
+  go_genrule(
     name = name,
     # Bazel needs to know all the files that this rule might possibly read
     srcs = [
         "//vendor/k8s.io/code-generator/hack:boilerplate.go.txt",
         "//:all-srcs", # TODO(fejta): consider updating kazel to provide just the list of go files
+	"@go_sdk//:files",  # k8s.io/gengo expects to be able to read $GOROOT/src
     ],
     # Build the tool we run to generate the files
     tools = ["//vendor/k8s.io/code-generator/cmd/deepcopy-gen"],
