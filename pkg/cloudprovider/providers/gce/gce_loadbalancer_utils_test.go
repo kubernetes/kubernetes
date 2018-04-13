@@ -69,9 +69,12 @@ func DefaultTestClusterValues() TestClusterValues {
 	}
 }
 
-func fakeLbApiService() *v1.Service {
+func fakeLoadbalancerService(lbType string) *v1.Service {
 	return &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: ""},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "",
+			Annotations: map[string]string{ServiceAnnotationLoadBalancerType: lbType},
+		},
 		Spec: v1.ServiceSpec{
 			SessionAffinity: v1.ServiceAffinityClientIP,
 			Type:            v1.ServiceTypeLoadBalancer,

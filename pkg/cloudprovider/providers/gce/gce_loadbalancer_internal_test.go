@@ -54,7 +54,7 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
@@ -82,7 +82,7 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
@@ -116,7 +116,7 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	status, err := createInternalLoadBalancer(gce, apiService, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
@@ -130,7 +130,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	// Create the expected resources necessary for an Internal Load Balancer
 	nm := types.NamespacedName{Name: apiService.Name, Namespace: apiService.Namespace}
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
@@ -162,7 +162,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	lbName := cloudprovider.GetLoadBalancerName(apiService)
 
 	// Create a ForwardingRule that's missing an IP address
@@ -239,7 +239,7 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
@@ -290,7 +290,7 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
@@ -320,7 +320,7 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
@@ -335,7 +335,7 @@ func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	apiService := fakeLbApiService()
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
