@@ -44,6 +44,8 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Path to a kubeconfig file, specifying how to connect to the API server.
+	KubeConfig string `json:"kubeConfig,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Default: ""
