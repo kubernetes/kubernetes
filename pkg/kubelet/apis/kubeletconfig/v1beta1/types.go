@@ -62,6 +62,10 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Path to a kubeconfig file that will be used to get client certificate for kubelet.
+	// Default: ""
+	// +optional
+	BootstrapKubeconfig string `json:"bootstrapKubeconfig,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
