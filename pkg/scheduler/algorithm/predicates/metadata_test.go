@@ -88,6 +88,13 @@ func (s sortableServices) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 var _ = sort.Interface(&sortableServices{})
 
+func sortNodePodMap(np map[string][]*v1.Pod) {
+	for _, pl := range np {
+		sortablePods := sortablePods(pl)
+		sort.Sort(sortablePods)
+	}
+}
+
 // predicateMetadataEquivalent returns true if the two metadata are equivalent.
 // Note: this function does not compare podRequest.
 func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
@@ -110,6 +117,16 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	sortAntiAffinityTerms(meta2.matchingAntiAffinityTerms)
 	if !reflect.DeepEqual(meta1.matchingAntiAffinityTerms, meta2.matchingAntiAffinityTerms) {
 		return fmt.Errorf("matchingAntiAffinityTerms are not euqal")
+	}
+	sortNodePodMap(meta1.nodeNameToMatchingAffinityPods)
+	sortNodePodMap(meta2.nodeNameToMatchingAffinityPods)
+	if !reflect.DeepEqual(meta1.nodeNameToMatchingAffinityPods, meta2.nodeNameToMatchingAffinityPods) {
+		return fmt.Errorf("nodeNameToMatchingAffinityPods are not euqal")
+	}
+	sortNodePodMap(meta1.nodeNameToMatchingAntiAffinityPods)
+	sortNodePodMap(meta2.nodeNameToMatchingAntiAffinityPods)
+	if !reflect.DeepEqual(meta1.nodeNameToMatchingAntiAffinityPods, meta2.nodeNameToMatchingAntiAffinityPods) {
+		return fmt.Errorf("nodeNameToMatchingAntiAffinityPods are not euqal")
 	}
 	if meta1.serviceAffinityInUse {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
@@ -162,6 +179,34 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 		},
 	}
 	antiAffinityComplex := &v1.PodAntiAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"bar", "buzz"},
+						},
+					},
+				},
+				TopologyKey: "region",
+			},
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "service",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"bar", "security", "test"},
+						},
+					},
+				},
+				TopologyKey: "zone",
+			},
+		},
+	}
+	affinityComplex := &v1.PodAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 			{
 				LabelSelector: &metav1.LabelSelector{
@@ -312,6 +357,41 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
 			},
 		},
+		{
+			description: "metadata matching pod affinity and anti-affinity are updated correctly after adding and removing a pod",
+			pendingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+			},
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeC",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: antiAffinityFooBar,
+							PodAffinity:     affinityComplex,
+						},
+					},
+				},
+			},
+			addedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
+				Spec: v1.PodSpec{
+					NodeName: "nodeA",
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityComplex,
+					},
+				},
+			},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector1}}},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -360,6 +440,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 // on the idea that shallow-copy should produce an object that is deep-equal to the original
 // object.
 func TestPredicateMetadata_ShallowCopy(t *testing.T) {
+	selector1 := map[string]string{"foo": "bar"}
 	source := predicateMetadata{
 		pod: &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -389,6 +470,45 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 					node: &v1.Node{
 						ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 					},
+				},
+			},
+		},
+		nodeNameToMatchingAffinityPods: map[string][]*v1.Pod{
+			"nodeA": {
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+			},
+			"nodeC": {
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeC",
+					},
+				},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeC"},
+				},
+			},
+		},
+		nodeNameToMatchingAntiAffinityPods: map[string][]*v1.Pod{
+			"nodeN": {
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeN"},
+				},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeM",
+					},
+				},
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p3"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeM",
+					},
+				},
+			},
+			"nodeM": {
+				&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeM"},
 				},
 			},
 		},
