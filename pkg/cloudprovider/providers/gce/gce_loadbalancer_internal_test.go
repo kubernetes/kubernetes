@@ -321,7 +321,7 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	assert.Equal(
 		t,
 		bs.HealthChecks,
-		[]string{fmt.Sprintf("%s/healthChecks/k8s-%s-node", url_base, vals.ClusterID)},
+		[]string{fmt.Sprintf("%s/global/healthChecks/k8s-%s-node", url_base, vals.ClusterID)},
 	)
 }
 
