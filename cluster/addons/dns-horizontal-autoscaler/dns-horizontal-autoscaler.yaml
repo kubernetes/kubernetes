@@ -26,6 +26,7 @@ metadata:
   name: system:kube-dns-autoscaler
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: true
 rules:
   - apiGroups: [""]
     resources: ["nodes"]
@@ -48,6 +49,7 @@ metadata:
   name: system:kube-dns-autoscaler
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: true
 subjects:
   - kind: ServiceAccount
     name: kube-dns-autoscaler
