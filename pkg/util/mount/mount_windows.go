@@ -201,31 +201,7 @@ func (mounter *Mounter) MakeRShared(path string) error {
 
 // GetFileType checks for sockets/block/character devices
 func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	var pathType FileType
-	info, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		return pathType, fmt.Errorf("path %q does not exist", pathname)
-	}
-	// err in call to os.Stat
-	if err != nil {
-		return pathType, err
-	}
-
-	mode := info.Sys().(*syscall.Win32FileAttributeData).FileAttributes
-	switch mode & syscall.S_IFMT {
-	case syscall.S_IFSOCK:
-		return FileTypeSocket, nil
-	case syscall.S_IFBLK:
-		return FileTypeBlockDev, nil
-	case syscall.S_IFCHR:
-		return FileTypeCharDev, nil
-	case syscall.S_IFDIR:
-		return FileTypeDirectory, nil
-	case syscall.S_IFREG:
-		return FileTypeFile, nil
-	}
-
-	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+	return getFileType(pathname)
 }
 
 // MakeFile creates a new directory
