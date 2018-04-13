@@ -18,12 +18,15 @@ package cmd
 
 import (
 	"errors"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/utils/exec"
@@ -52,8 +55,38 @@ func assertDirEmpty(t *testing.T, path string) {
 	}
 }
 
+func TestNewReset(t *testing.T) {
+	certsDir := kubeadmapiext.DefaultCertificatesDir
+	criSocketPath := "/var/run/dockershim.sock"
+	skipPreFlight := false
+
+	ignorePreflightErrors := []string{"all"}
+	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	NewReset(ignorePreflightErrorsSet, certsDir, criSocketPath)
+
+	ignorePreflightErrors = []string{}
+	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	NewReset(ignorePreflightErrorsSet, certsDir, criSocketPath)
+}
+
+func TestNewCmdReset(t *testing.T) {
+	var out io.Writer
+	cmd := NewCmdReset(out)
+
+	tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
+	if err != nil {
+		t.Errorf("Unable to create temporary directory: %v", err)
+	}
+	args := []string{"--ignore-preflight-errors=all", "--cert-dir=" + tmpDir}
+	cmd.SetArgs(args)
+	if err := cmd.Execute(); err != nil {
+		t.Errorf("Cannot execute reset command: %v", err)
+	}
+}
+
 func TestConfigDirCleaner(t *testing.T) {
 	tests := map[string]struct {
+		resetDir        string
 		setupDirs       []string
 		setupFiles      []string
 		verifyExists    []string
@@ -139,6 +172,12 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests",
 			},
 		},
+		"not a directory": {
+			resetDir: "test-path",
+			setupFiles: []string{
+				"test-path",
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -166,7 +205,10 @@ func TestConfigDirCleaner(t *testing.T) {
 			f.Close()
 		}
 
-		resetConfigDir(tmpDir, filepath.Join(tmpDir, "pki"))
+		if test.resetDir == "" {
+			test.resetDir = "pki"
+		}
+		resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
 
 		// Verify the files we cleanup implicitly in every test:
 		assertExists(t, tmpDir)
