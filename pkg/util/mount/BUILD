@@ -64,6 +64,7 @@ go_test(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
