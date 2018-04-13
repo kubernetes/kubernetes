@@ -108,7 +108,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, featureGate
 					firstPrinted = true
 					continue
 				}
-				fmt.Fprintf(tabw, "\t\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
+				fmt.Fprintf(tabw, "\t%d x %s\t%s\n", nodeCount, oldVersion, upgrade.After.KubeVersion)
 			}
 			// We should flush the writer here at this stage; as the columns will now be of the right size, adjusted to the above content
 			tabw.Flush()
