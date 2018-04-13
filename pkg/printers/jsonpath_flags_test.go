@@ -103,14 +103,14 @@ func TestPrinterSupportsExpectedJSONPathFormats(t *testing.T) {
 				TemplateArgument: templateArg,
 			}
 
-			p, matched, err := printFlags.ToPrinter(tc.outputFormat)
+			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if matched {
+				if !printers.IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if !matched {
+			if printers.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
 			}
 
@@ -183,8 +183,8 @@ func TestJSONPathPrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 			}
 
 			outputFormat := "jsonpath"
-			p, matched, err := printFlags.ToPrinter(outputFormat)
-			if !matched {
+			p, err := printFlags.ToPrinter(outputFormat)
+			if printers.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", outputFormat)
 			}
 			if err != nil {

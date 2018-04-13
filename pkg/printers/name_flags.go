@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,6 +36,11 @@ type NamePrintFlags struct {
 	// took place on an object, to be included in the
 	// finalized "successful" message.
 	Operation string
+}
+
+func (f *NamePrintFlags) Complete(successTemplate string) error {
+	f.Operation = fmt.Sprintf(successTemplate, f.Operation)
+	return nil
 }
 
 // ToPrinter receives an outputFormat and returns a printer capable of

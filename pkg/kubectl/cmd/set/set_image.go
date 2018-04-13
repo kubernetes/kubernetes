@@ -130,7 +130,6 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
-
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

@@ -63,10 +63,7 @@ func GetStandardPrinter(typer runtime.ObjectTyper, encoder runtime.Encoder, deco
 			},
 		}
 
-		kubeTemplatePrinter, matched, err := kubeTemplateFlags.ToPrinter(format)
-		if !matched {
-			return nil, fmt.Errorf("unable to match a template printer to handle current print options")
-		}
+		kubeTemplatePrinter, err := kubeTemplateFlags.ToPrinter(format)
 		if err != nil {
 			return nil, err
 		}

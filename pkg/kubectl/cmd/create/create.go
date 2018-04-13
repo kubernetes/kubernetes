@@ -28,6 +28,7 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -38,6 +39,11 @@ import (
 )
 
 type CreateOptions struct {
+	PrintFlags *PrintFlags
+	PrintObj   func(obj kruntime.Object) error
+
+	DryRun bool
+
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
 	EditBeforeCreate bool
@@ -65,6 +71,8 @@ var (
 
 func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &CreateOptions{
+		PrintFlags: NewPrintFlags("created"),
+
 		Out:    out,
 		ErrOut: errOut,
 	}
@@ -81,6 +89,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 				defaultRunFunc(cmd, args)
 				return
 			}
+			cmdutil.CheckErr(options.Complete(cmd))
 			cmdutil.CheckErr(options.ValidateArgs(cmd, args))
 			cmdutil.CheckErr(options.RunCreate(f, cmd))
 		},
@@ -90,7 +99,6 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.EditBeforeCreate, "edit", options.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
@@ -100,6 +108,8 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
+
+	options.PrintFlags.AddFlags(cmd)
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
@@ -150,6 +160,24 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func (o *CreateOptions) Complete(cmd *cobra.Command) error {
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj = func(obj kruntime.Object) error {
+		return printer.PrintObj(obj, o.Out)
+	}
+
+	return nil
+}
+
 func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	// raw only makes sense for a single file resource multiple objects aren't likely to do what you want.
 	// the validator enforces this, so
@@ -184,9 +212,6 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	dryRun := cmdutil.GetDryRunFlag(cmd)
-	output := cmdutil.GetFlagString(cmd, "output")
-
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -202,7 +227,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 		}
 
-		if !dryRun {
+		if !o.DryRun {
 			if err := createAndRefresh(info); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
@@ -210,13 +235,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 		count++
 
-		shortOutput := output == "name"
-		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintObject(cmd, info.Object, o.Out)
-		}
-
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "created")
-		return nil
+		return o.PrintObj(info.Object)
 	})
 	if err != nil {
 		return err
@@ -295,17 +314,52 @@ func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
 
 // CreateSubcommandOptions is an options struct to support create subcommands
 type CreateSubcommandOptions struct {
+	// PrintFlags holds options necessary for obtaining a printer
+	PrintFlags *PrintFlags
 	// Name of resource being created
 	Name string
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator kubectl.StructuredGenerator
 	// DryRun is true if the command should be simulated but not run against the server
-	DryRun       bool
-	OutputFormat string
+	DryRun           bool
+	CreateAnnotation bool
+
+	PrintObj func(obj kruntime.Object) error
+
+	CmdOut io.Writer
+	CmdErr io.Writer
 }
 
+func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	o.Name = name
+	o.StructuredGenerator = generator
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+
+	o.PrintObj = func(obj kruntime.Object) error {
+		return printer.PrintObj(obj, o.CmdOut)
+	}
+
+	return nil
+}
+
+// TODO(juanvallejo): remove dependency on factory here. Complete necessary bits
+// from it in the Complete() method.
 // RunCreateSubcommand executes a create subcommand using the specified options
-func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *CreateSubcommandOptions) error {
+func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) error {
 	namespace, nsOverriden, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -338,25 +392,22 @@ func RunCreateSubcommand(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, o
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
-		obj = info.Object
 
 		obj, err = resource.NewHelper(client, mapping).Create(namespace, false, info.Object)
 		if err != nil {
 			return err
 		}
+
+		// ensure we pass a versioned object to the printer
+		obj = info.AsVersioned()
 	} else {
 		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
 			meta.SetNamespace(namespace)
 		}
 	}
 
-	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(useShortOutput, out, obj, options.DryRun, "created")
-		return nil
-	}
-
-	return cmdutil.PrintObject(cmd, obj, out)
+	return options.PrintObj(obj)
 }

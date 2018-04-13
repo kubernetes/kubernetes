@@ -37,9 +37,9 @@ type JSONPathPrintFlags struct {
 // ToPrinter receives an templateFormat and returns a printer capable of
 // handling --template format printing.
 // Returns false if the specified templateFormat does not match a template format.
-func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, bool, error) {
+func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
 	if (f.TemplateArgument == nil || len(*f.TemplateArgument) == 0) && len(templateFormat) == 0 {
-		return nil, false, fmt.Errorf("missing --template value")
+		return nil, NoCompatiblePrinterError{f}
 	}
 
 	templateValue := ""
@@ -66,17 +66,17 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 	}
 
 	if _, supportedFormat := templateFormats[templateFormat]; !supportedFormat {
-		return nil, false, nil
+		return nil, NoCompatiblePrinterError{f}
 	}
 
 	if len(templateValue) == 0 {
-		return nil, true, fmt.Errorf("template format specified but no template given")
+		return nil, fmt.Errorf("template format specified but no template given")
 	}
 
 	if templateFormat == "jsonpath-file" {
 		data, err := ioutil.ReadFile(templateValue)
 		if err != nil {
-			return nil, true, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
 		}
 
 		templateValue = string(data)
@@ -84,7 +84,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 
 	p, err := NewJSONPathPrinter(templateValue)
 	if err != nil {
-		return nil, true, fmt.Errorf("error parsing jsonpath %s, %v\n", templateValue, err)
+		return nil, fmt.Errorf("error parsing jsonpath %s, %v\n", templateValue, err)
 	}
 
 	allowMissingKeys := true
@@ -93,7 +93,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, 
 	}
 
 	p.AllowMissingKeys(allowMissingKeys)
-	return p, true, nil
+	return p, nil
 }
 
 // AddFlags receives a *cobra.Command reference and binds

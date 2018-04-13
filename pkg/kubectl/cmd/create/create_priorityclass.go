@@ -39,8 +39,19 @@ var (
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"`))
 )
 
+type PriorityClassOpts struct {
+	CreateSubcommandOptions *CreateSubcommandOptions
+}
+
 // NewCmdCreatePriorityClass is a macro command to create a new priorityClass.
 func NewCmdCreatePriorityClass(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	options := &PriorityClassOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: NewPrintFlags("created"),
+			CmdOut:     cmdOut,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use: "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -49,13 +60,15 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 		Long:                  pcLong,
 		Example:               pcExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(CreatePriorityClass(f, cmdOut, cmd, args))
+			cmdutil.CheckErr(options.Complete(cmd, args))
+			cmdutil.CheckErr(options.Run(f))
 		},
 	}
 
+	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.PriorityClassV1Alpha1GeneratorName)
 
 	cmd.Flags().Int32("value", 0, i18n.T("the value of this priority class."))
@@ -64,12 +77,12 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comma
 	return cmd
 }
 
-// CreatePriorityClass implements the behavior to run the create priorityClass command.
-func CreatePriorityClass(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func (o *PriorityClassOpts) Complete(cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.PriorityClassV1Alpha1GeneratorName:
@@ -82,10 +95,11 @@ func CreatePriorityClass(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
-		Name:                name,
-		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetDryRunFlag(cmd),
-		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
-	})
+
+	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+}
+
+// CreatePriorityClass implements the behavior to run the create priorityClass command.
+func (o *PriorityClassOpts) Run(f cmdutil.Factory) error {
+	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
 }

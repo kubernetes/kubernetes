@@ -371,14 +371,17 @@ func TestComplete(t *testing.T) {
 		expectErr   bool
 	}{
 		"test-missing-name": {
-			params:      []string{},
-			roleOptions: &CreateRoleOptions{},
-			expectErr:   true,
+			params: []string{},
+			roleOptions: &CreateRoleOptions{
+				PrintFlags: NewPrintFlags("created"),
+			},
+			expectErr: true,
 		},
 		"test-duplicate-verbs": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				Name: roleName,
+				PrintFlags: NewPrintFlags("created"),
+				Name:       roleName,
 				Verbs: []string{
 					"get",
 					"watch",
@@ -410,7 +413,8 @@ func TestComplete(t *testing.T) {
 		"test-verball": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
-				Name: roleName,
+				PrintFlags: NewPrintFlags("created"),
+				Name:       roleName,
 				Verbs: []string{
 					"get",
 					"watch",
@@ -438,6 +442,7 @@ func TestComplete(t *testing.T) {
 		"test-duplicate-resourcenames": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
+				PrintFlags:    NewPrintFlags("created"),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo", "foo"},
@@ -462,6 +467,7 @@ func TestComplete(t *testing.T) {
 		"test-valid-complete-case": {
 			params: []string{roleName},
 			roleOptions: &CreateRoleOptions{
+				PrintFlags:    NewPrintFlags("created"),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo"},

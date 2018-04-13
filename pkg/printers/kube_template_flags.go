@@ -29,9 +29,9 @@ type KubeTemplatePrintFlags struct {
 	TemplateArgument *string
 }
 
-func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
-	if p, match, err := f.JSONPathPrintFlags.ToPrinter(outputFormat); match {
-		return p, match, err
+func (f *KubeTemplatePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error) {
+	if p, err := f.JSONPathPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+		return p, err
 	}
 	return f.GoTemplatePrintFlags.ToPrinter(outputFormat)
 }

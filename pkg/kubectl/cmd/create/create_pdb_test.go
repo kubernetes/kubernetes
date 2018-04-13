@@ -50,12 +50,34 @@ func TestCreatePdb(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
+	outputFormat := "name"
+
 	cmd := NewCmdCreatePodDisruptionBudget(tf, buf)
 	cmd.Flags().Set("min-available", "1")
 	cmd.Flags().Set("selector", "app=rails")
 	cmd.Flags().Set("dry-run", "true")
-	cmd.Flags().Set("output", "name")
-	CreatePodDisruptionBudget(tf, buf, cmd, []string{pdbName})
+	cmd.Flags().Set("output", outputFormat)
+
+	printFlags := NewPrintFlags("created")
+	printFlags.OutputFormat = &outputFormat
+
+	options := &PodDisruptionBudgetOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: printFlags,
+			CmdOut:     buf,
+			Name:       pdbName,
+		},
+	}
+	err := options.Complete(cmd, []string{pdbName})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = options.Run(tf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	expectedOutput := "poddisruptionbudget.policy/" + pdbName + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())

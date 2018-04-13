@@ -36,8 +36,19 @@ var (
 	  kubectl create serviceaccount my-service-account`))
 )
 
+type ServiceAccountOpts struct {
+	CreateSubcommandOptions *CreateSubcommandOptions
+}
+
 // NewCmdCreateServiceAccount is a macro command to create a new service account
 func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	options := &ServiceAccountOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: NewPrintFlags("created"),
+			CmdOut:     cmdOut,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use: "serviceaccount NAME [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -46,24 +57,26 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 		Long:                  serviceAccountLong,
 		Example:               serviceAccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateServiceAccount(f, cmdOut, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(cmd, args))
+			cmdutil.CheckErr(options.Run(f))
 		},
 	}
+
+	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ServiceAccountV1GeneratorName)
 	return cmd
 }
 
-// CreateServiceAccount implements the behavior to run the create service account command
-func CreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func (o *ServiceAccountOpts) Complete(cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.ServiceAccountV1GeneratorName:
@@ -71,10 +84,11 @@ func CreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comman
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
-		Name:                name,
-		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetDryRunFlag(cmd),
-		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
-	})
+
+	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+}
+
+// CreateServiceAccount implements the behavior to run the create service account command
+func (o *ServiceAccountOpts) Run(f cmdutil.Factory) error {
+	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
 }
