@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	policy "k8s.io/kubernetes/pkg/apis/policy"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -35,14 +35,14 @@ type PodSecurityPoliciesGetter interface {
 
 // PodSecurityPolicyInterface has methods to work with PodSecurityPolicy resources.
 type PodSecurityPolicyInterface interface {
-	Create(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
-	Update(*extensions.PodSecurityPolicy) (*extensions.PodSecurityPolicy, error)
+	Create(*policy.PodSecurityPolicy) (*policy.PodSecurityPolicy, error)
+	Update(*policy.PodSecurityPolicy) (*policy.PodSecurityPolicy, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*extensions.PodSecurityPolicy, error)
-	List(opts v1.ListOptions) (*extensions.PodSecurityPolicyList, error)
+	Get(name string, options v1.GetOptions) (*policy.PodSecurityPolicy, error)
+	List(opts v1.ListOptions) (*policy.PodSecurityPolicyList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *policy.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
 
@@ -52,15 +52,15 @@ type podSecurityPolicies struct {
 }
 
 // newPodSecurityPolicies returns a PodSecurityPolicies
-func newPodSecurityPolicies(c *ExtensionsClient) *podSecurityPolicies {
+func newPodSecurityPolicies(c *PolicyClient) *podSecurityPolicies {
 	return &podSecurityPolicies{
 		client: c.RESTClient(),
 	}
 }
 
 // Get takes name of the podSecurityPolicy, and returns the corresponding podSecurityPolicy object, and an error if there is any.
-func (c *podSecurityPolicies) Get(name string, options v1.GetOptions) (result *extensions.PodSecurityPolicy, err error) {
-	result = &extensions.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Get(name string, options v1.GetOptions) (result *policy.PodSecurityPolicy, err error) {
+	result = &policy.PodSecurityPolicy{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
 		Name(name).
@@ -71,8 +71,8 @@ func (c *podSecurityPolicies) Get(name string, options v1.GetOptions) (result *e
 }
 
 // List takes label and field selectors, and returns the list of PodSecurityPolicies that match those selectors.
-func (c *podSecurityPolicies) List(opts v1.ListOptions) (result *extensions.PodSecurityPolicyList, err error) {
-	result = &extensions.PodSecurityPolicyList{}
+func (c *podSecurityPolicies) List(opts v1.ListOptions) (result *policy.PodSecurityPolicyList, err error) {
+	result = &policy.PodSecurityPolicyList{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -91,8 +91,8 @@ func (c *podSecurityPolicies) Watch(opts v1.ListOptions) (watch.Interface, error
 }
 
 // Create takes the representation of a podSecurityPolicy and creates it.  Returns the server's representation of the podSecurityPolicy, and an error, if there is any.
-func (c *podSecurityPolicies) Create(podSecurityPolicy *extensions.PodSecurityPolicy) (result *extensions.PodSecurityPolicy, err error) {
-	result = &extensions.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Create(podSecurityPolicy *policy.PodSecurityPolicy) (result *policy.PodSecurityPolicy, err error) {
+	result = &policy.PodSecurityPolicy{}
 	err = c.client.Post().
 		Resource("podsecuritypolicies").
 		Body(podSecurityPolicy).
@@ -102,8 +102,8 @@ func (c *podSecurityPolicies) Create(podSecurityPolicy *extensions.PodSecurityPo
 }
 
 // Update takes the representation of a podSecurityPolicy and updates it. Returns the server's representation of the podSecurityPolicy, and an error, if there is any.
-func (c *podSecurityPolicies) Update(podSecurityPolicy *extensions.PodSecurityPolicy) (result *extensions.PodSecurityPolicy, err error) {
-	result = &extensions.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Update(podSecurityPolicy *policy.PodSecurityPolicy) (result *policy.PodSecurityPolicy, err error) {
+	result = &policy.PodSecurityPolicy{}
 	err = c.client.Put().
 		Resource("podsecuritypolicies").
 		Name(podSecurityPolicy.Name).
@@ -134,8 +134,8 @@ func (c *podSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, listOp
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.
-func (c *podSecurityPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.PodSecurityPolicy, err error) {
-	result = &extensions.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *policy.PodSecurityPolicy, err error) {
+	result = &policy.PodSecurityPolicy{}
 	err = c.client.Patch(pt).
 		Resource("podsecuritypolicies").
 		SubResource(subresources...).

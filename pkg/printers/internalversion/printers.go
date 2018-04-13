@@ -1619,7 +1619,7 @@ func printConfigMapList(list *api.ConfigMapList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printPodSecurityPolicy(obj *extensions.PodSecurityPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodSecurityPolicy(obj *policy.PodSecurityPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1640,7 +1640,7 @@ func printPodSecurityPolicy(obj *extensions.PodSecurityPolicy, options printers.
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodSecurityPolicyList(list *policy.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodSecurityPolicy(&list.Items[i], options)

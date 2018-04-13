@@ -32,6 +32,7 @@ import (
 	core "k8s.io/kubernetes/pkg/apis/core"
 	core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	policy "k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func init() {
@@ -42,10 +43,10 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_AllowedFlexVolume_To_extensions_AllowedFlexVolume,
-		Convert_extensions_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume,
-		Convert_v1beta1_AllowedHostPath_To_extensions_AllowedHostPath,
-		Convert_extensions_AllowedHostPath_To_v1beta1_AllowedHostPath,
+		Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume,
+		Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume,
+		Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath,
+		Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath,
 		Convert_v1beta1_CustomMetricCurrentStatus_To_extensions_CustomMetricCurrentStatus,
 		Convert_extensions_CustomMetricCurrentStatus_To_v1beta1_CustomMetricCurrentStatus,
 		Convert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCurrentStatusList,
@@ -80,14 +81,14 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
 		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
 		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
-		Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions,
-		Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
+		Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions,
+		Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
 		Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath,
 		Convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath,
 		Convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue,
 		Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue,
-		Convert_v1beta1_HostPortRange_To_extensions_HostPortRange,
-		Convert_extensions_HostPortRange_To_v1beta1_HostPortRange,
+		Convert_v1beta1_HostPortRange_To_policy_HostPortRange,
+		Convert_policy_HostPortRange_To_v1beta1_HostPortRange,
 		Convert_v1beta1_Ingress_To_extensions_Ingress,
 		Convert_extensions_Ingress_To_v1beta1_Ingress,
 		Convert_v1beta1_IngressBackend_To_extensions_IngressBackend,
@@ -104,12 +105,12 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_IngressStatus_To_v1beta1_IngressStatus,
 		Convert_v1beta1_IngressTLS_To_extensions_IngressTLS,
 		Convert_extensions_IngressTLS_To_v1beta1_IngressTLS,
-		Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy,
-		Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
-		Convert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList,
-		Convert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList,
-		Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec,
-		Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
+		Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy,
+		Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
+		Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList,
+		Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList,
+		Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec,
+		Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
 		Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet,
 		Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet,
 		Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition,
@@ -128,59 +129,59 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
 		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
 		Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
-		Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions,
-		Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions,
-		Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions,
-		Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions,
+		Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions,
+		Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions,
+		Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions,
+		Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions,
 		Convert_v1beta1_Scale_To_autoscaling_Scale,
 		Convert_autoscaling_Scale_To_v1beta1_Scale,
 		Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec,
 		Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec,
 		Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus,
 		Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus,
-		Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions,
-		Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
+		Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions,
+		Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
 	)
 }
 
-func autoConvert_v1beta1_AllowedFlexVolume_To_extensions_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *extensions.AllowedFlexVolume, s conversion.Scope) error {
+func autoConvert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *policy.AllowedFlexVolume, s conversion.Scope) error {
 	out.Driver = in.Driver
 	return nil
 }
 
-// Convert_v1beta1_AllowedFlexVolume_To_extensions_AllowedFlexVolume is an autogenerated conversion function.
-func Convert_v1beta1_AllowedFlexVolume_To_extensions_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *extensions.AllowedFlexVolume, s conversion.Scope) error {
-	return autoConvert_v1beta1_AllowedFlexVolume_To_extensions_AllowedFlexVolume(in, out, s)
+// Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume is an autogenerated conversion function.
+func Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *policy.AllowedFlexVolume, s conversion.Scope) error {
+	return autoConvert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in, out, s)
 }
 
-func autoConvert_extensions_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *extensions.AllowedFlexVolume, out *v1beta1.AllowedFlexVolume, s conversion.Scope) error {
+func autoConvert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *policy.AllowedFlexVolume, out *v1beta1.AllowedFlexVolume, s conversion.Scope) error {
 	out.Driver = in.Driver
 	return nil
 }
 
-// Convert_extensions_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume is an autogenerated conversion function.
-func Convert_extensions_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *extensions.AllowedFlexVolume, out *v1beta1.AllowedFlexVolume, s conversion.Scope) error {
-	return autoConvert_extensions_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in, out, s)
+// Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume is an autogenerated conversion function.
+func Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *policy.AllowedFlexVolume, out *v1beta1.AllowedFlexVolume, s conversion.Scope) error {
+	return autoConvert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in, out, s)
 }
 
-func autoConvert_v1beta1_AllowedHostPath_To_extensions_AllowedHostPath(in *v1beta1.AllowedHostPath, out *extensions.AllowedHostPath, s conversion.Scope) error {
+func autoConvert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in *v1beta1.AllowedHostPath, out *policy.AllowedHostPath, s conversion.Scope) error {
 	out.PathPrefix = in.PathPrefix
 	return nil
 }
 
-// Convert_v1beta1_AllowedHostPath_To_extensions_AllowedHostPath is an autogenerated conversion function.
-func Convert_v1beta1_AllowedHostPath_To_extensions_AllowedHostPath(in *v1beta1.AllowedHostPath, out *extensions.AllowedHostPath, s conversion.Scope) error {
-	return autoConvert_v1beta1_AllowedHostPath_To_extensions_AllowedHostPath(in, out, s)
+// Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath is an autogenerated conversion function.
+func Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in *v1beta1.AllowedHostPath, out *policy.AllowedHostPath, s conversion.Scope) error {
+	return autoConvert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in, out, s)
 }
 
-func autoConvert_extensions_AllowedHostPath_To_v1beta1_AllowedHostPath(in *extensions.AllowedHostPath, out *v1beta1.AllowedHostPath, s conversion.Scope) error {
+func autoConvert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in *policy.AllowedHostPath, out *v1beta1.AllowedHostPath, s conversion.Scope) error {
 	out.PathPrefix = in.PathPrefix
 	return nil
 }
 
-// Convert_extensions_AllowedHostPath_To_v1beta1_AllowedHostPath is an autogenerated conversion function.
-func Convert_extensions_AllowedHostPath_To_v1beta1_AllowedHostPath(in *extensions.AllowedHostPath, out *v1beta1.AllowedHostPath, s conversion.Scope) error {
-	return autoConvert_extensions_AllowedHostPath_To_v1beta1_AllowedHostPath(in, out, s)
+// Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath is an autogenerated conversion function.
+func Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in *policy.AllowedHostPath, out *v1beta1.AllowedHostPath, s conversion.Scope) error {
+	return autoConvert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in, out, s)
 }
 
 func autoConvert_v1beta1_CustomMetricCurrentStatus_To_extensions_CustomMetricCurrentStatus(in *v1beta1.CustomMetricCurrentStatus, out *extensions.CustomMetricCurrentStatus, s conversion.Scope) error {
@@ -715,26 +716,26 @@ func autoConvert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(in 
 	return nil
 }
 
-func autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *v1beta1.FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {
-	out.Rule = extensions.FSGroupStrategyType(in.Rule)
-	out.Ranges = *(*[]extensions.GroupIDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in *v1beta1.FSGroupStrategyOptions, out *policy.FSGroupStrategyOptions, s conversion.Scope) error {
+	out.Rule = policy.FSGroupStrategyType(in.Rule)
+	out.Ranges = *(*[]policy.GroupIDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
-// Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *v1beta1.FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in, out, s)
+// Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions is an autogenerated conversion function.
+func Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in *v1beta1.FSGroupStrategyOptions, out *policy.FSGroupStrategyOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in, out, s)
 }
 
-func autoConvert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *extensions.FSGroupStrategyOptions, out *v1beta1.FSGroupStrategyOptions, s conversion.Scope) error {
+func autoConvert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *policy.FSGroupStrategyOptions, out *v1beta1.FSGroupStrategyOptions, s conversion.Scope) error {
 	out.Rule = v1beta1.FSGroupStrategyType(in.Rule)
 	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
-// Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions is an autogenerated conversion function.
-func Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *extensions.FSGroupStrategyOptions, out *v1beta1.FSGroupStrategyOptions, s conversion.Scope) error {
-	return autoConvert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in, out, s)
+// Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions is an autogenerated conversion function.
+func Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *policy.FSGroupStrategyOptions, out *v1beta1.FSGroupStrategyOptions, s conversion.Scope) error {
+	return autoConvert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *extensions.HTTPIngressPath, s conversion.Scope) error {
@@ -783,26 +784,26 @@ func Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in 
 	return autoConvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *v1beta1.HostPortRange, out *extensions.HostPortRange, s conversion.Scope) error {
+func autoConvert_v1beta1_HostPortRange_To_policy_HostPortRange(in *v1beta1.HostPortRange, out *policy.HostPortRange, s conversion.Scope) error {
 	out.Min = in.Min
 	out.Max = in.Max
 	return nil
 }
 
-// Convert_v1beta1_HostPortRange_To_extensions_HostPortRange is an autogenerated conversion function.
-func Convert_v1beta1_HostPortRange_To_extensions_HostPortRange(in *v1beta1.HostPortRange, out *extensions.HostPortRange, s conversion.Scope) error {
-	return autoConvert_v1beta1_HostPortRange_To_extensions_HostPortRange(in, out, s)
+// Convert_v1beta1_HostPortRange_To_policy_HostPortRange is an autogenerated conversion function.
+func Convert_v1beta1_HostPortRange_To_policy_HostPortRange(in *v1beta1.HostPortRange, out *policy.HostPortRange, s conversion.Scope) error {
+	return autoConvert_v1beta1_HostPortRange_To_policy_HostPortRange(in, out, s)
 }
 
-func autoConvert_extensions_HostPortRange_To_v1beta1_HostPortRange(in *extensions.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
+func autoConvert_policy_HostPortRange_To_v1beta1_HostPortRange(in *policy.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
 	out.Min = in.Min
 	out.Max = in.Max
 	return nil
 }
 
-// Convert_extensions_HostPortRange_To_v1beta1_HostPortRange is an autogenerated conversion function.
-func Convert_extensions_HostPortRange_To_v1beta1_HostPortRange(in *extensions.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
-	return autoConvert_extensions_HostPortRange_To_v1beta1_HostPortRange(in, out, s)
+// Convert_policy_HostPortRange_To_v1beta1_HostPortRange is an autogenerated conversion function.
+func Convert_policy_HostPortRange_To_v1beta1_HostPortRange(in *policy.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
+	return autoConvert_policy_HostPortRange_To_v1beta1_HostPortRange(in, out, s)
 }
 
 func autoConvert_v1beta1_Ingress_To_extensions_Ingress(in *v1beta1.Ingress, out *extensions.Ingress, s conversion.Scope) error {
@@ -999,39 +1000,39 @@ func Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressT
 	return autoConvert_extensions_IngressTLS_To_v1beta1_IngressTLS(in, out, s)
 }
 
-func autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
+func autoConvert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy, out *policy.PodSecurityPolicy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy is an autogenerated conversion function.
-func Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy, out *extensions.PodSecurityPolicy, s conversion.Scope) error {
-	return autoConvert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(in, out, s)
+// Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy is an autogenerated conversion function.
+func Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy, out *policy.PodSecurityPolicy, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in, out, s)
 }
 
-func autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *extensions.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
+func autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *policy.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy is an autogenerated conversion function.
-func Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *extensions.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
-	return autoConvert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in, out, s)
+// Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy is an autogenerated conversion function.
+func Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *policy.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
+	return autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in, out, s)
 }
 
-func autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList, out *extensions.PodSecurityPolicyList, s conversion.Scope) error {
+func autoConvert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList, out *policy.PodSecurityPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]extensions.PodSecurityPolicy, len(*in))
+		*out = make([]policy.PodSecurityPolicy, len(*in))
 		for i := range *in {
-			if err := Convert_v1beta1_PodSecurityPolicy_To_extensions_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -1041,18 +1042,18 @@ func autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyLi
 	return nil
 }
 
-// Convert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList is an autogenerated conversion function.
-func Convert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList, out *extensions.PodSecurityPolicyList, s conversion.Scope) error {
-	return autoConvert_v1beta1_PodSecurityPolicyList_To_extensions_PodSecurityPolicyList(in, out, s)
+// Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList is an autogenerated conversion function.
+func Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList, out *policy.PodSecurityPolicyList, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in, out, s)
 }
 
-func autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *extensions.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
+func autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *policy.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1beta1.PodSecurityPolicy, len(*in))
 		for i := range *in {
-			if err := Convert_extensions_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -1062,31 +1063,31 @@ func autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyLi
 	return nil
 }
 
-// Convert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList is an autogenerated conversion function.
-func Convert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *extensions.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
-	return autoConvert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in, out, s)
+// Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList is an autogenerated conversion function.
+func Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *policy.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
+	return autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in, out, s)
 }
 
-func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *extensions.PodSecurityPolicySpec, s conversion.Scope) error {
+func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *policy.PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
 	out.DefaultAddCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
 	out.RequiredDropCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
 	out.AllowedCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
-	out.Volumes = *(*[]extensions.FSType)(unsafe.Pointer(&in.Volumes))
+	out.Volumes = *(*[]policy.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	out.HostPorts = *(*[]extensions.HostPortRange)(unsafe.Pointer(&in.HostPorts))
+	out.HostPorts = *(*[]policy.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
-	if err := Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
+	if err := Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
+	if err := Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, s); err != nil {
+	if err := Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, s); err != nil {
 		return err
 	}
-	if err := Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, s); err != nil {
+	if err := Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, s); err != nil {
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
@@ -1094,17 +1095,17 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 	if err := meta_v1.Convert_Pointer_bool_To_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
 		return err
 	}
-	out.AllowedHostPaths = *(*[]extensions.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
-	out.AllowedFlexVolumes = *(*[]extensions.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
+	out.AllowedHostPaths = *(*[]policy.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
+	out.AllowedFlexVolumes = *(*[]policy.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
 	return nil
 }
 
-// Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec is an autogenerated conversion function.
-func Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *extensions.PodSecurityPolicySpec, s conversion.Scope) error {
-	return autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(in, out, s)
+// Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec is an autogenerated conversion function.
+func Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *policy.PodSecurityPolicySpec, s conversion.Scope) error {
+	return autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in, out, s)
 }
 
-func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *extensions.PodSecurityPolicySpec, out *v1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
+func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *policy.PodSecurityPolicySpec, out *v1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
 	out.DefaultAddCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
 	out.RequiredDropCapabilities = *(*[]v1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
@@ -1114,16 +1115,16 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	out.HostPorts = *(*[]v1beta1.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
-	if err := Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
+	if err := Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
+	if err := Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, s); err != nil {
+	if err := Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, s); err != nil {
 		return err
 	}
-	if err := Convert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, s); err != nil {
+	if err := Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(&in.FSGroup, &out.FSGroup, s); err != nil {
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
@@ -1134,6 +1135,11 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	out.AllowedHostPaths = *(*[]v1beta1.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
 	out.AllowedFlexVolumes = *(*[]v1beta1.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
 	return nil
+}
+
+// Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec is an autogenerated conversion function.
+func Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *policy.PodSecurityPolicySpec, out *v1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
+	return autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in, out, s)
 }
 
 func autoConvert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in *v1beta1.ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
@@ -1352,48 +1358,48 @@ func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDepl
 	return nil
 }
 
-func autoConvert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(in *v1beta1.RunAsUserStrategyOptions, out *extensions.RunAsUserStrategyOptions, s conversion.Scope) error {
-	out.Rule = extensions.RunAsUserStrategy(in.Rule)
-	out.Ranges = *(*[]extensions.UserIDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in *v1beta1.RunAsUserStrategyOptions, out *policy.RunAsUserStrategyOptions, s conversion.Scope) error {
+	out.Rule = policy.RunAsUserStrategy(in.Rule)
+	out.Ranges = *(*[]policy.UserIDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
-// Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(in *v1beta1.RunAsUserStrategyOptions, out *extensions.RunAsUserStrategyOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(in, out, s)
+// Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions is an autogenerated conversion function.
+func Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in *v1beta1.RunAsUserStrategyOptions, out *policy.RunAsUserStrategyOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in, out, s)
 }
 
-func autoConvert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *extensions.RunAsUserStrategyOptions, out *v1beta1.RunAsUserStrategyOptions, s conversion.Scope) error {
+func autoConvert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *policy.RunAsUserStrategyOptions, out *v1beta1.RunAsUserStrategyOptions, s conversion.Scope) error {
 	out.Rule = v1beta1.RunAsUserStrategy(in.Rule)
 	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
-// Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions is an autogenerated conversion function.
-func Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *extensions.RunAsUserStrategyOptions, out *v1beta1.RunAsUserStrategyOptions, s conversion.Scope) error {
-	return autoConvert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in, out, s)
+// Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions is an autogenerated conversion function.
+func Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *policy.RunAsUserStrategyOptions, out *v1beta1.RunAsUserStrategyOptions, s conversion.Scope) error {
+	return autoConvert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *extensions.SELinuxStrategyOptions, s conversion.Scope) error {
-	out.Rule = extensions.SELinuxStrategy(in.Rule)
+func autoConvert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *policy.SELinuxStrategyOptions, s conversion.Scope) error {
+	out.Rule = policy.SELinuxStrategy(in.Rule)
 	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 
-// Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *extensions.SELinuxStrategyOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in, out, s)
+// Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions is an autogenerated conversion function.
+func Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *policy.SELinuxStrategyOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in, out, s)
 }
 
-func autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *v1beta1.SELinuxStrategyOptions, s conversion.Scope) error {
+func autoConvert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *policy.SELinuxStrategyOptions, out *v1beta1.SELinuxStrategyOptions, s conversion.Scope) error {
 	out.Rule = v1beta1.SELinuxStrategy(in.Rule)
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 
-// Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions is an autogenerated conversion function.
-func Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *v1beta1.SELinuxStrategyOptions, s conversion.Scope) error {
-	return autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in, out, s)
+// Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions is an autogenerated conversion function.
+func Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *policy.SELinuxStrategyOptions, out *v1beta1.SELinuxStrategyOptions, s conversion.Scope) error {
+	return autoConvert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in, out, s)
 }
 
 func autoConvert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscaling.Scale, s conversion.Scope) error {
@@ -1461,24 +1467,24 @@ func autoConvert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(in *autoscaling.
 	return nil
 }
 
-func autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions(in *v1beta1.SupplementalGroupsStrategyOptions, out *extensions.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
-	out.Rule = extensions.SupplementalGroupsStrategyType(in.Rule)
-	out.Ranges = *(*[]extensions.GroupIDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in *v1beta1.SupplementalGroupsStrategyOptions, out *policy.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
+	out.Rule = policy.SupplementalGroupsStrategyType(in.Rule)
+	out.Ranges = *(*[]policy.GroupIDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
-// Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions(in *v1beta1.SupplementalGroupsStrategyOptions, out *extensions.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
-	return autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions(in, out, s)
+// Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions is an autogenerated conversion function.
+func Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in *v1beta1.SupplementalGroupsStrategyOptions, out *policy.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
+	return autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in, out, s)
 }
 
-func autoConvert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *extensions.SupplementalGroupsStrategyOptions, out *v1beta1.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
+func autoConvert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *policy.SupplementalGroupsStrategyOptions, out *v1beta1.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
 	out.Rule = v1beta1.SupplementalGroupsStrategyType(in.Rule)
 	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
-// Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions is an autogenerated conversion function.
-func Convert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *extensions.SupplementalGroupsStrategyOptions, out *v1beta1.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
-	return autoConvert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in, out, s)
+// Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions is an autogenerated conversion function.
+func Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *policy.SupplementalGroupsStrategyOptions, out *v1beta1.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
+	return autoConvert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in, out, s)
 }

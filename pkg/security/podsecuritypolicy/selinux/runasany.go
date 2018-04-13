@@ -19,7 +19,7 @@ package selinux
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // runAsAny implements the SELinuxStrategy interface.
@@ -28,7 +28,7 @@ type runAsAny struct{}
 var _ SELinuxStrategy = &runAsAny{}
 
 // NewRunAsAny provides a strategy that will return the configured se linux context or nil.
-func NewRunAsAny(options *extensions.SELinuxStrategyOptions) (SELinuxStrategy, error) {
+func NewRunAsAny(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, error) {
 	return &runAsAny{}, nil
 }
 

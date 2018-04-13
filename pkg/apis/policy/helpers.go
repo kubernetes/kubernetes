@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package extensions
+package policy
 
 import (
 	"strings"
 )
 
 // SysctlsFromPodSecurityPolicyAnnotation parses an annotation value of the key
-// SysctlsSecurityPolocyAnnotationKey into a slice of sysctls. An empty slice
+// SysctlsSecurityPolicyAnnotationKey into a slice of sysctls. An empty slice
 // is returned if annotation is the empty string.
 func SysctlsFromPodSecurityPolicyAnnotation(annotation string) ([]string, error) {
 	if len(annotation) == 0 {

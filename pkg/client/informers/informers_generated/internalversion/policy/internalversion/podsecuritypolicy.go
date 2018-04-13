@@ -25,10 +25,10 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	policy "k8s.io/kubernetes/pkg/apis/policy"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
-	internalversion "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	internalversion "k8s.io/kubernetes/pkg/client/listers/policy/internalversion"
 )
 
 // PodSecurityPolicyInformer provides access to a shared informer and lister for
@@ -60,16 +60,16 @@ func NewFilteredPodSecurityPolicyInformer(client internalclientset.Interface, re
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().PodSecurityPolicies().List(options)
+				return client.Policy().PodSecurityPolicies().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().PodSecurityPolicies().Watch(options)
+				return client.Policy().PodSecurityPolicies().Watch(options)
 			},
 		},
-		&extensions.PodSecurityPolicy{},
+		&policy.PodSecurityPolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *podSecurityPolicyInformer) defaultInformer(client internalclientset.Int
 }
 
 func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.PodSecurityPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&policy.PodSecurityPolicy{}, f.defaultInformer)
 }
 
 func (f *podSecurityPolicyInformer) Lister() internalversion.PodSecurityPolicyLister {

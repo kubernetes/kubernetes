@@ -21,20 +21,20 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
 // mustRunAs implements the GroupStrategy interface
 type mustRunAs struct {
-	ranges []extensions.GroupIDRange
+	ranges []policy.GroupIDRange
 	field  string
 }
 
 var _ GroupStrategy = &mustRunAs{}
 
 // NewMustRunAs provides a new MustRunAs strategy based on ranges.
-func NewMustRunAs(ranges []extensions.GroupIDRange, field string) (GroupStrategy, error) {
+func NewMustRunAs(ranges []policy.GroupIDRange, field string) (GroupStrategy, error) {
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("ranges must be supplied for MustRunAs")
 	}

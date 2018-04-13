@@ -23,8 +23,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/policy/validation"
 )
 
 // strategy implements behavior for PodSecurityPolicy objects
@@ -63,9 +63,9 @@ func (strategy) Canonicalize(obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidatePodSecurityPolicy(obj.(*extensions.PodSecurityPolicy))
+	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy))
 }
 
 func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodSecurityPolicyUpdate(old.(*extensions.PodSecurityPolicy), obj.(*extensions.PodSecurityPolicy))
+	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy))
 }
