@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -80,6 +81,9 @@ type Options struct {
 	// ConfigFile is the location of the scheduler server's configuration file.
 	ConfigFile string
 
+	// WriteConfigTo is the path where the default configuration will be written.
+	WriteConfigTo string
+
 	// config is the scheduler server's configuration object.
 	config *componentconfig.KubeSchedulerConfiguration
 
@@ -106,6 +110,7 @@ type Options struct {
 // AddFlags adds flags for a specific SchedulerServer to the specified FlagSet
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
+	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 
 	// All flags below here are deprecated and will eventually be removed.
 
@@ -167,12 +172,24 @@ func NewOptions() (*Options, error) {
 }
 
 func (o *Options) Complete() error {
-	if len(o.ConfigFile) == 0 {
-		glog.Warning("WARNING: all flags other than --config are deprecated. Please begin using a config file ASAP.")
+	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
+		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzAddressToConfig()
 		o.applyDeprecatedHealthzPortToConfig()
 		o.applyDeprecatedAlgorithmSourceOptionsToConfig()
 	}
+
+	if len(o.ConfigFile) > 0 {
+		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+			return err
+		} else {
+			o.config = c
+		}
+	}
+
+	// Apply algorithms based on feature gates.
+	// TODO: make configurable?
+	algorithmprovider.ApplyFeatureGates()
 
 	return nil
 }
@@ -303,27 +320,48 @@ func (o *Options) ApplyDefaults(in *componentconfig.KubeSchedulerConfiguration) 
 }
 
 func (o *Options) Run() error {
-	config := o.config
-
-	if len(o.ConfigFile) > 0 {
-		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
-			return err
-		} else {
-			config = c
-		}
+	// If user only want to generate a configure file.
+	if len(o.WriteConfigTo) > 0 {
+		return o.writeConfigFile()
 	}
 
-	// Apply algorithms based on feature gates.
-	// TODO: make configurable?
-	algorithmprovider.ApplyFeatureGates()
-
-	server, err := NewSchedulerServer(config, o.master)
+	server, err := NewSchedulerServer(o.config, o.master)
 	if err != nil {
 		return err
 	}
 
 	stop := make(chan struct{})
 	return server.Run(stop)
+}
+
+func (o *Options) writeConfigFile() error {
+	var encoder runtime.Encoder
+	mediaTypes := o.codecs.SupportedMediaTypes()
+	for _, info := range mediaTypes {
+		if info.MediaType == "application/yaml" {
+			encoder = info.Serializer
+			break
+		}
+	}
+	if encoder == nil {
+		return errors.New("unable to locate yaml encoder")
+	}
+	encoder = json.NewYAMLSerializer(json.DefaultMetaFactory, o.scheme, o.scheme)
+	encoder = o.codecs.EncoderForVersion(encoder, componentconfigv1alpha1.SchemeGroupVersion)
+
+	configFile, err := os.Create(o.WriteConfigTo)
+	if err != nil {
+		return err
+	}
+	defer configFile.Close()
+
+	if err := encoder.Encode(o.config, configFile); err != nil {
+		return err
+	}
+
+	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
+
+	return nil
 }
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters
