@@ -5,8 +5,10 @@ go_library(
     srcs = [
         "bool.go",
         "bool_slice.go",
+        "bytes.go",
         "count.go",
         "duration.go",
+        "duration_slice.go",
         "flag.go",
         "float32.go",
         "float64.go",
