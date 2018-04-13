@@ -37,9 +37,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration) {
 	SetDefaults_KubeControllerManagerConfiguration(in)
-	SetDefaults_LeaderElectionConfiguration(&in.LeaderElection)
-	SetDefaults_VolumeConfiguration(&in.VolumeConfiguration)
-	SetDefaults_PersistentVolumeRecyclerConfiguration(&in.VolumeConfiguration.PersistentVolumeRecyclerConfiguration)
+	SetDefaults_LeaderElectionConfiguration(&in.GenericComponent.LeaderElection)
+	SetDefaults_VolumeConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration)
+	SetDefaults_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration.PersistentVolumeRecyclerConfiguration)
 }
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration) {
