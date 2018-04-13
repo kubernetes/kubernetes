@@ -1807,3 +1807,72 @@ func TestZonesGroup(t *testing.T) {
 
 	// Delete not found.
 }
+
+func TestResourceIDConversion(t *testing.T) {
+	t.Parallel()
+
+	for _, id := range []*ResourceID{
+		NewAddressesResourceID("some-project", "us-central1", "my-addresses-resource"),
+		NewBackendServicesResourceID("some-project", "my-backendServices-resource"),
+		NewDisksResourceID("some-project", "us-east1-b", "my-disks-resource"),
+		NewFirewallsResourceID("some-project", "my-firewalls-resource"),
+		NewForwardingRulesResourceID("some-project", "us-central1", "my-forwardingRules-resource"),
+		NewGlobalAddressesResourceID("some-project", "my-addresses-resource"),
+		NewGlobalForwardingRulesResourceID("some-project", "my-forwardingRules-resource"),
+		NewHealthChecksResourceID("some-project", "my-healthChecks-resource"),
+		NewHttpHealthChecksResourceID("some-project", "my-httpHealthChecks-resource"),
+		NewHttpsHealthChecksResourceID("some-project", "my-httpsHealthChecks-resource"),
+		NewInstanceGroupsResourceID("some-project", "us-east1-b", "my-instanceGroups-resource"),
+		NewInstancesResourceID("some-project", "us-east1-b", "my-instances-resource"),
+		NewNetworkEndpointGroupsResourceID("some-project", "us-east1-b", "my-networkEndpointGroups-resource"),
+		NewProjectsResourceID("my-projects-resource"),
+		NewRegionBackendServicesResourceID("some-project", "us-central1", "my-backendServices-resource"),
+		NewRegionDisksResourceID("some-project", "us-central1", "my-disks-resource"),
+		NewRegionsResourceID("some-project", "my-regions-resource"),
+		NewRoutesResourceID("some-project", "my-routes-resource"),
+		NewSslCertificatesResourceID("some-project", "my-sslCertificates-resource"),
+		NewTargetHttpProxiesResourceID("some-project", "my-targetHttpProxies-resource"),
+		NewTargetHttpsProxiesResourceID("some-project", "my-targetHttpsProxies-resource"),
+		NewTargetPoolsResourceID("some-project", "us-central1", "my-targetPools-resource"),
+		NewUrlMapsResourceID("some-project", "my-urlMaps-resource"),
+		NewZonesResourceID("some-project", "my-zones-resource"),
+	} {
+		t.Run(id.Resource, func(t *testing.T) {
+			// Test conversion to and from full URL.
+			fullURL := id.SelfLink(meta.VersionGA)
+			parsedID, err := ParseResourceURL(fullURL)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", fullURL, err)
+			}
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("SelfLink(%+v) -> ParseResourceURL(%s) = %+v, want original ID", id, fullURL, parsedID)
+			}
+
+			// Test conversion to and from relative resource name.
+			relativeName := id.RelativeResourceName()
+			parsedID, err = ParseResourceURL(relativeName)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", relativeName, err)
+			}
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("RelativeResourceName(%+v) -> ParseResourceURL(%s) = %+v, want original ID", id, relativeName, parsedID)
+			}
+
+			// Do not test ResourcePath for projects.
+			if id.Resource == "projects" {
+				return
+			}
+
+			// Test conversion to and from resource path.
+			resourcePath := id.ResourcePath()
+			parsedID, err = ParseResourceURL(resourcePath)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", resourcePath, err)
+			}
+			id.ProjectID = ""
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("ResourcePath(%+v) -> ParseResourceURL(%s) = %+v, want %+v", id, resourcePath, parsedID, id)
+			}
+		})
+	}
+}

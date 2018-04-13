@@ -28,7 +28,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"sort"
 	"text/template"
 	"time"
 
@@ -986,6 +985,38 @@ func (g *{{.GCEWrapType}}) {{.FcnArgs}} {
 	}
 }
 
+// genTypes generates the type wrappers.
+func genResourceIDs(wr io.Writer) {
+	const text = `
+// New{{.Service}}ResourceID creates a ResourceID for the {{.Service}} resource.
+{{- if .KeyIsProject}}
+func New{{.Service}}ResourceID(project string) *ResourceID {
+	var key *meta.Key
+{{- else}}
+{{- if .KeyIsGlobal}}
+func New{{.Service}}ResourceID(project, name string) *ResourceID {
+	key := meta.GlobalKey(name)
+{{- end}}
+{{- if .KeyIsRegional}}
+func New{{.Service}}ResourceID(project, region, name string) *ResourceID {
+	key := meta.RegionalKey(name, region)
+{{- end}}
+{{- if .KeyIsZonal}}
+func New{{.Service}}ResourceID(project, zone, name string) *ResourceID {
+	key := meta.ZonalKey(name, zone)
+{{- end -}}
+{{end}}
+	return &ResourceID{project, "{{.Resource}}", key}
+}
+`
+	tmpl := template.Must(template.New("resourceIDs").Parse(text))
+	for _, sg := range meta.SortedServicesGroups {
+		if err := tmpl.Execute(wr, sg.ServiceInfo()); err != nil {
+			panic(err)
+		}
+	}
+}
+
 func genUnitTestHeader(wr io.Writer) {
 	const text = `/*
 Copyright {{.Year}} The Kubernetes Authors.
@@ -1238,17 +1269,83 @@ func Test{{.Service}}Group(t *testing.T) {
 }
 `
 	tmpl := template.Must(template.New("unittest").Parse(text))
-	// Sort keys so the output will be stable.
-	var keys []string
-	for k := range meta.AllServicesByGroup {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		s := meta.AllServicesByGroup[k]
-		if err := tmpl.Execute(wr, s); err != nil {
+	for _, sg := range meta.SortedServicesGroups {
+		if err := tmpl.Execute(wr, sg); err != nil {
 			panic(err)
 		}
+	}
+}
+
+func genUnitTestResourceIDConversion(wr io.Writer) {
+	const text = `
+func TestResourceIDConversion(t *testing.T) {
+	t.Parallel()
+
+	for _, id := range []*ResourceID{
+		{{- range .Groups}}
+		{{- with .ServiceInfo}}
+		{{- if .KeyIsProject}}
+		New{{.Service}}ResourceID("my-{{.Resource}}-resource"),
+		{{- else}}
+		{{- if .KeyIsGlobal}}
+		New{{.Service}}ResourceID("some-project", "my-{{.Resource}}-resource"),
+		{{- end}}
+		{{- if .KeyIsRegional}}
+		New{{.Service}}ResourceID("some-project", "us-central1", "my-{{.Resource}}-resource"),
+		{{- end}}
+		{{- if .KeyIsZonal}}
+		New{{.Service}}ResourceID("some-project", "us-east1-b", "my-{{.Resource}}-resource"),
+		{{- end -}}
+		{{end -}}
+		{{end -}}
+		{{end}}
+	} {
+		t.Run(id.Resource, func(t *testing.T) {
+			// Test conversion to and from full URL.
+			fullURL := id.SelfLink(meta.VersionGA)
+			parsedID, err := ParseResourceURL(fullURL)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", fullURL, err)
+			}
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("SelfLink(%+v) -> ParseResourceURL(%s) = %+v, want original ID", id, fullURL, parsedID)
+			}
+
+			// Test conversion to and from relative resource name.
+			relativeName := id.RelativeResourceName()
+			parsedID, err = ParseResourceURL(relativeName)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", relativeName, err)
+			}
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("RelativeResourceName(%+v) -> ParseResourceURL(%s) = %+v, want original ID", id, relativeName, parsedID)
+			}
+
+			// Do not test ResourcePath for projects.
+			if id.Resource == "projects" {
+				return
+			}
+
+			// Test conversion to and from resource path.
+			resourcePath := id.ResourcePath()
+			parsedID, err = ParseResourceURL(resourcePath)
+			if err != nil {
+				t.Errorf("ParseResourceURL(%s) = _, %v, want nil", resourcePath, err)
+			}
+			id.ProjectID = ""
+			if !reflect.DeepEqual(id, parsedID) {
+				t.Errorf("ResourcePath(%+v) -> ParseResourceURL(%s) = %+v, want %+v", id, resourcePath, parsedID, id)
+			}
+		})
+	}
+}
+`
+	data := struct {
+		Groups []*meta.ServiceGroup
+	}{meta.SortedServicesGroups}
+	tmpl := template.Must(template.New("unittest-resourceIDs").Parse(text))
+	if err := tmpl.Execute(wr, data); err != nil {
+		panic(err)
 	}
 }
 
@@ -1262,9 +1359,11 @@ func main() {
 		genHeader(out)
 		genStubs(out)
 		genTypes(out)
+		genResourceIDs(out)
 	case "test":
 		genUnitTestHeader(out)
 		genUnitTestServices(out)
+		genUnitTestResourceIDConversion(out)
 	default:
 		log.Fatalf("Invalid -mode: %q", flags.mode)
 	}
