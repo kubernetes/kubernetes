@@ -6491,7 +6491,7 @@ Examples:<br>
 <div class="sect2">
 <h3 id="_v1_localvolumesource">v1.LocalVolumeSource</h3>
 <div class="paragraph">
-<p>Local represents directly-attached storage with node affinity</p>
+<p>Local represents directly-attached storage with node affinity (Beta feature)</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -6513,7 +6513,7 @@ Examples:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The full path to the volume on the node. It can be either a directory or block device (disk, partition, &#8230;). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
