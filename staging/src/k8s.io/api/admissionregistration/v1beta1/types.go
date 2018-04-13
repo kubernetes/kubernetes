@@ -254,9 +254,7 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// If there is only one port open for the service, that port will be
-	// used. If there are multiple ports open, port 443 will be used if it
-	// is open, otherwise it is an error.
+	// Port 443 will be used if it is open, otherwise it is an error.
 	//
 	// +optional
 	Service *ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`
