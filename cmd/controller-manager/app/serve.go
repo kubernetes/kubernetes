@@ -51,9 +51,9 @@ func BuildHandlerChain(apiHandler http.Handler, c *CompletedConfig) http.Handler
 func NewBaseHandler(c *CompletedConfig) http.Handler {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
-	if c.ComponentConfig.EnableProfiling {
+	if c.ComponentConfig.Debugging.EnableProfiling {
 		routes.Profiling{}.Install(mux)
-		if c.ComponentConfig.EnableContentionProfiling {
+		if c.ComponentConfig.Debugging.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}

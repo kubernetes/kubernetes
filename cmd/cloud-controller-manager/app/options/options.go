@@ -25,7 +25,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
@@ -36,7 +35,7 @@ import (
 
 // CloudControllerManagerOptions is the main context object for the controller manager.
 type CloudControllerManagerOptions struct {
-	Generic cmoptions.GenericControllerManagerOptions
+	Generic *cmoptions.GenericControllerManagerOptions
 
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
@@ -63,11 +62,7 @@ func NewCloudControllerManagerOptions() *CloudControllerManagerOptions {
 func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Generic.AddFlags(fs)
 
-	fs.StringVar(&o.Generic.ComponentConfig.CloudProvider, "cloud-provider", o.Generic.ComponentConfig.CloudProvider, "The provider of cloud services. Cannot be empty.")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
-	fs.Int32Var(&o.Generic.ComponentConfig.ConcurrentServiceSyncs, "concurrent-service-syncs", o.Generic.ComponentConfig.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
-
-	leaderelectionconfig.BindFlags(&o.Generic.ComponentConfig.LeaderElection, fs)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
@@ -88,7 +83,7 @@ func (o *CloudControllerManagerOptions) Validate() error {
 	errors := []error{}
 	errors = append(errors, o.Generic.Validate()...)
 
-	if len(o.Generic.ComponentConfig.CloudProvider) == 0 {
+	if len(o.Generic.CloudProvider.Name) == 0 {
 		errors = append(errors, fmt.Errorf("--cloud-provider cannot be empty"))
 	}
 

@@ -82,7 +82,7 @@ func (s *InsecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 
 // ApplyTo adds InsecureServingOptions to the insecureserverinfo amd kube-controller manager configuration.
 // Note: the double pointer allows to set the *InsecureServingInfo to nil without referencing the struct hosting this pointer.
-func (s *InsecureServingOptions) ApplyTo(c **genericcontrollermanager.InsecureServingInfo, cfg *componentconfig.KubeControllerManagerConfiguration) error {
+func (s *InsecureServingOptions) ApplyTo(c **genericcontrollermanager.InsecureServingInfo, cfg *componentconfig.KubeCloudSharedConfiguration) error {
 	if s == nil {
 		return nil
 	}
