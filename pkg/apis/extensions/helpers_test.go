@@ -51,10 +51,7 @@ func TestSysctlsFromPodSecurityPolicyAnnotation(t *testing.T) {
 		{annotation: "a.b,a.b", expectedValue: []string{"a.b", "a.b"}},
 		{annotation: "", expectedValue: []string{}},
 	} {
-		sysctls, err := SysctlsFromPodSecurityPolicyAnnotation(test.annotation)
-		if err != nil {
-			t.Errorf("error for %q: %v", test.annotation, err)
-		}
+		sysctls := SysctlsFromPodSecurityPolicyAnnotation(test.annotation)
 		if !reflect.DeepEqual(sysctls, test.expectedValue) {
 			t.Errorf("wrong value for %q: got=%v wanted=%v", test.annotation, sysctls, test.expectedValue)
 		}
