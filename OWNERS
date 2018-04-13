@@ -19,11 +19,11 @@ filters:
       - wojtek-t
 
   # Bazel build infrastructure changes often touch files throughout the tree
-  "\.bzl$":
+  "\\.bzl$":
     reviewers:
       - ixdy
     approvers:
       - ixdy
-  "BUILD(\.bazel)?$":
+  "BUILD(\\.bazel)?$":
     approvers:
       - ixdy
