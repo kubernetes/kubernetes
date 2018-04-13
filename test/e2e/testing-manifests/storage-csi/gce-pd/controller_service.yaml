@@ -10,4 +10,3 @@ spec:
   ports:
     - name: dummy
       port: 12345
- 

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,165 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
+	"time"
+
 	"k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/manifest"
+
+	. "github.com/onsi/ginkgo"
 )
 
 const (
-	csiHostPathPluginImage string = "quay.io/k8scsi/hostpathplugin:v0.2.0"
+	csiHostPathPluginImage      string = "quay.io/k8scsi/hostpathplugin:v0.2.0"
+	csiExternalAttacherImage    string = "quay.io/k8scsi/csi-attacher:v0.2.0"
+	csiExternalProvisionerImage string = "quay.io/k8scsi/csi-provisioner:v0.2.0"
+	csiDriverRegistrarImage     string = "quay.io/k8scsi/driver-registrar:v0.2.0"
 )
+
+// Create the driver registrar cluster role if it doesn't exist, no teardown so that tests
+// are parallelizable. This role will be shared with many of the CSI tests.
+func csiDriverRegistrarClusterRole(
+	config framework.VolumeTestConfig,
+) *rbacv1.ClusterRole {
+	// TODO(Issue: #62237) Remove impersonation workaround and cluster role when issue resolved
+	By("Creating an impersonating superuser kubernetes clientset to define cluster role")
+	rc, err := framework.LoadConfig()
+	framework.ExpectNoError(err)
+	rc.Impersonate = restclient.ImpersonationConfig{
+		UserName: "superuser",
+		Groups:   []string{"system:masters"},
+	}
+	superuserClientset, err := clientset.NewForConfig(rc)
+	framework.ExpectNoError(err, "Failed to create superuser clientset: %v", err)
+	By("Creating the CSI driver registrar cluster role")
+	clusterRoleClient := superuserClientset.RbacV1().ClusterRoles()
+	role := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiDriverRegistrarClusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"get", "update", "patch"},
+			},
+		},
+	}
+
+	ret, err := clusterRoleClient.Create(role)
+	if err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			return ret
+		}
+		framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
+	}
+
+	return ret
+}
+
+func csiServiceAccount(
+	client clientset.Interface,
+	config framework.VolumeTestConfig,
+	componentName string,
+	teardown bool,
+) *v1.ServiceAccount {
+	creatingString := "Creating"
+	if teardown {
+		creatingString = "Deleting"
+	}
+	By(fmt.Sprintf("%v a CSI service account for %v", creatingString, componentName))
+	serviceAccountName := config.Prefix + "-" + componentName + "-service-account"
+	serviceAccountClient := client.CoreV1().ServiceAccounts(config.Namespace)
+	sa := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceAccountName,
+		},
+	}
+
+	serviceAccountClient.Delete(sa.GetName(), &metav1.DeleteOptions{})
+	err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
+		_, err := serviceAccountClient.Get(sa.GetName(), metav1.GetOptions{})
+		return apierrs.IsNotFound(err), nil
+	})
+	framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
+
+	if teardown {
+		return nil
+	}
+
+	ret, err := serviceAccountClient.Create(sa)
+	if err != nil {
+		framework.ExpectNoError(err, "Failed to create %s service account: %v", sa.GetName(), err)
+	}
+
+	return ret
+}
+
+func csiClusterRoleBindings(
+	client clientset.Interface,
+	config framework.VolumeTestConfig,
+	teardown bool,
+	sa *v1.ServiceAccount,
+	clusterRolesNames []string,
+) {
+	bindingString := "Binding"
+	if teardown {
+		bindingString = "Unbinding"
+	}
+	By(fmt.Sprintf("%v cluster roles %v to the CSI service account %v", bindingString, clusterRolesNames, sa.GetName()))
+	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
+	for _, clusterRoleName := range clusterRolesNames {
+
+		binding := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: config.Prefix + "-" + clusterRoleName + "-" + config.Namespace + "-role-binding",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      sa.GetName(),
+					Namespace: sa.GetNamespace(),
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				Name:     clusterRoleName,
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		}
+
+		clusterRoleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
+			_, err := clusterRoleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			return apierrs.IsNotFound(err), nil
+		})
+		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
+
+		if teardown {
+			return
+		}
+
+		_, err = clusterRoleBindingClient.Create(binding)
+		if err != nil {
+			framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
+		}
+	}
+}
 
 func csiHostPathPod(
 	client clientset.Interface,
@@ -200,7 +347,7 @@ func csiHostPathPod(
 	return ret
 }
 
-func csiGCEPDSetup(
+func deployGCEPDCSIDriver(
 	client clientset.Interface,
 	config framework.VolumeTestConfig,
 	teardown bool,

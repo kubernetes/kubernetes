@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "csi_defs.go",
+        "csi_objects.go",
         "csi_volumes.go",
         "empty_dir_wrapper.go",
         "flexvolume.go",

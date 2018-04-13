@@ -41,11 +41,6 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: gce-driver
-          securityContext:
-            privileged: true
-            capabilities:
-              add: ["SYS_ADMIN"]
-            allowPrivilegeEscalation: true
           imagePullPolicy: Always
           image: gcr.io/google-containers/volume-csi/compute-persistent-disk-csi-driver:v0.2.0.alpha
           args:
