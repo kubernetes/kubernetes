@@ -331,15 +331,26 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 }
 
 // AddFlags adds flags for a specific KubeletFlags to the specified FlagSet
-func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
+func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
+	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	defer func() {
+		// Unhide deprecated flags. We want deprecated flags to show in Kubelet help.
+		// We have some hidden flags, but we might as well unhide these when they are deprecated,
+		// as silently deprecating and removing (even hidden) things is unkind to people who use them.
+		fs.VisitAll(func(f *pflag.Flag) {
+			if len(f.Deprecated) > 0 {
+				f.Hidden = false
+			}
+		})
+		mainfs.AddFlagSet(fs)
+	}()
+
 	f.ContainerRuntimeOptions.AddFlags(fs)
 	f.addOSFlags(fs)
 
 	fs.StringVar(&f.KubeletConfigFile, "config", f.KubeletConfigFile, "The Kubelet will load its initial configuration from this file. The path may be absolute or relative; relative paths start at the Kubelet's current working directory. Omit this flag to use the built-in default configuration values. Command-line flags override configuration from this file.")
 	fs.StringVar(&f.KubeConfig, "kubeconfig", f.KubeConfig, "Path to a kubeconfig file, specifying how to connect to the API server. Providing --kubeconfig enables API server mode, omitting --kubeconfig enables standalone mode.")
 
-	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
-	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "deprecated: use --bootstrap-kubeconfig")
 	fs.StringVar(&f.BootstrapKubeconfig, "bootstrap-kubeconfig", f.BootstrapKubeconfig, "Path to a kubeconfig file that will be used to get client certificate for kubelet. "+
 		"If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used to request a client certificate from the API server. "+
 		"On success, a kubeconfig file referencing the generated client certificate and key is written to the path specified by --kubeconfig. "+
@@ -390,6 +401,8 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to to the directory where the checkpoints are stored")
 
 	// DEPRECATED FLAGS
+	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")
+	fs.MarkDeprecated("experimental-bootstrap-kubeconfig", "Use --bootstrap-kubeconfig")
 	fs.Int32Var(&f.CAdvisorPort, "cadvisor-port", f.CAdvisorPort, "The port of the localhost cAdvisor endpoint (set to 0 to disable)")
 	fs.MarkDeprecated("cadvisor-port", "The default will change to 0 (disabled) in 1.12, and the cadvisor port will be removed entirely in 1.13")
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
@@ -443,7 +456,6 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 
 	fs.BoolVar(&c.FailSwapOn, "fail-swap-on", c.FailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. ")
 	fs.BoolVar(&c.FailSwapOn, "experimental-fail-swap-on", c.FailSwapOn, "DEPRECATED: please use --fail-swap-on instead.")
-	fs.MarkDeprecated("experimental-fail-swap-on", "This flag is deprecated and will be removed in future releases. please use --fail-swap-on instead.")
 
 	fs.StringVar(&c.StaticPodPath, "pod-manifest-path", c.StaticPodPath, "Path to the directory containing static pod files to run, or the path to a single static pod file. Files starting with dots will be ignored.")
 	fs.DurationVar(&c.SyncFrequency.Duration, "sync-frequency", c.SyncFrequency.Duration, "Max period between synchronizing running containers and config")
