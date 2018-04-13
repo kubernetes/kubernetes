@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -24,9 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestCreateClusterRole(t *testing.T) {
@@ -443,5 +446,16 @@ func TestClusterRoleValidate(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", name, err)
 			}
 		})
+	}
+}
+
+func defaultClientConfig() *restclient.Config {
+	return &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			ContentType:          runtime.ContentTypeJSON,
+			GroupVersion:         &schema.GroupVersion{Version: "v1"},
+		},
 	}
 }

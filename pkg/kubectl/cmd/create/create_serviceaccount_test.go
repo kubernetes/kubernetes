@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,49 +14,49 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-func TestCreatePriorityClass(t *testing.T) {
-	pcName := "my-pc"
+func TestCreateServiceAccount(t *testing.T) {
+	serviceAccountObject := &v1.ServiceAccount{}
+	serviceAccountObject.Name = "my-service-account"
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
+	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "scheduling.k8s.io", Version: "v1alpha1"},
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
-			}, nil
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/serviceaccounts" && m == "POST":
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, serviceAccountObject)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
 		}),
 	}
-	tf.ClientConfigVal = &restclient.Config{}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdCreatePriorityClass(tf, buf)
-	cmd.Flags().Set("value", "1000")
-	cmd.Flags().Set("global-default", "true")
-	cmd.Flags().Set("description", "my priority")
-	cmd.Flags().Set("dry-run", "true")
+	cmd := NewCmdCreateServiceAccount(tf, buf)
 	cmd.Flags().Set("output", "name")
-	CreatePriorityClass(tf, buf, cmd, []string{pcName})
-	expectedOutput := "priorityclass.scheduling.k8s.io/" + pcName + "\n"
+	cmd.Run(cmd, []string{serviceAccountObject.Name})
+	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

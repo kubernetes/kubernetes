@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-func TestCreateServiceAccount(t *testing.T) {
-	serviceAccountObject := &v1.ServiceAccount{}
-	serviceAccountObject.Name = "my-service-account"
+func TestCreateNamespace(t *testing.T) {
+	namespaceObject := &v1.Namespace{}
+	namespaceObject.Name = "my-namespace"
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
@@ -43,20 +43,19 @@ func TestCreateServiceAccount(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/serviceaccounts" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, serviceAccountObject)}, nil
+			case p == "/namespaces" && m == "POST":
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, namespaceObject)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
-	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceAccount(tf, buf)
+	cmd := NewCmdCreateNamespace(tf, buf)
 	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{serviceAccountObject.Name})
-	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
+	cmd.Run(cmd, []string{namespaceObject.Name})
+	expectedOutput := "namespace/" + namespaceObject.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}

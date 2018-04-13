@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -29,9 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-func TestCreateNamespace(t *testing.T) {
-	namespaceObject := &v1.Namespace{}
-	namespaceObject.Name = "my-namespace"
+func TestCreateConfigMap(t *testing.T) {
+	configMap := &v1.ConfigMap{}
+	configMap.Name = "my-configmap"
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
@@ -39,24 +42,29 @@ func TestCreateNamespace(t *testing.T) {
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, namespaceObject)}, nil
+			case p == "/namespaces/test/configmaps" && m == "POST":
+				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, configMap)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
+	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateNamespace(tf, buf)
+	cmd := NewCmdCreateConfigMap(tf, buf)
 	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{namespaceObject.Name})
-	expectedOutput := "namespace/" + namespaceObject.Name + "\n"
+	cmd.Run(cmd, []string{configMap.Name})
+	expectedOutput := "configmap/" + configMap.Name + "\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
+}
+
+func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }

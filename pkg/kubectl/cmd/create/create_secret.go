@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"io"
@@ -135,7 +135,7 @@ var (
 		When using the Docker command line to push images, you can authenticate to a given registry by running:
 			'$ docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
 
-    	That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
+	That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
 		authenticate to the registry. The email address is optional.
 
 		When creating applications, you may have a Docker registry that requires authentication.  In order for the

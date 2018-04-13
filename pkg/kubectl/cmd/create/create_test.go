@@ -14,17 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package create
 
 import (
 	"bytes"
 	"net/http"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -71,7 +76,7 @@ func TestCreateObject(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(tf, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -110,8 +115,8 @@ func TestCreateMultipleObject(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(tf, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
-	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
@@ -149,11 +154,65 @@ func TestCreateDirectory(t *testing.T) {
 	errBuf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdCreate(tf, buf, errBuf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy")
+	cmd.Flags().Set("filename", "../../../../examples/guestbook/legacy")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "replicationcontroller/name\nreplicationcontroller/name\nreplicationcontroller/name\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
+}
+
+var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
+
+func initTestErrorHandler(t *testing.T) {
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		t.Errorf("Error running command (exit code %d): %s", code, str)
+	})
+}
+
+func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
+	pods := &api.PodList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "15",
+		},
+		Items: []api.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+				Spec:       apitesting.DeepEqualSafePodSpec(),
+			},
+		},
+	}
+	svc := &api.ServiceList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "16",
+		},
+		Items: []api.Service{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					SessionAffinity: "None",
+					Type:            api.ServiceTypeClusterIP,
+				},
+			},
+		},
+	}
+	rc := &api.ReplicationControllerList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "17",
+		},
+		Items: []api.ReplicationController{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+				},
+			},
+		},
+	}
+	return pods, svc, rc
 }
