@@ -12,7 +12,6 @@ go_library(
         "framework.go",
         "gpu_device_plugin.go",
         "image_list.go",
-        "simple_mount.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
