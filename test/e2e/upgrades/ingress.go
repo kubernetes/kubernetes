@@ -97,7 +97,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 		framework.IngressStaticIPKey:  t.ipName,
 		framework.IngressAllowHTTPKey: "false",
 	}, map[string]string{})
-	t.jig.AddHTTPS("tls-secret", "ingress.test.com")
+	t.jig.SetHTTPS("tls-secret", "ingress.test.com")
 
 	By("waiting for Ingress to come up with ip: " + t.ip)
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
