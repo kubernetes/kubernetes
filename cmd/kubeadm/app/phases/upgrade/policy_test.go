@@ -24,13 +24,15 @@ import (
 
 func TestEnforceVersionPolicies(t *testing.T) {
 	tests := []struct {
+		name                        string
 		vg                          *fakeVersionGetter
 		expectedMandatoryErrs       int
 		expectedSkippableErrs       int
 		allowExperimental, allowRCs bool
 		newK8sVersion               string
 	}{
-		{ // everything ok
+		{
+			name: "minor upgrade",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -38,7 +40,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			},
 			newK8sVersion: "v1.9.5",
 		},
-		{ // everything ok
+		{
+			name: "major upgrade",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.2",
@@ -46,7 +49,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			},
 			newK8sVersion: "v1.10.0",
 		},
-		{ // downgrades ok
+		{
+			name: "downgrade",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -54,7 +58,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			},
 			newK8sVersion: "v1.9.2",
 		},
-		{ // upgrades without bumping the version number ok
+		{
+			name: "same version upgrade",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -62,16 +67,18 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			},
 			newK8sVersion: "v1.9.3",
 		},
-		{ // new version must be higher than v1.9.0
+		{
+			name: "new version must be higher than v1.9.0",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
 				kubeadmVersion: "v1.9.3",
 			},
 			newK8sVersion:         "v1.8.10",
-			expectedMandatoryErrs: 1, // version must be higher than v1.9.0
+			expectedMandatoryErrs: 2, // version must be higher than v1.9.0, can't upgrade old k8s with newer kubeadm
 		},
-		{ // upgrading two minor versions in one go is not supported
+		{
+			name: "upgrading two minor versions in one go is not supported",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -81,16 +88,18 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			expectedMandatoryErrs: 1, // can't upgrade two minor versions
 			expectedSkippableErrs: 1, // kubelet <-> apiserver skew too large
 		},
-		{ // downgrading two minor versions in one go is not supported
+		{
+			name: "downgrading two minor versions in one go is not supported",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.11.3",
 				kubeletVersion: "v1.11.3",
 				kubeadmVersion: "v1.11.0",
 			},
 			newK8sVersion:         "v1.9.3",
-			expectedMandatoryErrs: 1, // can't downgrade two minor versions
+			expectedMandatoryErrs: 2, // can't downgrade two minor versions, can't upgrade old k8s with newer kubeadm
 		},
-		{ // kubeadm version must be higher than the new kube version. However, patch version skews may be forced
+		{
+			name: "kubeadm version must be higher than the new kube version. However, patch version skews may be forced",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -99,7 +108,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         "v1.9.5",
 			expectedSkippableErrs: 1,
 		},
-		{ // kubeadm version must be higher than the new kube version. Trying to upgrade k8s to a higher minor version than kubeadm itself should never be supported
+		{
+			name: "kubeadm version must be higher than the new kube version. Trying to upgrade k8s to a higher minor version than kubeadm itself should never be supported",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -108,7 +118,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         "v1.10.0",
 			expectedMandatoryErrs: 1,
 		},
-		{ // the maximum skew between the cluster version and the kubelet versions should be one minor version. This may be forced through though.
+		{
+			name: "the maximum skew between the cluster version and the kubelet versions should be one minor version. This may be forced through though.",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.8.8",
@@ -117,7 +128,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         "v1.10.0",
 			expectedSkippableErrs: 1,
 		},
-		{ // experimental upgrades supported if the flag is set
+		{
+			name: "experimental upgrades supported if the flag is set",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -126,7 +138,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:     "v1.10.0-beta.1",
 			allowExperimental: true,
 		},
-		{ // release candidate upgrades supported if the flag is set
+		{
+			name: "release candidate upgrades supported if the flag is set",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -135,7 +148,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion: "v1.10.0-rc.1",
 			allowRCs:      true,
 		},
-		{ // release candidate upgrades supported if the flag is set
+		{
+			name: "release candidate upgrades supported if the flag is set",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -144,7 +158,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:     "v1.10.0-rc.1",
 			allowExperimental: true,
 		},
-		{ // the user should not be able to upgrade to an experimental version if they haven't opted into that
+		{
+			name: "the user should not be able to upgrade to an experimental version if they haven't opted into that",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -154,7 +169,8 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			allowRCs:              true,
 			expectedSkippableErrs: 1,
 		},
-		{ // the user should not be able to upgrade to an release candidate version if they haven't opted into that
+		{
+			name: "the user should not be able to upgrade to an release candidate version if they haven't opted into that",
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.9.3",
 				kubeletVersion: "v1.9.3",
@@ -163,30 +179,42 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         "v1.10.0-rc.1",
 			expectedSkippableErrs: 1,
 		},
+		{
+			name: "the user can't use a newer minor version of kubeadm to upgrade an older version of kubeadm",
+			vg: &fakeVersionGetter{
+				clusterVersion: "v1.9.3",
+				kubeletVersion: "v1.9.3",
+				kubeadmVersion: "v1.10.0",
+			},
+			newK8sVersion:         "v1.9.6",
+			expectedMandatoryErrs: 1, // can't upgrade old k8s with newer kubeadm
+		},
 	}
 
 	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
 
-		newK8sVer, err := version.ParseSemantic(rt.newK8sVersion)
-		if err != nil {
-			t.Fatalf("couldn't parse version %s: %v", rt.newK8sVersion, err)
-		}
-
-		actualSkewErrs := EnforceVersionPolicies(rt.vg, rt.newK8sVersion, newK8sVer, rt.allowExperimental, rt.allowRCs)
-		if actualSkewErrs == nil {
-			// No errors were seen. Report unit test failure if we expected to see errors
-			if rt.expectedMandatoryErrs+rt.expectedSkippableErrs > 0 {
-				t.Errorf("failed TestEnforceVersionPolicies\n\texpected errors but got none")
+			newK8sVer, err := version.ParseSemantic(rt.newK8sVersion)
+			if err != nil {
+				t.Fatalf("couldn't parse version %s: %v", rt.newK8sVersion, err)
 			}
-			// Otherwise, just move on with the next test
-			continue
-		}
 
-		if len(actualSkewErrs.Skippable) != rt.expectedSkippableErrs {
-			t.Errorf("failed TestEnforceVersionPolicies\n\texpected skippable errors: %d\n\tgot skippable errors: %d %v", rt.expectedSkippableErrs, len(actualSkewErrs.Skippable), *rt.vg)
-		}
-		if len(actualSkewErrs.Mandatory) != rt.expectedMandatoryErrs {
-			t.Errorf("failed TestEnforceVersionPolicies\n\texpected mandatory errors: %d\n\tgot mandatory errors: %d %v", rt.expectedMandatoryErrs, len(actualSkewErrs.Mandatory), *rt.vg)
-		}
+			actualSkewErrs := EnforceVersionPolicies(rt.vg, rt.newK8sVersion, newK8sVer, rt.allowExperimental, rt.allowRCs)
+			if actualSkewErrs == nil {
+				// No errors were seen. Report unit test failure if we expected to see errors
+				if rt.expectedMandatoryErrs+rt.expectedSkippableErrs > 0 {
+					t.Errorf("failed TestEnforceVersionPolicies\n\texpected errors but got none")
+				}
+				// Otherwise, just move on with the next test
+				return
+			}
+
+			if len(actualSkewErrs.Skippable) != rt.expectedSkippableErrs {
+				t.Errorf("failed TestEnforceVersionPolicies\n\texpected skippable errors: %d\n\tgot skippable errors: %d %v", rt.expectedSkippableErrs, len(actualSkewErrs.Skippable), *rt.vg)
+			}
+			if len(actualSkewErrs.Mandatory) != rt.expectedMandatoryErrs {
+				t.Errorf("failed TestEnforceVersionPolicies\n\texpected mandatory errors: %d\n\tgot mandatory errors: %d %v", rt.expectedMandatoryErrs, len(actualSkewErrs.Mandatory), *rt.vg)
+			}
+		})
 	}
 }
