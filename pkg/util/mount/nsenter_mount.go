@@ -235,7 +235,7 @@ func (n *NsenterMounter) MakeRShared(path string) error {
 
 func (mounter *NsenterMounter) GetFileType(pathname string) (FileType, error) {
 	var pathType FileType
-	outputBytes, err := mounter.ne.Exec("stat", []string{"-L", `--printf "%F"`, pathname}).CombinedOutput()
+	outputBytes, err := mounter.ne.Exec("stat", []string{"-L", "--printf=%F", pathname}).CombinedOutput()
 	if err != nil {
 		return pathType, err
 	}
