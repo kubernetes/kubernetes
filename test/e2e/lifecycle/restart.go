@@ -76,8 +76,9 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
-		ps = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
 		var err error
+		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
+		Expect(err).NotTo(HaveOccurred())
 		numNodes, err = framework.NumberOfRegisteredNodes(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		systemNamespace = metav1.NamespaceSystem
