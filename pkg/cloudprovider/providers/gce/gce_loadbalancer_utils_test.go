@@ -214,7 +214,7 @@ func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
-		MakeFirewallName(lbName),
+		MakeFirewallName(lbName), // Firewalls for external LBs are prefixed with k8s-fw-
 		MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
 	}
 
@@ -291,7 +291,7 @@ func assertInternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Servi
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
-		lbName,
+		lbName, // Firewalls for internal LBs are named the same name as the loadbalancer.
 		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
 	}
 
