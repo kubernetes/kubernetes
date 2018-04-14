@@ -129,12 +129,8 @@ update-k8s-gengo() {
     fi
     dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
   done
-  deepcopies=($(find . -iname "${out}" | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||'))
-  if [[ -z "${deepcopes:-}" ]]; then
-    return 0
-  fi
   echo "Deleting $out files"
-  echo "${deepcopies[@]}" | xargs -n 1 -I '{}' rm "{}/$out"
+  find . -iname "${out}" | xargs rm
 }
 update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen zz_generated.deepcopy.go '+k8s:deepcopy-gen='
 update-k8s-gengo defaulter k8s.io/code-generator/cmd/defaulter-gen zz_generated.defaults.go '+k8s:defaulter-gen='
