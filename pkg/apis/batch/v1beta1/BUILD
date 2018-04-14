@@ -1,3 +1,5 @@
+load("//build:deepcopy.bzl", "k8s_defaulter")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
@@ -57,3 +59,5 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+k8s_defaulter(outs = ["zz_generated.defaults.go"])

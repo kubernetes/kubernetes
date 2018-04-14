@@ -1,4 +1,4 @@
-load("//build:deepcopy.bzl", "k8s_deepcopy")
+load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_defaulter")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -54,3 +54,5 @@ go_test(
 )
 
 k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])
+
+k8s_defaulter(outs = ["zz_generated.defaults.go"])

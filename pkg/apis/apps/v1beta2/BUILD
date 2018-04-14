@@ -1,3 +1,5 @@
+load("//build:deepcopy.bzl", "k8s_defaulter")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
@@ -72,3 +74,5 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
+
+k8s_defaulter(outs = ["zz_generated.defaults.go"])

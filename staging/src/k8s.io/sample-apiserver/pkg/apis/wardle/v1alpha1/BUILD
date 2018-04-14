@@ -15,7 +15,6 @@ go_library(
         "types.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
     importpath = "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
     deps = [

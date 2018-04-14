@@ -1,3 +1,4 @@
+load("//build:deepcopy.bzl", "k8s_defaulter")
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
@@ -65,3 +66,5 @@ filegroup(
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
+
+k8s_defaulter(outs = ["zz_generated.defaults.go"])
