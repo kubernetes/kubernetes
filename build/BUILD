@@ -1,4 +1,4 @@
-load("//build:deepcopy.bzl", "k8s_deepcopy_all")
+load("//build:deepcopy.bzl", "k8s_deepcopy_all", "k8s_defaulter_all")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -169,6 +169,14 @@ filegroup(
     ],
 )
 
+filegroup(
+    name = "all-generated-sources",
+    srcs = [
+        ":deepcopy-sources",
+        ":defaulter-sources",
+    ],
+)
+
 k8s_deepcopy_all(
     name = "deepcopy-sources",
     packages = [
@@ -298,5 +306,60 @@ k8s_deepcopy_all(
         "vendor/k8s.io/sample-apiserver/pkg/apis/wardle",
         "vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
         "vendor/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1",
+    ],
+)
+
+k8s_defaulter_all(
+    name = "defaulter-sources",
+    packages = [
+        "cmd/kubeadm/app/apis/kubeadm/v1alpha1",
+        "pkg/apis/abac/v1beta1",
+        "pkg/apis/admission/v1beta1",
+        "pkg/apis/admissionregistration/v1alpha1",
+        "pkg/apis/admissionregistration/v1beta1",
+        "pkg/apis/apps/v1",
+        "pkg/apis/apps/v1beta1",
+        "pkg/apis/apps/v1beta2",
+        "pkg/apis/authentication/v1",
+        "pkg/apis/authentication/v1beta1",
+        "pkg/apis/authorization/v1",
+        "pkg/apis/authorization/v1beta1",
+        "pkg/apis/autoscaling/v1",
+        "pkg/apis/autoscaling/v2beta1",
+        "pkg/apis/batch/v1",
+        "pkg/apis/batch/v1beta1",
+        "pkg/apis/batch/v2alpha1",
+        "pkg/apis/certificates/v1beta1",
+        "pkg/apis/componentconfig/v1alpha1",
+        "pkg/apis/core/v1",
+        "pkg/apis/events/v1beta1",
+        "pkg/apis/extensions/v1beta1",
+        "pkg/apis/imagepolicy/v1alpha1",
+        "pkg/apis/networking/v1",
+        "pkg/apis/policy/v1beta1",
+        "pkg/apis/rbac/v1",
+        "pkg/apis/rbac/v1alpha1",
+        "pkg/apis/rbac/v1beta1",
+        "pkg/apis/scheduling/v1alpha1",
+        "pkg/apis/settings/v1alpha1",
+        "pkg/apis/storage/v1",
+        "pkg/apis/storage/v1alpha1",
+        "pkg/apis/storage/v1beta1",
+        "pkg/kubelet/apis/kubeletconfig/v1beta1",
+        "pkg/proxy/apis/kubeproxyconfig/v1alpha1",
+        "plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1",
+        "plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1",
+        "plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1",
+        "vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+        "vendor/k8s.io/apimachinery/pkg/apis/meta/v1",
+        "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1",
+        "vendor/k8s.io/apimachinery/pkg/apis/testapigroup/v1",
+        "vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1",
+        "vendor/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1",
+        "vendor/k8s.io/apiserver/pkg/apis/audit/v1alpha1",
+        "vendor/k8s.io/apiserver/pkg/apis/audit/v1beta1",
+        "vendor/k8s.io/apiserver/pkg/apis/example/v1",
+        "vendor/k8s.io/apiserver/pkg/apis/example2/v1",
+        "vendor/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
     ],
 )
