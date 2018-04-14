@@ -133,7 +133,7 @@ type MasterConfiguration struct {
 type API struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
-	// ControlPlaneEndpoint sets the DNS address for the API server
+	// ControlPlaneEndpoint sets the DNS address with optional port for the API server
 	ControlPlaneEndpoint string
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.

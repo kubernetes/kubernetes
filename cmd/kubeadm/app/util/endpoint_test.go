@@ -64,6 +64,73 @@ func TestGetMasterEndpoint(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "valid DNS endpoint with port",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "cp.k8s.io:443",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:443",
+			expected: true,
+		},
+		{
+			name: "valid DNS endpoint and IP with port",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress:     "1.2.3.4",
+					ControlPlaneEndpoint: "cp.k8s.io:443",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:443",
+			expected: true,
+		},
+		{
+			name: "DNS endpoint with malformed port",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "cp.k8s.io:443:443",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:443:443",
+			expected: false,
+		},
+		{
+			name: "DNS endpoint with colon and missing port uses bind port",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "cp.k8s.io:",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:1234",
+			expected: true,
+		},
+		{
+			name: "DNS endpoint with non numeric port",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "cp.k8s.io:port",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:port",
+			expected: false,
+		},
+		{
+			name: "DNS endpoint with invalid port",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					ControlPlaneEndpoint: "cp.k8s.io:987654321",
+					BindPort:             1234,
+				},
+			},
+			endpoint: "https://cp.k8s.io:987654321",
+			expected: false,
+		},
+		{
 			name: "valid IPv4 endpoint",
 			cfg: &kubeadmapi.MasterConfiguration{
 				API: kubeadmapi.API{
