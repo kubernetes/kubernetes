@@ -78,9 +78,9 @@ go get github.com/bazelbuild/buildtools/buildozer
 update-k8s-gengo() {
   local name="$1" # something like deepcopy
   local pkg="$2"  # something like k8s.io/code-generator/cmd/deepcopy-gen
-  local match="$3"  # something like +k8s:deepcopy-gen=
+  local out="$3"  # something like zz_generated.deepcopy.go
+  local match="$4"  # something like +k8s:deepcopy-gen=
 
-  local out="zz_generated.${name}.go" # zz_generated.deepcopy.go
   local all_rule="k8s_${name}_all"  # k8s_deepcopy_all, which generates out for matching packages
   local rule="k8s_${name}" # k8s_deepcopy, which copies out the file for a particular package
 
@@ -99,7 +99,6 @@ update-k8s-gengo() {
   fi
   dozer "new_load //build:deepcopy.bzl $all_rule" //build:__pkg__
   dozer "set packages ${want[*]}" "//build:$name-sources"
-  deepcopies=$(find . -iname "${out}" | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||')
   have=$(find . -name BUILD -or -name BUILD.bazel | (xargs grep -l "$rule(" || true))
   if [[ -n "$have" ]]; then
     echo Deleting existing "$rule" commands... $have
@@ -130,10 +129,13 @@ update-k8s-gengo() {
     fi
     dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
   done
+  deepcopies=($(find . -iname "${out}" | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||'))
+  if [[ -z "${deepcopes:-}" ]]; then
+    return 0
+  fi
   echo "Deleting $out files"
-  echo $deepcopies | xargs -n 1 -I '{}' rm "{}/$out"
+  echo "${deepcopies[@]}" | xargs -n 1 -I '{}' rm "{}/$out"
 }
-update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen '+k8s:deepcopy-gen='
-update-k8s-gengo defaulter k8s.io/code-generator/cmd/defaulter-gen '+k8s:defaulter-gen='
+update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen zz_generated.deepcopy.go '+k8s:deepcopy-gen='
 echo Running gazelle to cleanup any changes...
 gazelle-fix
