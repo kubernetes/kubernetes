@@ -120,54 +120,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 		{
 			config: kubeproxyconfig.KubeProxyConfiguration{
-				BindAddress: "10.10.12.11",
-				// only HealthzBindAddress is invalid
-				HealthzBindAddress: "0.0.0.0",
-				MetricsBindAddress: "127.0.0.1:10249",
-				ClusterCIDR:        "192.168.59.0/24",
-				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-					MasqueradeAll: true,
-					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-				},
-				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:        pointer.Int32Ptr(2),
-					MaxPerCore: pointer.Int32Ptr(1),
-					Min:        pointer.Int32Ptr(1),
-					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				},
-			},
-			msg: "must be IP:port",
-		},
-		{
-			config: kubeproxyconfig.KubeProxyConfiguration{
-				BindAddress:        "10.10.12.11",
-				HealthzBindAddress: "0.0.0.0:12345",
-				// only MetricsBindAddress is invalid
-				MetricsBindAddress: "127.0.0.1",
-				ClusterCIDR:        "192.168.59.0/24",
-				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-					MasqueradeAll: true,
-					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-				},
-				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:        pointer.Int32Ptr(2),
-					MaxPerCore: pointer.Int32Ptr(1),
-					Min:        pointer.Int32Ptr(1),
-					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				},
-			},
-			msg: "must be IP:port",
-		},
-		{
-			config: kubeproxyconfig.KubeProxyConfiguration{
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
@@ -592,6 +544,7 @@ func TestValidateHostPort(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 
 	successCases := []string{
+		"10.10.10.10",
 		"0.0.0.0:10256",
 		"127.0.0.1:10256",
 		"10.10.10.10:10256",
@@ -607,10 +560,6 @@ func TestValidateHostPort(t *testing.T) {
 		ccc string
 		msg string
 	}{
-		{
-			ccc: "10.10.10.10",
-			msg: "must be IP:port",
-		},
 		{
 			ccc: "123.456.789.10:12345",
 			msg: "must be a valid IP",

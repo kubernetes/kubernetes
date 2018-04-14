@@ -108,6 +108,18 @@ func TestIPPortVar(t *testing.T) {
 			expectVal: defaultIPPort,
 		},
 		{
+			desc:      "invalid ipv4 with invalid port number(lower bound)",
+			argc:      "blah --ipport=0.0.0.0:0",
+			expectErr: true,
+			expectVal: defaultIPPort,
+		},
+		{
+			desc:      "invalid ipv4 with invalid port number(upper bound)",
+			argc:      "blah --ipport=0.0.0.0:65536",
+			expectErr: true,
+			expectVal: defaultIPPort,
+		},
+		{
 			desc:      "invalid IP with port",
 			argc:      "blah --ipport=invalidip:8080",
 			expectErr: true,
