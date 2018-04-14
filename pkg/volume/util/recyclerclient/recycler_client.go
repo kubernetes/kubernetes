@@ -18,6 +18,7 @@ package recyclerclient
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -191,6 +192,8 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 	c.recorder(eventtype, message)
 }
 
+// WatchPod watches a pod and events related to it. It sends pod updates and events over the returned channel
+// It will continue until stopChannel is closed
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
 	podSelector, err := fields.ParseSelector("metadata.name=" + name)
 	if err != nil {
@@ -217,13 +220,34 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 	}
 
 	eventCh := make(chan watch.Event, 30)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer close(eventCh)
+		wg.Wait()
+	}()
 
 	go func() {
 		defer eventWatch.Stop()
+		defer wg.Done()
+		for {
+			select {
+			case _ = <-stopChannel:
+				return
+			case eventEvent, ok := <-eventWatch.ResultChan():
+				if !ok {
+					return
+				} else {
+					eventCh <- eventEvent
+				}
+			}
+		}
+	}()
+
+	go func() {
 		defer podWatch.Stop()
-		defer close(eventCh)
-		var podWatchChannelClosed bool
-		var eventWatchChannelClosed bool
+		defer wg.Done()
 		for {
 			select {
 			case <-stopChannel:
@@ -231,19 +255,10 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 
 			case podEvent, ok := <-podWatch.ResultChan():
 				if !ok {
-					podWatchChannelClosed = true
+					return
 				} else {
 					eventCh <- podEvent
 				}
-			case eventEvent, ok := <-eventWatch.ResultChan():
-				if !ok {
-					eventWatchChannelClosed = true
-				} else {
-					eventCh <- eventEvent
-				}
-			}
-			if podWatchChannelClosed && eventWatchChannelClosed {
-				break
 			}
 		}
 	}()
