@@ -37,27 +37,20 @@ _generate = """
     exit 1
   fi
 
-  # Ensure all the vendor/staging code is in the expected locations
-  for i in $$(ls vendor/k8s.io); do
-    ln -snf $$PWD/vendor/k8s.io/$$i $$dstpath/src/k8s.io/$$i
-  done
-  # symlink in all the staging dirs
-  for i in $$(ls staging/src/k8s.io); do
-    ln -snf $$PWD/staging/src/k8s.io/$$i $$dstpath/src/k8s.io/$$i
-  done
-
+  # when vendor/k8s.io/foo symlinks to staging/src/k8s.io/foo
+  # bazel will wind up creating concrete versions of both folders,
+  # putting half the files in staging and the other half in vendor
+  rsync -v --links --recursive staging/src/k8s.io/ vendor/k8s.io/
 
   # Find all packages that request generation, except for the tool itself
   files=()
   GO="$$GOROOT/bin/go"
-  for p in $$(find . -name *.go | \
+  files=($$(find . -name *.go | \
       (xargs grep -l "$$match" || true) | \
       (xargs -n 1 dirname || true) | sort -u | \
-      sed -e 's|./staging/src/||' | xargs "$$GO" list | grep -v "$${{tool##*/}}"); do
-    files+=("$$p")
-  done
+      sed -e 's|./staging/src/|./vendor/|;s|^./|k8s.io/kubernetes/|' | grep -v "$${{tool##*/}}"))
+  echo "Generating: $${{files[*]}}"
   packages="$$(IFS="," ; echo "$${{files[*]}}")"  # Create comma-separated list of packages expected by tool
-  echo "Generating: $${{files[*]}}..."
   $$dcg \
     -v 1 \
     -i "$$packages" \
@@ -184,6 +177,24 @@ def k8s_deepcopy(outs):
   """find the zz_generated.deepcopy.go for the calling package."""
   k8s_gengo(
     name="deepcopy",
+    outs=outs,
+  )
+
+def k8s_defaulter_all(name, packages):
+  """Generate zz_generated.defaulter.go for all specified packages in one invocation."""
+  k8s_gengo_all(
+    name=name,
+    base="zz_generated.defaulter.go",
+    tool="//vendor/k8s.io/code-generator/cmd/defaulter-gen",
+    match="+k8s:defaulter-gen=",
+    flags="--extra-peer-dirs %s" % ",".join(["k8s.io/kubernetes/%s" % p for p in packages]),
+    packages=packages,
+  )
+
+def k8s_defaulter(outs):
+  """find the zz_generated.defaulter.go for the calling package."""
+  k8s_gengo(
+    name="defaulter",
     outs=outs,
   )
 

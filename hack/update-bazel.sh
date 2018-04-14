@@ -91,21 +91,27 @@ update-k8s-gengo() {
 
   # Ensure that k8s_deepcopy_all() rule exists
   if ! grep -q "${all_rule}(" build/BUILD; then
+    echo Adding $all_rule to build/BULID
+    touch build/BUILD
     echo "$all_rule(name=\"${name}-sources\")" >> build/BUILD
+  else
+    echo $all_rule found in build/BUILD
   fi
   dozer "new_load //build:deepcopy.bzl $all_rule" //build:__pkg__
   dozer "set packages ${want[*]}" "//build:$name-sources"
-  deepcopies="$(find . -iname "${out}" | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||')"
-  have="$(find . -name BUILD -or -name BUILD.bazel | xargs grep -l "$rule(")"
-  echo Deleting existing "$rule" commands... $have
-  case "$(uname -s)" in
-    Darwin*)
-      bsed -e "/^$rule/d" $have
-      ;;
-    *)
-      bsed -e "/^$rule/d" $have
-      ;;
-  esac
+  deepcopies=$(find . -iname "${out}" | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||')
+  have=$(find . -name BUILD -or -name BUILD.bazel | (xargs grep -l "$rule(" || true))
+  if [[ -n "$have" ]]; then
+    echo Deleting existing "$rule" commands... $have
+    case "$(uname -s)" in
+      Darwin*)
+        bsed -e "/^$rule/d" $have
+        ;;
+      *)
+        bsed -e "/^$rule/d" $have
+        ;;
+    esac
+  fi
   echo "Adding $rule() rule"
   for w in "${want[@]}"; do
     if [[ $w == */$pkg ]]; then
@@ -128,4 +134,6 @@ update-k8s-gengo() {
   echo $deepcopies | xargs -n 1 -I '{}' rm "{}/$out"
 }
 update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen '+k8s:deepcopy-gen='
+update-k8s-gengo defaulter k8s.io/code-generator/cmd/defaulter-gen '+k8s:defaulter-gen='
+echo Running gazelle to cleanup any changes...
 gazelle-fix
