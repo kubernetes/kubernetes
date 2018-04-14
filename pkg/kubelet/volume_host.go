@@ -148,7 +148,7 @@ func (kvh *kubeletVolumeHost) GetCloudProvider() cloudprovider.Interface {
 func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	exec, err := kvh.getMountExec(pluginName)
 	if err != nil {
-		glog.V(2).Info("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
+		glog.V(2).Infof("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
 		// Use the default mounter
 		exec = nil
 	}
@@ -201,7 +201,7 @@ func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {
 	exec, err := kvh.getMountExec(pluginName)
 	if err != nil {
-		glog.V(2).Info("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
+		glog.V(2).Infof("Error finding mount pod for plugin %s: %s", pluginName, err.Error())
 		// Use the default exec
 		exec = nil
 	}
