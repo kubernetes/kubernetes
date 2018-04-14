@@ -17,6 +17,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if ! which -s bazel && [[ "${CALLED_FROM_MAIN_MAKEFILE:-}" == "" ]]; then
+  echo "Please use 'make update' or install https://bazel.build"
+fi
+
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
@@ -41,32 +45,11 @@ touch "${KUBE_ROOT}/vendor/BUILD"
 
 dozer() {
   # returns 0 on successful mod and 3 on no change
-  buildozer "$@" && return 0 || [[ "$?" == 3 ]] && return 0
+  buildozer --quiet "$@" && return 0 || [[ "$?" == 3 ]] && return 0
   return 1
 }
 
-
-add-generated-deps() {
-  if which -s bazel; then
-    bazel build //build:all-generated-sources
-    for path in $(find -H bazel-genfiles -iname *.go.deps); do
-      deps="${path#bazel-genfiles/build/}" # rel/path/to/foo.go.deps
-      pkg="${deps%/*}" # rel/path/to
-      if [[ ! -f "$pkg/BUILD" && ! -f "$pkg/BUILD.bazel" ]]; then
-        echo "$pkg: no BUILD.bazel file"
-        continue
-      fi
-      deps=($(cat "$path"))
-      deps="$(IFS=' '  ; echo "${deps[*]}")"
-      dozer "add deps $deps" "//${pkg}:go_default_library"
-    done
-  fi
-}
-
 gazelle-fix() {
-  if ! which -s bazel && [[ "${CALLED_FROM_MAIN_MAKEFILE:-}" == "" ]]; then
-    echo "Please use "make update" or install http://bazel.build"
-  fi
   gazelle fix \
       -build_file_name=BUILD,BUILD.bazel \
       -external=vendored \
@@ -78,11 +61,6 @@ gazelle-fix() {
   # staging/. Instead we just fix the bad paths with sed.
   find staging -name BUILD -o -name BUILD.bazel | \
     xargs ${SED} -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
-
-  # Add deps for any generated dependencies
-  if which -s bazel; then
-    add-generated-deps
-  fi
 }
 
 gazelle-fix
@@ -100,8 +78,19 @@ update-k8s-gengo() {
 
   # look for packages that contain match
   echo "Looking for packages with a $match comment in go code..."
-  want=($(find . -name *.go | grep -v "$pkg" | (xargs grep -l "$match" || true) | (xargs -n 1 dirname || true) | sort -u | $SED -e 's|./staging/src/|./vendor/|' | (xargs go list || true) | $SED -e 's|k8s.io/kubernetes/||' | sort -u))
-  echo "[$(IFS=$'\n ' ; echo "${want[*]}" | sed -e 's|\(^.*$\)|  "\1",|')]"
+
+  white=($(find . -name *.go | \
+      grep -v "$pkg" | \
+      (xargs grep -l "$match" || true)))
+  want=()
+  for w in "${white[@]}"; do
+    if grep "$match" "$w" | grep -q -v "${match}false"; then
+      want+=( "$(dirname "$w" | $SED -e 's|./staging/src/|./vendor/|;s|^./||')" )
+    else
+      echo SKIP: $w, has only ${match}false tags
+    fi
+  done
+  want=($(IFS=$'\n ' ; echo "${want[*]}" | sort -u))
 
   # Ensure that k8s_deepcopy_all() rule exists
   if ! grep -q "${all_rule}(" build/BUILD; then
@@ -113,30 +102,24 @@ update-k8s-gengo() {
   fi
   dozer "new_load //build:deepcopy.bzl $all_rule" //build:__pkg__
   dozer "set packages ${want[*]}" "//build:$name-sources"
+  dozer "add srcs :$name-sources" //build:all-generated-sources
   have=$(find . -name BUILD -or -name BUILD.bazel | (xargs grep -l "$rule(" || true))
   if [[ -n "$have" ]]; then
     echo Deleting existing "$rule" commands... $have
-    case "$(uname -s)" in
-      Darwin*)
-        $SED -i -e "/^$rule/d" $have
-        ;;
-      *)
-        $SED -i -e "/^$rule/d" $have
-        ;;
-    esac
+    $SED -i -e "/^$rule/d" $have
   fi
-  echo "Adding $rule() rule"
+
+  echo "Adding $rule() rules"
   for w in "${want[@]}"; do
+    w="${w#k8s.io/kubernetes/}"  # Remove k8s.io/kubernetes/ prefix
     if [[ $w == */$pkg ]]; then
-      echo skipping $w...
-      continue
+      echo "ERROR: $pkg should not generate itself"
+      exit 1
     fi
     if [[ -f $w/BUILD.bazel ]]; then
       echo "$rule(outs=[\"${out}\"])" >> $w/BUILD
-      dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
     elif  [[ -f $w/BUILD ]]; then
       echo "$rule(outs=[\"${out}\"])" >> $w/BUILD
-      dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
     else
       echo cannot find build file for $w
       continue
@@ -148,5 +131,24 @@ update-k8s-gengo() {
 }
 update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen zz_generated.deepcopy.go '+k8s:deepcopy-gen='
 update-k8s-gengo defaulter k8s.io/code-generator/cmd/defaulter-gen zz_generated.defaults.go '+k8s:defaulter-gen='
+update-k8s-gengo conversion k8s.io/code-generator/cmd/conversion-gen zz_generated.conversion.go '+k8s:conversion-gen='
 echo Running gazelle to cleanup any changes...
 gazelle-fix
+
+if ! which -s bazel; then
+  return 0  # We should have already generated these files
+fi
+
+# Add dependencies from generated files
+bazel build //build:all-generated-sources
+for path in $(find -H bazel-genfiles -iname *.go.deps); do
+  deps="${path#bazel-genfiles/build/}" # rel/path/to/foo.go.deps
+  pkg="${deps%/*}" # rel/path/to
+  if [[ ! -f "$pkg/BUILD" && ! -f "$pkg/BUILD.bazel" ]]; then
+    echo "$pkg: no BUILD.bazel file"
+    continue
+  fi
+  deps=($(cat "$path"))
+  deps="$(IFS=' '  ; echo "${deps[*]}")"
+  dozer "add deps $deps" "//${pkg}:go_default_library"
+done

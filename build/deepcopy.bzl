@@ -47,12 +47,20 @@ _generate_body = """
   # Find all packages that request generation, except for the tool itself
   files=()
   GO="$$GOROOT/bin/go"
-  files=($$(find . -name *.go | \
-      (xargs grep -l "$$match" || true) | \
-      (xargs -n 1 dirname || true) | sort -u | \
-      sed -e 's|./staging/src/|./vendor/|;s|^./|k8s.io/kubernetes/|' | grep -v "$${tool##*/}"))
-  echo "Generating: $${files[*]}"
-  packages="$$(IFS="," ; echo "$${files[*]}")"  # Create comma-separated list of packages expected by tool
+  white=($$(find . -name *.go | \
+      grep -v "$${tool##*/}" | \
+      (xargs grep -l "$$match" || true)))
+  dirs=()
+  for w in "$${white[@]}"; do
+    if grep "$$match" "$$w" | grep -q -v "$${match}false"; then
+      dirs+=("$$(dirname "$$w" | sed -e 's|./staging/src/|./vendor/|;s|^./|k8s.io/kubernetes/|')")
+    else
+      echo SKIP: $$w, has only $${match}false tags
+    fi
+  done
+
+  echo "Generating: $${dirs[*]}"
+  packages="$$(IFS="," ; echo "$${dirs[*]}")"  # Create comma-separated list of packages expected by tool
   $$dcg \
     -v 1 \
     -i "$$packages" \
@@ -63,30 +71,33 @@ _generate_body = """
   # Ensure we generated each file
   DEBUG=1
   if [[ -n "$${DEBUG:-}" ]]; then
-    for p in "$${files[@]}"; do
+    for p in "$${dirs[@]}"; do
       found=false
       for s in "" "k8s.io/kubernetes/vendor/" "staging/src/"; do
-        echo $$s
         if [[ -f "$$srcpath/src/$$s$$p/$$out" ]]; then
           found=true
           if [[ $$s == "k8s.io/kubernetes/vendor/" ]]; then
             grep -A 1 import $$srcpath/src/$$s$$p/$$out
           fi
-          echo FOUND: $$s$$p
           break
         fi
       done
       if [[ $$found == false ]]; then
         echo FAILED: $$p
-        exit 1
+	failed=1
+      else
+        echo FOUND: $$p
       fi
     done
+    if [[ -n "$${failed:-}" ]]; then
+      exit 1
+    fi
   fi
 
   oifs="$$IFS"
-  IFS='\n'
+  IFS=$$'\n'
   # use go list to create lines of pkg import import ...
-  for line in $$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' "$${files[@]}"); do
+  for line in $$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' "$${dirs[@]}"); do
     pkg="$${line%% *}" # first word
     imports="$${line#* }" # everything after the first word
     IFS=' '
@@ -98,7 +109,7 @@ _generate_body = """
       fi
       echo //$${dep#k8s.io/kubernetes/}:go_default_library >> $$deps
     done
-    IFS='\n'
+    IFS=$$'\n'
   done
   IFS="$$oifs"
 
@@ -172,6 +183,25 @@ def k8s_defaulter(outs):
   """find the zz_generated.defaulter.go for the calling package."""
   k8s_gengo(
     name="defaulter",
+    outs=outs,
+  )
+
+def k8s_conversion_all(name, packages):
+  k8s_gengo_all(
+    name=name,
+    base="zz_generated.conversion.go",
+    tool="//vendor/k8s.io/code-generator/cmd/conversion-gen",
+    match="+k8s:conversion-gen=",
+    flags="--extra-peer-dirs %s" % ",".join([
+        "k8s.io/kubernetes/pkg/apis/core",
+	"k8s.io/kubernetes/pkg/apis/core/v1",
+	"k8s.io/api/core/v1",
+    ]),
+    packages=packages)
+
+def k8s_conversion(outs):
+  k8s_gengo(
+    name="conversion",
     outs=outs,
   )
 
