@@ -14,12 +14,14 @@
 
 load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
 
-_generate = """
+_generate_prefix = """
   tool='$(location {tool})' # something like k8s.io/code-generator/cmd/deepcopy-gen
   tool_flags='{flags}' # something like --bounding-dirs k8s.io/kubernetes,k8s.io/api
   out='{out}'  # something like zz_generated.deepcopy.go
   match='{match}'  # something like +k8s:deepcopy-gen=
+"""
 
+_generate_body = """
   # location of the prebuilt generator
   dcg="$$PWD/$$tool"
 
@@ -29,8 +31,8 @@ _generate = """
   # split each GOPATH entry by :
   gopaths=($$(IFS=: ; echo $$GOPATH))
 
-  srcpath="$${{gopaths[0]}}"
-  dstpath="$${{gopaths[1]}}"
+  srcpath="$${gopaths[0]}"
+  dstpath="$${gopaths[1]}"
   if [[ "$$dstpath" != "$$GENGOPATH" ]]; then
     env | sort
     echo "Envionrmental assumptions failed: GENGOPATH is no the second GOPATH"
@@ -40,7 +42,7 @@ _generate = """
   # when vendor/k8s.io/foo symlinks to staging/src/k8s.io/foo
   # bazel will wind up creating concrete versions of both folders,
   # putting half the files in staging and the other half in vendor
-  rsync -v --links --recursive staging/src/k8s.io/ vendor/k8s.io/
+  rsync --links --recursive staging/src/k8s.io/ vendor/k8s.io/
 
   # Find all packages that request generation, except for the tool itself
   files=()
@@ -48,20 +50,20 @@ _generate = """
   files=($$(find . -name *.go | \
       (xargs grep -l "$$match" || true) | \
       (xargs -n 1 dirname || true) | sort -u | \
-      sed -e 's|./staging/src/|./vendor/|;s|^./|k8s.io/kubernetes/|' | grep -v "$${{tool##*/}}"))
-  echo "Generating: $${{files[*]}}"
-  packages="$$(IFS="," ; echo "$${{files[*]}}")"  # Create comma-separated list of packages expected by tool
+      sed -e 's|./staging/src/|./vendor/|;s|^./|k8s.io/kubernetes/|' | grep -v "$${tool##*/}"))
+  echo "Generating: $${files[*]}"
+  packages="$$(IFS="," ; echo "$${files[*]}")"  # Create comma-separated list of packages expected by tool
   $$dcg \
     -v 1 \
     -i "$$packages" \
-    -O "$${{out%%???}}" \
+    -O "$${out%%???}" \
     -h $(location //vendor/k8s.io/code-generator/hack:boilerplate.go.txt) \
     $$tool_flags
 
   # Ensure we generated each file
   DEBUG=1
-  if [[ -n "$${{DEBUG:-}}" ]]; then
-    for p in "$${{files[@]}}"; do
+  if [[ -n "$${DEBUG:-}" ]]; then
+    for p in "$${files[@]}"; do
       found=false
       for s in "" "k8s.io/kubernetes/vendor/" "staging/src/"; do
         echo $$s
@@ -81,17 +83,36 @@ _generate = """
     done
   fi
 
+  oifs="$$IFS"
+  IFS='\n'
+  # use go list to create lines of pkg import import ...
+  for line in $$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' "$${files[@]}"); do
+    pkg="$${line%% *}" # first word
+    imports="$${line#* }" # everything after the first word
+    IFS=' '
+    deps="$$srcpath/src/$$pkg/$$out.deps"
+    echo > "$$deps"
+    for dep in $$imports; do
+      if [[ ! "$$dep" == k8s.io/kubernetes/* ]]; then
+        continue
+      fi
+      echo //$${dep#k8s.io/kubernetes/}:go_default_library >> $$deps
+    done
+    IFS='\n'
+  done
+  IFS="$$oifs"
+
   # detect if the out file does not exist or changed
-  move-out() {{
+  move-out() {
     D="$(OUTS)"
-    dst="$$O/$${{D%%/genfiles/*}}/genfiles/build/$$1/$$out"
+    dst="$$O/$${D%%/genfiles/*}/genfiles/build/$$1/$$out"
     options=(
       "k8s.io/kubernetes/$$1"
-      "$${{1/vendor\//}}"
-      "k8s.io/kubernetes/staging/src/$${{1/vendor\//}}"
+      "$${1/vendor\//}"
+      "k8s.io/kubernetes/staging/src/$${1/vendor\//}"
     )
     found=false
-    for o in "$${{options[@]}}"; do
+    for o in "$${options[@]}"; do
       src="$$srcpath/src/$$o/$$out"
       if [[ ! -f "$$src" ]]; then
         continue
@@ -100,66 +121,22 @@ _generate = """
       break
     done
     if [[ $$found == false ]]; then
-      echo "NOT FOUND: $$1 in any of the $${{options[@]}}"
+      echo "NOT FOUND: $$1 in any of the $${options[@]}"
       exit 1
     fi
 
     if [[ ! -f "$$dst" ]]; then
       mkdir -p "$$(dirname "$$dst")"
       cp -f "$$src" "$$dst"
+      cp -f "$$src.deps" "$$dst.deps"
       echo ... generated $$1/$$out
       return 0
     fi
-  }}
+  }
 
   ####################################
   # append move-out calls below here #
   ####################################
-"""
-
-_link = """
-  # location of prebuilt deepcopy generator
-  dcg=$$PWD/'$(location //vendor/k8s.io/code-generator/cmd/deepcopy-gen)'
-  # original pwd
-  export O=$$PWD
-  # gopath/goroot for genrule
-  export GOPATH=$$PWD/.go
-  export GOROOT=/usr/lib/google-golang
-
-  # symlink in source into new gopath
-  mkdir -p $$GOPATH/src/k8s.io
-  ln -snf $$PWD $$GOPATH/src/k8s.io/kubernetes
-  # symlink in all the staging dirs
-  for i in $$(ls staging/src/k8s.io); do
-    ln -snf $$PWD/staging/src/k8s.io/$$i $$GOPATH/src/k8s.io/$$i
-  done
-  # prevent symlink recursion
-  touch $$GOPATH/BUILD.bazel
-
-  echo GP: {go_package}
-  echo BP: {bazel_package}
-  # generate zz_generated.deepcopy.go
-  cd $$GOPATH/src/k8s.io/kubernetes
-  $$dcg \
-  -v 1 \
-  -i {go_package} \
-  --bounding-dirs k8s.io/kubernetes,k8s.io/api \
-  -h $(location //vendor/k8s.io/code-generator/hack:boilerplate.go.txt) \
-  -O zz_generated.deepcopy
-
-  # detect if the out file does not exist or changed
-  out="$$O/$(location zz_generated.deepcopy.go)"
-  now="{bazel_package}/zz_generated.deepcopy.go"
-  if [[ ! -f "$$out" ]]; then
-    echo "NEW: $$out, linking in..."
-    ln "$$now" "$$out"
-  elif ! cmp -s "$$now" "$$old"; then
-    # link it back to the expected location
-    echo "UPDATE: $$out (now $$? old), updating..."
-    ln "$$now" "$$out"
-  else
-    echo "CACHED: using cached version of $$out"
-  fi
 """
 
 def k8s_deepcopy_all(name, packages):
@@ -181,10 +158,10 @@ def k8s_deepcopy(outs):
   )
 
 def k8s_defaulter_all(name, packages):
-  """Generate zz_generated.defaulter.go for all specified packages in one invocation."""
+  """Generate zz_generated.defaults.go for all specified packages in one invocation."""
   k8s_gengo_all(
     name=name,
-    base="zz_generated.defaulter.go",
+    base="zz_generated.defaults.go",
     tool="//vendor/k8s.io/code-generator/cmd/defaulter-gen",
     match="+k8s:defaulter-gen=",
     flags="--extra-peer-dirs %s" % ",".join(["k8s.io/kubernetes/%s" % p for p in packages]),
@@ -201,16 +178,17 @@ def k8s_defaulter(outs):
 def k8s_gengo_all(name, base, tool, flags, match, packages):
   """Use TOOL to generate BASE files in all the PACKAGES with a MATCH comment."""
   # Tell bazel all the files we will generate
-  outs = ["%s/%s" % (p, base) for p in packages]
+  go_files = ["%s/%s" % (p, base) for p in packages] # generated files
+  dep_files = ["%s.deps" % g for g in go_files] # list of new packages dependencies
+  outs = go_files + dep_files
 
   # script which generates all the files
-  cmd= _generate.format(
+  cmd = _generate_prefix.format(
     flags=flags,
     match=match,
     out=base,
-    packages=packages,
     tool=tool,
-  ) + "\n".join(["move-out %s" % p for p in packages])
+  ) + _generate_body + "\n".join(["move-out %s" % p for p in packages])
 
 
   # Rule which generates a set of out files given a set of input src and tool files
@@ -268,9 +246,8 @@ def k8s_gengo(name, outs):
         continue  # not here
       fi
 
-      echo "FOUND: $$goal at $$o"
       mkdir -p "$$(dirname "$$goal")"
-      ln -f "$$o" "$(location {out})"
+      cp -f "$$o" "$(location {out})"
       exit 0
     done
     echo "MISSING: could not find $$goal in any of the $${{options[@]}}"
