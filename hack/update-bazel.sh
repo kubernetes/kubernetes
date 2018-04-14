@@ -35,37 +35,9 @@ go install ./vendor/github.com/bazelbuild/bazel-gazelle/cmd/gazelle
 
 go install ./vendor/github.com/kubernetes/repo-infra/kazel
 
+cd "${KUBE_ROOT}"
+go get github.com/bazelbuild/buildtools/buildozer
 touch "${KUBE_ROOT}/vendor/BUILD"
-
-gazelle-fix() {
-
-gazelle fix \
-    -build_file_name=BUILD,BUILD.bazel \
-    -external=vendored \
-    -proto=legacy \
-    -mode=fix
-# gazelle gets confused by our staging/ directory, prepending an extra
-# "k8s.io/kubernetes/staging/src" to the import path.
-# gazelle won't follow the symlinks in vendor/, so we can't just exclude
-# staging/. Instead we just fix the bad paths with sed.
-find staging -name BUILD -o -name BUILD.bazel | \
-  xargs ${SED} -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
-}
-
-gazelle-fix
-
-kazel
-
-bsed() {
-  case "$(uname -s)" in
-    Darwin*)
-      sed -i '' "$@"
-      ;;
-    *)
-      sed --in-place= "$@"
-      ;;
-  esac
-}
 
 dozer() {
   # returns 0 on successful mod and 3 on no change
@@ -73,8 +45,50 @@ dozer() {
   return 1
 }
 
-cd "${KUBE_ROOT}"
-go get github.com/bazelbuild/buildtools/buildozer
+
+add-generated-deps() {
+  if which -s bazel; then
+    bazel build //build:all-generated-sources
+    for path in $(find -H bazel-genfiles -iname *.go.deps); do
+      deps="${path#bazel-genfiles/build/}" # rel/path/to/foo.go.deps
+      pkg="${deps%/*}" # rel/path/to
+      if [[ ! -f "$pkg/BUILD" && ! -f "$pkg/BUILD.bazel" ]]; then
+        echo "$pkg: no BUILD.bazel file"
+        continue
+      fi
+      deps=($(cat "$path"))
+      deps="$(IFS=' '  ; echo "${deps[*]}")"
+      dozer "add deps $deps" "//${pkg}:go_default_library"
+    done
+  fi
+}
+
+gazelle-fix() {
+  if ! which -s bazel && [[ "${CALLED_FROM_MAIN_MAKEFILE:-}" == "" ]]; then
+    echo "Please use "make update" or install http://bazel.build"
+  fi
+  gazelle fix \
+      -build_file_name=BUILD,BUILD.bazel \
+      -external=vendored \
+      -proto=legacy \
+      -mode=fix
+  # gazelle gets confused by our staging/ directory, prepending an extra
+  # "k8s.io/kubernetes/staging/src" to the import path.
+  # gazelle won't follow the symlinks in vendor/, so we can't just exclude
+  # staging/. Instead we just fix the bad paths with sed.
+  find staging -name BUILD -o -name BUILD.bazel | \
+    xargs ${SED} -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
+
+  # Add deps for any generated dependencies
+  if which -s bazel; then
+    add-generated-deps
+  fi
+}
+
+gazelle-fix
+
+kazel
+
 update-k8s-gengo() {
   local name="$1" # something like deepcopy
   local pkg="$2"  # something like k8s.io/code-generator/cmd/deepcopy-gen
@@ -86,7 +100,7 @@ update-k8s-gengo() {
 
   # look for packages that contain match
   echo "Looking for packages with a $match comment in go code..."
-  want=($(find . -name *.go | grep -v "$pkg" | (xargs grep -l "$match" || true) | (xargs -n 1 dirname || true) | sort -u | sed -e 's|./staging/src/|./vendor/|' | (xargs go list || true) | sed -e 's|k8s.io/kubernetes/||' | sort -u))
+  want=($(find . -name *.go | grep -v "$pkg" | (xargs grep -l "$match" || true) | (xargs -n 1 dirname || true) | sort -u | $SED -e 's|./staging/src/|./vendor/|' | (xargs go list || true) | $SED -e 's|k8s.io/kubernetes/||' | sort -u))
   echo "[$(IFS=$'\n ' ; echo "${want[*]}" | sed -e 's|\(^.*$\)|  "\1",|')]"
 
   # Ensure that k8s_deepcopy_all() rule exists
@@ -104,10 +118,10 @@ update-k8s-gengo() {
     echo Deleting existing "$rule" commands... $have
     case "$(uname -s)" in
       Darwin*)
-        bsed -e "/^$rule/d" $have
+        $SED -i -e "/^$rule/d" $have
         ;;
       *)
-        bsed -e "/^$rule/d" $have
+        $SED -i -e "/^$rule/d" $have
         ;;
     esac
   fi
