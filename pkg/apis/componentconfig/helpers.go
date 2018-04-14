@@ -93,7 +93,7 @@ func (v IPPortVar) Set(s string) error {
 	if net.ParseIP(host) == nil {
 		return fmt.Errorf("%q is not a valid IP address", host)
 	}
-	if _, err := strconv.Atoi(port); err != nil {
+	if p, err := strconv.Atoi(port); err != nil || p < 1 || p > 65535 {
 		return fmt.Errorf("%q is not a valid number", port)
 	}
 	*v.Val = s

@@ -192,6 +192,12 @@ func validateClientConnectionConfiguration(config kubeproxyconfig.ClientConnecti
 func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	// Both IP and IP:port are valid.
+	// Attempt to parse into IP first.
+	if net.ParseIP(input) != nil {
+		return nil
+	}
+
 	hostIP, port, err := net.SplitHostPort(input)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, input, "must be IP:port"))
