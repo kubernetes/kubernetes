@@ -196,8 +196,9 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
+			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOpts{
-				DeleteOptions: NewDeleteOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
 				In:     os.Stdin,
 				Out:    os.Stdout,
@@ -353,8 +354,9 @@ func TestGenerateService(t *testing.T) {
 			}
 
 			buff := &bytes.Buffer{}
+			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOpts{
-				DeleteOptions: NewDeleteOptions(os.Stdout, os.Stderr),
+				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
 				Out:    buff,
 				ErrOut: buff,

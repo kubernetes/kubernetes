@@ -113,19 +113,8 @@ type DeleteOptions struct {
 	ErrOut io.Writer
 }
 
-func NewDeleteOptions(out, errout io.Writer) *DeleteOptions {
-	return &DeleteOptions{
-		Cascade:         true,
-		GracePeriod:     -1,
-		Include3rdParty: true,
-
-		Out:    out,
-		ErrOut: errout,
-	}
-}
-
 func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := NewDeleteOptions(out, errOut)
+	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -135,7 +124,9 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
+			options := deleteFlags.ToOptions(out, errOut)
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+
 			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
@@ -151,22 +142,11 @@ func NewCmdDelete(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
-	usage := "containing the resource to delete."
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones.")
-	cmd.Flags().BoolVar(&options.DeleteAll, "all", options.DeleteAll, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
-	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", options.IgnoreNotFound, "Treat \"resource not found\" as a successful delete. Defaults to \"true\" when --all is specified.")
-	cmd.Flags().BoolVar(&options.Cascade, "cascade", options.Cascade, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
-	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", options.GracePeriod, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion).")
-	cmd.Flags().BoolVar(&options.DeleteNow, "now", options.DeleteNow, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
-	cmd.Flags().BoolVar(&options.ForceDeletion, "force", options.ForceDeletion, "Only used when grace-period=0. If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
+	deleteFlags.AddFlags(cmd)
 
-	// we do not need to wire PrintFlags through this command,
-	// as it does not deal with runtime.Objects, and only accepts the "name" output format
-	cmdutil.AddOutputVarFlagsForMutation(cmd, &options.Output)
+	// flag-specific output flag, as this command does not depend on PrintFlags
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
 
-	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -177,6 +157,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args 
 		return err
 	}
 
+	o.Selector = cmdutil.GetFlagString(cmd, "selector")
 	o.Reaper = f.Reaper
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)

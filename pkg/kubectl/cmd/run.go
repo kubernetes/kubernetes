@@ -91,6 +91,8 @@ type RunObject struct {
 }
 
 type RunOpts struct {
+	DeleteFlags *DeleteFlags
+
 	DeleteOptions *DeleteOptions
 
 	DryRun bool
@@ -115,7 +117,7 @@ type RunOpts struct {
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &RunOpts{
-		DeleteOptions: NewDeleteOptions(cmdOut, cmdErr),
+		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 
 		In:     cmdIn,
 		Out:    cmdOut,
@@ -134,11 +136,12 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 		},
 	}
 
+	options.DeleteFlags.AddFlags(cmd)
+
 	cmdutil.AddPrinterFlags(cmd)
 	addRunFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	return cmd
 }
@@ -192,13 +195,13 @@ func (o *RunOpts) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		o.Attach = true
 	}
 
-	// complete delete options
-	// TODO(juanvallejo): turn delete options into a DeleteFlags struct, similar to PrintFlags
-	o.DeleteOptions.IgnoreNotFound = true
-	o.DeleteOptions.Timeout = 0
-	o.DeleteOptions.GracePeriod = -1
-	o.DeleteOptions.WaitForDeletion = false
-	o.DeleteOptions.Reaper = f.Reaper
+	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+	deleteOpts.IgnoreNotFound = true
+	deleteOpts.WaitForDeletion = false
+	deleteOpts.GracePeriod = -1
+	deleteOpts.Reaper = f.Reaper
+
+	o.DeleteOptions = deleteOpts
 
 	return nil
 }

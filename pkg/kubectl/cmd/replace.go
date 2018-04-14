@@ -65,9 +65,10 @@ var (
 )
 
 type ReplaceOpts struct {
-	PrintFlags      *printers.PrintFlags
-	FileNameOptions *resource.FilenameOptions
-	DeleteOptions   *DeleteOptions
+	PrintFlags  *printers.PrintFlags
+	DeleteFlags *DeleteFlags
+
+	DeleteOptions *DeleteOptions
 
 	PrintObj func(obj runtime.Object) error
 
@@ -90,10 +91,8 @@ type ReplaceOpts struct {
 
 func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &ReplaceOpts{
-		PrintFlags: printers.NewPrintFlags("replaced"),
-
-		FileNameOptions: &resource.FilenameOptions{},
-		DeleteOptions:   NewDeleteOptions(out, errOut),
+		PrintFlags:  printers.NewPrintFlags("replaced"),
+		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 
 		Out:    out,
 		ErrOut: errOut,
@@ -114,18 +113,12 @@ func NewCmdReplace(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 
 	options.PrintFlags.AddFlags(cmd)
+	options.DeleteFlags.AddFlags(cmd)
 
-	usage := "to use to replace the resource."
-	cmdutil.AddFilenameOptionFlags(cmd, options.FileNameOptions, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().BoolVar(&options.DeleteOptions.ForceDeletion, "force", options.DeleteOptions.ForceDeletion, "Delete and re-create the specified resource")
-	cmd.Flags().BoolVar(&options.DeleteOptions.Cascade, "cascade", options.DeleteOptions.Cascade, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).")
-	cmd.Flags().IntVar(&options.DeleteOptions.GracePeriod, "grace-period", options.DeleteOptions.GracePeriod, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
-	cmd.Flags().DurationVar(&options.DeleteOptions.Timeout, "timeout", options.DeleteOptions.Timeout, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }
@@ -147,22 +140,21 @@ func (o *ReplaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	// complete delete options
-	// TODO(juanvallejo): Turn these fields in a DeleteFlags struct, similar to PrintFlags
+	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
-	o.DeleteOptions.IgnoreNotFound = true
-	o.DeleteOptions.Reaper = f.Reaper
-
+	deleteOpts.IgnoreNotFound = true
+	deleteOpts.Reaper = f.Reaper
 	if o.PrintFlags.OutputFormat != nil {
-		o.DeleteOptions.Output = *o.PrintFlags.OutputFormat
+		deleteOpts.Output = *o.PrintFlags.OutputFormat
 	}
-
-	if o.DeleteOptions.GracePeriod == 0 {
+	if deleteOpts.GracePeriod == 0 {
 		// To preserve backwards compatibility, but prevent accidental data loss, we convert --grace-period=0
 		// into --grace-period=1 and wait until the object is successfully deleted.
-		o.DeleteOptions.GracePeriod = 1
-		o.DeleteOptions.WaitForDeletion = true
+		deleteOpts.GracePeriod = 1
+		deleteOpts.WaitForDeletion = true
 	}
+	o.DeleteOptions = deleteOpts
 
 	schema, err := f.Validator(o.validate)
 	if err != nil {
@@ -190,7 +182,7 @@ func (o *ReplaceOpts) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	if cmdutil.IsFilenameSliceEmpty(o.FileNameOptions.Filenames) {
+	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Must specify --filename to replace")
 	}
 
@@ -207,14 +199,14 @@ func (o *ReplaceOpts) Run() error {
 		Schema(o.Schema).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, o.FileNameOptions).
+		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
 		return err
 	}
 
-	return o.Result.Visit(func(info *resource.Info, err error) error {
+	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -241,7 +233,7 @@ func (o *ReplaceOpts) Run() error {
 }
 
 func (o *ReplaceOpts) forceReplace() error {
-	for i, filename := range o.FileNameOptions.Filenames {
+	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
 			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
 			if err != nil {
@@ -253,7 +245,7 @@ func (o *ReplaceOpts) forceReplace() error {
 			if err != nil {
 				return err
 			}
-			o.FileNameOptions.Filenames[i] = tempFilename
+			o.DeleteOptions.FilenameOptions.Filenames[i] = tempFilename
 		}
 	}
 
@@ -261,8 +253,8 @@ func (o *ReplaceOpts) forceReplace() error {
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, o.FileNameOptions).
 		ResourceTypeOrNameArgs(false, o.BuilderArgs...).RequireObject(false).
+		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
@@ -303,7 +295,7 @@ func (o *ReplaceOpts) forceReplace() error {
 		Schema(o.Schema).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, o.FileNameOptions).
+		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
 		Flatten().
 		Do()
 	err = r.Err()
