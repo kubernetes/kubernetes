@@ -102,6 +102,7 @@ go_test(
         "gce_healthchecks_test.go",
         "gce_loadbalancer_external_test.go",
         "gce_loadbalancer_internal_test.go",
+        "gce_loadbalancer_test.go",
         "gce_loadbalancer_utils_test.go",
         "gce_test.go",
         "gce_util_test.go",
@@ -127,6 +128,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ],
 )
