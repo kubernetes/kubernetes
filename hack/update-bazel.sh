@@ -137,5 +137,6 @@ update-k8s-gengo() {
   echo "${deepcopies[@]}" | xargs -n 1 -I '{}' rm "{}/$out"
 }
 update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen zz_generated.deepcopy.go '+k8s:deepcopy-gen='
+update-k8s-gengo defaulter k8s.io/code-generator/cmd/defaulter-gen zz_generated.defaults.go '+k8s:defaulter-gen='
 echo Running gazelle to cleanup any changes...
 gazelle-fix
