@@ -32,8 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
-func createInternalLoadBalancer(gce *GCECloud, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
-	nodes, err := createAndInsertNodes(gce, nodeNames, zoneName)
+func createInternalLoadBalancer(gce *GCECloud, existingFwdRule *compute.ForwardingRule, nodeConfigs []nodeConfig, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
+	nodes, err := createAndInsertNodes(gce, nodeConfigs, zoneName)
 	if err != nil {
 		return nil, err
 	}
@@ -49,13 +49,13 @@ func createInternalLoadBalancer(gce *GCECloud, existingFwdRule *compute.Forwardi
 
 func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeNames := []string{"test-node-1"}
+	nodeConfigs := []nodeConfig{{name: "test-node-1", instanceName: "test-instance-1"}}
 
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
 	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	nodes, err := createAndInsertNodes(gce, nodeConfigs, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
@@ -76,13 +76,13 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 
 func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeNames := []string{"test-node-1"}
+	nodeConfigs := []nodeConfig{{name: "test-node-1", instanceName: "test-instance-1"}}
 
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
 	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	nodes, err := createAndInsertNodes(gce, nodeConfigs, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
@@ -93,7 +93,14 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update the BackendService with new Instances
-	newNodeNames := []string{"new-test-node-1", "new-test-node-2"}
+	newNodeConfigs := []nodeConfig{
+		{name: "new-test-node-1", instanceName: "test-instance-1"},
+		{name: "new-test-node-2", instanceName: "test-instance-2"},
+	}
+	var newNodeNames []string
+	for _, node := range newNodeConfigs {
+		newNodeNames = append(newNodeNames, node.name)
+	}
 	err = gce.ensureInternalBackendServiceGroups(bsName, newNodeNames)
 	assert.NoError(t, err)
 
@@ -101,7 +108,7 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check that the instances are updated
-	newNodes, err := createAndInsertNodes(gce, newNodeNames, vals.ZoneName)
+	newNodes, err := createAndInsertNodes(gce, newNodeConfigs, vals.ZoneName)
 	newIgLinks, err := gce.ensureInternalInstanceGroups(igName, newNodes)
 	backends := backendsFromGroupLinks(newIgLinks)
 	assert.Equal(t, bs.Backends, backends)
@@ -109,12 +116,12 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 
 func TestEnsureInternalLoadBalancer(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeName := "test-node-1"
+	testNodeConfig := nodeConfig{"test-node-1", "test-instance-1"}
 
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	status, err := createInternalLoadBalancer(gce, nil, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	status, err := createInternalLoadBalancer(gce, nil, []nodeConfig{testNodeConfig}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
 
@@ -135,7 +142,7 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 	for _, fwName := range fwNames {
 		firewall, err := gce.GetFirewall(fwName)
 		require.NoError(t, err)
-		assert.Equal(t, []string{nodeName}, firewall.TargetTags)
+		assert.Equal(t, []string{testNodeConfig.instanceName}, firewall.TargetTags)
 		assert.NotEmpty(t, firewall.SourceRanges)
 	}
 
@@ -172,7 +179,7 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 
 func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeNames := []string{"test-node-1"}
+	nodeConfigs := []nodeConfig{{name: "test-node-1", instanceName: "test-instance-1"}}
 
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -188,7 +195,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	err = gce.CreateHealthCheck(existingHC)
 	require.NoError(t, err)
 
-	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	nodes, err := createAndInsertNodes(gce, nodeConfigs, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
@@ -199,7 +206,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	err = gce.ensureInternalBackendService(bsName, bsDescription, fakeApiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, existingHC.SelfLink)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, nil, nodeConfigs, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 }
 
@@ -257,7 +264,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	gce.CreateRegionBackendService(existingBS, gce.region)
 	existingFwdRule.BackendService = existingBS.Name
 
-	_, err = createInternalLoadBalancer(gce, existingFwdRule, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, existingFwdRule, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Expect new resources with the correct attributes to be created
@@ -284,7 +291,7 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, nil, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// BackendService exists prior to updateInternalLoadBalancer call, but has
@@ -303,7 +310,7 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 
 	gce.CreateRegionBackendService(existingBS, gce.region)
 
-	nodes, err := createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+	nodes, err := createAndInsertNodes(gce, []nodeConfig{{name: nodeName}}, vals.ZoneName)
 	require.NoError(t, err)
 
 	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, fakeApiService, nodes)
@@ -334,12 +341,12 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, nil, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Remove the old Node and insert a new Node.
 	newNodeName := "test-node-2"
-	newNodes, err := createAndInsertNodes(gce, []string{newNodeName}, vals.ZoneName)
+	newNodes, err := createAndInsertNodes(gce, []nodeConfig{{name: newNodeName}}, vals.ZoneName)
 	require.NoError(t, err)
 
 	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, fakeApiService, newNodes)
@@ -363,7 +370,7 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, nil, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
@@ -407,7 +414,7 @@ func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, nil, []nodeConfig{{"test-node-1", "test-instance-1"}}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)

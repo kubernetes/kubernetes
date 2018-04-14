@@ -157,7 +157,7 @@ func (gce *GCECloud) InstanceTypeByProviderID(ctx context.Context, providerID st
 
 // ExternalID returns the cloud provider ID of the node with the specified NodeName (deprecated).
 func (gce *GCECloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
 		if gce.isCurrentInstance(instanceName) {
@@ -192,7 +192,7 @@ func (gce *GCECloud) InstanceExistsByProviderID(ctx context.Context, providerID 
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
 func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
 		if gce.isCurrentInstance(instanceName) {
@@ -211,7 +211,7 @@ func (gce *GCECloud) InstanceID(ctx context.Context, nodeName types.NodeName) (s
 
 // InstanceType returns the type of the specified node with the specified NodeName.
 func (gce *GCECloud) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	if gce.useMetadataServer {
 		// Use metadata, if possible, to fetch ID. See issue #12000
 		if gce.isCurrentInstance(instanceName) {
@@ -350,7 +350,7 @@ func (gce *GCECloud) CurrentNodeName(ctx context.Context, hostname string) (type
 // "<ip>/<netmask>".
 func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err error) {
 	var instance *gceInstance
-	instance, err = gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	instance, err = gce.getInstanceByName(gce.mapNodeNameToInstanceName(nodeName))
 	if err != nil {
 		return
 	}
@@ -373,7 +373,7 @@ func (gce *GCECloud) AliasRanges(nodeName types.NodeName) (cidrs []string, err e
 // secondary range.
 func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) error {
 
-	v1instance, err := gce.getInstanceByName(mapNodeNameToInstanceName(nodeName))
+	v1instance, err := gce.getInstanceByName(gce.mapNodeNameToInstanceName(nodeName))
 	if err != nil {
 		return err
 	}
@@ -611,7 +611,7 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 // GetNodeTags will first try returning the list of tags specified in GCE cloud Configuration.
 // If they weren't provided, it'll compute the host tags with the given hostnames. If the list
 // of hostnames has not changed, a cached set of nodetags are returned.
-func (gce *GCECloud) GetNodeTags(nodeNames []string) ([]string, error) {
+func (gce *GCECloud) GetNodeTags(nodes []*v1.Node) ([]string, error) {
 	// If nodeTags were specified through configuration, use them
 	if len(gce.nodeTags) > 0 {
 		return gce.nodeTags, nil
@@ -621,13 +621,13 @@ func (gce *GCECloud) GetNodeTags(nodeNames []string) ([]string, error) {
 	defer gce.computeNodeTagLock.Unlock()
 
 	// Early return if hosts have not changed
-	hosts := sets.NewString(nodeNames...)
+	hosts := sets.NewString(nodeNames(nodes)...)
 	if hosts.Equal(gce.lastKnownNodeNames) {
 		return gce.lastComputedNodeTags, nil
 	}
 
 	// Get GCE instance data by hostname
-	instances, err := gce.getInstancesByNames(nodeNames)
+	instances, err := gce.getInstancesByNames(gce.instanceNames(nodes))
 	if err != nil {
 		return nil, err
 	}

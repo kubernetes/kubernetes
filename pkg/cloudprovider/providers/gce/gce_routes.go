@@ -62,7 +62,7 @@ func (gce *GCECloud) ListRoutes(ctx context.Context, clusterName string) ([]*clo
 func (gce *GCECloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
 	mc := newRoutesMetricContext("create")
 
-	targetInstance, err := gce.getInstanceByName(mapNodeNameToInstanceName(route.TargetNode))
+	targetInstance, err := gce.getInstanceByName(gce.mapNodeNameToInstanceName(route.TargetNode))
 	if err != nil {
 		return mc.Observe(err)
 	}

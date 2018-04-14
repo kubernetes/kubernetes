@@ -58,7 +58,7 @@ func (gce *GCECloud) GetZoneByProviderID(ctx context.Context, providerID string)
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (gce *GCECloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
-	instanceName := mapNodeNameToInstanceName(nodeName)
+	instanceName := gce.mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
 		return cloudprovider.Zone{}, err

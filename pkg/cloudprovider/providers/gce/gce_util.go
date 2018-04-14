@@ -133,9 +133,16 @@ func lastComponent(s string) string {
 }
 
 // mapNodeNameToInstanceName maps a k8s NodeName to a GCE Instance Name
-// This is a simple string cast.
-func mapNodeNameToInstanceName(nodeName types.NodeName) string {
-	return string(nodeName)
+func (gce *GCECloud) mapNodeNameToInstanceName(nodeName types.NodeName) string {
+	instanceName, ok := gce.instanceNameMap[string(nodeName)]
+	if !ok {
+		if gce.instanceName == "" {
+			instanceName = string(nodeName)
+		} else {
+			instanceName = gce.instanceName
+		}
+	}
+	return instanceName
 }
 
 // mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
