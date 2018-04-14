@@ -75,48 +75,57 @@ dozer() {
 
 cd "${KUBE_ROOT}"
 go get github.com/bazelbuild/buildtools/buildozer
-echo looking for needs $KUBE_ROOT...
-want=($(find . -name *.go | grep -v k8s.io/code-generator/cmd/deepcopy-gen | (xargs grep -l '+k8s:deepcopy-gen=' || true) | (xargs -n 1 dirname || true) | sort -u | sed -e 's|./staging/src/|./vendor/|' | (xargs go list || true) | sed -e 's|k8s.io/kubernetes/||' | sort -u))
-if ! grep -q k8s_deepcopy_all build/BUILD; then
-  echo 'k8s_deepcopy_all(name="deepcopy-sources")' >> build/BUILD
-fi
-echo $PWD
-dozer 'new_load //build:deepcopy.bzl k8s_deepcopy_all' //build:__pkg__
-dozer "set packages ${want[*]}" //build:deepcopy-sources
-echo yay
-exit 1
-echo "[$(IFS=$'\n ' ; echo "${want[*]}" | sed -e 's|\(^.*$\)|  "\1",|')]"
-exit 1
-deepcopies="$(find . -iname zz_generated.deepcopy.go | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||')"
-have="$(find . -name BUILD -or -name BUILD.bazel | xargs grep -l k8s_deepcopy)"
-echo Deleting existing k8s_deepcopy commands... $have
-case "$(uname -s)" in
-  Darwin*)
-    echo $have | xargs bsed -e '/^k8s_deepcopy/d'
-    ;;
-  *)
-    echo $have | xargs bsed -e '/^k8s_deepcopy/d'
-    ;;
-esac
-echo "Adding k8s_deepcopy() rule"
-for w in $want; do
-  if [[ $w == "vendor/k8s.io/code-generator/cmd/deepcopy-gen" || \
-        $w == "staging/src/k8s.io/code-generator/cmd/deepcopy-gen" ]]; then
-    echo ignoring deepcopy-gen binary
-    continue
+update-k8s-gengo() {
+  local name="$1" # something like deepcopy
+  local pkg="$2"  # something like k8s.io/code-generator/cmd/deepcopy-gen
+  local match="$3"  # something like +k8s:deepcopy-gen=
+
+  local out="zz_generated.${name}.go" # zz_generated.deepcopy.go
+  local all_rule="k8s_${name}_all"  # k8s_deepcopy_all, which generates out for matching packages
+  local rule="k8s_${name}" # k8s_deepcopy, which copies out the file for a particular package
+
+  # look for packages that contain match
+  echo "Looking for packages with a $match comment in go code..."
+  want=($(find . -name *.go | grep -v "$pkg" | (xargs grep -l "$match" || true) | (xargs -n 1 dirname || true) | sort -u | sed -e 's|./staging/src/|./vendor/|' | (xargs go list || true) | sed -e 's|k8s.io/kubernetes/||' | sort -u))
+  echo "[$(IFS=$'\n ' ; echo "${want[*]}" | sed -e 's|\(^.*$\)|  "\1",|')]"
+
+  # Ensure that k8s_deepcopy_all() rule exists
+  if ! grep -q "${all_rule}(" build/BUILD; then
+    echo "$all_rule(name=\"${name}-sources\")" >> build/BUILD
   fi
-  if [[ -f $w/BUILD.bazel ]]; then
-    echo 'k8s_deepcopy(outs=["zz_generated.deepcopy.go"])' >> $w/BUILD
-    dozer 'new_load //build:deepcopy.bzl k8s_deepcopy' //$w:__pkg__
-  elif  [[ -f $w/BUILD ]]; then
-    echo 'k8s_deepcopy(outs=["zz_generated.deepcopy.go"])' >> $w/BUILD
-    dozer 'new_load //build:deepcopy.bzl k8s_deepcopy' //$w:__pkg__
-  else
-    echo cannot find build file for $w
-    continue
-  fi
-  dozer 'new_load //build:deepcopy.bzl k8s_deepcopy' //$w:__pkg__
-done
-echo Deleting zz_generated.deepcopy.go files
-echo $deepcopies | xargs -n 1 -I '{}' rm {}/zz_generated.deepcopy.go
+  dozer "new_load //build:deepcopy.bzl $all_rule" //build:__pkg__
+  dozer "set packages ${want[*]}" "//build:$name-sources"
+  deepcopies="$(find . -iname "${out}" | (xargs -n 1 dirname || true) | sort -u | sed -e 's|^./||')"
+  have="$(find . -name BUILD -or -name BUILD.bazel | xargs grep -l "$rule(")"
+  echo Deleting existing "$rule" commands... $have
+  case "$(uname -s)" in
+    Darwin*)
+      bsed -e "/^$rule/d" $have
+      ;;
+    *)
+      bsed -e "/^$rule/d" $have
+      ;;
+  esac
+  echo "Adding $rule() rule"
+  for w in "${want[@]}"; do
+    if [[ $w == */$pkg ]]; then
+      echo skipping $w...
+      continue
+    fi
+    if [[ -f $w/BUILD.bazel ]]; then
+      echo "$rule(outs=[\"${out}\"])" >> $w/BUILD
+      dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
+    elif  [[ -f $w/BUILD ]]; then
+      echo "$rule(outs=[\"${out}\"])" >> $w/BUILD
+      dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
+    else
+      echo cannot find build file for $w
+      continue
+    fi
+    dozer "new_load //build:deepcopy.bzl $rule" //$w:__pkg__
+  done
+  echo "Deleting $out files"
+  echo $deepcopies | xargs -n 1 -I '{}' rm "{}/$out"
+}
+update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen '+k8s:deepcopy-gen='
 gazelle-fix
