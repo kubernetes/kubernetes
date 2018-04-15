@@ -1798,11 +1798,24 @@ func testPSPAdmit(testCaseName string, psps []*policy.PodSecurityPolicy, pod *ka
 	testPSPAdmitAdvanced(testCaseName, kadmission.Create, psps, nil, &user.DefaultInfo{}, pod, nil, shouldPassAdmit, shouldPassValidate, true, expectedPSP, t)
 }
 
+// fakeAttributes decorate kadmission.Attributes. It's used to trace the added annotations.
+type fakeAttributes struct {
+	kadmission.Attributes
+	annotations map[string]string
+}
+
+func (f fakeAttributes) AddAnnotation(k, v string) error {
+	f.annotations[k] = v
+	return f.Attributes.AddAnnotation(k, v)
+}
+
 func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer, userInfo user.Info, pod, oldPod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, canMutate bool, expectedPSP string, t *testing.T) {
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, userInfo)
+	annotations := make(map[string]string)
+	attrs = &fakeAttributes{attrs, annotations}
 	err := plugin.Admit(attrs)
 
 	if shouldPassAdmit && err != nil {
@@ -1832,10 +1845,26 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	}
 
 	err = plugin.Validate(attrs)
+	psp := ""
+	if shouldPassAdmit && op == kadmission.Create {
+		psp = expectedPSP
+	}
+	validateAuditAnnotation(t, testCaseName, annotations, "podsecuritypolicy.policy.k8s.io/admit-policy", psp)
 	if shouldPassValidate && err != nil {
 		t.Errorf("%s: expected no errors on Validate but received %v", testCaseName, err)
 	} else if !shouldPassValidate && err == nil {
 		t.Errorf("%s: expected errors on Validate but received none", testCaseName)
+	}
+	if shouldPassValidate {
+		validateAuditAnnotation(t, testCaseName, annotations, "podsecuritypolicy.policy.k8s.io/validate-policy", expectedPSP)
+	} else {
+		validateAuditAnnotation(t, testCaseName, annotations, "podsecuritypolicy.policy.k8s.io/validate-policy", "")
+	}
+}
+
+func validateAuditAnnotation(t *testing.T, testCaseName string, annotations map[string]string, key, value string) {
+	if annotations[key] != value {
+		t.Errorf("%s: expected to have annotations[%s] set to %q, got %q", testCaseName, key, value, annotations[key])
 	}
 }
 
