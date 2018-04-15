@@ -474,7 +474,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			devicePath:      "",
 			deviceMountPath: "path2",
 			stageUnstageSet: true,
-			shouldFail:      true,
+			shouldFail:      false,
 		},
 		{
 			testName:        "no device mount path",
@@ -539,7 +539,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			if !tc.shouldFail {
 				t.Errorf("test should not fail, but error occurred: %v", err)
 			}
-			return
+			continue
 		}
 		if err == nil && tc.shouldFail {
 			t.Errorf("test should fail, but no error occurred")
