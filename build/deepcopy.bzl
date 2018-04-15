@@ -22,6 +22,7 @@ _generate_prefix = """
 """
 
 _generate_body = """
+  DEBUG=
   # location of the prebuilt generator
   dcg="$$PWD/$$tool"
 
@@ -42,7 +43,7 @@ _generate_body = """
   # when vendor/k8s.io/foo symlinks to staging/src/k8s.io/foo
   # bazel will wind up creating concrete versions of both folders,
   # putting half the files in staging and the other half in vendor
-  rsync --links --recursive staging/src/k8s.io/ vendor/k8s.io/
+  #rsync --links --recursive staging/src/k8s.io/ vendor/k8s.io/
 
   # Find all packages that request generation, except for the tool itself
   files=()
@@ -54,12 +55,16 @@ _generate_body = """
   for w in "$${white[@]}"; do
     if grep "$$match" "$$w" | grep -q -v "$${match}false"; then
       dirs+=("$$(dirname "$$w" | sed -e 's|./staging/src/|./vendor/|;s|^./|k8s.io/kubernetes/|')")
-    else
+    elif [[ -n "$${DEBUG:-}" ]]; then
       echo SKIP: $$w, has only $${match}false tags
     fi
   done
 
-  echo "Generating: $${dirs[*]}"
+  if [[ -n "$${DEBUG:-}" ]]; then
+    echo "Generating: $$(IFS=$$'\n ' ; echo "$${dirs[*]}" | sort -u)"
+  else
+    echo "Generating $$out for $${#dirs} packages..."
+  fi
   packages="$$(IFS="," ; echo "$${dirs[*]}")"  # Create comma-separated list of packages expected by tool
   $$dcg \
     -v 1 \
@@ -69,7 +74,6 @@ _generate_body = """
     $$tool_flags
 
   # Ensure we generated each file
-  DEBUG=1
   if [[ -n "$${DEBUG:-}" ]]; then
     for p in "$${dirs[@]}"; do
       found=false
@@ -97,7 +101,7 @@ _generate_body = """
   oifs="$$IFS"
   IFS=$$'\n'
   # use go list to create lines of pkg import import ...
-  for line in $$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' "$${dirs[@]}"); do
+  for line in $$($$GO list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' "$${dirs[@]}"); do
     pkg="$${line%% *}" # first word
     imports="$${line#* }" # everything after the first word
     IFS=' '
@@ -150,7 +154,7 @@ _generate_body = """
   ####################################
 """
 
-def k8s_deepcopy_all(name, packages):
+def k8s_deepcopy_all(name, packages, deps):
   """Generate zz_generated.deepcopy.go for all specified packages in one invocation."""
   k8s_gengo_all(
     name=name,
@@ -159,6 +163,7 @@ def k8s_deepcopy_all(name, packages):
     match="+k8s:deepcopy-gen=",
     flags="--bounding-dirs k8s.io/kubernetes,k8s.io/api",
     packages=packages,
+    deps=deps,
   )
 
 def k8s_deepcopy(outs):
@@ -168,7 +173,7 @@ def k8s_deepcopy(outs):
     outs=outs,
   )
 
-def k8s_defaulter_all(name, packages):
+def k8s_defaulter_all(name, packages, deps):
   """Generate zz_generated.defaults.go for all specified packages in one invocation."""
   k8s_gengo_all(
     name=name,
@@ -177,6 +182,7 @@ def k8s_defaulter_all(name, packages):
     match="+k8s:defaulter-gen=",
     flags="--extra-peer-dirs %s" % ",".join(["k8s.io/kubernetes/%s" % p for p in packages]),
     packages=packages,
+    deps=deps,
   )
 
 def k8s_defaulter(outs):
@@ -186,7 +192,7 @@ def k8s_defaulter(outs):
     outs=outs,
   )
 
-def k8s_conversion_all(name, packages):
+def k8s_conversion_all(name, packages, deps):
   k8s_gengo_all(
     name=name,
     base="zz_generated.conversion.go",
@@ -197,7 +203,9 @@ def k8s_conversion_all(name, packages):
 	"k8s.io/kubernetes/pkg/apis/core/v1",
 	"k8s.io/api/core/v1",
     ]),
-    packages=packages)
+    packages=packages,
+    deps=deps,
+    )
 
 def k8s_conversion(outs):
   k8s_gengo(
@@ -205,8 +213,16 @@ def k8s_conversion(outs):
     outs=outs,
   )
 
-def k8s_gengo_all(name, base, tool, flags, match, packages):
+def package_files(pkgs):
+  return ["//%s:go_default_library.sourcefiles" % p for p in pkgs]
+
+def k8s_gengo_all(name, base, tool, flags, match, packages, deps):
   """Use TOOL to generate BASE files in all the PACKAGES with a MATCH comment."""
+  # TODO(fejta): bazel doesn't appear to create rules for this package
+  packages = [p for p in packages if not p.startswith("vendor/k8s.io/code-generator/_examples/")]
+  # Add any missing packages to deps
+  deps = {d: True for d in (deps + packages) if not d.startswith("vendor/k8s.io/code-generator/_examples/")}.keys()
+
   # Tell bazel all the files we will generate
   go_files = ["%s/%s" % (p, base) for p in packages] # generated files
   dep_files = ["%s.deps" % g for g in go_files] # list of new packages dependencies
@@ -221,15 +237,15 @@ def k8s_gengo_all(name, base, tool, flags, match, packages):
   ) + _generate_body + "\n".join(["move-out %s" % p for p in packages])
 
 
+
   # Rule which generates a set of out files given a set of input src and tool files
   go_genrule(
     name = name,
     # Bazel needs to know all the files that this rule might possibly read
     srcs = [
         "//vendor/k8s.io/code-generator/hack:boilerplate.go.txt",
-        "//:all-srcs", # TODO(fejta): consider updating kazel to provide just the list of go files
 	"@go_sdk//:files",  # k8s.io/gengo expects to be able to read $GOROOT/src
-    ],
+    ] + package_files(deps),
     # Build the tool we run to generate the files
     tools = [tool],
     # Tell bazel all the files we will generate

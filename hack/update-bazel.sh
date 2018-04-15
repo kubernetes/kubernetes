@@ -50,6 +50,7 @@ dozer() {
 }
 
 gazelle-fix() {
+  find . -name BUILD -or -name BUILD.bazel | xargs sed -i '' -e 's|//build:go.bzl|@io_bazel_rules_go//go:def.bzl|g'
   gazelle fix \
       -build_file_name=BUILD,BUILD.bazel \
       -external=vendored \
@@ -67,11 +68,20 @@ gazelle-fix
 
 kazel
 
+ensure-rule() {
+  if ! bazel query "$1:all" | grep "$1:$3" ; then
+    dozer "new $2 $3" "$1:__pkg__"
+  else
+    dozer "set kind $2" "$1:$3"
+  fi
+}
+
 update-k8s-gengo() {
   local name="$1" # something like deepcopy
   local pkg="$2"  # something like k8s.io/code-generator/cmd/deepcopy-gen
   local out="$3"  # something like zz_generated.deepcopy.go
   local match="$4"  # something like +k8s:deepcopy-gen=
+  local extra=("${@:5}")  # list of extra packages
 
   local all_rule="k8s_${name}_all"  # k8s_deepcopy_all, which generates out for matching packages
   local rule="k8s_${name}" # k8s_deepcopy, which copies out the file for a particular package
@@ -91,27 +101,26 @@ update-k8s-gengo() {
     fi
   done
   want=($(IFS=$'\n ' ; echo "${want[*]}" | sort -u))
+  deps=()
+  for w in "${want[@]}"; do
+    deps+=( "./$w" )
+  done
+  deps=( $(go list -f "{{.ImportPath}}{{\"\n\"}}{{range .Deps}}{{.}}{{\"\n\"}}{{end}}" "${deps[@]}" ${extra:+"${extra[@]}"} | sort -u | grep -E '^k8s.io/kubernetes/' | $SED -e 's|^k8s.io/kubernetes/||') )
 
   # Ensure that k8s_deepcopy_all() rule exists
-  if ! grep -q "${all_rule}(" build/BUILD; then
-    echo Adding $all_rule to build/BULID
-    touch build/BUILD
-    echo "$all_rule(name=\"${name}-sources\")" >> build/BUILD
-  else
-    echo $all_rule found in build/BUILD
-  fi
   dozer "new_load //build:deepcopy.bzl $all_rule" //build:__pkg__
+  ensure-rule //build "$all_rule" "${name}-sources"
   dozer "set packages ${want[*]}" "//build:$name-sources"
+  dozer "set deps ${deps[*]}" "//build:$name-sources"
   dozer "add srcs :$name-sources" //build:all-generated-sources
   have=$(find . -name BUILD -or -name BUILD.bazel | (xargs grep -l "$rule(" || true))
   if [[ -n "$have" ]]; then
-    echo Deleting existing "$rule" commands... $have
+    echo Deleting existing "$rule" commands...
     $SED -i -e "/^$rule/d" $have
   fi
 
   echo "Adding $rule() rules"
   for w in "${want[@]}"; do
-    w="${w#k8s.io/kubernetes/}"  # Remove k8s.io/kubernetes/ prefix
     if [[ $w == */$pkg ]]; then
       echo "ERROR: $pkg should not generate itself"
       exit 1
@@ -130,14 +139,21 @@ update-k8s-gengo() {
   find . -iname "${out}" | xargs rm
 }
 update-k8s-gengo deepcopy k8s.io/code-generator/cmd/deepcopy-gen zz_generated.deepcopy.go '+k8s:deepcopy-gen='
+extra_conv=($( \
+  find . -name *.go | \
+  xargs grep "+k8s:conversion-gen=" | \
+  grep -v conversion-gen=false | grep -v cmd/conversion-gen | \
+  sed -e 's|^[^=]*=||' | sort -u | $SED -e 's|k8s.io/kubernetes/|./|;s|\(^[^.]\)|./vendor/\1|'))
+update-k8s-gengo conversion k8s.io/code-generator/cmd/conversion-gen zz_generated.conversion.go '+k8s:conversion-gen=' "${extra_conv[@]}"
 update-k8s-gengo defaulter k8s.io/code-generator/cmd/defaulter-gen zz_generated.defaults.go '+k8s:defaulter-gen='
-update-k8s-gengo conversion k8s.io/code-generator/cmd/conversion-gen zz_generated.conversion.go '+k8s:conversion-gen='
 echo Running gazelle to cleanup any changes...
 gazelle-fix
 
 if ! which -s bazel; then
   return 0  # We should have already generated these files
 fi
+
+find . -name BUILD -or -name BUILD.bazel | xargs sed -i '' -e 's|@io_bazel_rules_go//go:def.bzl|//build:go.bzl|g'
 
 # Add dependencies from generated files
 bazel build //build:all-generated-sources
