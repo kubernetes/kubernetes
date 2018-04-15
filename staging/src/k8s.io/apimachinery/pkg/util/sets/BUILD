@@ -2,7 +2,7 @@ package(default_visibility = ["//visibility:public"])
 
 load("@io_kubernetes_build//defs:go.bzl", "go_genrule")
 load(
-    "@io_bazel_rules_go//go:def.bzl",
+    "//build:go.bzl",
     "go_library",
     "go_test",
 )

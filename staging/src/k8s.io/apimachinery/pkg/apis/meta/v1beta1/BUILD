@@ -1,5 +1,5 @@
 load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_defaulter")
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//build:go.bzl", "go_library")
 
 filegroup(
     name = "go_default_library_protos",
