@@ -1,4 +1,4 @@
-load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_defaulter")
+load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_defaulter", "k8s_conversion")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
@@ -82,3 +82,5 @@ filegroup(
 k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])
 
 k8s_defaulter(outs = ["zz_generated.defaults.go"])
+
+k8s_conversion(outs = ["zz_generated.conversion.go"])

@@ -1,3 +1,4 @@
+load("//build:deepcopy.bzl", "k8s_conversion")
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
@@ -33,3 +34,5 @@ filegroup(
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
+
+k8s_conversion(outs = ["zz_generated.conversion.go"])

@@ -1,4 +1,4 @@
-load("//build:deepcopy.bzl", "k8s_deepcopy")
+load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_conversion")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -40,3 +40,5 @@ filegroup(
 )
 
 k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])
+
+k8s_conversion(outs = ["zz_generated.conversion.go"])

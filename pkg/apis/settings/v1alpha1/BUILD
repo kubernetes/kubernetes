@@ -1,4 +1,4 @@
-load("//build:deepcopy.bzl", "k8s_defaulter")
+load("//build:deepcopy.bzl", "k8s_defaulter", "k8s_conversion")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -42,3 +42,5 @@ filegroup(
 )
 
 k8s_defaulter(outs = ["zz_generated.defaults.go"])
+
+k8s_conversion(outs = ["zz_generated.conversion.go"])
