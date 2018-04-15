@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
+	"k8s.io/kubernetes/test/e2e_node/remote"
 )
 
 // TODO(random-liu): Replace this with standard kubelet launcher.
@@ -198,7 +198,12 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		isSystemd = true
-		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
+		// We can ignore errors, to have GetTimestampFromWorkspaceDir() fallback
+		// to the current time.
+		cwd, _ := os.Getwd()
+		// Use the timestamp from the current directory to name the systemd unit.
+		unitTimestamp := remote.GetTimestampFromWorkspaceDir(cwd)
+		unitName := fmt.Sprintf("kubelet-%s.service", unitTimestamp)
 		if kubeletContainerized {
 			cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit",
 				"/usr/bin/docker", "run", "--name=kubelet",

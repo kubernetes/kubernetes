@@ -11,9 +11,7 @@ go_library(
         "docker_util.go",
         "framework.go",
         "gpu_device_plugin.go",
-        "gpus.go",
         "image_list.go",
-        "simple_mount.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
@@ -35,6 +33,7 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cm/devicemanager:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/remote:go_default_library",

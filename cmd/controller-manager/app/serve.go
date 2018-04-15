@@ -19,7 +19,6 @@ package app
 import (
 	"net/http"
 	goruntime "runtime"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -33,31 +32,33 @@ import (
 	"k8s.io/kubernetes/pkg/util/configz"
 )
 
-type serveFunc func(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error
+// BuildHandlerChain builds a handler chain with a base handler and CompletedConfig.
+func BuildHandlerChain(apiHandler http.Handler, c *CompletedConfig) http.Handler {
+	requestContextMapper := apirequest.NewRequestContextMapper()
+	requestInfoResolver := &apirequest.RequestInfoFactory{}
+	failedHandler := genericapifilters.Unauthorized(requestContextMapper, legacyscheme.Codecs, false)
 
-// Serve creates a base handler chain for a controller manager. It runs the
-// the chain with the given serveFunc.
-func Serve(c *CompletedConfig, serveFunc serveFunc, stopCh <-chan struct{}) error {
+	handler := genericapifilters.WithAuthorization(apiHandler, requestContextMapper, c.Authorization.Authorizer, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver, requestContextMapper)
+	handler = apirequest.WithRequestContext(handler, requestContextMapper)
+	handler = genericfilters.WithPanicRecovery(handler)
+
+	return handler
+}
+
+// NewBaseHandler takes in CompletedConfig and returns a handler.
+func NewBaseHandler(c *CompletedConfig) http.Handler {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux)
-	if c.ComponentConfig.EnableProfiling {
+	if c.ComponentConfig.Debugging.EnableProfiling {
 		routes.Profiling{}.Install(mux)
-		if c.ComponentConfig.EnableContentionProfiling {
+		if c.ComponentConfig.Debugging.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
 	}
 	configz.InstallHandler(mux)
 	mux.Handle("/metrics", prometheus.Handler())
 
-	requestContextMapper := apirequest.NewRequestContextMapper()
-	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(requestContextMapper, legacyscheme.Codecs, false)
-
-	handler := genericapifilters.WithAuthorization(mux, requestContextMapper, c.Authorization.Authorizer, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.Authenticator, failedHandler)
-	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver, requestContextMapper)
-	handler = apirequest.WithRequestContext(handler, requestContextMapper)
-	handler = genericfilters.WithPanicRecovery(handler)
-
-	return serveFunc(handler, 0, stopCh)
+	return mux
 }

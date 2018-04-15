@@ -13651,7 +13651,7 @@ msgstr "Imposta il current-context in un file kubeconfig"
 
 #: pkg/kubectl/cmd/describe.go:86
 msgid "Show details of a specific resource or group of resources"
-msgstr "Mostra i dettagli di una specifiche risorsa o un gruppo di risorse"
+msgstr "Mostra i dettagli di una specifica risorsa o un gruppo di risorse"
 
 #: pkg/kubectl/cmd/rollout/rollout_status.go:58
 msgid "Show the status of the rollout"
@@ -16241,7 +16241,7 @@ msgid ""
 "\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 msgstr ""
 "\n"
-"\t\t  # 如果你还没有一个 .dockercfg 文件, 你可以创建一个 dockercfg 的 secret 直接使用:\n"
+"\t\t  # 如果你还没有一个 .dockercfg 文件, 你可以直接使用下面的命令创建一个 dockercfg 的 secret:\n"
 "\t\t  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL"
 
 #: pkg/kubectl/cmd/top_node.go:65

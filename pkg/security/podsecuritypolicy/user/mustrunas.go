@@ -21,22 +21,22 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
 // mustRunAs implements the RunAsUserStrategy interface
 type mustRunAs struct {
-	opts *extensions.RunAsUserStrategyOptions
+	opts *policy.RunAsUserStrategyOptions
 }
 
 // NewMustRunAs provides a strategy that requires the container to run as a specific UID in a range.
-func NewMustRunAs(options *extensions.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
+func NewMustRunAs(options *policy.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
 	if options == nil {
-		return nil, fmt.Errorf("MustRunAsRange requires run as user options")
+		return nil, fmt.Errorf("MustRunAs requires run as user options")
 	}
 	if len(options.Ranges) == 0 {
-		return nil, fmt.Errorf("MustRunAsRange requires at least one range")
+		return nil, fmt.Errorf("MustRunAs requires at least one range")
 	}
 	return &mustRunAs{
 		opts: options,

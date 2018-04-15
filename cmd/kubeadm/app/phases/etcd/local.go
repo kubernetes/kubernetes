@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -35,7 +37,7 @@ const (
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
 func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec, actualized for the current MasterConfiguration
 	spec := GetEtcdPodSpec(cfg)
 	// writes etcd StaticPod to disk
@@ -86,6 +88,7 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"peer-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
 		"peer-trusted-ca-file":  filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
 		"peer-client-cert-auth": "true",
+		"snapshot-count":        "10000",
 	}
 
 	command := []string{"etcd"}

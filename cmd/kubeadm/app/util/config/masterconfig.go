@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"net"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -37,9 +39,14 @@ import (
 // SetInitDynamicDefaults checks and sets configuration values for Master node
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
+	// validate cfg.API.AdvertiseAddress.
+	addressIP := net.ParseIP(cfg.API.AdvertiseAddress)
+	if addressIP == nil && cfg.API.AdvertiseAddress != "" {
+		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.API.AdvertiseAddress)
+	}
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
 	// This is the same logic as the API Server uses
-	ip, err := netutil.ChooseBindAddress(net.ParseIP(cfg.API.AdvertiseAddress))
+	ip, err := netutil.ChooseBindAddress(addressIP)
 	if err != nil {
 		return err
 	}
@@ -91,10 +98,12 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfigu
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
 func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiext.MasterConfiguration) (*kubeadmapi.MasterConfiguration, error) {
+	glog.V(1).Infoln("configuring files and defaults to internal config")
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
 	// Loads configuration from config file, if provided
 	// Nb. --config overrides command line flags
+	glog.V(1).Infoln("attempting to load configuration from config file")
 	if err := TryLoadMasterConfiguration(cfgPath, defaultversionedcfg); err != nil {
 		return nil, err
 	}

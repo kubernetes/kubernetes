@@ -24,6 +24,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
 	policy "k8s.io/api/policy/v1beta1"
@@ -80,10 +82,42 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
+// Snapshot takes a snapshot of the current schedulerCache. The method has performance impact,
+// and should be only used in non-critical path.
+func (cache *schedulerCache) Snapshot() *Snapshot {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	nodes := make(map[string]*NodeInfo)
+	for k, v := range cache.nodes {
+		nodes[k] = v.Clone()
+	}
+
+	assumedPods := make(map[string]bool)
+	for k, v := range cache.assumedPods {
+		assumedPods[k] = v
+	}
+
+	pdbs := make(map[string]*policy.PodDisruptionBudget)
+	for k, v := range cache.pdbs {
+		pdbs[k] = v.DeepCopy()
+	}
+
+	return &Snapshot{
+		Nodes:       nodes,
+		AssumedPods: assumedPods,
+		Pdbs:        pdbs,
+	}
+}
+
 func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	for name, info := range cache.nodes {
+		if utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && info.TransientInfo != nil {
+			// Transient scheduler info is reset here.
+			info.TransientInfo.resetTransientSchedulerInfo()
+		}
 		if current, ok := nodeNameToInfo[name]; !ok || current.generation != info.generation {
 			nodeNameToInfo[name] = info.Clone()
 		}

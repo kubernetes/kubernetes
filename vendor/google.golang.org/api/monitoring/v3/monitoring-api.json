@@ -964,7 +964,7 @@
       }
     }
   },
-  "revision": "20180205",
+  "revision": "20180225",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "BasicAuthentication": {
@@ -1125,7 +1125,7 @@
       "id": "ContentMatcher",
       "properties": {
         "content": {
-          "description": "String content to match",
+          "description": "String content to match (max 1024 bytes)",
           "type": "string"
         }
       },

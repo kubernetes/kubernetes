@@ -69,8 +69,7 @@ type CronJobController struct {
 func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -86,14 +85,6 @@ func NewCronJobController(kubeClient clientset.Interface) (*CronJobController, e
 		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
 	}
 
-	return jm, nil
-}
-
-func NewCronJobControllerFromClient(kubeClient clientset.Interface) (*CronJobController, error) {
-	jm, err := NewCronJobController(kubeClient)
-	if err != nil {
-		return nil, err
-	}
 	return jm, nil
 }
 
@@ -281,9 +272,8 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	}
 	if tooLate {
 		glog.V(4).Infof("Missed starting window for %s", nameForLog)
-		// TODO: generate an event for a miss.  Use a warning level event because it indicates a
-		// problem with the controller (restart or long queue), and is not expected by user either.
-		// Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
+		recorder.Eventf(sj, v1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
+		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
 		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
 		// the sj again and again, we could set a Status.LastMissedTime when we notice a miss.
 		// Then, when we call getRecentUnmetScheduleTimes, we can take max(creationTimestamp,

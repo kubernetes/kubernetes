@@ -17,13 +17,13 @@ limitations under the License.
 package etcd3
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 const (

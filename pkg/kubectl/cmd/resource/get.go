@@ -122,16 +122,22 @@ var (
 
 const (
 	useOpenAPIPrintColumnFlagLabel = "use-openapi-print-columns"
-	useServerPrintColumns          = "experimental-server-print"
+	useServerPrintColumns          = "server-print"
 )
+
+// NewGetOptions returns a GetOptions with default chunk size 500.
+func NewGetOptions(out io.Writer, errOut io.Writer) *GetOptions {
+	return &GetOptions{
+		Out:       out,
+		ErrOut:    errOut,
+		ChunkSize: 500,
+	}
+}
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &GetOptions{
-		Out:    out,
-		ErrOut: errOut,
-	}
+	options := NewGetOptions(out, errOut)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -153,7 +159,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&options.Watch, "watch", "w", options.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&options.WatchOnly, "watch-only", options.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
-	cmd.Flags().Int64Var(&options.ChunkSize, "chunk-size", 500, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
+	cmd.Flags().Int64Var(&options.ChunkSize, "chunk-size", options.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", options.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVarP(&options.LabelSelector, "selector", "l", options.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&options.FieldSelector, "field-selector", options.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
@@ -196,6 +202,13 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 	options.Sort = len(isSorting) > 0
 
+	// TODO (soltysh): currently we don't support sorting and custom columns
+	// with server side print. So in these cases force the old behavior.
+	outputOption := cmd.Flags().Lookup("output").Value.String()
+	if options.Sort && outputOption == "custom-columns" {
+		options.ServerPrint = false
+	}
+
 	options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
 
 	switch {
@@ -205,7 +218,7 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-			fmt.Fprint(options.ErrOut, "You must specify the type of resource to get. ", cmdutil.ValidResourceTypeList(f))
+			fmt.Fprintf(options.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.ValidResourceTypeList(f))
 			fullCmdName := cmd.Parent().CommandPath()
 			usageString := "Required resource not specified."
 			if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {
@@ -287,14 +300,8 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	filterFuncs := f.DefaultResourceFilterFunc()
-	if r.TargetsSingleItems() {
-		filterFuncs = nil
-	}
-
 	if printer.IsGeneric() {
-		return options.printGeneric(printer, r, filterFuncs, filterOpts)
+		return options.printGeneric(printer, r)
 	}
 
 	allErrs := []error{}
@@ -341,7 +348,6 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 	showKind := options.ShowKind || resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter)
 
-	filteredResourceCount := 0
 	noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
 	for ix := range objs {
 		var mapping *meta.RESTMapping
@@ -382,6 +388,11 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				updatePrintOptionsForOpenAPI(f, mapping, printOpts)
 			}
 
+			if showKind && mapping != nil {
+				printOpts.WithKind = true
+				printOpts.Kind = mapping.GroupVersionKind.GroupKind()
+			}
+
 			printer, err = cmdutil.PrinterForOptions(printOpts)
 			if err != nil {
 				if !errs.Has(err.Error()) {
@@ -403,45 +414,6 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 		typedObj := info.AsInternal()
 
-		// filter objects if filter has been defined for current object
-		if isFiltered, err := filterFuncs.Filter(typedObj, filterOpts); isFiltered {
-			if err == nil {
-				filteredResourceCount++
-				continue
-			}
-			if !errs.Has(err.Error()) {
-				errs.Insert(err.Error())
-				allErrs = append(allErrs, err)
-			}
-		}
-
-		if resourcePrinter, found := printer.(*printers.HumanReadablePrinter); found {
-			resourceName := resourcePrinter.GetResourceKind()
-			if mapping != nil {
-				if resourceName == "" {
-					resourceName = mapping.Resource
-				}
-				if alias, ok := kubectl.ResourceShortFormFor(mapping.Resource); ok {
-					resourceName = alias
-				} else if resourceName == "" {
-					resourceName = "none"
-				}
-			} else {
-				resourceName = "none"
-			}
-
-			if showKind {
-				resourcePrinter.EnsurePrintWithKind(resourceName)
-			}
-
-			if err := printer.PrintObj(typedObj, w); err != nil {
-				if !errs.Has(err.Error()) {
-					errs.Insert(err.Error())
-					allErrs = append(allErrs, err)
-				}
-			}
-			continue
-		}
 		objToPrint := typedObj
 		if printer.IsGeneric() {
 			// use raw object as received from the builder when using generic
@@ -469,7 +441,9 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		nonEmptyObjCount++
 	}
 
-	cmdutil.PrintFilterCount(options.ErrOut, nonEmptyObjCount, filteredResourceCount, len(allErrs), filterOpts, options.IgnoreNotFound)
+	if nonEmptyObjCount == 0 && !options.IgnoreNotFound {
+		fmt.Fprintln(options.ErrOut, "No resources found.")
+	}
 	return utilerrors.NewAggregate(allErrs)
 }
 
@@ -538,12 +512,6 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		}
 	}
 
-	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	filterFuncs := f.DefaultResourceFilterFunc()
-	if r.TargetsSingleItems() {
-		filterFuncs = nil
-	}
-
 	info := infos[0]
 	mapping := info.ResourceMapping()
 	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
@@ -582,18 +550,11 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 			objsToPrint = append(objsToPrint, obj)
 		}
 		for _, objToPrint := range objsToPrint {
-			if isFiltered, err := filterFuncs.Filter(objToPrint, filterOpts); !isFiltered {
-				if err != nil {
-					glog.V(2).Infof("Unable to filter resource: %v", err)
-					continue
-				}
-
-				// printing always takes the internal version, but the watch event uses externals
-				// TODO fix printing to use server-side or be version agnostic
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				if err := printer.PrintObj(attemptToConvertToInternal(objToPrint, mapping, internalGV), writer); err != nil {
-					return fmt.Errorf("unable to output the provided object: %v", err)
-				}
+			// printing always takes the internal version, but the watch event uses externals
+			// TODO fix printing to use server-side or be version agnostic
+			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+			if err := printer.PrintObj(attemptToConvertToInternal(objToPrint, mapping, internalGV), writer); err != nil {
+				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 		}
 		writer.Flush()
@@ -615,18 +576,11 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 				return false, nil
 			}
 
-			if isFiltered, err := filterFuncs.Filter(e.Object, filterOpts); !isFiltered {
-				if err != nil {
-					glog.V(2).Infof("Unable to filter resource: %v", err)
-					return false, nil
-				}
-
-				// printing always takes the internal version, but the watch event uses externals
-				// TODO fix printing to use server-side or be version agnostic
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				if err := printer.PrintObj(attemptToConvertToInternal(e.Object, mapping, internalGV), options.Out); err != nil {
-					return false, err
-				}
+			// printing always takes the internal version, but the watch event uses externals
+			// TODO fix printing to use server-side or be version agnostic
+			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+			if err := printer.PrintObj(attemptToConvertToInternal(e.Object, mapping, internalGV), options.Out); err != nil {
+				return false, err
 			}
 			return false, nil
 		})
@@ -664,7 +618,7 @@ func (options *GetOptions) decodeIntoTable(encoder runtime.Encoder, obj runtime.
 	return table, nil
 }
 
-func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *resource.Result, filterFuncs kubectl.Filters, filterOpts *printers.PrintOptions) error {
+func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *resource.Result) error {
 	// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 	// 1. if there is more than one item, combine them all into a single list
 	// 2. if there is a single item and that item is a list, leave it as its specific list
@@ -717,12 +671,12 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 
 	isList := meta.IsListType(obj)
 	if isList {
-		_, items, err := cmdutil.FilterResourceList(obj, filterFuncs, filterOpts)
+		items, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
 		}
 
-		// take the filtered items and create a new list for display
+		// take the items and create a new list for display
 		list := &unstructured.UnstructuredList{
 			Object: map[string]interface{}{
 				"kind":       "List",
@@ -746,12 +700,8 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
-	if isFiltered, err := filterFuncs.Filter(obj, filterOpts); !isFiltered {
-		if err != nil {
-			glog.V(2).Infof("Unable to filter resource: %v", err)
-		} else if err := printer.PrintObj(obj, options.Out); err != nil {
-			errs = append(errs, err)
-		}
+	if printErr := printer.PrintObj(obj, options.Out); printErr != nil {
+		errs = append(errs, printErr)
 	}
 
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
@@ -762,7 +712,7 @@ func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
 }
 
 func addServerPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useServerPrintColumns, false, "If true, have the server return the appropriate table output. Supports extension APIs and CRD. Experimental.")
+	cmd.Flags().Bool(useServerPrintColumns, true, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 
 func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping, mapping *meta.RESTMapping) bool {

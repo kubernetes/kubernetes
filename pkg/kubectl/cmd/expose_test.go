@@ -466,42 +466,46 @@ func TestRunExposeService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-		ns := legacyscheme.Codecs
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.Client = &fake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Version: "v1"},
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == test.calls[m] && m == "GET":
-					return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.input)}, nil
-				case p == test.calls[m] && m == "POST":
-					return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.output)}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = test.ns
-		buf := bytes.NewBuffer([]byte{})
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
 
-		cmd := NewCmdExposeService(tf, buf)
-		cmd.SetOutput(buf)
-		for flag, value := range test.flags {
-			cmd.Flags().Set(flag, value)
-		}
-		cmd.Run(cmd, test.args)
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == test.calls[m] && m == "GET":
+						return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.input)}, nil
+					case p == test.calls[m] && m == "POST":
+						return &http.Response{StatusCode: test.status, Header: defaultHeader(), Body: objBody(codec, test.output)}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.Namespace = test.ns
+			buf := bytes.NewBuffer([]byte{})
 
-		out := buf.String()
-		if _, ok := test.flags["dry-run"]; ok {
-			test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
-		}
+			cmd := NewCmdExposeService(tf, buf)
+			cmd.SetOutput(buf)
+			for flag, value := range test.flags {
+				cmd.Flags().Set(flag, value)
+			}
+			cmd.Run(cmd, test.args)
 
-		if !strings.Contains(out, test.expected) {
-			t.Errorf("%s: Unexpected output! Expected\n%s\ngot\n%s", test.name, test.expected, out)
-		}
+			out := buf.String()
+			if _, ok := test.flags["dry-run"]; ok {
+				test.expected = fmt.Sprintf("service %q exposed (dry run)", test.flags["name"])
+			}
+
+			if !strings.Contains(out, test.expected) {
+				t.Errorf("%s: Unexpected output! Expected\n%s\ngot\n%s", test.name, test.expected, out)
+			}
+		})
 	}
 }

@@ -25,7 +25,7 @@ set -o pipefail
 
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.6.0"
-DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f" 
+DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
 DEFAULT_NPD_VERSION="v0.4.1"
 DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
@@ -54,37 +54,59 @@ EOF
 
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
-  (umask 700;
-  local -r tmp_kube_env="/tmp/kube-env.yaml"
-  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
-    -H "X-Google-Metadata-Request: True" \
-    -o "${tmp_kube_env}" \
-    http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
-  # Convert the yaml format file into a shell-style file.
-  eval $(python -c '''
+  (
+    umask 077
+    local -r tmp_kube_env="/tmp/kube-env.yaml"
+    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+      -H "X-Google-Metadata-Request: True" \
+      -o "${tmp_kube_env}" \
+      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+    # Convert the yaml format file into a shell-style file.
+    eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
-  rm -f "${tmp_kube_env}"
+    rm -f "${tmp_kube_env}"
+  )
+}
+
+function download-kubelet-config {
+  local -r dest="$1"
+  echo "Downloading Kubelet config file, if it exists"
+  # Fetch kubelet config file from GCE metadata server.
+  (
+    umask 077
+    local -r tmp_kubelet_config="/tmp/kubelet-config.yaml"
+    if curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o "${tmp_kubelet_config}" \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/kubelet-config; then
+      # only write to the final location if curl succeeds
+      mv "${tmp_kubelet_config}" "${dest}"
+    elif [[ "${REQUIRE_METADATA_KUBELET_CONFIG_FILE:-false}" == "true" ]]; then
+      echo "== Failed to download required Kubelet config file from metadata server =="
+      exit 1
+    fi
   )
 }
 
 function download-kube-master-certs {
   # Fetch kube-env from GCE metadata server.
-  (umask 700;
-  local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
-  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
-    -H "X-Google-Metadata-Request: True" \
-    -o "${tmp_kube_master_certs}" \
-    http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
-  # Convert the yaml format file into a shell-style file.
-  eval $(python -c '''
+  (
+    umask 077
+    local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
+    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+      -H "X-Google-Metadata-Request: True" \
+      -o "${tmp_kube_master_certs}" \
+      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
+    # Convert the yaml format file into a shell-style file.
+    eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")
-  rm -f "${tmp_kube_master_certs}"
+    rm -f "${tmp_kube_master_certs}"
   )
 }
 
@@ -356,13 +378,24 @@ function install-kube-binary-config {
 
 ######### Main Function ##########
 echo "Start to install kubernetes files"
+# if install fails, message-of-the-day (motd) will warn at login shell
 set-broken-motd
+
 KUBE_HOME="/home/kubernetes"
 KUBE_BIN="${KUBE_HOME}/bin"
+
+# download and source kube-env
 download-kube-env
 source "${KUBE_HOME}/kube-env"
+
+download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
+
+# master certs
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   download-kube-master-certs
 fi
+
+# binaries and kube-system manifests
 install-kube-binary-config
+
 echo "Done for installing kubernetes files"

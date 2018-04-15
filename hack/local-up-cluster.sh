@@ -63,6 +63,7 @@ DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-cluster/kubectl.sh}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
+MAX_TIME_FOR_URL_API_SERVER=${MAX_TIME_FOR_URL_API_SERVER:-1}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 EXTERNAL_CLOUD_PROVIDER=${EXTERNAL_CLOUD_PROVIDER:-false}
@@ -71,6 +72,8 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
+# preserve etcd data. you also need to set ETCD_DIR.
+PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 # enable swagger ui
 ENABLE_SWAGGER_UI=${ENABLE_SWAGGER_UI:-false}
 # enable Pod priority and preemption
@@ -90,8 +93,9 @@ AUTH_ARGS=${AUTH_ARGS:-""}
 # Install a default storage class (enabled by default)
 DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 
-# start the cache mutation detector by default so that cache mutators will be found
-KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
+# Do not run the mutation detector by default on a local cluster.
+# It is intended for a specific type of testing and inherently leaks memory.
+KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-false}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
 # panic the server on watch decode errors since they are considered coder mistakes
@@ -139,7 +143,7 @@ fi
 
 # warn if users are running with swap allowed
 if [ "${FAIL_SWAP_ON}" == "false" ]; then
-    echo "WARNING : The kubelet is configured to not fail if swap is enabled; production deployments should disable swap."
+    echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
 fi
 
 if [ "$(id -u)" != "0" ]; then
@@ -203,23 +207,6 @@ else
     echo "skipped the build."
 fi
 
-function test_rkt {
-    if [[ -n "${RKT_PATH}" ]]; then
-      ${RKT_PATH} list 2> /dev/null 1> /dev/null
-      if [ "$?" != "0" ]; then
-        echo "Failed to successfully run 'rkt list', please verify that ${RKT_PATH} is the path of rkt binary."
-        exit 1
-      fi
-    else
-      rkt list 2> /dev/null 1> /dev/null
-      if [ "$?" != "0" ]; then
-        echo "Failed to successfully run 'rkt list', please verify that rkt is in \$PATH."
-        exit 1
-      fi
-    fi
-}
-
-
 # Shut down anyway if there's an error.
 set +e
 
@@ -244,8 +231,6 @@ LOG_DIR=${LOG_DIR:-"/tmp"}
 CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
-RKT_PATH=${RKT_PATH:-""}
-RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
@@ -395,8 +380,9 @@ cleanup()
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-  [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
-
+  if [[ "${PRESERVE_ETCD}" == "false" ]]; then
+    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  fi
   exit 0
 }
 
@@ -581,10 +567,7 @@ function start_apiserver {
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    # this uses the API port because if you don't have any authenticator, you can't seem to use the secure port at all.
-    # this matches what happened with the combination in 1.4.
-    # TODO change this conditionally based on whether API_PORT is on or off
-    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} \
+    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} ${MAX_TIME_FOR_URL_API_SERVER} \
         || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
 
     # Create kubeconfigs for all components, using client certs
@@ -736,8 +719,6 @@ function start_kubelet {
         --vmodule="${LOG_SPEC}" \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
-        --rkt-path="${RKT_PATH}" \
-        --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
         ${cloud_config_arg} \
         --address="${KUBELET_HOST}" \
@@ -954,6 +935,8 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
   apt install -y sudo
+  # configure shared mounts to prevent failure in DIND scenarios
+  mount --make-rshared /
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
@@ -963,10 +946,6 @@ fi
 
 if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
   exit 1
-fi
-
-if [[ "${CONTAINER_RUNTIME}" == "rkt" ]]; then
-  test_rkt
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then

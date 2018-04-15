@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ import (
 	"path"
 
 	"github.com/golang/glog"
-	grpctx "golang.org/x/net/context"
+
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -118,7 +119,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	nodeName := string(c.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 	// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 	deviceMountPath := ""
@@ -152,6 +153,15 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	attribs := csiSource.VolumeAttributes
+
+	nodePublishSecrets := map[string]string{}
+	if csiSource.NodePublishSecretRef != nil {
+		nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
+		if err != nil {
+			return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v",
+				csiSource.NodePublishSecretRef.Namespace, csiSource.NodePublishSecretRef.Name, err)
+		}
+	}
 
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
@@ -188,10 +198,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	if len(fsType) == 0 {
 		fsType = defaultFSType
 	}
-	nodePublishSecrets := map[string]string{}
-	if csiSource.NodePublishSecretRef != nil {
-		nodePublishSecrets = getCredentialsFromSecret(c.k8s, csiSource.NodePublishSecretRef)
-	}
 	err = csi.NodePublishVolume(
 		ctx,
 		c.volumeID,
@@ -207,11 +213,38 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	if err != nil {
 		glog.Errorf(log("mounter.SetupAt failed: %v", err))
-		if err := removeMountDir(c.plugin, dir); err != nil {
-			glog.Error(log("mounter.SetuAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, err))
-			return err
+		if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
+			glog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 		}
 		return err
+	}
+
+	// apply volume ownership
+	if !c.readOnly && fsGroup != nil {
+		err := volume.SetVolumeOwnership(c, fsGroup)
+		if err != nil {
+			// attempt to rollback mount.
+			glog.Error(log("mounter.SetupAt failed to set fsgroup volume ownership for [%s]: %v", c.volumeID, err))
+			glog.V(4).Info(log("mounter.SetupAt attempting to unpublish volume %s due to previous error", c.volumeID))
+			if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
+				glog.Error(log(
+					"mounter.SetupAt failed to unpublish volume [%s]: %v (caused by previous NodePublish error: %v)",
+					c.volumeID, unpubErr, err,
+				))
+				return fmt.Errorf("%v (caused by %v)", unpubErr, err)
+			}
+
+			if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
+				glog.Error(log(
+					"mounter.SetupAt failed to clean mount dir [%s]: %v (caused by previous NodePublish error: %v)",
+					dir, unmountErr, err,
+				))
+				return fmt.Errorf("%v (caused by %v)", unmountErr, err)
+			}
+
+			return err
+		}
+		glog.V(4).Info(log("mounter.SetupAt sets fsGroup to [%d] for %s", *fsGroup, c.volumeID))
 	}
 
 	glog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
@@ -249,11 +282,6 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return nil
 	}
 
-	if err != nil {
-		glog.Error(log("mounter.TearDownAt failed to get CSI persistent source: %v", err))
-		return err
-	}
-
 	// load volume info from file
 	dataDir := path.Dir(dir) // dropoff /mount at end
 	data, err := loadVolumeData(dataDir, volDataFileName)
@@ -272,7 +300,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		c.csiClient = client
 	}
 
-	ctx, cancel := grpctx.WithTimeout(grpctx.Background(), csiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
 	csi := c.csiClient

@@ -380,7 +380,7 @@ func waitLogs(id string, w *fsnotify.Watcher, runtimeService internalapi.Runtime
 			}
 			// Only keep following container log when it is running.
 			if s.State != runtimeapi.ContainerState_CONTAINER_RUNNING {
-				glog.Errorf("Container %q is not running (state=%q)", id, s.State)
+				glog.V(5).Infof("Container %q is not running (state=%q)", id, s.State)
 				// Do not return error because it's normal that the container stops
 				// during waiting.
 				return false, nil

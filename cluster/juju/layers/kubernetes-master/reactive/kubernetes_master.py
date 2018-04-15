@@ -559,9 +559,9 @@ def push_service_data(kube_api):
     kube_api.configure(port=6443)
 
 
-def get_ingress_address(relation):
+def get_ingress_address(relation_name):
     try:
-        network_info = hookenv.network_get(relation.relation_name)
+        network_info = hookenv.network_get(relation_name)
     except NotImplementedError:
         network_info = []
 
@@ -585,7 +585,7 @@ def send_data(tls, kube_api_endpoint):
     kubernetes_service_ip = get_kubernetes_service_ip()
 
     # Get ingress address
-    ingress_ip = get_ingress_address(kube_api_endpoint)
+    ingress_ip = get_ingress_address(kube_api_endpoint.relation_name)
 
     domain = hookenv.config('dns_domain')
     # Create SANs that the tls layer will add to the server cert.
@@ -638,14 +638,21 @@ def kick_api_server(tls):
 def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
+    load_gpu_plugin = hookenv.config('enable-nvidia-plugin').lower()
+    gpuEnable = (get_version('kube-apiserver') >= (1, 9) and
+                 load_gpu_plugin == "auto" and
+                 is_state('kubernetes-master.gpu.enabled'))
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
+    metricsEnabled = str(hookenv.config('enable-metrics')).lower()
     args = [
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
         'dns-domain=' + hookenv.config('dns_domain'),
         'enable-dashboard=' + dbEnabled,
-        'enable-kube-dns=' + dnsEnabled
+        'enable-kube-dns=' + dnsEnabled,
+        'enable-metrics=' + metricsEnabled,
+        'enable-gpu=' + str(gpuEnable).lower()
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -885,8 +892,10 @@ def on_gpu_available(kube_control):
     We need to run in privileged mode.
 
     """
+    kube_version = get_version('kube-apiserver')
     config = hookenv.config()
-    if config['allow-privileged'].lower() == "false":
+    if (config['allow-privileged'].lower() == "false" and
+            kube_version < (1, 9)):
         hookenv.status_set(
             'active',
             'GPUs available. Set allow-privileged="auto" to enable.'
@@ -898,10 +907,24 @@ def on_gpu_available(kube_control):
 
 
 @when('kubernetes-master.gpu.enabled')
+@when('kubernetes-master.components.started')
 @when_not('kubernetes-master.privileged')
-def disable_gpu_mode():
+def gpu_with_no_privileged():
     """We were in gpu mode, but the operator has set allow-privileged="false",
     so we can't run in gpu mode anymore.
+
+    """
+    if get_version('kube-apiserver') < (1, 9):
+        remove_state('kubernetes-master.gpu.enabled')
+
+
+@when('kube-control.connected')
+@when_not('kube-control.gpu.available')
+@when('kubernetes-master.gpu.enabled')
+@when('kubernetes-master.components.started')
+def gpu_departed(kube_control):
+    """We were in gpu mode, but the workers informed us there is
+    no gpu support anymore.
 
     """
     remove_state('kubernetes-master.gpu.enabled')
@@ -1076,6 +1099,7 @@ def configure_kubernetes_service(service, base_args, extra_args_key):
     args = {}
     for arg in prev_args:
         # remove previous args by setting to null
+        # note this is so we remove them from the snap's config
         args[arg] = 'null'
     for k, v in base_args.items():
         args[k] = v
@@ -1098,6 +1122,14 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     client_key_path = layer_options.get('client_key_path')
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
+
+    # at one point in time, this code would set ca-client-cert,
+    # but this was removed. This was before configure_kubernetes_service
+    # kept track of old arguments and removed them, so client-ca-cert
+    # was able to hang around forever stored in the snap configuration.
+    # This removes that stale configuration from the snap if it still
+    # exists.
+    api_opts['client-ca-file'] = 'null'
 
     if is_privileged():
         api_opts['allow-privileged'] = 'true'
@@ -1124,6 +1156,7 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['service-account-key-file'] = '/root/cdk/serviceaccount.key'
     api_opts['kubelet-preferred-address-types'] = \
         '[InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP]'
+    api_opts['advertise-address'] = get_ingress_address('kube-control')
 
     etcd_dir = '/root/cdk/etcd'
     etcd_ca = os.path.join(etcd_dir, 'client-ca.pem')
@@ -1135,7 +1168,7 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
     api_opts['etcd-certfile'] = etcd_cert
     api_opts['etcd-servers'] = etcd_connection_string
 
-    admission_control = [
+    admission_control_pre_1_9 = [
         'Initializers',
         'NamespaceLifecycle',
         'LimitRanger',
@@ -1144,19 +1177,47 @@ def configure_apiserver(etcd_connection_string, leader_etcd_version):
         'DefaultTolerationSeconds'
     ]
 
+    admission_control = [
+        'NamespaceLifecycle',
+        'LimitRanger',
+        'ServiceAccount',
+        'PersistentVolumeLabel',
+        'DefaultStorageClass',
+        'DefaultTolerationSeconds',
+        'MutatingAdmissionWebhook',
+        'ValidatingAdmissionWebhook',
+        'ResourceQuota'
+    ]
+
     auth_mode = hookenv.config('authorization-mode')
     if 'Node' in auth_mode:
         admission_control.append('NodeRestriction')
 
     api_opts['authorization-mode'] = auth_mode
 
-    if get_version('kube-apiserver') < (1, 6):
+    kube_version = get_version('kube-apiserver')
+    if kube_version < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
-        admission_control.remove('DefaultTolerationSeconds')
-    if get_version('kube-apiserver') < (1, 7):
+        admission_control_pre_1_9.remove('DefaultTolerationSeconds')
+    if kube_version < (1, 7):
         hookenv.log('Removing Initializers from admission-control')
-        admission_control.remove('Initializers')
-    api_opts['admission-control'] = ','.join(admission_control)
+        admission_control_pre_1_9.remove('Initializers')
+    if kube_version < (1, 9):
+        api_opts['admission-control'] = ','.join(admission_control_pre_1_9)
+    else:
+        api_opts['admission-control'] = ','.join(admission_control)
+
+    if kube_version > (1, 6) and \
+       hookenv.config('enable-metrics'):
+        api_opts['requestheader-client-ca-file'] = ca_cert_path
+        api_opts['requestheader-allowed-names'] = 'client'
+        api_opts['requestheader-extra-headers-prefix'] = 'X-Remote-Extra-'
+        api_opts['requestheader-group-headers'] = 'X-Remote-Group'
+        api_opts['requestheader-username-headers'] = 'X-Remote-User'
+        api_opts['proxy-client-cert-file'] = client_cert_path
+        api_opts['proxy-client-key-file'] = client_key_path
+        api_opts['enable-aggregator-routing'] = 'true'
+        api_opts['client-ca-file'] = ca_cert_path
 
     configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
     restart_apiserver()

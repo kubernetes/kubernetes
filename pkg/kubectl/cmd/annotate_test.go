@@ -417,29 +417,33 @@ func TestAnnotateErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		tf := cmdtesting.NewTestFactory()
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
+		t.Run(k, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdAnnotate(tf, buf)
-		cmd.SetOutput(buf)
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
-		for k, v := range testCase.flags {
-			cmd.Flags().Set(k, v)
-		}
-		options := &AnnotateOptions{}
-		err := options.Complete(buf, cmd, testCase.args)
-		if err == nil {
-			err = options.Validate()
-		}
-		if !testCase.errFn(err) {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
-		if buf.Len() > 0 {
-			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
-		}
+			buf := bytes.NewBuffer([]byte{})
+			cmd := NewCmdAnnotate(tf, buf)
+			cmd.SetOutput(buf)
+
+			for k, v := range testCase.flags {
+				cmd.Flags().Set(k, v)
+			}
+			options := &AnnotateOptions{}
+			err := options.Complete(buf, cmd, testCase.args)
+			if err == nil {
+				err = options.Validate()
+			}
+			if !testCase.errFn(err) {
+				t.Errorf("%s: unexpected error: %v", k, err)
+				return
+			}
+			if buf.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+			}
+		})
 	}
 }
 
@@ -447,6 +451,8 @@ func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -499,6 +505,8 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -550,6 +558,8 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 
 func TestAnnotateLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
 		NegotiatedSerializer: unstructuredSerializer,
@@ -581,6 +591,8 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},

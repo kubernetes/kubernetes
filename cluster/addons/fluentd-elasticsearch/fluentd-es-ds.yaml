@@ -92,9 +92,6 @@ spec:
         - name: varlibdockercontainers
           mountPath: /var/lib/docker/containers
           readOnly: true
-        - name: libsystemddir
-          mountPath: /host/lib
-          readOnly: true
         - name: config-volume
           mountPath: /etc/fluent/config.d
       nodeSelector:
@@ -107,10 +104,6 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      # It is needed to copy systemd library to decompress journals
-      - name: libsystemddir
-        hostPath:
-          path: /usr/lib64
       - name: config-volume
         configMap:
           name: fluentd-es-config-v0.1.4

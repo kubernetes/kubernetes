@@ -238,11 +238,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace-dev":       &api.Namespace{},
 			"namespace-prod":      &api.Namespace{},
 		},
-		"../examples/elasticsearch": {
-			"es-rc":           &api.ReplicationController{},
-			"es-svc":          &api.Service{},
-			"service-account": nil,
-		},
 		"../examples/explorer": {
 			"pod": &api.Pod{},
 		},

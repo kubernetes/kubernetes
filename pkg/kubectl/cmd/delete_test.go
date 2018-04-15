@@ -57,6 +57,8 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -121,6 +123,8 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	var expectedOrphanDependents *bool
@@ -171,6 +175,8 @@ func TestDeleteNamedObject(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -222,6 +228,8 @@ func TestDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -281,6 +289,8 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 	objectDeletionWaitInterval = time.Millisecond
 	count := 0
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -331,6 +341,8 @@ func TestDeleteObjectGraceZero(t *testing.T) {
 func TestDeleteObjectNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -367,6 +379,8 @@ func TestDeleteObjectNotFound(t *testing.T) {
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -402,6 +416,8 @@ func TestDeleteAllNotFound(t *testing.T) {
 	notFoundError := &errors.NewNotFound(api.Resource("services"), "foo").ErrStatus
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -447,6 +463,8 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	_, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	// Add an item to the list which will result in a 404 on delete
@@ -488,6 +506,8 @@ func TestDeleteMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -524,6 +544,8 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	_, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -569,6 +591,8 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -608,6 +632,8 @@ func TestDeleteDirectory(t *testing.T) {
 	_, _, rc := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -641,6 +667,8 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -706,26 +734,30 @@ func TestResourceErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		tf := cmdtesting.NewTestFactory()
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
+		t.Run(k, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
-		options := &DeleteOptions{
-			FilenameOptions: resource.FilenameOptions{},
-			GracePeriod:     -1,
-			Cascade:         false,
-			Output:          "name",
-		}
-		err := options.Complete(tf, buf, errBuf, testCase.args, fakecmd)
-		if !testCase.errFn(err) {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
+			buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
-		if buf.Len() > 0 {
-			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
-		}
+			options := &DeleteOptions{
+				FilenameOptions: resource.FilenameOptions{},
+				GracePeriod:     -1,
+				Cascade:         false,
+				Output:          "name",
+			}
+			err := options.Complete(tf, buf, errBuf, testCase.args, fakecmd)
+			if !testCase.errFn(err) {
+				t.Errorf("%s: unexpected error: %v", k, err)
+				return
+			}
+
+			if buf.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+			}
+		})
 	}
 }

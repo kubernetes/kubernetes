@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	// TODO: try this library to see if it generates correct json patch
@@ -204,8 +205,8 @@ func mutateConfigmaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("mutating crd")
+func mutateCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("mutating custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -232,8 +233,8 @@ func mutateCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func admitCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
-	glog.V(2).Info("admitting crd")
+func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("admitting custom resource")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
@@ -259,6 +260,37 @@ func admitCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	return &reviewResponse
 }
 
+// Deny all crds with the label "webhook-e2e-test":"webhook-disallow"
+// This function expects all CRDs submitted to it to be apiextensions.k8s.io/v1beta1
+// TODO: When apiextensions.k8s.io/v1 is added we will need to update this function.
+func admitCRD(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	glog.V(2).Info("admitting crd")
+	crdResource := metav1.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1beta1", Resource: "customresourcedefinitions"}
+	if ar.Request.Resource != crdResource {
+		err := fmt.Errorf("expect resource to be %s", crdResource)
+		glog.Error(err)
+		return toAdmissionResponse(err)
+	}
+
+	raw := ar.Request.Object.Raw
+	crd := apiextensionsv1beta1.CustomResourceDefinition{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(raw, nil, &crd); err != nil {
+		glog.Error(err)
+		return toAdmissionResponse(err)
+	}
+	reviewResponse := v1beta1.AdmissionResponse{}
+	reviewResponse.Allowed = true
+
+	if v, ok := crd.Labels["webhook-e2e-test"]; ok {
+		if v == "webhook-disallow" {
+			reviewResponse.Allowed = false
+			reviewResponse.Result = &metav1.Status{Message: "the crd contains unwanted label"}
+		}
+	}
+	return &reviewResponse
+}
+
 type admitFunc func(v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
 
 func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
@@ -276,6 +308,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 		return
 	}
 
+	glog.V(2).Info(fmt.Sprintf("handling request: %v", body))
 	var reviewResponse *v1beta1.AdmissionResponse
 	ar := v1beta1.AdmissionReview{}
 	deserializer := codecs.UniversalDeserializer()
@@ -285,6 +318,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	} else {
 		reviewResponse = admit(ar)
 	}
+	glog.V(2).Info(fmt.Sprintf("sending response: %v", reviewResponse))
 
 	response := v1beta1.AdmissionReview{}
 	if reviewResponse != nil {
@@ -324,12 +358,16 @@ func serveMutateConfigmaps(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, mutateConfigmaps)
 }
 
-func serveCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitCRD)
+func serveCustomResource(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitCustomResource)
 }
 
-func serveMutateCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, mutateCRD)
+func serveMutateCustomResource(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, mutateCustomResource)
+}
+
+func serveCRD(w http.ResponseWriter, r *http.Request) {
+	serve(w, r, admitCRD)
 }
 
 func main() {
@@ -342,8 +380,9 @@ func main() {
 	http.HandleFunc("/mutating-pods", serveMutatePods)
 	http.HandleFunc("/configmaps", serveConfigmaps)
 	http.HandleFunc("/mutating-configmaps", serveMutateConfigmaps)
+	http.HandleFunc("/custom-resource", serveCustomResource)
+	http.HandleFunc("/mutating-custom-resource", serveMutateCustomResource)
 	http.HandleFunc("/crd", serveCRD)
-	http.HandleFunc("/mutating-crd", serveMutateCRD)
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      ":443",

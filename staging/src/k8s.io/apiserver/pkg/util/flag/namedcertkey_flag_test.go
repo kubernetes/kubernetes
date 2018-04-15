@@ -112,9 +112,8 @@ func TestNamedCertKeyArrayFlag(t *testing.T) {
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testNamedCertKeyArray", pflag.ContinueOnError)
 		var nkcs []NamedCertKey
-		for _, d := range test.def {
-			nkcs = append(nkcs, d)
-		}
+		nkcs = append(nkcs, test.def...)
+
 		fs.Var(NewNamedCertKeyArray(&nkcs), "tls-sni-cert-key", "usage")
 
 		args := []string{}

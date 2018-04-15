@@ -6,7 +6,7 @@
 // https://ed25519.cr.yp.to/.
 //
 // These functions are also compatible with the “Ed25519” function defined in
-// https://tools.ietf.org/html/draft-irtf-cfrg-eddsa-05.
+// RFC 8032.
 package ed25519
 
 // This code is a port of the public domain, “ref10” implementation of ed25519

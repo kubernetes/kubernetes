@@ -26,6 +26,8 @@ import (
 
 	"crypto/rsa"
 
+	"github.com/golang/glog"
+
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -60,6 +62,7 @@ type kubeConfigSpec struct {
 // to establish the control plane, including also the admin kubeconfig file.
 // If kubeconfig files already exists, they are used only if evaluated equal; otherwise an error is returned.
 func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating all kubeconfig files")
 	return createKubeConfigFiles(
 		outDir,
 		cfg,
@@ -73,24 +76,28 @@ func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguratio
 // CreateAdminKubeConfigFile create a kubeconfig file for the admin to use and for kubeadm itself.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateAdminKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("create a kubeconfig file for the admin and for kubeadm itself")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.AdminKubeConfigFileName)
 }
 
 // CreateKubeletKubeConfigFile create a kubeconfig file for the Kubelet to use.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateKubeletKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating a kubeconfig file for the Kubelet")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.KubeletKubeConfigFileName)
 }
 
 // CreateControllerManagerKubeConfigFile create a kubeconfig file for the ControllerManager to use.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateControllerManagerKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating kubeconfig file for the ControllerManager")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.ControllerManagerKubeConfigFileName)
 }
 
 // CreateSchedulerKubeConfigFile create a create a kubeconfig file for the Scheduler to use.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateSchedulerKubeConfigFile(outDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating kubeconfig file for Scheduler")
 	return createKubeConfigFiles(outDir, cfg, kubeadmconstants.SchedulerKubeConfigFileName)
 }
 
@@ -112,7 +119,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.MasterConfiguration, k
 		}
 
 		// builds the KubeConfig object
-		config, err := buildKubeConfigFromSpec(spec)
+		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
 		if err != nil {
 			return err
 		}
@@ -181,14 +188,14 @@ func getKubeConfigSpecs(cfg *kubeadmapi.MasterConfiguration) (map[string]*kubeCo
 }
 
 // buildKubeConfigFromSpec creates a kubeconfig object for the given kubeConfigSpec
-func buildKubeConfigFromSpec(spec *kubeConfigSpec) (*clientcmdapi.Config, error) {
+func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientcmdapi.Config, error) {
 
 	// If this kubeconfig should use token
 	if spec.TokenAuth != nil {
 		// create a kubeconfig with a token
 		return kubeconfigutil.CreateWithToken(
 			spec.APIServer,
-			"kubernetes",
+			clustername,
 			spec.ClientName,
 			certutil.EncodeCertPEM(spec.CACert),
 			spec.TokenAuth.Token,
@@ -209,7 +216,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec) (*clientcmdapi.Config, error)
 	// create a kubeconfig with the client certs
 	return kubeconfigutil.CreateWithCerts(
 		spec.APIServer,
-		"kubernetes",
+		clustername,
 		spec.ClientName,
 		certutil.EncodeCertPEM(spec.CACert),
 		certutil.EncodePrivateKeyPEM(clientKey),
@@ -286,7 +293,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.MasterConfigur
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
 // WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
@@ -312,14 +319,14 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.MasterConfiguration
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
 // writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.
-func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec) error {
+func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string) error {
 
 	// builds the KubeConfig object
-	config, err := buildKubeConfigFromSpec(spec)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		return err
 	}

@@ -68,6 +68,7 @@ go_test(
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apiserver:go_default_library",
+        "//vendor/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -82,6 +83,8 @@ go_test(
         "//vendor/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//vendor/k8s.io/client-go/discovery:go_default_library",
     ],
 )

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ type PolicyInterface interface {
 	RESTClient() rest.Interface
 	EvictionsGetter
 	PodDisruptionBudgetsGetter
+	PodSecurityPoliciesGetter
 }
 
 // PolicyClient is used to interact with features provided by the policy group.
@@ -40,6 +41,10 @@ func (c *PolicyClient) Evictions(namespace string) EvictionInterface {
 
 func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
 	return newPodDisruptionBudgets(c, namespace)
+}
+
+func (c *PolicyClient) PodSecurityPolicies() PodSecurityPolicyInterface {
+	return newPodSecurityPolicies(c)
 }
 
 // NewForConfig creates a new PolicyClient for the given config.

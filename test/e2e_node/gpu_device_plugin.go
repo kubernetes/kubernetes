@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -92,6 +93,10 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 			By("Restarting Kubelet and creating another pod")
 			restartKubelet()
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			Eventually(func() bool {
+				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 10*time.Second, framework.Poll).Should(BeTrue())
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
 
 			By("Checking that pods got a different GPU")
@@ -127,6 +132,16 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 	})
 })
+
+func checkIfNvidiaGPUsExistOnNode() bool {
+	// Cannot use `lspci` because it is not installed on all distros by default.
+	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
+	if err != nil {
+		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
+		return false
+	}
+	return true
+}
 
 func logDevicePluginMetrics() {
 	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")

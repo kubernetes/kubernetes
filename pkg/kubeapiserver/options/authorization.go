@@ -17,11 +17,13 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	versionedinformers "k8s.io/client-go/informers"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
@@ -29,7 +31,7 @@ import (
 )
 
 type BuiltInAuthorizationOptions struct {
-	Mode                        string
+	Modes                       []string
 	PolicyFile                  string
 	WebhookConfigFile           string
 	WebhookCacheAuthorizedTTL   time.Duration
@@ -38,19 +40,57 @@ type BuiltInAuthorizationOptions struct {
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
-		Mode: authzmodes.ModeAlwaysAllow,
+		Modes: []string{authzmodes.ModeAlwaysAllow},
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
 	}
 }
 
 func (s *BuiltInAuthorizationOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
 	allErrors := []error{}
+
+	if len(s.Modes) == 0 {
+		allErrors = append(allErrors, fmt.Errorf("at least one authorization-mode must be passed"))
+	}
+
+	allowedModes := sets.NewString(authzmodes.AuthorizationModeChoices...)
+	modes := sets.NewString(s.Modes...)
+	for _, mode := range s.Modes {
+		if !allowedModes.Has(mode) {
+			allErrors = append(allErrors, fmt.Errorf("authorization-mode %q is not a valid mode", mode))
+		}
+		if mode == authzmodes.ModeABAC {
+			if s.PolicyFile == "" {
+				allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC's authorization policy file not passed"))
+			}
+		}
+		if mode == authzmodes.ModeWebhook {
+			if s.WebhookConfigFile == "" {
+				allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook's authorization config file not passed"))
+			}
+		}
+	}
+
+	if s.PolicyFile != "" && !modes.Has(authzmodes.ModeABAC) {
+		allErrors = append(allErrors, fmt.Errorf("cannot specify --authorization-policy-file without mode ABAC"))
+	}
+
+	if s.WebhookConfigFile != "" && !modes.Has(authzmodes.ModeWebhook) {
+		allErrors = append(allErrors, fmt.Errorf("cannot specify --authorization-webhook-config-file without mode Webhook"))
+	}
+
+	if len(s.Modes) != len(modes.List()) {
+		allErrors = append(allErrors, fmt.Errorf("authorization-mode %q has mode specified more than once", s.Modes))
+	}
+
 	return allErrors
 }
 
 func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&s.Mode, "authorization-mode", s.Mode, ""+
+	fs.StringSliceVar(&s.Modes, "authorization-mode", s.Modes, ""+
 		"Ordered list of plug-ins to do authorization on secure port. Comma-delimited list of: "+
 		strings.Join(authzmodes.AuthorizationModeChoices, ",")+".")
 
@@ -68,25 +108,11 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.WebhookCacheUnauthorizedTTL,
 		"authorization-webhook-cache-unauthorized-ttl", s.WebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
-
-	fs.String("authorization-rbac-super-user", "", ""+
-		"If specified, a username which avoids RBAC authorization checks and role binding "+
-		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
-	fs.MarkDeprecated("authorization-rbac-super-user", "Removed during alpha to beta.  The 'system:masters' group has privileged access.")
-
-}
-
-func (s *BuiltInAuthorizationOptions) Modes() []string {
-	modes := []string{}
-	if len(s.Mode) > 0 {
-		modes = strings.Split(s.Mode, ",")
-	}
-	return modes
 }
 
 func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory, versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.AuthorizationConfig {
 	return authorizer.AuthorizationConfig{
-		AuthorizationModes:          s.Modes(),
+		AuthorizationModes:          s.Modes,
 		PolicyFile:                  s.PolicyFile,
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,

@@ -97,7 +97,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 		framework.IngressStaticIPKey:  t.ipName,
 		framework.IngressAllowHTTPKey: "false",
 	}, map[string]string{})
-	t.jig.AddHTTPS("tls-secret", "ingress.test.com")
+	t.jig.SetHTTPS("tls-secret", "ingress.test.com")
 
 	By("waiting for Ingress to come up with ip: " + t.ip)
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/%v", t.ip, path), host, framework.LoadBalancerPollTimeout, t.jig.PollInterval, t.httpClient, false))
@@ -176,14 +176,6 @@ func (t *IngressUpgradeTest) verify(f *framework.Framework, done <-chan struct{}
 	By("comparing GCP resources post-upgrade")
 	postUpgradeResourceStore := &GCPResourceStore{}
 	t.populateGCPResourceStore(postUpgradeResourceStore)
-
-	// Ignore certain fields in compute.Firewall that we know will change
-	// due to the upgrade/downgrade.
-	// TODO(rramkumar): Remove this once glbc 0.9.8 is released.
-	t.resourceStore.Fw.Allowed = nil
-	t.resourceStore.Fw.SourceRanges = nil
-	postUpgradeResourceStore.Fw.Allowed = nil
-	postUpgradeResourceStore.Fw.SourceRanges = nil
 
 	framework.ExpectNoError(compareGCPResourceStores(t.resourceStore, postUpgradeResourceStore, func(v1 reflect.Value, v2 reflect.Value) error {
 		i1 := v1.Interface()

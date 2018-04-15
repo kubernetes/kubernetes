@@ -16,7 +16,7 @@ go_library(
     srcs = ["main.go"],
     importpath = "k8s.io/client-go/examples/create-update-delete-deployment",
     deps = [
-        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

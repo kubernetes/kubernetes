@@ -161,6 +161,7 @@ type CloudConfig struct {
 	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
 	MultiZone         bool
+	MultiMaster       bool
 	Cluster           string
 	MasterName        string
 	NodeInstanceGroup string // comma-delimited list of groups' names
@@ -208,7 +209,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.Var(utilflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
-	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/rkt/remote).")
+	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker/remote).")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/dockershim.sock", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flag.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -245,6 +246,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
 	flag.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
+	flag.BoolVar(&cloudConfig.MultiMaster, "gce-multimaster", false, "If true, the underlying GCE/GKE cluster is assumed to be multi-master.")
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
@@ -275,7 +277,7 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
 	// TODO(random-liu): Move kubelet start logic out of the test.
 	// TODO(random-liu): Move log fetch logic out of the test.
-	// There are different ways to start kubelet (systemd, initd, docker, rkt, manually started etc.)
+	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
 	// and manage logs (journald, upstart etc.).
 	// For different situation we need to mount different things into the container, run different commands.
 	// It is hard and unnecessary to deal with the complexity inside the test suite.

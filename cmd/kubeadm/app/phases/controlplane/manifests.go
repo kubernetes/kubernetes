@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -50,21 +52,25 @@ const (
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
 func CreateInitStaticPodManifestFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("[controlplane] creating static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // CreateAPIServerStaticPodManifestFile will write APIserver static pod manifest file.
 func CreateAPIServerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating APIserver static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeAPIServer)
 }
 
 // CreateControllerManagerStaticPodManifestFile will write  controller manager static pod manifest file.
 func CreateControllerManagerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating controller manager static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeControllerManager)
 }
 
 // CreateSchedulerStaticPodManifestFile will write scheduler static pod manifest file.
 func CreateSchedulerStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.MasterConfiguration) error {
+	glog.V(1).Infoln("creating scheduler static pod files")
 	return createStaticPodFiles(manifestDir, cfg, kubeadmconstants.KubeScheduler)
 }
 
@@ -132,6 +138,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 	}
 
 	// gets the StaticPodSpecs, actualized for the current MasterConfiguration
+	glog.V(1).Infoln("[controlplane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, k8sVersion)
 
 	// creates required static pod specs
@@ -147,7 +154,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.MasterConfiguratio
 			return fmt.Errorf("failed to create static pod manifest file for %q: %v", componentName, err)
 		}
 
-		fmt.Printf("[controlplane] Wrote Static Pod manifest for component %s to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
+		glog.Infof("[controlplane] wrote Static Pod manifest for component %s to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
 	}
 
 	return nil
@@ -213,13 +220,13 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 
 		// Warn for unused user supplied variables
 		if cfg.Etcd.CAFile != "" {
-			fmt.Printf("[controlplane] WARNING: Configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
+			glog.Warningf("[controlplane] configuration for %s CAFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CAFile, kubeadmconstants.Etcd)
 		}
 		if cfg.Etcd.CertFile != "" {
-			fmt.Printf("[controlplane] WARNING: Configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
+			glog.Warningf("[controlplane] configuration for %s CertFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.CertFile, kubeadmconstants.Etcd)
 		}
 		if cfg.Etcd.KeyFile != "" {
-			fmt.Printf("[controlplane] WARNING: Configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
+			glog.Warningf("[controlplane] configuration for %s KeyFile, %s, is unused without providing Endpoints for external %s\n", kubeadmconstants.Etcd, cfg.Etcd.KeyFile, kubeadmconstants.Etcd)
 		}
 	}
 
@@ -321,15 +328,12 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 		defaultArguments["cluster-signing-cert-file"] = ""
 	}
 
-	command := []string{"kube-controller-manager"}
-	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManagerExtraArgs)...)
-
 	if cfg.CloudProvider != "" {
-		command = append(command, "--cloud-provider="+cfg.CloudProvider)
+		defaultArguments["cloud-provider"] = cfg.CloudProvider
 
 		// Only append the --cloud-config option if there's a such file
 		if _, err := os.Stat(DefaultCloudConfigPath); err == nil {
-			command = append(command, "--cloud-config="+DefaultCloudConfigPath)
+			defaultArguments["cloud-config"] = DefaultCloudConfigPath
 		}
 	}
 
@@ -337,9 +341,14 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
 		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
-		command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet,
-			"--node-cidr-mask-size="+maskSize)
+		defaultArguments["allocate-node-cidrs"] = "true"
+		defaultArguments["cluster-cidr"] = cfg.Networking.PodSubnet
+		defaultArguments["node-cidr-mask-size"] = maskSize
 	}
+
+	command := []string{"kube-controller-manager"}
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.ControllerManagerExtraArgs)...)
+
 	return command
 }
 

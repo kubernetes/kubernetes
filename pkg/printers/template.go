@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,27 +26,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
-type TemplatePrinter struct {
+// GoTemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
+type GoTemplatePrinter struct {
 	rawTemplate string
 	template    *template.Template
 }
 
-func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
+func NewGoTemplatePrinter(tmpl []byte) (*GoTemplatePrinter, error) {
 	t, err := template.New("output").
-		Funcs(template.FuncMap{"exists": exists}).
+		Funcs(template.FuncMap{
+			"exists":       exists,
+			"base64decode": base64decode,
+		}).
 		Parse(string(tmpl))
 	if err != nil {
 		return nil, err
 	}
-	return &TemplatePrinter{
+	return &GoTemplatePrinter{
 		rawTemplate: string(tmpl),
 		template:    t,
 	}, nil
 }
 
 // AllowMissingKeys tells the template engine if missing keys are allowed.
-func (p *TemplatePrinter) AllowMissingKeys(allow bool) {
+func (p *GoTemplatePrinter) AllowMissingKeys(allow bool) {
 	if allow {
 		p.template.Option("missingkey=default")
 	} else {
@@ -53,12 +57,12 @@ func (p *TemplatePrinter) AllowMissingKeys(allow bool) {
 	}
 }
 
-func (p *TemplatePrinter) AfterPrint(w io.Writer, res string) error {
+func (p *GoTemplatePrinter) AfterPrint(w io.Writer, res string) error {
 	return nil
 }
 
 // PrintObj formats the obj with the Go Template.
-func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+func (p *GoTemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	var data []byte
 	var err error
 	data, err = json.Marshal(obj)
@@ -84,17 +88,17 @@ func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 }
 
 // TODO: implement HandledResources()
-func (p *TemplatePrinter) HandledResources() []string {
+func (p *GoTemplatePrinter) HandledResources() []string {
 	return []string{}
 }
 
-func (p *TemplatePrinter) IsGeneric() bool {
+func (p *GoTemplatePrinter) IsGeneric() bool {
 	return true
 }
 
 // safeExecute tries to execute the template, but catches panics and returns an error
 // should the template engine panic.
-func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
+func (p *GoTemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
 	var panicErr error
 	// Sorry for the double anonymous function. There's probably a clever way
 	// to do this that has the defer'd func setting the value to be returned, but
@@ -111,4 +115,12 @@ func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {
 		return panicErr
 	}
 	return retErr
+}
+
+func base64decode(v string) (string, error) {
+	data, err := base64.StdEncoding.DecodeString(v)
+	if err != nil {
+		return "", fmt.Errorf("base64 decode failed: %v", err)
+	}
+	return string(data), nil
 }

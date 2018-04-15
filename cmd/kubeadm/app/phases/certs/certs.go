@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
+
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -32,7 +34,7 @@ import (
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
 // If the PKI assets already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating PKI assets")
 	certActions := []func(cfg *kubeadmapi.MasterConfiguration) error{
 		CreateCACertAndKeyFiles,
 		CreateAPIServerCertAndKeyFiles,
@@ -54,7 +56,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
-	fmt.Printf("[certificates] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+	glog.Infof("[certificates] valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	return nil
 }
@@ -62,7 +64,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 // CreateCACertAndKeyFiles create a new self signed cluster CA certificate and key files.
 // If the CA certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 func CreateCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("create a new self signed cluster CA certificate and key files")
 	caCert, caKey, err := NewCACertAndKey()
 	if err != nil {
 		return err
@@ -80,7 +82,7 @@ func CreateCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // If the apiserver certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the cluster CA certificate and key files exist in the CertificatesDir.
 func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new certificate and key files for the apiserver")
 	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
@@ -104,7 +106,7 @@ func CreateAPIServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // If the apiserver-kubelet-client certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 // It assumes the cluster CA certificate and key files exist in the CertificatesDir.
 func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new certificate for kubelets calling apiserver")
 	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
 		return err
@@ -129,7 +131,7 @@ func CreateAPIServerKubeletClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigura
 // This is a separate CA, so that kubernetes client identities cannot connect to etcd directly or peer with the etcd cluster.
 // If the etcd CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateEtcdCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a self signed etcd CA certificate and key files")
 	etcdCACert, etcdCAKey, err := NewEtcdCACertAndKey()
 	if err != nil {
 		return err
@@ -147,7 +149,7 @@ func CreateEtcdCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 // If the etcd serving certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
 func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new server certificate and key files for etcd")
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
 		return err
@@ -171,7 +173,7 @@ func CreateEtcdServerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error 
 // If the etcd peer certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
 func CreateEtcdPeerCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new certificate and key files for etcd peering")
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
 		return err
@@ -219,7 +221,7 @@ func CreateEtcdHealthcheckClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfigurat
 // If the apiserver-etcd-client certificate and key file already exist in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 // It assumes the etcd CA certificate and key file exist in the CertificatesDir
 func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new client certificate for the apiserver calling etcd")
 	etcdCACert, etcdCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName)
 	if err != nil {
 		return err
@@ -242,7 +244,7 @@ func CreateAPIServerEtcdClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
 // If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new public/private key files for signing service account users")
 	saSigningKey, err := NewServiceAccountSigningKey()
 	if err != nil {
 		return err
@@ -261,7 +263,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 // as front proxies.
 // If the front proxy CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a self signed front proxy CA certificate and key files")
 	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey()
 	if err != nil {
 		return err
@@ -279,7 +281,7 @@ func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) erro
 // If the front-proxy-client certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 // It assumes the front proxy CA certificate and key files exist in the CertificatesDir.
 func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
-
+	glog.V(1).Infoln("creating a new certificate for proxy server client")
 	frontProxyCACert, frontProxyCAKey, err := loadCertificateAuthority(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName)
 	if err != nil {
 		return err

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -158,12 +159,12 @@ func newDeploymentRollback(name string, annotations map[string]string, revision 
 	}
 }
 
-func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, ns, deploymentName string) {
+func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, scaleClient scaleclient.ScalesGetter, ns, deploymentName string) {
 	deployment, err := c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClient)
+	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClient, scaleClient)
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 
@@ -224,7 +225,7 @@ func testDeleteDeployment(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nilRs))
-	stopDeployment(c, internalClient, ns, deploymentName)
+	stopDeployment(c, internalClient, f.ScalesGetter, ns, deploymentName)
 }
 
 func testRollingUpdateDeployment(f *framework.Framework) {
@@ -242,7 +243,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	rsRevision := "3546343826724305832"
 	annotations := make(map[string]string)
 	annotations[deploymentutil.RevisionAnnotation] = rsRevision
-	rs := newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage)
+	rs := newExtensionsRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage)
 	rs.Annotations = annotations
 	framework.Logf("Creating replica set %q (going to be adopted)", rs.Name)
 	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(rs)
@@ -274,10 +275,6 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c.ExtensionsV1beta1())
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(allOldRSs)).Should(Equal(1))
-	// The old RS should contain pod-template-hash in its selector, label, and template label
-	Expect(len(allOldRSs[0].Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
-	Expect(len(allOldRSs[0].Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
-	Expect(len(allOldRSs[0].Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
 }
 
 func testRecreateDeployment(f *framework.Framework) {
@@ -324,7 +321,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
 	revisionHistoryLimit := utilpointer.Int32Ptr(0)
-	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage))
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newExtensionsRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
@@ -395,7 +392,7 @@ func testRolloverDeployment(f *framework.Framework) {
 
 	rsName := "test-rollover-controller"
 	rsReplicas := int32(1)
-	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns).Create(newExtensionsRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)

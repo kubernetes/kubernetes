@@ -119,4 +119,14 @@ type Cache interface {
 
 	// FilteredList returns all cached pods that pass the filter.
 	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+
+	// Snapshot takes a snapshot on current cache
+	Snapshot() *Snapshot
+}
+
+// Snapshot is a snapshot of cache state
+type Snapshot struct {
+	AssumedPods map[string]bool
+	Nodes       map[string]*NodeInfo
+	Pdbs        map[string]*policy.PodDisruptionBudget
 }

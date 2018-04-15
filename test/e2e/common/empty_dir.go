@@ -41,7 +41,7 @@ var (
 var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	Context("when FSGroup is specified [Feature:FSGroup]", func() {
+	Context("when FSGroup is specified", func() {
 		It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
@@ -252,6 +252,7 @@ func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.Storag
 		fmt.Sprintf("--fs_type=%v", volumePath),
 		fmt.Sprintf("--file_perm=%v", volumePath),
 		fmt.Sprintf("--file_owner=%v", volumePath),
+		fmt.Sprintf("--file_mode=%v", volumePath),
 	}
 
 	pod.Spec.Containers[0].VolumeMounts[0].SubPath = subPath
@@ -264,6 +265,7 @@ func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.Storag
 		"perms of file \"/test-volume\": -rwxrwxrwx",
 		"owner UID of \"/test-volume\": 0",
 		"owner GID of \"/test-volume\": 123",
+		"mode of file \"/test-volume\": dgtrwxrwxrwx",
 	}
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")

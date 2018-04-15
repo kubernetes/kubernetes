@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/deployment"
-	"k8s.io/kubernetes/pkg/controller/replicaset"
 )
 
 func startDeploymentController(ctx ControllerContext) (bool, error) {
@@ -41,19 +40,6 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(ctx.ComponentConfig.ConcurrentDeploymentSyncs), ctx.Stop)
-	return true, nil
-}
-
-func startReplicaSetController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}] {
-		return false, nil
-	}
-	go replicaset.NewReplicaSetController(
-		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
-		replicaset.BurstReplicas,
-	).Run(int(ctx.ComponentConfig.ConcurrentRSSyncs), ctx.Stop)
+	go dc.Run(int(ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }

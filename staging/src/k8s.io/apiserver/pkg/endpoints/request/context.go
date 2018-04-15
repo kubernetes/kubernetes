@@ -17,10 +17,10 @@ limitations under the License.
 package request
 
 import (
-	stderrs "errors"
+	"context"
+	"errors"
 	"time"
 
-	"golang.org/x/net/context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/apis/audit"
@@ -83,7 +83,7 @@ func NewDefaultContext() Context {
 func WithValue(parent Context, key interface{}, val interface{}) Context {
 	internalCtx, ok := parent.(context.Context)
 	if !ok {
-		panic(stderrs.New("Invalid context type"))
+		panic(errors.New("Invalid context type"))
 	}
 	return context.WithValue(internalCtx, key, val)
 }

@@ -27,6 +27,8 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
@@ -98,6 +100,9 @@ type AuditLogOptions struct {
 	Format     string
 
 	BatchOptions AuditBatchOptions
+
+	// API group version used for serializing audit events.
+	GroupVersionString string
 }
 
 // AuditWebhookOptions control the webhook configuration for audit events.
@@ -106,6 +111,9 @@ type AuditWebhookOptions struct {
 	InitialBackoff time.Duration
 
 	BatchOptions AuditBatchOptions
+
+	// API group version used for serializing audit events.
+	GroupVersionString string
 }
 
 func NewAuditOptions() *AuditOptions {
@@ -116,16 +124,18 @@ func NewAuditOptions() *AuditOptions {
 		WebhookOptions: AuditWebhookOptions{
 			BatchOptions: AuditBatchOptions{
 				Mode:        ModeBatch,
-				BatchConfig: defaultLogBatchConfig,
+				BatchConfig: pluginbuffered.NewDefaultBatchConfig(),
 			},
-			InitialBackoff: pluginwebhook.DefaultInitialBackoff,
+			InitialBackoff:     pluginwebhook.DefaultInitialBackoff,
+			GroupVersionString: "audit.k8s.io/v1beta1",
 		},
 		LogOptions: AuditLogOptions{
 			Format: pluginlog.FormatJson,
 			BatchOptions: AuditBatchOptions{
-				Mode:        ModeBatch,
-				BatchConfig: pluginbuffered.NewDefaultBatchConfig(),
+				Mode:        ModeBlocking,
+				BatchConfig: defaultLogBatchConfig,
 			},
+			GroupVersionString: "audit.k8s.io/v1beta1",
 		},
 	}
 }
@@ -145,46 +155,10 @@ func (o *AuditOptions) Validate() []error {
 		if len(o.WebhookOptions.ConfigFile) > 0 {
 			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-webhook-config-file", features.AdvancedAuditing))
 		}
-	} else {
-		// check webhook configuration
-		if err := validateBackendMode(pluginwebhook.PluginName, o.WebhookOptions.BatchOptions.Mode); err != nil {
-			allErrors = append(allErrors, err)
-		}
-		if err := validateBackendBatchConfig(pluginwebhook.PluginName, o.LogOptions.BatchOptions.BatchConfig); err != nil {
-			allErrors = append(allErrors, err)
-		}
-
-		// check log configuration
-		if err := validateBackendMode(pluginlog.PluginName, o.LogOptions.BatchOptions.Mode); err != nil {
-			allErrors = append(allErrors, err)
-		}
-		if err := validateBackendBatchConfig(pluginlog.PluginName, o.LogOptions.BatchOptions.BatchConfig); err != nil {
-			allErrors = append(allErrors, err)
-		}
-
-		// Check log format
-		validFormat := false
-		for _, f := range pluginlog.AllowedFormats {
-			if f == o.LogOptions.Format {
-				validFormat = true
-				break
-			}
-		}
-		if !validFormat {
-			allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.LogOptions.Format, strings.Join(pluginlog.AllowedFormats, ",")))
-		}
 	}
 
-	// Check validities of MaxAge, MaxBackups and MaxSize of log options
-	if o.LogOptions.MaxAge < 0 {
-		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxage %v can't be a negative number", o.LogOptions.MaxAge))
-	}
-	if o.LogOptions.MaxBackups < 0 {
-		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxbackup %v can't be a negative number", o.LogOptions.MaxBackups))
-	}
-	if o.LogOptions.MaxSize < 0 {
-		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxsize %v can't be a negative number", o.LogOptions.MaxSize))
-	}
+	allErrors = append(allErrors, o.LogOptions.Validate()...)
+	allErrors = append(allErrors, o.WebhookOptions.Validate()...)
 
 	return allErrors
 }
@@ -198,7 +172,15 @@ func validateBackendMode(pluginName string, mode string) error {
 	return fmt.Errorf("invalid audit %s mode %s, allowed modes are %q", pluginName, mode, strings.Join(AllowedModes, ","))
 }
 
-func validateBackendBatchConfig(pluginName string, config pluginbuffered.BatchConfig) error {
+func validateBackendBatchOptions(pluginName string, options AuditBatchOptions) error {
+	if err := validateBackendMode(pluginName, options.Mode); err != nil {
+		return err
+	}
+	if options.Mode != ModeBatch {
+		// Don't validate the unused options.
+		return nil
+	}
+	config := options.BatchConfig
 	if config.BufferSize <= 0 {
 		return fmt.Errorf("invalid audit batch %s buffer size %v, must be a positive number", pluginName, config.BufferSize)
 	}
@@ -212,6 +194,31 @@ func validateBackendBatchConfig(pluginName string, config pluginbuffered.BatchCo
 		return fmt.Errorf("invalid audit batch %s throttle burst %v, must be a positive number", pluginName, config.ThrottleBurst)
 	}
 	return nil
+}
+
+var knownGroupVersions = []schema.GroupVersion{
+	auditv1alpha1.SchemeGroupVersion,
+	auditv1beta1.SchemeGroupVersion,
+}
+
+func validateGroupVersionString(groupVersion string) error {
+	gv, err := schema.ParseGroupVersion(groupVersion)
+	if err != nil {
+		return err
+	}
+	if !knownGroupVersion(gv) {
+		return fmt.Errorf("invalid group version, allowed versions are %q", knownGroupVersions)
+	}
+	return nil
+}
+
+func knownGroupVersion(gv schema.GroupVersion) bool {
+	for _, knownGv := range knownGroupVersions {
+		if gv == knownGv {
+			return true
+		}
+	}
+	return false
 }
 
 func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
@@ -315,10 +322,60 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
 			" \"json\" indicates structured json format. Requires the 'AdvancedAuditing' feature"+
 			" gate. Known formats are "+strings.Join(pluginlog.AllowedFormats, ",")+".")
+	fs.StringVar(&o.GroupVersionString, "audit-log-version", o.GroupVersionString,
+		"API group and version used for serializing audit events written to log.")
+}
+
+func (o *AuditLogOptions) Validate() []error {
+	// Check whether the log backend is enabled based on the options.
+	if !o.enabled() {
+		return nil
+	}
+
+	var allErrors []error
+	if advancedAuditingEnabled() {
+		if err := validateBackendBatchOptions(pluginlog.PluginName, o.BatchOptions); err != nil {
+			allErrors = append(allErrors, err)
+		}
+
+		if err := validateGroupVersionString(o.GroupVersionString); err != nil {
+			allErrors = append(allErrors, err)
+		}
+
+		// Check log format
+		validFormat := false
+		for _, f := range pluginlog.AllowedFormats {
+			if f == o.Format {
+				validFormat = true
+				break
+			}
+		}
+		if !validFormat {
+			allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.Format, strings.Join(pluginlog.AllowedFormats, ",")))
+		}
+	}
+
+	// Check validities of MaxAge, MaxBackups and MaxSize of log options, if file log backend is enabled.
+	if o.MaxAge < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxage %v can't be a negative number", o.MaxAge))
+	}
+	if o.MaxBackups < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxbackup %v can't be a negative number", o.MaxBackups))
+	}
+	if o.MaxSize < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--audit-log-maxsize %v can't be a negative number", o.MaxSize))
+	}
+
+	return allErrors
+}
+
+// Check whether the log backend is enabled based on the options.
+func (o *AuditLogOptions) enabled() bool {
+	return o != nil && o.Path != ""
 }
 
 func (o *AuditLogOptions) getWriter() io.Writer {
-	if o.Path == "" {
+	if !o.enabled() {
 		return nil
 	}
 
@@ -336,7 +393,8 @@ func (o *AuditLogOptions) getWriter() io.Writer {
 
 func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
 	if w := o.getWriter(); w != nil {
-		log := pluginlog.NewBackend(w, o.Format, auditv1beta1.SchemeGroupVersion)
+		groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
+		log := pluginlog.NewBackend(w, o.Format, groupVersion)
 		c.AuditBackend = appendBackend(c.AuditBackend, o.BatchOptions.wrapBackend(log))
 	}
 	return nil
@@ -357,14 +415,39 @@ func (o *AuditWebhookOptions) AddFlags(fs *pflag.FlagSet) {
 		o.InitialBackoff, "The amount of time to wait before retrying the first failed request.")
 	fs.MarkDeprecated("audit-webhook-batch-initial-backoff",
 		"Deprecated, use --audit-webhook-initial-backoff instead.")
+	fs.StringVar(&o.GroupVersionString, "audit-webhook-version", o.GroupVersionString,
+		"API group and version used for serializing audit events written to webhook.")
 }
 
-func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
-	if o.ConfigFile == "" {
+func (o *AuditWebhookOptions) Validate() []error {
+	if !o.enabled() {
 		return nil
 	}
 
-	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, auditv1beta1.SchemeGroupVersion)
+	var allErrors []error
+	if advancedAuditingEnabled() {
+		if err := validateBackendBatchOptions(pluginwebhook.PluginName, o.BatchOptions); err != nil {
+			allErrors = append(allErrors, err)
+		}
+
+		if err := validateGroupVersionString(o.GroupVersionString); err != nil {
+			allErrors = append(allErrors, err)
+		}
+	}
+	return allErrors
+}
+
+func (o *AuditWebhookOptions) enabled() bool {
+	return o != nil && o.ConfigFile != ""
+}
+
+func (o *AuditWebhookOptions) applyTo(c *server.Config) error {
+	if !o.enabled() {
+		return nil
+	}
+
+	groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
+	webhook, err := pluginwebhook.NewBackend(o.ConfigFile, groupVersion, o.InitialBackoff)
 	if err != nil {
 		return fmt.Errorf("initializing audit webhook: %v", err)
 	}

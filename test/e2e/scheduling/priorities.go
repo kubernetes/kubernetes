@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type Resource struct {
@@ -152,7 +153,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		// Cleanup the replication controller when we are done.
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
-			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
+			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, rc.Name); err != nil {
 				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
 			}
 		}()
@@ -194,7 +195,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		By(fmt.Sprintf("Scale the RC: %s to len(nodeList.Item)-1 : %v.", rc.Name, len(nodeList.Items)-1))
 
-		framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
+		framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
 		testPods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{
 			LabelSelector: "name=scheduler-priority-avoid-pod",
 		})
@@ -376,7 +377,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 					Containers: []v1.Container{
 						{
 							Name:      rsName,
-							Image:     framework.GetPauseImageName(f.ClientSet),
+							Image:     imageutils.GetPauseImageName(),
 							Resources: *resource,
 						},
 					},

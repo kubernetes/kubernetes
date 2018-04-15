@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/arm/network"
 	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 
@@ -243,22 +243,24 @@ func (ss *scaleSet) GetPrimaryVMSetName() string {
 	return ss.Config.PrimaryScaleSetName
 }
 
-// GetIPByNodeName gets machine IP by node name.
-func (ss *scaleSet) GetIPByNodeName(nodeName, vmSetName string) (string, error) {
+// GetIPByNodeName gets machine private IP and public IP by node name.
+// TODO(feiskyer): Azure vmss doesn't support associating a public IP to single virtual machine yet,
+// fix this after it is supported.
+func (ss *scaleSet) GetIPByNodeName(nodeName, vmSetName string) (string, string, error) {
 	nic, err := ss.GetPrimaryInterface(nodeName, vmSetName)
 	if err != nil {
 		glog.Errorf("error: ss.GetIPByNodeName(%s), GetPrimaryInterface(%q, %q), err=%v", nodeName, nodeName, vmSetName, err)
-		return "", err
+		return "", "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
 		glog.Errorf("error: ss.GetIPByNodeName(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
-		return "", err
+		return "", "", err
 	}
 
 	targetIP := *ipConfig.PrivateIPAddress
-	return targetIP, nil
+	return targetIP, "", nil
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
@@ -545,7 +547,7 @@ func (ss *scaleSet) updateVMSSInstancesWithRetry(scaleSetName string, vmInstance
 
 // EnsureHostsInPool ensures the given Node's primary IP configurations are
 // participating in the specified LoadBalancer Backend Pool.
-func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string) error {
+func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
 	virtualMachineScaleSet, exists, err := ss.getScaleSetWithRetry(vmSetName)
 	if err != nil {
 		glog.Errorf("ss.getScaleSetWithRetry(%s) for service %q failed: %v", vmSetName, serviceName, err)

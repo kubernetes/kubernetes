@@ -33,7 +33,7 @@ var (
 	LeastRequestedPriorityMap = leastResourcePriority.PriorityMap
 )
 
-func leastResourceScorer(requested, allocable *schedulercache.Resource) int64 {
+func leastResourceScorer(requested, allocable *schedulercache.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
 	return (leastRequestedScore(requested.MilliCPU, allocable.MilliCPU) +
 		leastRequestedScore(requested.Memory, allocable.Memory)) / 2
 }

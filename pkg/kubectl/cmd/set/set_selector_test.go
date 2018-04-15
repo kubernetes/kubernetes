@@ -317,6 +317,8 @@ func TestGetResourcesAndSelector(t *testing.T) {
 
 func TestSelectorTest(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Version: ""},

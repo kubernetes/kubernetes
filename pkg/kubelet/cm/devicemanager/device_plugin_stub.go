@@ -17,13 +17,13 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
 	"path"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +34,10 @@ func (c *FakePolicy) Evictions(namespace string) internalversion.EvictionInterfa
 
 func (c *FakePolicy) PodDisruptionBudgets(namespace string) internalversion.PodDisruptionBudgetInterface {
 	return &FakePodDisruptionBudgets{c, namespace}
+}
+
+func (c *FakePolicy) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
+	return &FakePodSecurityPolicies{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -592,3 +592,30 @@ func Example_mergingEverythingNoConflicts() {
 	//   user:
 	//     token: red-token
 }
+
+func TestDeduplicate(t *testing.T) {
+	testCases := []struct {
+		src    []string
+		expect []string
+	}{
+		{
+			src:    []string{"a", "b", "c", "d", "e", "f"},
+			expect: []string{"a", "b", "c", "d", "e", "f"},
+		},
+		{
+			src:    []string{"a", "b", "c", "b", "e", "f"},
+			expect: []string{"a", "b", "c", "e", "f"},
+		},
+		{
+			src:    []string{"a", "a", "b", "b", "c", "b"},
+			expect: []string{"a", "b", "c"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		get := deduplicate(testCase.src)
+		if !reflect.DeepEqual(get, testCase.expect) {
+			t.Errorf("expect: %v, get: %v", testCase.expect, get)
+		}
+	}
+}

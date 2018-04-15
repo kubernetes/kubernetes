@@ -33,6 +33,7 @@ import (
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 	tf.DescriberVal = d
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -58,6 +59,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 
 	tf.DescriberVal = d
@@ -83,6 +85,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	d := &testDescriber{Output: "test output"}
@@ -118,6 +121,7 @@ func TestDescribeObject(t *testing.T) {
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	d := &testDescriber{Output: "test output"}
@@ -140,6 +144,7 @@ func TestDescribeListObjects(t *testing.T) {
 func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	d := &testDescriber{Output: "test output"}
@@ -163,6 +168,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	d := &testDescriber{Output: "test output"}
@@ -185,6 +191,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 
 func TestDescribeHelpMessage(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
 
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})

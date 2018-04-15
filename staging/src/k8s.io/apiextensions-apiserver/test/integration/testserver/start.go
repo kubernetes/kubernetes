@@ -90,7 +90,7 @@ func DefaultServerConfig() (*extensionsapiserver.Config, error) {
 
 func StartServer(config *extensionsapiserver.Config) (chan struct{}, *rest.Config, error) {
 	stopCh := make(chan struct{})
-	server, err := config.Complete().New(genericapiserver.EmptyDelegate)
+	server, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, nil, err
 	}

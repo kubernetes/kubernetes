@@ -127,7 +127,7 @@ kind: ConfigMap
 metadata:
   name: nginx-load-balancer-{{ juju_application }}-conf
 ---
-apiVersion: apps/v1beta2
+apiVersion: {{ daemonset_api_version }}
 kind: DaemonSet
 metadata:
   name: nginx-ingress-{{ juju_application }}-controller
@@ -152,7 +152,6 @@ spec:
       containers:
       - image: {{ ingress_image }}
         name: nginx-ingress-{{ juju_application }}
-        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz

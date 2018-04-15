@@ -197,3 +197,14 @@ func (f *FakeMounter) MakeFile(pathname string) error {
 func (f *FakeMounter) ExistsPath(pathname string) bool {
 	return false
 }
+
+func (f *FakeMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath string, cleanupAction func(), err error) {
+	return subPath.Path, nil, nil
+}
+
+func (f *FakeMounter) CleanSubPaths(podDir string, volumeName string) error {
+	return nil
+}
+func (mounter *FakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
+	return nil
+}

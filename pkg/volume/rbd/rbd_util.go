@@ -346,6 +346,8 @@ func (util *RBDUtil) rbdUnlock(b rbdMounter) error {
 		cmd, err = b.exec.Run("rbd", args...)
 		if err == nil {
 			glog.V(4).Infof("rbd: successfully remove lock (locker_id: %s) on image: %s/%s with id %s mon %s", lock_id, b.Pool, b.Image, b.Id, mon)
+		} else {
+			glog.Warningf("rbd: failed to remove lock (lock_id: %s) on image: %s/%s with id %s mon %s: %v", lock_id, b.Pool, b.Image, b.Id, mon, err)
 		}
 	}
 
@@ -372,7 +374,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	nbdToolsFound := false
 
 	if !mapped {
-		nbdToolsFound := checkRbdNbdTools(b.exec)
+		nbdToolsFound = checkRbdNbdTools(b.exec)
 		if nbdToolsFound {
 			devicePath, mapped = waitForPath(b.Pool, b.Image, 1 /*maxRetries*/, true /*useNbdDriver*/)
 		}

@@ -51,6 +51,7 @@ pkg_tar(
         "manifests/e2e-image-puller.manifest",
         "manifests/etcd.manifest",
         "manifests/glbc.manifest",
+        "manifests/kms-plugin-container.manifest",
         "manifests/kube-addon-manager.yaml",
         "manifests/kube-apiserver.manifest",
         "manifests/kube-controller-manager.manifest",

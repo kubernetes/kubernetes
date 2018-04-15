@@ -52,7 +52,7 @@ func AddNonDeprecatedPrinterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("template", "", "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
 	cmd.MarkFlagFilename("template")
 	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
-	cmd.Flags().BoolP("show-all", "a", true, "When printing, show all resources (default hide terminated pods.)")
+	cmd.Flags().BoolP("show-all", "a", true, "When printing, show all resources (default show all pods including terminated one.)")
 	cmd.Flags().MarkDeprecated("show-all", "will be removed in an upcoming release")
 }
 

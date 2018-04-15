@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -250,6 +249,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// This test checks that dynamic provisioning can provision a volume
 			// that can be used to persist data among pods.
 			tests := []storageClassTest{
+				// GCE/GKE
 				{
 					name:           "SSD PD on GCE/GKE",
 					cloudProviders: []string{"gce", "gke"},
@@ -377,6 +377,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					expectedSize:   "1.5Gi",
 					pvCheck:        nil,
 				},
+				// Azure
 				{
 					name:           "Azure disk volume with empty sku and location",
 					cloudProviders: []string{"azure"},
@@ -410,7 +411,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				testDynamicProvisioning(test, c, claim, class)
 			}
 
-			// Run the last test with storage.k8s.io/v1beta1 and beta annotation on pvc
+			// Run the last test with storage.k8s.io/v1beta1 on pvc
 			if betaTest != nil {
 				By("Testing " + betaTest.name + " with beta volume provisioning")
 				class := newBetaStorageClass(*betaTest, "beta")
@@ -420,9 +421,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				defer deleteStorageClass(c, class.Name)
 
 				claim := newClaim(*betaTest, ns, "beta")
-				claim.Annotations = map[string]string{
-					v1.BetaStorageClassAnnotation: class.Name,
-				}
+				claim.Spec.StorageClassName = &(class.Name)
 				testDynamicProvisioning(*betaTest, c, claim, nil)
 			}
 		})
@@ -692,14 +691,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				expectedSize: "1500Mi",
 			}
 			class := newStorageClass(test, ns, "external")
-			className := class.Name
 			claim := newClaim(test, ns, "external")
-			// the external provisioner understands Beta only right now, see
-			// https://github.com/kubernetes-incubator/external-storage/issues/37
-			// claim.Spec.StorageClassName = &className
-			claim.Annotations = map[string]string{
-				v1.BetaStorageClassAnnotation: className,
-			}
+			claim.Spec.StorageClassName = &(class.Name)
 
 			By("creating a claim with a external provisioning annotation")
 			testDynamicProvisioning(test, c, claim, class)
@@ -953,8 +946,7 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 	}
 }
 
-// TODO: remove when storage.k8s.io/v1beta1 and beta storage class annotations
-// are removed.
+// TODO: remove when storage.k8s.io/v1beta1 is removed.
 func newBetaStorageClass(t storageClassTest, suffix string) *storagebeta.StorageClass {
 	pluginName := t.provisioner
 
@@ -1063,7 +1055,7 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 			return true, err
 		}
 		for _, pv := range allPVs.Items {
-			if v1helper.GetPersistentVolumeClass(&pv) == scName {
+			if pv.Spec.StorageClassName == scName {
 				remainingPVs = append(remainingPVs, &pv)
 			}
 		}

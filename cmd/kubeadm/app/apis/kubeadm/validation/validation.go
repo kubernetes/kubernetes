@@ -214,7 +214,7 @@ func ValidateDiscoveryFile(discoveryFile string, fldPath *field.Path) field.Erro
 	}
 
 	if u.Scheme != "https" {
-		allErrs = append(allErrs, field.Invalid(fldPath, discoveryFile, "if an URL is used, the scheme must be https"))
+		allErrs = append(allErrs, field.Invalid(fldPath, discoveryFile, "if a URL is used, the scheme must be https"))
 	}
 	return allErrs
 }

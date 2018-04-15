@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -58,10 +59,6 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 	}
 }
 
-func getReaperForKind(c internalclientset.Interface, kind schema.GroupKind) (kubectl.Reaper, error) {
-	return kubectl.ReaperFor(kind, c)
-}
-
 func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, namespace, name string, options *metav1.DeleteOptions) error {
 	deleteFunc := func() (bool, error) {
 		err := deleteResource(c, kind, namespace, name, options)
@@ -76,8 +73,8 @@ func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, nam
 	return RetryWithExponentialBackOff(deleteFunc)
 }
 
-func DeleteResourceUsingReaperWithRetries(c internalclientset.Interface, kind schema.GroupKind, namespace, name string, options *metav1.DeleteOptions) error {
-	reaper, err := getReaperForKind(c, kind)
+func DeleteResourceUsingReaperWithRetries(c internalclientset.Interface, kind schema.GroupKind, namespace, name string, options *metav1.DeleteOptions, scaleClient scaleclient.ScalesGetter) error {
+	reaper, err := kubectl.ReaperFor(kind, c, scaleClient)
 	if err != nil {
 		return err
 	}

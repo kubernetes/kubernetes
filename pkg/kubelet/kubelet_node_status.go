@@ -302,8 +302,8 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
-		// TODO: ExternalID is deprecated, we'll have to drop this code
-		externalID, err := instances.ExternalID(context.TODO(), kl.nodeName)
+		// ExternalID is deprecated, so ProviderID is retrieved using InstanceID
+		externalID, err := instances.InstanceID(context.TODO(), kl.nodeName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get external ID from cloud provider: %v", err)
 		}
@@ -369,6 +369,7 @@ func (kl *Kubelet) syncNodeStatus() {
 
 // updateNodeStatus updates node status to master with retries.
 func (kl *Kubelet) updateNodeStatus() error {
+	glog.V(5).Infof("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			glog.Errorf("Error updating node status, will retry: %v", err)
@@ -538,14 +539,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	//       resources are being advertised.
 	if node.Status.Capacity == nil {
 		node.Status.Capacity = v1.ResourceList{}
-	}
-
-	// populate GPU capacity.
-	gpuCapacity := kl.gpuManager.Capacity()
-	if gpuCapacity != nil {
-		for k, v := range gpuCapacity {
-			node.Status.Capacity[k] = v
-		}
 	}
 
 	var devicePluginAllocatable v1.ResourceList
@@ -1049,7 +1042,8 @@ func (kl *Kubelet) setNodeVolumesInUseStatus(node *v1.Node) {
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *v1.Node) {
-	for _, f := range kl.setNodeStatusFuncs {
+	for i, f := range kl.setNodeStatusFuncs {
+		glog.V(5).Infof("Setting node status at position %v", i)
 		if err := f(node); err != nil {
 			glog.Warningf("Failed to set some node status fields: %s", err)
 		}

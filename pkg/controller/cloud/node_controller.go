@@ -84,7 +84,7 @@ func NewCloudNodeController(
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	} else {
 		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -417,11 +417,9 @@ func ensureNodeExistsByProviderIDOrExternalID(instances cloudprovider.Instances,
 	exists, err := instances.InstanceExistsByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {
 		providerIDErr := err
-		_, err = instances.ExternalID(context.TODO(), types.NodeName(node.Name))
+		_, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
+		//<anupn> Changing the check as InstanceID does not return error
 		if err == nil {
-			return true, nil
-		}
-		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
 

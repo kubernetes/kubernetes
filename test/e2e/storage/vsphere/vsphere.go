@@ -17,18 +17,19 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -57,7 +58,7 @@ type VolumeOptions struct {
 // GetDatacenter returns the DataCenter Object for the given datacenterPath
 func (vs *VSphere) GetDatacenter(ctx context.Context, datacenterPath string) (*object.Datacenter, error) {
 	Connect(ctx, vs)
-	finder := find.NewFinder(vs.Client.Client, true)
+	finder := find.NewFinder(vs.Client.Client, false)
 	return finder.Datacenter(ctx, datacenterPath)
 }
 
@@ -70,7 +71,7 @@ func (vs *VSphere) GetDatacenterFromObjectReference(ctx context.Context, dc obje
 // GetAllDatacenter returns all the DataCenter Objects
 func (vs *VSphere) GetAllDatacenter(ctx context.Context) ([]*object.Datacenter, error) {
 	Connect(ctx, vs)
-	finder := find.NewFinder(vs.Client.Client, true)
+	finder := find.NewFinder(vs.Client.Client, false)
 	return finder.DatacenterList(ctx, "*")
 }
 
@@ -88,7 +89,7 @@ func (vs *VSphere) GetVMByUUID(ctx context.Context, vmUUID string, dc object.Ref
 func (vs *VSphere) GetFolderByPath(ctx context.Context, dc object.Reference, folderPath string) (vmFolderMor types.ManagedObjectReference, err error) {
 	Connect(ctx, vs)
 	datacenter := object.NewDatacenter(vs.Client.Client, dc.Reference())
-	finder := find.NewFinder(datacenter.Client(), true)
+	finder := find.NewFinder(datacenter.Client(), false)
 	finder.SetDatacenter(datacenter)
 	vmFolder, err := finder.Folder(ctx, folderPath)
 	if err != nil {
@@ -113,7 +114,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *VolumeOptions, dataCenterRef type
 		return "", fmt.Errorf("datacenter is nil")
 	}
 	vs.initVolumeOptions(volumeOptions)
-	finder := find.NewFinder(datacenter.Client(), true)
+	finder := find.NewFinder(datacenter.Client(), false)
 	finder.SetDatacenter(datacenter)
 	ds, err := finder.Datastore(ctx, volumeOptions.Datastore)
 	if err != nil {

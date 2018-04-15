@@ -17,6 +17,7 @@ openapi_library(
         "pkg/kubelet/apis/kubeletconfig/v1beta1",
         "pkg/proxy/apis/kubeproxyconfig/v1alpha1",
         "pkg/version",
+        "vendor/github.com/kubernetes/repo-infra/kazel",
     ],
     tags = ["automanaged"],
     vendor_prefix = openapi_vendor_prefix,

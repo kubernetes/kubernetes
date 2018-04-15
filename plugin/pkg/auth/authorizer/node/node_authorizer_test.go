@@ -26,6 +26,7 @@ import (
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -72,8 +73,8 @@ func TestAuthorizer(t *testing.T) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	pods, pvs, attachments := generate(opts)
-	populate(g, pods, pvs, attachments)
+	nodes, pods, pvs, attachments := generate(opts)
+	populate(g, nodes, pods, pvs, attachments)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*NodeAuthorizer)
@@ -86,6 +87,11 @@ func TestAuthorizer(t *testing.T) {
 		expect   authorizer.Decision
 		features utilfeature.FeatureGate
 	}{
+		{
+			name:   "allowed node configmap",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node0-configmap", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
@@ -117,6 +123,11 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 
+		{
+			name:   "disallowed node configmap",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node1-configmap", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
+		},
 		{
 			name:   "disallowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
@@ -247,9 +258,14 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		},
 	})
 
+	g.SetNodeConfigMap("node1", "shared-configmap", "ns1")
+	g.SetNodeConfigMap("node2", "shared-configmap", "ns1")
+	g.SetNodeConfigMap("node3", "configmap", "ns1")
+
 	testcases := []struct {
 		User          user.Info
 		Secret        string
+		ConfigMap     string
 		ExpectAllowed bool
 	}{
 		{User: node1, ExpectAllowed: true, Secret: "node1-only"},
@@ -263,14 +279,39 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		{User: node3, ExpectAllowed: false, Secret: "node1-only"},
 		{User: node3, ExpectAllowed: false, Secret: "node1-node2-only"},
 		{User: node3, ExpectAllowed: true, Secret: "shared-all"},
+
+		{User: node1, ExpectAllowed: true, ConfigMap: "shared-configmap"},
+		{User: node1, ExpectAllowed: false, ConfigMap: "configmap"},
+
+		{User: node2, ExpectAllowed: true, ConfigMap: "shared-configmap"},
+		{User: node2, ExpectAllowed: false, ConfigMap: "configmap"},
+
+		{User: node3, ExpectAllowed: false, ConfigMap: "shared-configmap"},
+		{User: node3, ExpectAllowed: true, ConfigMap: "configmap"},
 	}
 
 	for i, tc := range testcases {
-		decision, _, err := authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
+		var (
+			decision authorizer.Decision
+			err      error
+		)
+
+		if len(tc.Secret) > 0 {
+			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+		} else if len(tc.ConfigMap) > 0 {
+			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+		} else {
+			t.Fatalf("test case must include a request for a Secret or ConfigMap")
 		}
+
 		if (decision == authorizer.DecisionAllow) != tc.ExpectAllowed {
 			t.Errorf("%d: expected %v, got %v", i, tc.ExpectAllowed, decision)
 		}
@@ -309,12 +350,12 @@ func BenchmarkPopulationAllocation(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	pods, pvs, attachments := generate(opts)
+	nodes, pods, pvs, attachments := generate(opts)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, pods, pvs, attachments)
+		populate(g, nodes, pods, pvs, attachments)
 	}
 }
 
@@ -340,14 +381,14 @@ func BenchmarkPopulationRetention(b *testing.B) {
 		uniquePVCsPerPod:       1,
 	}
 
-	pods, pvs, attachments := generate(opts)
+	nodes, pods, pvs, attachments := generate(opts)
 	// Garbage collect before the first iteration
 	runtime.GC()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		g := NewGraph()
-		populate(g, pods, pvs, attachments)
+		populate(g, nodes, pods, pvs, attachments)
 
 		if i == 0 {
 			f, _ := os.Create("BenchmarkPopulationRetention.profile")
@@ -375,8 +416,8 @@ func BenchmarkAuthorization(b *testing.B) {
 		sharedPVCsPerPod:       0,
 		uniquePVCsPerPod:       1,
 	}
-	pods, pvs, attachments := generate(opts)
-	populate(g, pods, pvs, attachments)
+	nodes, pods, pvs, attachments := generate(opts)
+	populate(g, nodes, pods, pvs, attachments)
 
 	identifier := nodeidentifier.NewDefaultNodeIdentifier()
 	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules()).(*NodeAuthorizer)
@@ -389,6 +430,11 @@ func BenchmarkAuthorization(b *testing.B) {
 		expect   authorizer.Decision
 		features utilfeature.FeatureGate
 	}{
+		{
+			name:   "allowed node configmap",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node0-configmap", Namespace: "ns0"},
+			expect: authorizer.DecisionAllow,
+		},
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
@@ -403,6 +449,12 @@ func BenchmarkAuthorization(b *testing.B) {
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
 			expect: authorizer.DecisionAllow,
+		},
+
+		{
+			name:   "disallowed node configmap",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "node1-configmap", Namespace: "ns0"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed configmap",
@@ -467,9 +519,12 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
+func populate(graph *Graph, nodes []*api.Node, pods []*api.Pod, pvs []*api.PersistentVolume, attachments []*storagev1beta1.VolumeAttachment) {
 	p := &graphPopulator{}
 	p.graph = graph
+	for _, node := range nodes {
+		p.addNode(node)
+	}
 	for _, pod := range pods {
 		p.addPod(pod)
 	}
@@ -485,7 +540,8 @@ func populate(graph *Graph, pods []*api.Pod, pvs []*api.PersistentVolume, attach
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
+func generate(opts sampleDataOpts) ([]*api.Node, []*api.Pod, []*api.PersistentVolume, []*storagev1beta1.VolumeAttachment) {
+	nodes := make([]*api.Node, 0, opts.nodes)
 	pods := make([]*api.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*api.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1beta1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
@@ -552,6 +608,20 @@ func generate(opts sampleDataOpts) ([]*api.Pod, []*api.PersistentVolume, []*stor
 			attachment.Spec.NodeName = nodeName
 			attachments = append(attachments, attachment)
 		}
+
+		name := fmt.Sprintf("%s-configmap", nodeName)
+		nodes = append(nodes, &api.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: nodeName},
+			Spec: api.NodeSpec{
+				ConfigSource: &api.NodeConfigSource{
+					ConfigMapRef: &api.ObjectReference{
+						Name:      name,
+						Namespace: "ns0",
+						UID:       types.UID(fmt.Sprintf("ns0-%s", name)),
+					},
+				},
+			},
+		})
 	}
-	return pods, pvs, attachments
+	return nodes, pods, pvs, attachments
 }

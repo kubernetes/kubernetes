@@ -255,7 +255,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+			glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
@@ -265,7 +265,7 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 			}
 			notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
+				glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 				return err
 			}
 			if !notMnt {

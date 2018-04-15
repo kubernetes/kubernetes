@@ -104,6 +104,7 @@ const (
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
+	cleanFlagSet.SetNormalizeFunc(flag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
 	kubeletConfig, err := options.NewKubeletConfiguration()
 	// programmer error
@@ -228,6 +229,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			}
 
 			// run the kubelet
+			glog.V(5).Infof("KubeletConfiguration: %#v", kubeletServer.KubeletConfiguration)
 			if err := Run(kubeletServer, kubeletDeps); err != nil {
 				glog.Fatal(err)
 			}
@@ -357,7 +359,6 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		ExternalKubeClient:  nil,
 		EventClient:         nil,
 		Mounter:             mounter,
-		NetworkPlugins:      ProbeNetworkPlugins(s.CNIConfDir, s.CNIBinDir),
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		Writer:              writer,
@@ -660,6 +661,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 				ExperimentalCPUManagerPolicy:          s.CPUManagerPolicy,
 				ExperimentalCPUManagerReconcilePeriod: s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalPodPidsLimit:              s.PodPidsLimit,
+				EnforceCPULimits:                      s.CPUCFSQuota,
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,
@@ -1109,15 +1111,13 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 
 	// Initialize network plugin settings.
-	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:       kubeletconfiginternal.HairpinMode(c.HairpinMode),
-		NonMasqueradeCIDR: f.NonMasqueradeCIDR,
-		PluginName:        r.NetworkPluginName,
-		PluginConfDir:     r.CNIConfDir,
-		PluginBinDir:      r.CNIBinDir,
-		MTU:               int(r.NetworkPluginMTU),
-		LegacyRuntimeHost: nh,
+		HairpinMode:        kubeletconfiginternal.HairpinMode(c.HairpinMode),
+		NonMasqueradeCIDR:  f.NonMasqueradeCIDR,
+		PluginName:         r.NetworkPluginName,
+		PluginConfDir:      r.CNIConfDir,
+		PluginBinDirString: r.CNIBinDir,
+		MTU:                int(r.NetworkPluginMTU),
 	}
 
 	// Initialize streaming configuration. (Not using TLS now)

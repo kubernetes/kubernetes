@@ -102,9 +102,13 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	fs.Parse(customFlags)
+	completedOptions, err := app.Complete(s)
+	if err != nil {
+		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
+	}
 
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-	server, err := app.CreateServerChain(s, stopCh)
+	server, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 

@@ -321,38 +321,44 @@ func TestLabelErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		tf := cmdtesting.NewTestFactory()
-		tf.Namespace = "test"
-		tf.ClientConfigVal = defaultClientConfig()
+		t.Run(k, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdLabel(tf, buf)
-		cmd.SetOutput(buf)
+			tf.Namespace = "test"
+			tf.ClientConfigVal = defaultClientConfig()
 
-		for k, v := range testCase.flags {
-			cmd.Flags().Set(k, v)
-		}
-		opts := LabelOptions{}
-		err := opts.Complete(buf, cmd, testCase.args)
-		if err == nil {
-			err = opts.Validate()
-		}
-		if err == nil {
-			err = opts.RunLabel(tf, cmd)
-		}
-		if !testCase.errFn(err) {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
-		if buf.Len() > 0 {
-			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
-		}
+			buf := bytes.NewBuffer([]byte{})
+			cmd := NewCmdLabel(tf, buf, buf)
+			cmd.SetOutput(buf)
+
+			for k, v := range testCase.flags {
+				cmd.Flags().Set(k, v)
+			}
+			opts := LabelOptions{}
+			err := opts.Complete(buf, cmd, testCase.args)
+			if err == nil {
+				err = opts.Validate()
+			}
+			if err == nil {
+				err = opts.RunLabel(tf, cmd)
+			}
+			if !testCase.errFn(err) {
+				t.Errorf("%s: unexpected error: %v", k, err)
+				return
+			}
+			if buf.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+			}
+		})
 	}
 }
 
 func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -385,7 +391,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf)
+	cmd := NewCmdLabel(tf, buf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}}}
 	err := opts.Complete(buf, cmd, []string{"a=b"})
@@ -405,6 +411,8 @@ func TestLabelForResourceFromFile(t *testing.T) {
 
 func TestLabelLocal(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -416,7 +424,7 @@ func TestLabelLocal(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf)
+	cmd := NewCmdLabel(tf, buf, buf)
 	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
 		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
 		local: true}
@@ -438,6 +446,8 @@ func TestLabelLocal(t *testing.T) {
 func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -472,8 +482,8 @@ func TestLabelMultipleObjects(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf)
 	opts := LabelOptions{all: true}
+	cmd := NewCmdLabel(tf, buf, buf)
 	err := opts.Complete(buf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()

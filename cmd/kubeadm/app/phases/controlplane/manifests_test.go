@@ -776,6 +776,29 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
+				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
+				CertificatesDir:            testCertsDir,
+				KubernetesVersion:          "v1.7.0",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--allocate-node-cidrs=true",
+				"--cluster-cidr=10.0.1.15/16",
+				"--node-cidr-mask-size=20",
+			},
+		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "2001:db8::/64"},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: "v1.7.0",

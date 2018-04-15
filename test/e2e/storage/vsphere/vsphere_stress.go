@@ -128,7 +128,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 	for iterationCount := 0; iterationCount < iterations; iterationCount++ {
 		logPrefix := fmt.Sprintf("Instance: [%v], Iteration: [%v] :", instanceId, iterationCount+1)
 		By(fmt.Sprintf("%v Creating PVC using the Storage Class: %v", logPrefix, sc.Name))
-		pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "1Gi", sc))
+		pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "1Gi", sc))
 		Expect(err).NotTo(HaveOccurred())
 		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 

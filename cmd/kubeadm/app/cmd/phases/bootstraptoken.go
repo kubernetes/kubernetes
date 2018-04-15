@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -316,19 +317,20 @@ func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfg
 		return err
 	}
 
+	glog.V(1).Infoln("[bootstraptoken] creating/updating token")
 	// Creates or updates the token
 	if err := node.UpdateOrCreateToken(client, internalcfg.Token, false, internalcfg.TokenTTL.Duration, internalcfg.TokenUsages, internalcfg.TokenGroups, description); err != nil {
 		return err
 	}
 
-	fmt.Println("[bootstraptoken] Bootstrap token Created")
-	fmt.Println("[bootstraptoken] You can now join any number of machines by running:")
+	glog.Infoln("[bootstraptoken] bootstrap token created")
+	glog.Infoln("[bootstraptoken] you can now join any number of machines by running:")
 
 	joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.Token, skipTokenPrint)
 	if err != nil {
 		return fmt.Errorf("failed to get join command: %v", err)
 	}
-	fmt.Println(joinCommand)
+	glog.Infoln(joinCommand)
 
 	return nil
 }

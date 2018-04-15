@@ -25,8 +25,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
@@ -63,6 +65,7 @@ type OIDCAuthenticationOptions struct {
 	GroupsClaim    string
 	GroupsPrefix   string
 	SigningAlgs    []string
+	RequiredClaims map[string]string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -222,6 +225,11 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Comma-separated list of allowed JOSE asymmetric signing algorithms. JWTs with a "+
 			"'alg' header value not in this list will be rejected. "+
 			"Values are defined by RFC 7518 https://tools.ietf.org/html/rfc7518#section-3.1.")
+
+		fs.Var(flag.NewMapStringStringNoSplit(&s.OIDC.RequiredClaims), "oidc-required-claim", ""+
+			"A key=value pair that describes a required claim in the ID Token. "+
+			"If set, the claim is verified to be present in the ID Token with a matching value. "+
+			"Repeat this flag to specify multiple claims.")
 	}
 
 	if s.PasswordFile != nil {
@@ -297,6 +305,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCUsernameClaim = s.OIDC.UsernameClaim
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
 		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
+		ret.OIDCRequiredClaims = s.OIDC.RequiredClaims
 	}
 
 	if s.PasswordFile != nil {
@@ -365,17 +374,8 @@ func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltIn
 
 	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
 	// in such a case the AnonymousAuth is stomped to false and you get a message
-	if o.Anonymous.Allow {
-		found := false
-		for _, mode := range strings.Split(authorization.Mode, ",") {
-			if mode == authzmodes.ModeAlwaysAllow {
-				found = true
-				break
-			}
-		}
-		if found {
-			glog.Warningf("AnonymousAuth is not allowed with the AllowAll authorizer.  Resetting AnonymousAuth to false. You should use a different authorizer")
-			o.Anonymous.Allow = false
-		}
+	if o.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
+		glog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
+		o.Anonymous.Allow = false
 	}
 }

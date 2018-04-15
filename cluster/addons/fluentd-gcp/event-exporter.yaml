@@ -29,11 +29,11 @@ subjects:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: event-exporter-v0.1.8
+  name: event-exporter-v0.1.9
   namespace: kube-system
   labels:
     k8s-app: event-exporter
-    version: v0.1.8
+    version: v0.1.9
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
@@ -42,12 +42,12 @@ spec:
     metadata:
       labels:
         k8s-app: event-exporter
-        version: v0.1.8
+        version: v0.1.9
     spec:
       serviceAccountName: event-exporter-sa
       containers:
       - name: event-exporter
-        image: k8s.gcr.io/event-exporter:v0.1.8
+        image: k8s.gcr.io/event-exporter:v0.1.9
         command:
         - /event-exporter
         - -sink-opts=-location={{ event_exporter_zone }}

@@ -583,6 +583,13 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			stageUnstageSet: true,
 		},
 		{
+			testName:        "no volID",
+			volID:           "",
+			deviceMountPath: "/tmp/csi-test049507108/plugins/csi/pv/test-pv-name/globalmount",
+			stageUnstageSet: true,
+			shouldFail:      true,
+		},
+		{
 			testName:        "no device mount path",
 			volID:           "project/zone/test-vol1",
 			deviceMountPath: "",

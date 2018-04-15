@@ -1,3 +1,9 @@
+# This ConfigMap is used to ingest logs against new resources like
+# "k8s_container" and "k8s_node" when $LOGGING_STACKDRIVER_RESOURCE_TYPES is set
+# to "new".
+# When $LOGGING_STACKDRIVER_RESOURCE_TYPES is set to "old", the ConfigMap in
+# fluentd-gcp-configmap-old.yaml will be used for ingesting logs against old
+# resources like "gke_container" and "gce_instance".
 kind: ConfigMap
 apiVersion: v1
 data:
@@ -17,29 +23,34 @@ data:
     #  "stream":"stderr",
     #   "time":"2014-09-25T21:15:03.499185026Z"}
     #
-    # The record reformer is used to write the tag to focus on the pod name
-    # and the Kubernetes container name. For example a Docker container's logs
-    # might be in the directory:
+    # The original tag is derived from the log file's location.
+    # For example a Docker container's logs might be in the directory:
     #  /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b
     # and in the file:
     #  997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
     # where 997599971ee6... is the Docker ID of the running container.
-    # The Kubernetes kubelet makes a symbolic link to this file on the host machine
-    # in the /var/log/containers directory which includes the pod name and the Kubernetes
-    # container name:
-    #    synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+    # The Kubernetes kubelet makes a symbolic link to this file on the host
+    # machine in the /var/log/containers directory which includes the pod name,
+    # the namespace name and the Kubernetes container name:
+    #    synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
     #    ->
     #    /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
     # The /var/log directory on the host is mapped to the /var/log directory in the container
     # running this instance of Fluentd and we end up collecting the file:
-    #   /var/log/containers/synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+    #   /var/log/containers/synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
     # This results in the tag:
-    #  var.log.containers.synthetic-logger-0.25lps-pod_default-synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
-    # The record reformer is used is discard the var.log.containers prefix and
-    # the Docker container ID suffix and "kubernetes." is pre-pended giving the tag:
-    #   kubernetes.synthetic-logger-0.25lps-pod_default-synth-lgr
-    # Tag is then parsed by google_cloud plugin and translated to the metadata,
-    # visible in the log viewer
+    #  var.log.containers.synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+    # where 'synthetic-logger-0.25lps-pod' is the pod name, 'default' is the
+    # namespace name, 'synth-lgr' is the container name and '997599971ee6..' is
+    # the container ID.
+    # The record reformer is used to extract pod_name, namespace_name and
+    # container_name from the tag and set them in a local_resource_id in the
+    # format of:
+    # 'k8s_container.<NAMESPACE_NAME>.<POD_NAME>.<CONTAINER_NAME>'.
+    # The reformer also changes the tags to 'stderr' or 'stdout' based on the
+    # value of 'stream'.
+    # local_resource_id is later used by google_cloud plugin to determine the
+    # monitored resource to ingest logs against.
 
     # Json Log Example:
     # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
@@ -49,27 +60,21 @@ data:
       @type tail
       path /var/log/containers/*.log
       pos_file /var/log/gcp-containers.log.pos
+      # Tags at this point are in the format of:
+      # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
       tag reform.*
       read_from_head true
-      format none
+      format multi_format
+      <pattern>
+        format json
+        time_key time
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </pattern>
+      <pattern>
+        format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+        time_format %Y-%m-%dT%H:%M:%S.%N%:z
+      </pattern>
     </source>
-
-    <filter reform.**>
-      @type parser
-      key_name message
-      <parse>
-        @type multi_format
-        <pattern>
-          format json
-          time_key time
-          time_format %Y-%m-%dT%H:%M:%S.%NZ
-        </pattern>
-        <pattern>
-          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
-          time_format %Y-%m-%dT%H:%M:%S.%N%:z
-        </pattern>
-      </parse>
-    </filter>
 
     <filter reform.**>
       @type parser
@@ -83,11 +88,23 @@ data:
     <match reform.**>
       @type record_reformer
       enable_ruby true
-      tag raw.kubernetes.${tag_suffix[4].split('-')[0..-2].join('-')}
+      <record>
+        # Extract local_resource_id from tag for 'k8s_container' monitored
+        # resource. The format is:
+        # 'k8s_container.<namespace_name>.<pod_name>.<container_name>'.
+        "logging.googleapis.com/local_resource_id" ${"k8s_container.#{tag_suffix[4].rpartition('.')[0].split('_')[1]}.#{tag_suffix[4].rpartition('.')[0].split('_')[0]}.#{tag_suffix[4].rpartition('.')[0].split('_')[2].rpartition('-')[0]}"}
+        # Rename the field 'log' to a more generic field 'message'. This way the
+        # fluent-plugin-google-cloud knows to flatten the field as textPayload
+        # instead of jsonPayload after extracting 'time', 'severity' and
+        # 'stream' from the record.
+        message ${record['log']}
+      </record>
+      tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
+      remove_keys stream,log
     </match>
 
     # Detect exceptions in the log output and forward them as one log entry.
-    <match raw.kubernetes.**>
+    <match {raw.stderr,raw.stdout}>
       @type detect_exceptions
 
       remove_tag_prefix raw
@@ -282,6 +299,25 @@ data:
       read_from_head true
       tag node-problem-detector
     </source>
+
+    # BEGIN_NODE_JOURNAL
+    # Whether to include node-journal or not is determined when starting the
+    # cluster. It is not changed when the cluster is already running.
+    <source>
+      @type systemd
+      pos_file /var/log/gcp-journald.pos
+      read_from_head true
+      tag node-journal
+    </source>
+
+    <filter node-journal>
+      @type grep
+      <exclude>
+        key _SYSTEMD_UNIT
+        pattern ^(docker|{{ container_runtime }}|kubelet|node-problem-detector)\.service$
+      </exclude>
+    </filter>
+    # END_NODE_JOURNAL
   monitoring.conf: |-
     # This source is used to acquire approximate process start timestamp,
     # which purpose is explained before the corresponding output plugin.
@@ -331,23 +367,30 @@ data:
       </metric>
     </filter>
 
+    # This section is exclusive for k8s_container logs. Those come with
+    # 'stderr'/'stdout' tags.
     # TODO(instrumentation): Reconsider this workaround later.
     # Trim the entries which exceed slightly less than 100KB, to avoid
     # dropping them. It is a necessity, because Stackdriver only supports
     # entries that are up to 100KB in size.
-    <filter kubernetes.**>
+    <filter {stderr,stdout}>
       @type record_transformer
       enable_ruby true
       <record>
-        log ${record['log'].length > 100000 ? "[Trimmed]#{record['log'][0..100000]}..." : record['log']}
+        message ${record['message'].length > 100000 ? "[Trimmed]#{record['message'][0..100000]}..." : record['message']}
       </record>
     </filter>
 
-    # We use 2 output stanzas - one to handle the container logs and one to handle
-    # the node daemon logs, the latter of which explicitly sends its logs to the
-    # compute.googleapis.com service rather than container.googleapis.com to keep
-    # them separate since most users don't care about the node logs.
-    <match kubernetes.**>
+    # Do not collect fluentd's own logs to avoid infinite loops.
+    <match fluent.**>
+      @type null
+    </match>
+
+    # This section is exclusive for k8s_container logs. These logs come with
+    # 'stderr'/'stdout' tags.
+    # We use a separate output stanza for 'k8s_node' logs with a smaller buffer
+    # because node logs are less important than user's container logs.
+    <match {stderr,stdout}>
       @type google_cloud
 
       # Try to detect JSON formatted log entries.
@@ -377,15 +420,24 @@ data:
       disable_retry_limit
       # Use multiple threads for processing.
       num_threads 2
-      labels {
-        # The logging backend will take responsibility for double writing to
-        # the necessary resource types when this label is set.
-        "logging.googleapis.com/k8s_compatibility": "true"
-      }
+      use_grpc true
+      # Use Metadata Agent to get monitored resource.
+      enable_metadata_agent true
     </match>
 
-    # Keep a smaller buffer here since these logs are less important than the user's
-    # container logs.
+    # Attach local_resource_id for 'k8s_node' monitored resource.
+    <filter **>
+      @type record_transformer
+      enable_ruby true
+      <record>
+        "logging.googleapis.com/local_resource_id" ${"k8s_node.#{ENV['NODE_NAME']}"}
+      </record>
+    </filter>
+
+    # This section is exclusive for 'k8s_node' logs. These logs come with tags
+    # that are neither 'stderr' or 'stdout'.
+    # We use a separate output stanza for 'k8s_container' logs with a larger
+    # buffer because user's container logs are more important than node logs.
     <match **>
       @type google_cloud
 
@@ -404,14 +456,12 @@ data:
       max_retry_wait 30
       disable_retry_limit
       num_threads 2
-      labels {
-        # The logging backend will take responsibility for double writing to
-        # the necessary resource types when this label is set.
-        "logging.googleapis.com/k8s_compatibility": "true"
-      }
+      use_grpc true
+      # Use Metadata Agent to get monitored resource.
+      enable_metadata_agent true
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.4
+  name: fluentd-gcp-config-v1.2.5
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

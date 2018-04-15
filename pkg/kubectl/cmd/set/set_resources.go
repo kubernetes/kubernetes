@@ -21,6 +21,8 @@ import (
 	"io"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 
@@ -61,6 +63,8 @@ var (
 type ResourcesOptions struct {
 	resource.FilenameOptions
 
+	PrintFlags *printers.PrintFlags
+
 	Infos             []*resource.Info
 	Out               io.Writer
 	Err               io.Writer
@@ -73,6 +77,10 @@ type ResourcesOptions struct {
 	Local             bool
 	Cmd               *cobra.Command
 
+	DryRun bool
+
+	PrintObj printers.ResourcePrinterFunc
+
 	Limits               string
 	Requests             string
 	ResourceRequirements v1.ResourceRequirements
@@ -81,11 +89,20 @@ type ResourcesOptions struct {
 	Resources              []string
 }
 
-func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &ResourcesOptions{
-		Out: out,
-		Err: errOut,
+// NewResourcesOptions returns a ResourcesOptions indicating all containers in the selected
+// pod templates are selected by default.
+func NewResourcesOptions(out io.Writer, errOut io.Writer) *ResourcesOptions {
+	return &ResourcesOptions{
+		PrintFlags: printers.NewPrintFlags("resource requirements updated"),
+
+		Out:               out,
+		Err:               errOut,
+		ContainerSelector: "*",
 	}
+}
+
+func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+	options := NewResourcesOptions(out, errOut)
 
 	resourceTypesWithPodTemplate := []string{}
 	for _, resource := range f.SuggestedPodTemplateResources() {
@@ -105,14 +122,15 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 		},
 	}
 
-	cmdutil.AddPrinterFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
+
 	//usage := "Filename, directory, or URL to a file identifying the resource to get from the server"
 	//kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", options.ContainerSelector, "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
 	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, set resources will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -128,6 +146,16 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command(cmd, false)
 	o.Cmd = cmd
+	o.DryRun = cmdutil.GetDryRunFlag(o.Cmd)
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -231,8 +259,8 @@ func (o *ResourcesOptions) Run() error {
 			continue
 		}
 
-		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			if err := cmdutil.PrintObject(o.Cmd, patch.Info.AsVersioned(), o.Out); err != nil {
+		if o.Local || o.DryRun {
+			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -255,14 +283,9 @@ func (o *ResourcesOptions) Run() error {
 		}
 		info.Refresh(obj, true)
 
-		shortOutput := o.Output == "name"
-		if len(o.Output) > 0 && !shortOutput {
-			if err := cmdutil.PrintObject(o.Cmd, info.AsVersioned(), o.Out); err != nil {
-				return err
-			}
-			continue
+		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

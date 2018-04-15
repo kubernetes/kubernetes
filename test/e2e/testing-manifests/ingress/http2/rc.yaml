@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: echoheaders
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: echoheaders
+    spec:
+      containers:
+      - name: echoheaders
+        image: k8s.gcr.io/echoserver:1.10
+        ports:
+        - containerPort: 8443

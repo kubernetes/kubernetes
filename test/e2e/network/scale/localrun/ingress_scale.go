@@ -106,11 +106,7 @@ func main() {
 	}
 
 	// Initializing a GCE client.
-	gceAlphaFeatureGate, err := gcecloud.NewAlphaFeatureGate([]string{})
-	if err != nil {
-		glog.Errorf("Encountered error for creating alpha feature gate: %v", err)
-		os.Exit(1)
-	}
+	gceAlphaFeatureGate := gcecloud.NewAlphaFeatureGate([]string{})
 	gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
 		ProjectID:        cloudConfig.ProjectID,
 		Region:           cloudConfig.Region,

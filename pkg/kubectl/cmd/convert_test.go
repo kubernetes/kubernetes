@@ -102,6 +102,8 @@ func TestConvertObject(t *testing.T) {
 		for _, field := range tc.fields {
 			t.Run(fmt.Sprintf("%s %s", tc.name, field), func(t *testing.T) {
 				tf := cmdtesting.NewTestFactory()
+				defer tf.Cleanup()
+
 				tf.UnstructuredClient = &fake.RESTClient{
 					Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

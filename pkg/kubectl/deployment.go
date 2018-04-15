@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -28,7 +29,7 @@ import (
 )
 
 // BaseDeploymentGenerator: implement the common functionality of
-// DeploymentBasicGeneratorV1 and DeploymentBasicAppsGeneratorV1. To reduce
+// DeploymentBasicGeneratorV1, DeploymentBasicAppsGeneratorV1Beta1 and DeploymentBasicAppsGeneratorV1. To reduce
 // confusion, it's best to keep this struct in the same file as those
 // generators.
 type BaseDeploymentGenerator struct {
@@ -78,7 +79,8 @@ func buildPodSpec(images []string) v1.PodSpec {
 		// Remove any tag or hash
 		if strings.Contains(name, ":") {
 			name = strings.Split(name, ":")[0]
-		} else if strings.Contains(name, "@") {
+		}
+		if strings.Contains(name, "@") {
 			name = strings.Split(name, "@")[0]
 		}
 		podSpec.Containers = append(podSpec.Containers, v1.Container{Name: name, Image: imageString})
@@ -116,7 +118,37 @@ func (s *DeploymentBasicGeneratorV1) StructuredGenerate() (runtime.Object, error
 	}, err
 }
 
-// DeploymentBasicAppsGeneratorV1 supports stable generation of a deployment under apps/v1beta1 endpoint
+// DeploymentBasicAppsGeneratorV1Beta1 supports stable generation of a deployment under apps/v1beta1 endpoint
+type DeploymentBasicAppsGeneratorV1Beta1 struct {
+	BaseDeploymentGenerator
+}
+
+// Ensure it supports the generator pattern that uses parameters specified during construction
+var _ StructuredGenerator = &DeploymentBasicAppsGeneratorV1Beta1{}
+
+// StructuredGenerate outputs a deployment object using the configured fields
+func (s *DeploymentBasicAppsGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
+	podSpec, labels, selector, err := s.structuredGenerate()
+	one := int32(1)
+	return &appsv1beta1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   s.Name,
+			Labels: labels,
+		},
+		Spec: appsv1beta1.DeploymentSpec{
+			Replicas: &one,
+			Selector: &selector,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: podSpec,
+			},
+		},
+	}, err
+}
+
+// DeploymentBasicAppsGeneratorV1 supports stable generation of a deployment under apps/v1 endpoint
 type DeploymentBasicAppsGeneratorV1 struct {
 	BaseDeploymentGenerator
 }
@@ -128,12 +160,12 @@ var _ StructuredGenerator = &DeploymentBasicAppsGeneratorV1{}
 func (s *DeploymentBasicAppsGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	podSpec, labels, selector, err := s.structuredGenerate()
 	one := int32(1)
-	return &appsv1beta1.Deployment{
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   s.Name,
 			Labels: labels,
 		},
-		Spec: appsv1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &one,
 			Selector: &selector,
 			Template: v1.PodTemplateSpec{

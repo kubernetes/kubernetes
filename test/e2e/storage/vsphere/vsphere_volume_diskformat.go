@@ -17,13 +17,14 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
-	"golang.org/x/net/context"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -112,7 +113,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass)
+	pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass)
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
 	Expect(err).NotTo(HaveOccurred())
 

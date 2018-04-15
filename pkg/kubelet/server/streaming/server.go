@@ -25,8 +25,8 @@ import (
 	"path"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	restful "github.com/emicklei/go-restful"
 
@@ -160,15 +160,15 @@ type server struct {
 
 func validateExecRequest(req *runtimeapi.ExecRequest) error {
 	if req.ContainerId == "" {
-		return grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+		return status.Errorf(codes.InvalidArgument, "missing required container_id")
 	}
 	if req.Tty && req.Stderr {
 		// If TTY is set, stderr cannot be true because multiplexing is not
 		// supported.
-		return grpc.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
+		return status.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
 	}
 	if !req.Stdin && !req.Stdout && !req.Stderr {
-		return grpc.Errorf(codes.InvalidArgument, "one of stdin, stdout, or stderr must be set")
+		return status.Errorf(codes.InvalidArgument, "one of stdin, stdout, or stderr must be set")
 	}
 	return nil
 }
@@ -188,15 +188,15 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 
 func validateAttachRequest(req *runtimeapi.AttachRequest) error {
 	if req.ContainerId == "" {
-		return grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+		return status.Errorf(codes.InvalidArgument, "missing required container_id")
 	}
 	if req.Tty && req.Stderr {
 		// If TTY is set, stderr cannot be true because multiplexing is not
 		// supported.
-		return grpc.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
+		return status.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
 	}
 	if !req.Stdin && !req.Stdout && !req.Stderr {
-		return grpc.Errorf(codes.InvalidArgument, "one of stdin, stdout, and stderr must be set")
+		return status.Errorf(codes.InvalidArgument, "one of stdin, stdout, and stderr must be set")
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachRes
 
 func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	if req.PodSandboxId == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "missing required pod_sandbox_id")
+		return nil, status.Errorf(codes.InvalidArgument, "missing required pod_sandbox_id")
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {

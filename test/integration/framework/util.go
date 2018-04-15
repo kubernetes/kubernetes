@@ -20,12 +20,10 @@ package framework
 
 import (
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -34,27 +32,6 @@ const (
 	currentPodInfraContainerImageName    = "k8s.gcr.io/pause"
 	currentPodInfraContainerImageVersion = "3.1"
 )
-
-// GetServerArchitecture fetches the architecture of the cluster's apiserver.
-func GetServerArchitecture(c clientset.Interface) string {
-	arch := ""
-	sVer, err := c.Discovery().ServerVersion()
-	if err != nil || sVer.Platform == "" {
-		// If we failed to get the server version for some reason, default to amd64.
-		arch = "amd64"
-	} else {
-		// Split the platform string into OS and Arch separately.
-		// The platform string may for example be "linux/amd64", "linux/arm" or "windows/amd64".
-		osArchArray := strings.Split(sVer.Platform, "/")
-		arch = osArchArray[1]
-	}
-	return arch
-}
-
-// GetPauseImageName fetches the pause image name for the same architecture as the apiserver.
-func GetPauseImageName(c clientset.Interface) string {
-	return currentPodInfraContainerImageName + "-" + GetServerArchitecture(c) + ":" + currentPodInfraContainerImageVersion
-}
 
 func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
 	// TODO: Create a namespace with a given basename.

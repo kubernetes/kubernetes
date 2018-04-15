@@ -233,9 +233,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
 			common.NewSVCByName(c, ns, name)
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
@@ -298,9 +300,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			gracePeriod := int64(30)
 
 			common.NewSVCByName(c, ns, name)
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			framework.ExpectNoError(err)
+			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
+			err = framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
 
 			By("choose a node with at least one pod - we will block some network traffic on this node")
@@ -371,10 +375,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			pst := framework.NewStatefulSetTester(c)
 
-			nn := framework.TestContext.CloudConfig.NumNodes
-			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
+			nn, err := framework.NumberOfRegisteredNodes(f.ClientSet)
 			framework.ExpectNoError(err)
-			common.RestartNodes(f.ClientSet, nodeNames)
+			nodes, err := framework.CheckNodesReady(f.ClientSet, nn, framework.NodeReadyInitialTimeout)
+			framework.ExpectNoError(err)
+			common.RestartNodes(f.ClientSet, nodes)
 
 			By("waiting for pods to be running again")
 			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)

@@ -110,12 +110,8 @@ func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 }
 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
-	if (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs == nil) ||
-		(spec.Volume != nil && spec.Volume.Glusterfs == nil) {
-		return false
-	}
-
-	return true
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs != nil) ||
+		(spec.Volume != nil && spec.Volume.Glusterfs != nil)
 }
 
 func (plugin *glusterfsPlugin) RequiresRemount() bool {

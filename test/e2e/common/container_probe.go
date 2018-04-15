@@ -37,7 +37,7 @@ const (
 	probTestContainerName       = "test-webserver"
 	probTestInitialDelaySeconds = 15
 
-	defaultObservationTimeout = time.Minute * 2
+	defaultObservationTimeout = time.Minute * 4
 )
 
 var _ = framework.KubeDescribe("Probing container", func() {

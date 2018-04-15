@@ -4,6 +4,7 @@ reviewers:
   - fejta
   - ixdy
   - jbeda
+  - juanvallejo
   - lavalamp
   - zmerlynn
   - sttts
@@ -25,3 +26,4 @@ approvers:
   - gmarek
   - vishh
   - liggitt
+  - soltysh # for sig-cli related stuff

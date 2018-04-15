@@ -362,12 +362,12 @@ func TestCascadingDeletion(t *testing.T) {
 	// sometimes the deletion of the RC takes long time to be observed by
 	// the gc, so wait for the garbage collector to observe the deletion of
 	// the toBeDeletedRC
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		return !gc.GraphHasUID([]types.UID{toBeDeletedRC.ObjectMeta.UID}), nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {
+	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 1*time.Second, 30*time.Second); err != nil {
 		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
 	// checks the garbage collect doesn't delete pods it shouldn't delete.
@@ -407,7 +407,7 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 		t.Fatalf("Unexpected pod list: %v", pods.Items)
 	}
 	// wait for the garbage collector to delete the pod
-	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {
+	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 1*time.Second, 30*time.Second); err != nil {
 		t.Fatalf("expect pod %s to be garbage collected, got err= %v", garbageCollectedPodName, err)
 	}
 }
@@ -441,7 +441,7 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	// creation of the pods, otherwise if the deletion of RC is observed before
 	// the creation of the pods, the pods will not be orphaned.
 	if orphan {
-		wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) { return gc.GraphHasUID(podUIDs), nil })
+		wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) { return gc.GraphHasUID(podUIDs), nil })
 	}
 	// delete the rc
 	if err := rcClient.Delete(rc.ObjectMeta.Name, options); err != nil {
@@ -501,7 +501,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	wg.Wait()
 	t.Logf("all pods are created, all replications controllers are created then deleted")
 	// wait for the RCs and Pods to reach the expected numbers.
-	if err := wait.Poll(5*time.Second, 300*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 300*time.Second, func() (bool, error) {
 		podsInEachCollection := 3
 		// see the comments on the calls to setupRCsPods for details
 		remainingGroups := 3
@@ -568,14 +568,14 @@ func TestOrphaning(t *testing.T) {
 	// we need wait for the gc to observe the creation of the pods, otherwise if
 	// the deletion of RC is observed before the creation of the pods, the pods
 	// will not be orphaned.
-	wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) { return gc.GraphHasUID(podUIDs), nil })
+	wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) { return gc.GraphHasUID(podUIDs), nil })
 
 	err = rcClient.Delete(toBeDeletedRCName, getOrphanOptions())
 	if err != nil {
 		t.Fatalf("Failed to gracefully delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
 		rcs, err := rcClient.List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
@@ -639,7 +639,7 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
 		_, err := rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -707,7 +707,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 		t.Fatalf("Failed to delete the rc: %v", err)
 	}
 	// verify the toBeDeleteRC is deleted
-	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
 		_, err := rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -829,7 +829,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := resourceClient.Get(owner.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {
@@ -907,7 +907,7 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := resourceClient.Get(customOwner.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {
@@ -931,7 +931,7 @@ func TestMixedRelationships(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := configMapClient.Get(coreOwner.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {
@@ -987,7 +987,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	}
 
 	// Ensure the owner is deleted.
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := resourceClient.Get(owner.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {
@@ -995,7 +995,7 @@ func TestCRDDeletionCascading(t *testing.T) {
 	}
 
 	// Ensure the dependent is deleted.
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := configMapClient.Get(dependent.GetName(), metav1.GetOptions{})
 		return errors.IsNotFound(err), nil
 	}); err != nil {

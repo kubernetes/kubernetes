@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	policylisters "k8s.io/kubernetes/pkg/client/listers/policy/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	psp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
@@ -61,7 +61,7 @@ type PodSecurityPolicyPlugin struct {
 	strategyFactory  psp.StrategyFactory
 	failOnNoPolicies bool
 	authz            authorizer.Authorizer
-	lister           extensionslisters.PodSecurityPolicyLister
+	lister           policylisters.PodSecurityPolicyLister
 }
 
 // SetAuthorizer sets the authorizer.
@@ -95,7 +95,7 @@ func newPlugin(strategyFactory psp.StrategyFactory, failOnNoPolicies bool) *PodS
 }
 
 func (a *PodSecurityPolicyPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	podSecurityPolicyInformer := f.Extensions().InternalVersion().PodSecurityPolicies()
+	podSecurityPolicyInformer := f.Policy().InternalVersion().PodSecurityPolicies()
 	a.lister = podSecurityPolicyInformer.Lister()
 	a.SetReadyFunc(podSecurityPolicyInformer.Informer().HasSynced)
 }
@@ -329,7 +329,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 }
 
 // createProvidersFromPolicies creates providers from the constraints supplied.
-func (c *PodSecurityPolicyPlugin) createProvidersFromPolicies(psps []*extensions.PodSecurityPolicy, namespace string) ([]psp.Provider, []error) {
+func (c *PodSecurityPolicyPlugin) createProvidersFromPolicies(psps []*policy.PodSecurityPolicy, namespace string) ([]psp.Provider, []error) {
 	var (
 		// collected providers
 		providers []psp.Provider

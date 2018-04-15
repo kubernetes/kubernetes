@@ -22,7 +22,7 @@ options:
       switch to privileged mode if gpu hardware is detected.
   channel:
     type: string
-    default: "1.9/stable"
+    default: "1.10/stable"
     description: |
       Snap channel to install Kubernetes worker services from
   require-manual-upgrade:

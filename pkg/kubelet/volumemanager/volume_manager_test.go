@@ -243,7 +243,7 @@ func createObjects() (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVol
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
-					Name:       "fake/pvA",
+					Name:       "fake/fake-device",
 					DevicePath: "fake/path",
 				},
 			}},

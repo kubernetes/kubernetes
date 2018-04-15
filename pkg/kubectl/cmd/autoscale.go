@@ -129,7 +129,7 @@ func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 				ScaleRefApiVersion: mapping.GroupVersionKind.GroupVersion().String(),
 			}
 		default:
-			return errUnsupportedGenerator(cmd, generatorName)
+			return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 		}
 
 		// Generate new object

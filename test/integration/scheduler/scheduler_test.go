@@ -179,7 +179,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
 		eventBroadcaster := record.NewBroadcaster()
-		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
+		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
 		ss := &schedulerapp.SchedulerServer{
 			SchedulerName: v1.DefaultSchedulerName,
@@ -238,7 +238,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
 	ss := &schedulerapp.SchedulerServer{
 		SchedulerName: v1.DefaultSchedulerName,
@@ -517,29 +517,14 @@ func TestMultiScheduler(t *testing.T) {
 	informerFactory2 := informers.NewSharedInformerFactory(context.clientSet, 0)
 	podInformer2 := factory.NewPodInformer(context.clientSet, 0, fooScheduler)
 
-	schedulerConfigFactory2 := factory.NewConfigFactory(
-		fooScheduler,
-		clientSet2,
-		informerFactory2.Core().V1().Nodes(),
-		podInformer2,
-		informerFactory2.Core().V1().PersistentVolumes(),
-		informerFactory2.Core().V1().PersistentVolumeClaims(),
-		informerFactory2.Core().V1().ReplicationControllers(),
-		informerFactory2.Extensions().V1beta1().ReplicaSets(),
-		informerFactory2.Apps().V1beta1().StatefulSets(),
-		informerFactory2.Core().V1().Services(),
-		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory2.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
+	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
-	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.CoreV1().RESTClient()).Events("")})
+	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet2.CoreV1().Events("")})
 	go podInformer2.Informer().Run(schedulerConfig2.StopEverything)
 	informerFactory2.Start(schedulerConfig2.StopEverything)
 

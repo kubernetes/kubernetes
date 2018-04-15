@@ -1,8 +1,4 @@
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -18,9 +14,7 @@ go_library(
         "shortcut_restmapper.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
-    ],
+    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps:go_default_library",
@@ -93,13 +87,7 @@ go_test(
         "helpers_test.go",
         "shortcut_restmapper_test.go",
     ],
-    data = [
-        "//api/swagger-spec",
-    ],
     embed = [":go_default_library"],
-    visibility = [
-        "//build/visible_to:COMMON_testing",
-    ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -144,6 +132,7 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(

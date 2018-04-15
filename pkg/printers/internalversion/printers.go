@@ -40,6 +40,7 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -220,6 +221,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Roles", Type: "string", Description: "The roles of the node"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Version", Type: "string", Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kubeletVersion"]},
+		{Name: "Internal-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
 		{Name: "External-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
 		{Name: "OS-Image", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["osImage"]},
 		{Name: "Kernel-Version", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kernelVersion"]},
@@ -340,7 +342,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podSecurityPolicyColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Data", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
+		{Name: "Priv", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
 		{Name: "Caps", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
 		{Name: "SELinux", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
 		{Name: "RunAsUser", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
@@ -1138,7 +1140,7 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1beta1.Tabl
 		if crVersion == "" {
 			crVersion = "<unknown>"
 		}
-		row.Cells = append(row.Cells, getNodeExternalIP(obj), osImage, kernelVersion, crVersion)
+		row.Cells = append(row.Cells, getNodeInternalIP(obj), getNodeExternalIP(obj), osImage, kernelVersion, crVersion)
 	}
 
 	return []metav1beta1.TableRow{row}, nil
@@ -1148,6 +1150,17 @@ func printNode(obj *api.Node, options printers.PrintOptions) ([]metav1beta1.Tabl
 func getNodeExternalIP(node *api.Node) string {
 	for _, address := range node.Status.Addresses {
 		if address.Type == api.NodeExternalIP {
+			return address.Address
+		}
+	}
+
+	return "<none>"
+}
+
+// Returns the internal IP of the node or "<none>" if none is found.
+func getNodeInternalIP(node *api.Node) string {
+	for _, address := range node.Status.Addresses {
+		if address.Type == api.NodeInternalIP {
 			return address.Address
 		}
 	}
@@ -1606,7 +1619,7 @@ func printConfigMapList(list *api.ConfigMapList, options printers.PrintOptions) 
 	return rows, nil
 }
 
-func printPodSecurityPolicy(obj *extensions.PodSecurityPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodSecurityPolicy(obj *policy.PodSecurityPolicy, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1627,7 +1640,7 @@ func printPodSecurityPolicy(obj *extensions.PodSecurityPolicy, options printers.
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPodSecurityPolicyList(list *extensions.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPodSecurityPolicyList(list *policy.PodSecurityPolicyList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodSecurityPolicy(&list.Items[i], options)
@@ -1747,7 +1760,12 @@ func printControllerRevision(obj *apps.ControllerRevision, options printers.Prin
 	controllerName := "<none>"
 	if controllerRef != nil {
 		withKind := true
-		controllerName = printers.FormatResourceName(controllerRef.Kind, controllerRef.Name, withKind)
+		gv, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+		if err != nil {
+			return nil, err
+		}
+		gvk := gv.WithKind(controllerRef.Kind)
+		controllerName = printers.FormatResourceName(gvk.GroupKind(), controllerRef.Name, withKind)
 	}
 	revision := obj.Revision
 	age := translateTimestamp(obj.CreationTimestamp)

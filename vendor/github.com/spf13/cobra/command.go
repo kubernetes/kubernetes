@@ -475,6 +475,9 @@ Loop:
 		s := args[0]
 		args = args[1:]
 		switch {
+		case s == "--":
+			// "--" terminates the flags
+			break Loop
 		case strings.HasPrefix(s, "--") && !strings.Contains(s, "=") && !hasNoOptDefVal(s[2:], flags):
 			// If '--flag arg' then
 			// delete arg from args.

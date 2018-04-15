@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	scaleclient "k8s.io/client-go/scale"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -59,7 +60,10 @@ type ApplyOptions struct {
 	PruneResources  []pruneResource
 	Timeout         time.Duration
 	cmdBaseName     string
-	all             bool
+	All             bool
+	Overwrite       bool
+	OpenApiPatch    bool
+	PruneWhitelist  []string
 }
 
 const (
@@ -98,8 +102,17 @@ var (
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
+func NewApplyOptions() *ApplyOptions {
+	return &ApplyOptions{
+		Overwrite:    true,
+		Cascade:      true,
+		GracePeriod:  -1,
+		OpenApiPatch: true,
+	}
+}
+
 func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	var options ApplyOptions
+	options := NewApplyOptions()
 
 	// Store baseName for use in printing warnings / messages involving the base command name.
 	// This is useful for downstream command that wrap this one.
@@ -113,25 +126,25 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 		Example: applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(options.Prune, options.all, options.Selector))
-			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, &options))
+			cmdutil.CheckErr(validatePruneAll(options.Prune, options.All, options.Selector))
+			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, options))
 		},
 	}
 
 	usage := "that contains the configuration to apply"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().Bool("overwrite", true, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
-	cmd.Flags().BoolVar(&options.Prune, "prune", false, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
-	cmd.Flags().BoolVar(&options.Cascade, "cascade", true, "Only relevant during a prune or a force apply. If true, cascade the deletion of the resources managed by pruned or deleted resources (e.g. Pods created by a ReplicationController).")
-	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", -1, "Only relevant during a prune or a force apply. Period of time in seconds given to pruned or deleted resources to terminate gracefully. Ignored if negative.")
-	cmd.Flags().BoolVar(&options.Force, "force", false, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", options.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
+	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
+	cmd.Flags().BoolVar(&options.Cascade, "cascade", options.Cascade, "Only relevant during a prune or a force apply. If true, cascade the deletion of the resources managed by pruned or deleted resources (e.g. Pods created by a ReplicationController).")
+	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", options.GracePeriod, "Only relevant during a prune or a force apply. Period of time in seconds given to pruned or deleted resources to terminate gracefully. Ignored if negative.")
+	cmd.Flags().BoolVar(&options.Force, "force", options.Force, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
+	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all resources in the namespace of the specified resource types.")
-	cmd.Flags().StringArray("prune-whitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().Bool("openapi-patch", true, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources in the namespace of the specified resource types.")
+	cmd.Flags().StringArrayVar(&options.PruneWhitelist, "prune-whitelist", options.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().BoolVar(&options.OpenApiPatch, "openapi-patch", options.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -201,7 +214,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 
 	var openapiSchema openapi.Resources
-	if cmdutil.GetFlagBool(cmd, "openapi-patch") {
+	if options.OpenApiPatch {
 		openapiSchema, err = f.OpenAPISchema()
 		if err != nil {
 			openapiSchema = nil
@@ -231,7 +244,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 
 	if options.Prune {
-		options.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		options.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, options.PruneWhitelist)
 		if err != nil {
 			return err
 		}
@@ -271,12 +284,15 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		// in the patch sent to the server.
 		modified, err := kubectl.GetModifiedConfiguration(info, true, encoder)
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
+			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 		}
+
+		// Print object only if output format other than "name" is specified
+		printObject := len(output) > 0 && !shortOutput
 
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
-				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
@@ -286,9 +302,11 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if !dryRun {
 				// Then create the resource and skip the three-way merge
-				if err := createAndRefresh(info); err != nil {
+				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
+				info.Refresh(obj, true)
 				if uid, err := info.Mapping.UID(info.Object); err != nil {
 					return err
 				} else {
@@ -297,7 +315,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			}
 
 			count++
-			if len(output) > 0 && !shortOutput {
+			if printObject {
 				return cmdutil.PrintObject(cmd, info.Object, out)
 			}
 			cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "created")
@@ -312,7 +330,10 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation, options.cmdBaseName)
 			}
-			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
+			scaler, err := f.ScaleClient()
+			if err != nil {
+				return err
+			}
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &patcher{
 				encoder:       encoder,
@@ -321,13 +342,14 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				helper:        helper,
 				clientFunc:    f.UnstructuredClientForMapping,
 				clientsetFunc: f.ClientSet,
-				overwrite:     overwrite,
+				overwrite:     options.Overwrite,
 				backOff:       clockwork.NewRealClock(),
 				force:         options.Force,
 				cascade:       options.Cascade,
 				timeout:       options.Timeout,
 				gracePeriod:   options.GracePeriod,
 				openapiSchema: openapiSchema,
+				scaleClient:   scaler,
 			}
 
 			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, errOut)
@@ -343,14 +365,14 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				visitedUids.Insert(string(uid))
 			}
 
-			if string(patchBytes) == "{}" {
+			if string(patchBytes) == "{}" && !printObject {
 				count++
 				cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "unchanged")
 				return nil
 			}
 		}
 		count++
-		if len(output) > 0 && !shortOutput {
+		if printObject {
 			return cmdutil.PrintObject(cmd, info.Object, out)
 		}
 		cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "configured")
@@ -493,6 +515,10 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 	if err != nil {
 		return err
 	}
+	scaler, err := f.ScaleClient()
+	if err != nil {
+		return err
+	}
 
 	for _, obj := range objs {
 		annots, err := mapping.MetadataAccessor.Annotations(obj)
@@ -516,7 +542,7 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 			return err
 		}
 		if !p.dryRun {
-			if err := p.delete(namespace, name, mapping); err != nil {
+			if err := p.delete(namespace, name, mapping, scaler); err != nil {
 				return err
 			}
 		}
@@ -525,16 +551,16 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 	return nil
 }
 
-func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
+func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping, scaleClient scaleclient.ScalesGetter) error {
 	c, err := p.clientFunc(mapping)
 	if err != nil {
 		return err
 	}
 
-	return runDelete(namespace, name, mapping, c, nil, p.cascade, p.gracePeriod, p.clientsetFunc)
+	return runDelete(namespace, name, mapping, c, nil, p.cascade, p.gracePeriod, p.clientsetFunc, scaleClient)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient, helper *resource.Helper, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error)) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RESTClient, helper *resource.Helper, cascade bool, gracePeriod int, clientsetFunc func() (internalclientset.Interface, error), scaleClient scaleclient.ScalesGetter) error {
 	if !cascade {
 		if helper == nil {
 			helper = resource.NewHelper(c, mapping)
@@ -545,7 +571,7 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c resource.RES
 	if err != nil {
 		return err
 	}
-	r, err := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), cs)
+	r, err := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), cs, scaleClient)
 	if err != nil {
 		if _, ok := err.(*kubectl.NoSuchReaperError); !ok {
 			return err
@@ -567,7 +593,7 @@ func (p *patcher) delete(namespace, name string) error {
 	if err != nil {
 		return err
 	}
-	return runDelete(namespace, name, p.mapping, c, p.helper, p.cascade, p.gracePeriod, p.clientsetFunc)
+	return runDelete(namespace, name, p.mapping, c, p.helper, p.cascade, p.gracePeriod, p.clientsetFunc, p.scaleClient)
 }
 
 type patcher struct {
@@ -588,6 +614,7 @@ type patcher struct {
 	gracePeriod int
 
 	openapiSchema openapi.Resources
+	scaleClient   scaleclient.ScalesGetter
 }
 
 func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {

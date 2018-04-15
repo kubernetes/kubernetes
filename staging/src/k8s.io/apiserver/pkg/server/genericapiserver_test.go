@@ -84,7 +84,6 @@ func init() {
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
-	config.RequestContextMapper = apirequest.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
@@ -111,7 +110,7 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 func newMaster(t *testing.T) (*GenericAPIServer, Config, *assert.Assertions) {
 	config, assert := setUp(t)
 
-	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -126,7 +125,6 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
-	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
 
 	// these values get defaulted
 	assert.Equal(net.JoinHostPort(config.PublicAddress.String(), "443"), s.ExternalAddress)
@@ -141,7 +139,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
 
-	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -333,7 +331,7 @@ func TestCustomHandlerChain(t *testing.T) {
 
 	var protected, called bool
 
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			protected = true
 			apiHandler.ServeHTTP(w, req)
@@ -343,7 +341,7 @@ func TestCustomHandlerChain(t *testing.T) {
 		called = true
 	})
 
-	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -397,7 +395,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
 
-	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -509,10 +507,10 @@ func TestGracefulShutdown(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
-		handler := genericfilters.WithWaitGroup(apiHandler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
-		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, c.RequestContextMapper)
-		handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
+		handler := genericfilters.WithWaitGroup(apiHandler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, contextMapper)
+		handler = apirequest.WithRequestContext(handler, contextMapper)
 		return handler
 	}
 
@@ -523,7 +521,7 @@ func TestGracefulShutdown(t *testing.T) {
 		graceShutdown = true
 	})
 
-	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}

@@ -366,7 +366,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
-		eventClient := corev1typed.New(clientset.CoreV1().RESTClient()).Events(ns.Namespace)
+		eventClient := clientset.CoreV1().Events(ns.Namespace)
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
 		go dc.Run(5, stopCh)

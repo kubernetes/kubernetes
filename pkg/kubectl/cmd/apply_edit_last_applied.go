@@ -60,7 +60,9 @@ var (
 
 func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &editor.EditOptions{
-		EditMode: editor.ApplyEditMode,
+		EditMode:           editor.ApplyEditMode,
+		Output:             "yaml",
+		WindowsLineEndings: runtime.GOOS == "windows",
 	}
 	validArgs := cmdutil.ValidArgList(f)
 
@@ -85,8 +87,8 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 
 	usage := "to use to edit the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Output, "output", "o", "yaml", "Output format. One of: yaml|json.")
-	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", runtime.GOOS == "windows",
+	cmd.Flags().StringVarP(&options.Output, "output", "o", options.Output, "Output format. One of: yaml|json.")
+	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", options.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddRecordVarFlag(cmd, &options.Record)
 	cmdutil.AddIncludeUninitializedFlag(cmd)

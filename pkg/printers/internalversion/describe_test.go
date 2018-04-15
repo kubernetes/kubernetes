@@ -1120,6 +1120,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	block := api.PersistentVolumeBlock
 	file := api.PersistentVolumeFilesystem
 	goldClassName := "gold"
+	now := time.Now()
 	testCases := []struct {
 		name               string
 		pvc                *api.PersistentVolumeClaim
@@ -1169,6 +1170,103 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 			},
 			expectedElements: []string{"VolumeMode", "Block"},
+		},
+		// Tests for Status.Condition.
+		{
+			name: "condition-type",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume4",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Conditions: []api.PersistentVolumeClaimCondition{
+						{Type: api.PersistentVolumeClaimResizing},
+					},
+				},
+			},
+			expectedElements: []string{"Conditions", "Type", "Resizing"},
+		},
+		{
+			name: "condition-status",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume5",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Conditions: []api.PersistentVolumeClaimCondition{
+						{Status: api.ConditionTrue},
+					},
+				},
+			},
+			expectedElements: []string{"Conditions", "Status", "True"},
+		},
+		{
+			name: "condition-last-probe-time",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume6",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Conditions: []api.PersistentVolumeClaimCondition{
+						{LastProbeTime: metav1.Time{Time: now}},
+					},
+				},
+			},
+			expectedElements: []string{"Conditions", "LastProbeTime", now.Format(time.RFC1123Z)},
+		},
+		{
+			name: "condition-last-transition-time",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume7",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Conditions: []api.PersistentVolumeClaimCondition{
+						{LastTransitionTime: metav1.Time{Time: now}},
+					},
+				},
+			},
+			expectedElements: []string{"Conditions", "LastTransitionTime", now.Format(time.RFC1123Z)},
+		},
+		{
+			name: "condition-reason",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume8",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Conditions: []api.PersistentVolumeClaimCondition{
+						{Reason: "OfflineResize"},
+					},
+				},
+			},
+			expectedElements: []string{"Conditions", "Reason", "OfflineResize"},
+		},
+		{
+			name: "condition-message",
+			pvc: &api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "volume9",
+					StorageClassName: &goldClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Conditions: []api.PersistentVolumeClaimCondition{
+						{Message: "User request resize"},
+					},
+				},
+			},
+			expectedElements: []string{"Conditions", "Message", "User request resize"},
 		},
 	}
 
@@ -2089,22 +2187,22 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 		"Supplemental Groups Strategy: RunAsAny",
 	}
 
-	fake := fake.NewSimpleClientset(&extensions.PodSecurityPolicy{
+	fake := fake.NewSimpleClientset(&policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mypsp",
 		},
-		Spec: extensions.PodSecurityPolicySpec{
-			SELinux: extensions.SELinuxStrategyOptions{
-				Rule: extensions.SELinuxStrategyRunAsAny,
+		Spec: policy.PodSecurityPolicySpec{
+			SELinux: policy.SELinuxStrategyOptions{
+				Rule: policy.SELinuxStrategyRunAsAny,
 			},
-			RunAsUser: extensions.RunAsUserStrategyOptions{
-				Rule: extensions.RunAsUserStrategyRunAsAny,
+			RunAsUser: policy.RunAsUserStrategyOptions{
+				Rule: policy.RunAsUserStrategyRunAsAny,
 			},
-			FSGroup: extensions.FSGroupStrategyOptions{
-				Rule: extensions.FSGroupStrategyRunAsAny,
+			FSGroup: policy.FSGroupStrategyOptions{
+				Rule: policy.FSGroupStrategyRunAsAny,
 			},
-			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
+				Rule: policy.SupplementalGroupsStrategyRunAsAny,
 			},
 		},
 	})

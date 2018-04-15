@@ -41,6 +41,7 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,6 +57,9 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = "busybox"
+
+// Kubelet internal cgroup name for node allocatable cgroup.
+const defaultNodeAllocatableCgroup = "kubepods"
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
@@ -399,11 +403,27 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 func restartKubelet() {
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
-	regex := regexp.MustCompile("(kubelet-[0-9]+)")
+	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
 	Expect(len(matches)).NotTo(BeZero())
 	kube := matches[0]
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+}
+
+func toCgroupFsName(cgroup string) string {
+	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
+		return cm.ConvertCgroupNameToSystemd(cm.CgroupName(cgroup), true)
+	}
+	return cgroup
+}
+
+// reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
+// to make the kernel reclaim memory in the allocatable cgroup
+// the time to reduce pressure may be unbounded, but usually finishes within a second
+func reduceAllocatableMemoryUsage() {
+	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(defaultNodeAllocatableCgroup))
+	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
+	framework.ExpectNoError(err)
 }

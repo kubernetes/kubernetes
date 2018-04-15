@@ -798,6 +798,67 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 }
 
+func TestUpdateLastTransitionTime(t *testing.T) {
+	old := metav1.Now()
+	for desc, test := range map[string]struct {
+		condition    *v1.PodCondition
+		oldCondition *v1.PodCondition
+		expectUpdate bool
+	}{
+		"should do nothing if no corresponding condition": {
+			expectUpdate: false,
+		},
+		"should update last transition time if no old condition": {
+			condition: &v1.PodCondition{
+				Type:   "test-type",
+				Status: v1.ConditionTrue,
+			},
+			oldCondition: nil,
+			expectUpdate: true,
+		},
+		"should update last transition time if condition is changed": {
+			condition: &v1.PodCondition{
+				Type:   "test-type",
+				Status: v1.ConditionTrue,
+			},
+			oldCondition: &v1.PodCondition{
+				Type:               "test-type",
+				Status:             v1.ConditionFalse,
+				LastTransitionTime: old,
+			},
+			expectUpdate: true,
+		},
+		"should keep last transition time if condition is not changed": {
+			condition: &v1.PodCondition{
+				Type:   "test-type",
+				Status: v1.ConditionFalse,
+			},
+			oldCondition: &v1.PodCondition{
+				Type:               "test-type",
+				Status:             v1.ConditionFalse,
+				LastTransitionTime: old,
+			},
+			expectUpdate: false,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		status := &v1.PodStatus{}
+		oldStatus := &v1.PodStatus{}
+		if test.condition != nil {
+			status.Conditions = []v1.PodCondition{*test.condition}
+		}
+		if test.oldCondition != nil {
+			oldStatus.Conditions = []v1.PodCondition{*test.oldCondition}
+		}
+		updateLastTransitionTime(status, oldStatus, "test-type")
+		if test.expectUpdate {
+			assert.True(t, status.Conditions[0].LastTransitionTime.After(old.Time))
+		} else if test.condition != nil {
+			assert.Equal(t, old, status.Conditions[0].LastTransitionTime)
+		}
+	}
+}
+
 func getAction() core.GetAction {
 	return core.GetActionImpl{ActionImpl: core.ActionImpl{Verb: "get", Resource: schema.GroupVersionResource{Resource: "pods"}}}
 }

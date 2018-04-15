@@ -145,6 +145,7 @@ docs/man/man1/kubeadm.1
 docs/man/man1/kubectl-alpha-diff.1
 docs/man/man1/kubectl-alpha.1
 docs/man/man1/kubectl-annotate.1
+docs/man/man1/kubectl-api-resources.1
 docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply-edit-last-applied.1
 docs/man/man1/kubectl-apply-set-last-applied.1
@@ -245,6 +246,7 @@ docs/user-guide/kubectl/kubectl.md
 docs/user-guide/kubectl/kubectl_alpha.md
 docs/user-guide/kubectl/kubectl_alpha_diff.md
 docs/user-guide/kubectl/kubectl_annotate.md
+docs/user-guide/kubectl/kubectl_api-resources.md
 docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
 docs/user-guide/kubectl/kubectl_apply_edit-last-applied.md
@@ -341,6 +343,7 @@ docs/user-guide/kubectl/kubectl_version.md
 docs/yaml/kubectl/kubectl.yaml
 docs/yaml/kubectl/kubectl_alpha.yaml
 docs/yaml/kubectl/kubectl_annotate.yaml
+docs/yaml/kubectl/kubectl_api-resources.yaml
 docs/yaml/kubectl/kubectl_api-versions.yaml
 docs/yaml/kubectl/kubectl_apply.yaml
 docs/yaml/kubectl/kubectl_attach.yaml

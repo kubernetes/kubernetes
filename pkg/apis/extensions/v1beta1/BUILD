@@ -23,6 +23,7 @@ go_library(
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/networking:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

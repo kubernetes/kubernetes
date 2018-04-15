@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -319,7 +320,7 @@ var _ = SIGDescribe("kubelet", func() {
 					InternalClient: f.InternalClientset,
 					Name:           rcName,
 					Namespace:      f.Namespace.Name,
-					Image:          framework.GetPauseImageName(f.ClientSet),
+					Image:          imageutils.GetPauseImageName(),
 					Replicas:       totalPods,
 					NodeSelector:   nodeLabels,
 				})).NotTo(HaveOccurred())
@@ -334,7 +335,7 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
+				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

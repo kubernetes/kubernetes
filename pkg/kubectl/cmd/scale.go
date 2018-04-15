@@ -22,7 +22,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -60,7 +62,7 @@ var (
 func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
-	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "job", "statefulset"}
+	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
@@ -139,6 +141,15 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
 	}
 
+	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
+	precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: resourceVersion}
+	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
+
+	var waitForReplicas *kubectl.RetryParams
+	if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {
+		waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
+	}
+
 	counter := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -147,26 +158,29 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 
 		mapping := info.ResourceMapping()
 		if mapping.Resource == "jobs" {
+			// go down the legacy jobs path.  This can be removed in 3.14  For now, contain it.
 			fmt.Fprintf(errOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", cmd.Parent().Name())
+
+			clientset, err := f.ClientSet()
+			if err != nil {
+				return err
+			}
+			if err := ScaleJob(info, clientset.Batch(), uint(count), precondition, retry, waitForReplicas); err != nil {
+				return err
+			}
+
+		} else {
+			scaler, err := f.Scaler()
+			if err != nil {
+				return err
+			}
+
+			gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
+			if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas, gvk.GroupResource()); err != nil {
+				return err
+			}
 		}
 
-		scaler, err := f.Scaler(mapping)
-		if err != nil {
-			return err
-		}
-
-		currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
-		precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: resourceVersion}
-		retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
-
-		var waitForReplicas *kubectl.RetryParams
-		if timeout := cmdutil.GetFlagDuration(cmd, "timeout"); timeout != 0 {
-			waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
-		}
-
-		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
-			return err
-		}
 		if cmdutil.ShouldRecord(cmd, info) {
 			patchBytes, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command(cmd, true))
 			if err != nil {
@@ -194,4 +208,24 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		return fmt.Errorf("no objects passed to scale")
 	}
 	return nil
+}
+
+func ScaleJob(info *resource.Info, jobsClient batchclient.JobsGetter, count uint, preconditions *kubectl.ScalePrecondition, retry, waitForReplicas *kubectl.RetryParams) error {
+	scaler := scalejob.JobPsuedoScaler{
+		JobsClient: jobsClient,
+	}
+	var jobPreconditions *scalejob.ScalePrecondition
+	if preconditions != nil {
+		jobPreconditions = &scalejob.ScalePrecondition{Size: preconditions.Size, ResourceVersion: preconditions.ResourceVersion}
+	}
+	var jobRetry *scalejob.RetryParams
+	if retry != nil {
+		jobRetry = &scalejob.RetryParams{Interval: retry.Interval, Timeout: retry.Timeout}
+	}
+	var jobWaitForReplicas *scalejob.RetryParams
+	if waitForReplicas != nil {
+		jobWaitForReplicas = &scalejob.RetryParams{Interval: waitForReplicas.Interval, Timeout: waitForReplicas.Timeout}
+	}
+
+	return scaler.Scale(info.Namespace, info.Name, count, jobPreconditions, jobRetry, jobWaitForReplicas)
 }

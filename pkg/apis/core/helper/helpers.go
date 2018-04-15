@@ -153,7 +153,7 @@ func IsStandardContainerResourceName(str string) bool {
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name core.ResourceName) bool {
-	if IsDefaultNamespaceResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
+	if IsNativeResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
 		return false
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
@@ -164,22 +164,19 @@ func IsExtendedResourceName(name core.ResourceName) bool {
 	return true
 }
 
-// IsDefaultNamespaceResource returns true if the resource name is in the
+// IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
-func IsDefaultNamespaceResource(name core.ResourceName) bool {
+func IsNativeResource(name core.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
 		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
 
-var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
-
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted.
+// namespace and is not hugepages.
 func IsOvercommitAllowed(name core.ResourceName) bool {
-	return IsDefaultNamespaceResource(name) &&
-		!IsHugePageResourceName(name) &&
-		!overcommitBlacklist.Has(string(name))
+	return IsNativeResource(name) &&
+		!IsHugePageResourceName(name)
 }
 
 var standardLimitRangeTypes = sets.NewString(
@@ -324,16 +321,6 @@ func ingressEqual(lhs, rhs *core.LoadBalancerIngress) bool {
 		return false
 	}
 	return true
-}
-
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusDeepCopy(lb *core.LoadBalancerStatus) *core.LoadBalancerStatus {
-	c := &core.LoadBalancerStatus{}
-	c.Ingress = make([]core.LoadBalancerIngress, len(lb.Ingress))
-	for i := range lb.Ingress {
-		c.Ingress[i] = lb.Ingress[i]
-	}
-	return c
 }
 
 // GetAccessModesAsString returns a string representation of an array of access modes.
@@ -564,34 +551,4 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
-}
-
-// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
-// and converts it to the NodeAffinity type in core.
-// TODO: update when storage node affinity graduates to beta
-func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*core.NodeAffinity, error) {
-	if len(annotations) > 0 && annotations[core.AlphaStorageNodeAffinityAnnotation] != "" {
-		var affinity core.NodeAffinity
-		err := json.Unmarshal([]byte(annotations[core.AlphaStorageNodeAffinityAnnotation]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
-// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
-// TODO: update when storage node affinity graduates to beta
-func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *core.NodeAffinity) error {
-	if affinity == nil {
-		return nil
-	}
-
-	json, err := json.Marshal(*affinity)
-	if err != nil {
-		return err
-	}
-	annotations[core.AlphaStorageNodeAffinityAnnotation] = string(json)
-	return nil
 }

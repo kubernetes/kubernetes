@@ -25,8 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -49,12 +47,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Name = c.RandString()
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.FieldPath = c.RandString()
-		},
-		func(j *core.ListOptions, c fuzz.Continue) {
-			label, _ := labels.Parse("a=b")
-			j.LabelSelector = label
-			field, _ := fields.ParseSelector("a=b")
-			j.FieldSelector = field
 		},
 		func(j *core.PodExecOptions, c fuzz.Continue) {
 			j.Stdout = true

@@ -309,7 +309,7 @@ func TestBadPrinter(t *testing.T) {
 	}{
 		{"empty template", &printers.PrintOptions{OutputFormatType: "template", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
 		{"bad template", &printers.PrintOptions{OutputFormatType: "template", OutputFormatArgument: "{{ .Name", AllowMissingKeys: false}, fmt.Errorf("error parsing template {{ .Name, template: output:1: unclosed action\n")},
-		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("templatefile format specified but no template file given")},
+		{"bad templatefile", &printers.PrintOptions{OutputFormatType: "templatefile", AllowMissingKeys: false}, fmt.Errorf("template format specified but no template given")},
 		{"bad jsonpath", &printers.PrintOptions{OutputFormatType: "jsonpath", OutputFormatArgument: "{.Name", AllowMissingKeys: false}, fmt.Errorf("error parsing jsonpath {.Name, unclosed action\n")},
 		{"unknown format", &printers.PrintOptions{OutputFormatType: "anUnknownFormat", OutputFormatArgument: "", AllowMissingKeys: false}, fmt.Errorf("output format \"anUnknownFormat\" not recognized")},
 	}
@@ -375,13 +375,15 @@ func TestJSONPrinter(t *testing.T) {
 
 func TestFormatResourceName(t *testing.T) {
 	tests := []struct {
-		kind, name string
-		want       string
+		kind schema.GroupKind
+		name string
+		want string
 	}{
-		{"", "", ""},
-		{"", "name", "name"},
-		{"kind", "", "kind/"}, // should not happen in practice
-		{"kind", "name", "kind/name"},
+		{schema.GroupKind{}, "", ""},
+		{schema.GroupKind{}, "name", "name"},
+		{schema.GroupKind{Kind: "Kind"}, "", "kind/"}, // should not happen in practice
+		{schema.GroupKind{Kind: "Kind"}, "name", "kind/name"},
+		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
 	}
 	for _, tt := range tests {
 		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
@@ -394,7 +396,7 @@ func PrintCustomType(obj *TestPrintType, w io.Writer, options printers.PrintOpti
 	data := obj.Data
 	kind := options.Kind
 	if options.WithKind {
-		data = kind + "/" + data
+		data = kind.String() + "/" + data
 	}
 	_, err := fmt.Fprintf(w, "%s", data)
 	return err
@@ -416,24 +418,6 @@ func TestCustomTypePrinting(t *testing.T) {
 		t.Fatalf("An error occurred printing the custom type: %#v", err)
 	}
 	expectedOutput := "DATA\ntest object"
-	if buffer.String() != expectedOutput {
-		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
-	}
-}
-
-func TestCustomTypePrintingWithKind(t *testing.T) {
-	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{})
-	printer.Handler(columns, nil, PrintCustomType)
-	printer.EnsurePrintWithKind("test")
-
-	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
-	if err != nil {
-		t.Fatalf("An error occurred printing the custom type: %#v", err)
-	}
-	expectedOutput := "DATA\ntest/test object"
 	if buffer.String() != expectedOutput {
 		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
 	}
@@ -462,7 +446,7 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplatePanic(t *testing.T) {
 	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
-	printer, err := printers.NewTemplatePrinter([]byte(tmpl))
+	printer, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
@@ -618,7 +602,7 @@ func TestTemplateStrings(t *testing.T) {
 	}
 	// The point of this test is to verify that the below template works.
 	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	p, err := printers.NewTemplatePrinter([]byte(tmpl))
+	p, err := printers.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
@@ -652,13 +636,13 @@ func TestPrinters(t *testing.T) {
 		jsonpathPrinter  printers.ResourcePrinter
 	)
 
-	templatePrinter, err = printers.NewTemplatePrinter([]byte("{{.name}}"))
+	templatePrinter, err = printers.NewGoTemplatePrinter([]byte("{{.name}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	templatePrinter = printers.NewVersionedPrinter(templatePrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
-	templatePrinter2, err = printers.NewTemplatePrinter([]byte("{{len .items}}"))
+	templatePrinter2, err = printers.NewGoTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1118,6 +1102,54 @@ func TestPrintNodeExternalIP(t *testing.T) {
 	}
 }
 
+func TestPrintNodeInternalIP(t *testing.T) {
+	printer := printers.NewHumanReadablePrinter(nil, nil, printers.PrintOptions{
+		Wide: true,
+	})
+	AddHandlers(printer)
+	table := []struct {
+		node       api.Node
+		internalIP string
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
+			},
+			internalIP: "1.1.1.1",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
+			},
+			internalIP: "<none>",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo3"},
+				Status: api.NodeStatus{Addresses: []api.NodeAddress{
+					{Type: api.NodeInternalIP, Address: "2.2.2.2"},
+					{Type: api.NodeExternalIP, Address: "3.3.3.3"},
+					{Type: api.NodeInternalIP, Address: "4.4.4.4"},
+				}},
+			},
+			internalIP: "2.2.2.2",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.node, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.internalIP) {
+			t.Fatalf("Expect printing node %s with internal ip %#v, got: %#v", test.node.Name, test.internalIP, buffer.String())
+		}
+	}
+}
+
 func contains(fields []string, field string) bool {
 	for _, v := range fields {
 		if v == field {
@@ -1534,15 +1566,15 @@ func TestPrintPodTable(t *testing.T) {
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest1\t1/2\tRunning\t6\t<unknown>\n",
 		},
 		{
-			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: "pods"},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npods/test1\t1/2\tRunning\t6\t<unknown>\n",
+			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
+			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npod/test1\t1/2\tRunning\t6\t<unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{ShowLabels: true},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tLABELS\ntest1\t1/2\tRunning\t6\t<unknown>\ta=1,b=2\n",
 		},
 		{
-			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ShowAll: true, ColumnLabels: []string{"a"}},
+			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tA\ntest1\t1/2\tRunning\t6\t<unknown>\t1\ntest2\t1/2\tFailed\t6\t<unknown>\t\n",
 		},
 		{
@@ -1551,11 +1583,11 @@ func TestPrintPodTable(t *testing.T) {
 		},
 		{
 			obj: failedPod, opts: printers.PrintOptions{},
-			expect:       "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\n",
+			expect:       "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
 			ignoreLegacy: true, // filtering is not done by the printer in the legacy path
 		},
 		{
-			obj: failedPod, opts: printers.PrintOptions{ShowAll: true},
+			obj: failedPod, opts: printers.PrintOptions{},
 			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
 		},
 	}
@@ -1671,7 +1703,7 @@ func TestPrintPod(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.PrintOptions{ShowAll: true})
+		rows, err := printPod(&test.pod, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1781,7 +1813,7 @@ func TestPrintPodList(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rows, err := printPodList(&test.pods, printers.PrintOptions{ShowAll: true})
+		rows, err := printPodList(&test.pods, printers.PrintOptions{})
 
 		if err != nil {
 			t.Fatal(err)
@@ -3010,6 +3042,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							Controller: boolP(true),
+							APIVersion: "apps/v1",
 							Kind:       "DaemonSet",
 							Name:       "foo",
 						},
@@ -3017,7 +3050,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 1,
 			},
-			"test1\tDaemonSet/foo\t1\t0s\n",
+			"test1\tdaemonset.apps/foo\t1\t0s\n",
 		},
 		{
 			apps.ControllerRevision{

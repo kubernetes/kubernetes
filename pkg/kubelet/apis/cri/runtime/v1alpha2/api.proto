@@ -171,7 +171,9 @@ enum MountPropagation {
 message Mount {
     // Path of the mount within the container.
     string container_path = 1;
-    // Path of the mount on the host.
+    // Path of the mount on the host. If the hostPath doesn't exist, then runtimes
+    // should report error. If the hostpath is a symbolic link, runtimes should
+    // follow the symlink and mount the real destination to container.
     string host_path = 2;
     // If set, the mount is read-only.
     bool readonly = 3;
@@ -235,7 +237,8 @@ message LinuxSandboxSecurityContext {
     SELinuxOption selinux_options = 2;
     // UID to run sandbox processes as, when applicable.
     Int64Value run_as_user = 3;
-    // GID to run sandbox processes as, when applicable.
+    // GID to run sandbox processes as, when applicable. run_as_group should only
+    // be specified when run_as_user is specified; otherwise, the runtime MUST error.
     Int64Value run_as_group = 8;
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
@@ -553,8 +556,9 @@ message LinuxContainerSecurityContext {
     // UID to run the container process as. Only one of run_as_user and
     // run_as_username can be specified at a time.
     Int64Value run_as_user = 5;
-    // GID to run the container process as. Only one of run_as_group and
-    // run_as_groupname can be specified at a time.
+    // GID to run the container process as. run_as_group should only be specified
+    // when run_as_user or run_as_username is specified; otherwise, the runtime
+    // MUST error.
     Int64Value run_as_group = 12;
     // User name to run the container process as. If specified, the user MUST
     // exist in the container image (i.e. in the /etc/passwd inside the image),

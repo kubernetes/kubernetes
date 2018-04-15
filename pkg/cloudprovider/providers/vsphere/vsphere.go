@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -32,7 +33,6 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -575,11 +575,6 @@ func convertToString(nodeName k8stypes.NodeName) string {
 
 func convertToK8sType(vmName string) k8stypes.NodeName {
 	return k8stypes.NodeName(vmName)
-}
-
-// ExternalID returns the cloud provider ID of the node with the specified Name (deprecated).
-func (vs *VSphere) ExternalID(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
-	return vs.InstanceID(ctx, nodeName)
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.

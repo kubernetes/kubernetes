@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/golang/glog"
 
@@ -296,11 +297,13 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
-		return err
+	if runtime.GOOS != "windows" {
+		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			glog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+			return err
+		}
 	}
-
 	// Perform a bind mount to the full path to allow duplicate mounts of the same volume.
 	options := []string{"bind"}
 	if m.readOnly {
@@ -308,7 +311,8 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	glog.V(4).Infof("attempting to mount %s", dir)
-	err = m.mounter.Mount(m.globalPath, dir, "", options)
+	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	err = m.mounter.Mount(globalPath, dir, "", options)
 	if err != nil {
 		glog.Errorf("Mount of volume %s failed: %v", dir, err)
 		notMnt, mntErr := m.mounter.IsNotMountPoint(dir)
@@ -371,8 +375,9 @@ var _ volume.BlockVolumeMapper = &localVolumeMapper{}
 
 // SetUpDevice provides physical device path for the local PV.
 func (m *localVolumeMapper) SetUpDevice() (string, error) {
-	glog.V(4).Infof("SetupDevice returning path %s", m.globalPath)
-	return m.globalPath, nil
+	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	glog.V(4).Infof("SetupDevice returning path %s", globalPath)
+	return globalPath, nil
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.

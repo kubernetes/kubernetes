@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,8 +30,6 @@ type Interface interface {
 	Deployments() DeploymentInformer
 	// Ingresses returns a IngressInformer.
 	Ingresses() IngressInformer
-	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
-	PodSecurityPolicies() PodSecurityPolicyInformer
 	// ReplicaSets returns a ReplicaSetInformer.
 	ReplicaSets() ReplicaSetInformer
 }
@@ -60,11 +58,6 @@ func (v *version) Deployments() DeploymentInformer {
 // Ingresses returns a IngressInformer.
 func (v *version) Ingresses() IngressInformer {
 	return &ingressInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// PodSecurityPolicies returns a PodSecurityPolicyInformer.
-func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
-	return &podSecurityPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ReplicaSets returns a ReplicaSetInformer.

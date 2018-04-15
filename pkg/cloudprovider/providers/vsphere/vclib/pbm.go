@@ -17,11 +17,11 @@ limitations under the License.
 package vclib
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/pbm"
-	"golang.org/x/net/context"
 
 	pbmtypes "github.com/vmware/govmomi/pbm/types"
 	"github.com/vmware/govmomi/vim25"

@@ -98,6 +98,10 @@ type Options struct {
 	// https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation
 	SupportedSigningAlgs []string
 
+	// RequiredClaims, if specified, causes the OIDCAuthenticator to verify that all the
+	// required claims key value pairs are present in the ID Token.
+	RequiredClaims map[string]string
+
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
 }
@@ -109,6 +113,7 @@ type Authenticator struct {
 	usernamePrefix string
 	groupsClaim    string
 	groupsPrefix   string
+	requiredClaims map[string]string
 
 	// Contains an *oidc.IDTokenVerifier. Do not access directly use the
 	// idTokenVerifier method.
@@ -218,6 +223,7 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		usernamePrefix: opts.UsernamePrefix,
 		groupsClaim:    opts.GroupsClaim,
 		groupsPrefix:   opts.GroupsPrefix,
+		requiredClaims: opts.RequiredClaims,
 		cancel:         cancel,
 	}
 
@@ -284,14 +290,18 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 	}
 
 	if a.usernameClaim == "email" {
-		// Check the email_verified claim to ensure the email is valid.
+		// If the email_verified claim is present, ensure the email is valid.
 		// https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
-		var emailVerified bool
-		if err := c.unmarshalClaim("email_verified", &emailVerified); err != nil {
-			return nil, false, fmt.Errorf("oidc: parse 'email_verified' claim: %v", err)
-		}
-		if !emailVerified {
-			return nil, false, fmt.Errorf("oidc: email not verified")
+		if hasEmailVerified := c.hasClaim("email_verified"); hasEmailVerified {
+			var emailVerified bool
+			if err := c.unmarshalClaim("email_verified", &emailVerified); err != nil {
+				return nil, false, fmt.Errorf("oidc: parse 'email_verified' claim: %v", err)
+			}
+
+			// If the email_verified claim is present we have to verify it is set to `true`.
+			if !emailVerified {
+				return nil, false, fmt.Errorf("oidc: email not verified")
+			}
 		}
 	}
 
@@ -319,6 +329,23 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 			info.Groups[i] = a.groupsPrefix + group
 		}
 	}
+
+	// check to ensure all required claims are present in the ID token and have matching values.
+	for claim, value := range a.requiredClaims {
+		if !c.hasClaim(claim) {
+			return nil, false, fmt.Errorf("oidc: required claim %s not present in ID token", claim)
+		}
+
+		// NOTE: Only string values are supported as valid required claim values.
+		var claimValue string
+		if err := c.unmarshalClaim(claim, &claimValue); err != nil {
+			return nil, false, fmt.Errorf("oidc: parse claim %s: %v", claim, err)
+		}
+		if claimValue != value {
+			return nil, false, fmt.Errorf("oidc: required claim %s value does not match. Got = %s, want = %s", claim, claimValue, value)
+		}
+	}
+
 	return info, true, nil
 }
 
@@ -346,4 +373,11 @@ func (c claims) unmarshalClaim(name string, v interface{}) error {
 		return fmt.Errorf("claim not present")
 	}
 	return json.Unmarshal([]byte(val), v)
+}
+
+func (c claims) hasClaim(name string) bool {
+	if _, ok := c[name]; !ok {
+		return false
+	}
+	return true
 }

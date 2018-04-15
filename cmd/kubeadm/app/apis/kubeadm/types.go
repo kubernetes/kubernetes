@@ -124,13 +124,16 @@ type MasterConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool
+
+	// The cluster name
+	ClusterName string
 }
 
 // API struct contains elements of API server address.
 type API struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
-	// ControlPlaneEndpoint sets the DNS address for the API server
+	// ControlPlaneEndpoint sets the DNS address with optional port for the API server
 	ControlPlaneEndpoint string
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
@@ -224,6 +227,8 @@ type NodeConfiguration struct {
 	// will be fetched. Currently we only pay attention to one API server but
 	// hope to support >1 in the future.
 	DiscoveryTokenAPIServers []string
+	// DiscoveryTimeout modifies the discovery timeout
+	DiscoveryTimeout *metav1.Duration
 	// NodeName is the name of the node to join the cluster. Defaults
 	// to the name of the host.
 	NodeName string
@@ -234,6 +239,8 @@ type NodeConfiguration struct {
 	Token string
 	// CRISocket is used to retrieve container runtime info.
 	CRISocket string
+	// The cluster name
+	ClusterName string
 
 	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
 	// when token-based discovery is used. The root CA found during discovery
@@ -281,6 +288,8 @@ type HostPathMount struct {
 	HostPath string
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string
+	// Writable controls write access to the volume
+	Writable bool
 }
 
 // KubeProxy contains elements describing the proxy configuration.

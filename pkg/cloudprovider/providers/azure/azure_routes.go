@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
-	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
@@ -111,7 +111,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	if err := az.createRouteTableIfNotExists(clusterName, kubeRoute); err != nil {
 		return err
 	}
-	targetIP, err := az.getIPForMachine(kubeRoute.TargetNode)
+	targetIP, _, err := az.getIPForMachine(kubeRoute.TargetNode)
 	if err != nil {
 		return err
 	}

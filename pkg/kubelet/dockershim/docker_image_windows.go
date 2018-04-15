@@ -19,10 +19,10 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"

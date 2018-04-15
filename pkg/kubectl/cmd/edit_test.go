@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -207,6 +208,8 @@ func TestEdit(t *testing.T) {
 			}
 
 			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
 			tf.UnstructuredClientForMappingFunc = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 				versionedAPIPath := ""
 				if mapping.GroupVersionKind.Group == "" {
@@ -234,7 +237,7 @@ func TestEdit(t *testing.T) {
 			case "edit":
 				cmd = NewCmdEdit(tf, buf, errBuf)
 			case "create":
-				cmd = NewCmdCreate(tf, buf, errBuf)
+				cmd = create.NewCmdCreate(tf, buf, errBuf)
 				cmd.Flags().Set("edit", "true")
 			case "edit-last-applied":
 				cmd = NewCmdApplyEditLastApplied(tf, buf, errBuf)

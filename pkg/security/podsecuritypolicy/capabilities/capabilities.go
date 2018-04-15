@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // defaultCapabilities implements the Strategy interface
@@ -100,7 +100,7 @@ func (s *defaultCapabilities) Validate(pod *api.Pod, container *api.Container, c
 	}
 
 	allowedAdd := makeCapSet(s.allowedCaps)
-	allowAllCaps := allowedAdd.Has(string(extensions.AllowAllCapabilities))
+	allowAllCaps := allowedAdd.Has(string(policy.AllowAllCapabilities))
 	if allowAllCaps {
 		// skip validation against allowed/defaultAdd/requiredDrop because all capabilities are allowed by a wildcard
 		return allErrs

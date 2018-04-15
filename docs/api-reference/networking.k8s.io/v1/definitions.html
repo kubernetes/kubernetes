@@ -918,7 +918,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <div class="sect2">
 <h3 id="_v1_networkpolicypeer">v1.NetworkPolicyPeer</h3>
 <div class="paragraph">
-<p>NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields must be specified.</p>
+<p>NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of fields are allowed</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -940,21 +940,25 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">podSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If present but empty, this selector selects all pods in this namespace.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods.<br>
+<br>
+If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy&#8217;s own Namespace.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">namespaceSelector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Selects Namespaces using cluster scoped-labels. This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If present but empty, this selector selects all namespaces.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces.<br>
+<br>
+If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_labelselector">v1.LabelSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ipBlock</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">IPBlock defines policy on a particular IPBlock</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_ipblock">v1.IPBlock</a></p></td>
 <td class="tableblock halign-left valign-top"></td>

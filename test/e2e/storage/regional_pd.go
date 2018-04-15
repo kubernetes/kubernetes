@@ -21,6 +21,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"fmt"
+	"strings"
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -34,8 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	"strings"
-	"time"
 )
 
 const (
@@ -333,7 +334,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 				// and prints the entire file to stdout.
 				{
 					Name:    "busybox",
-					Image:   "gcr.io/google_containers/busybox",
+					Image:   "k8s.gcr.io/busybox",
 					Command: []string{"sh", "-c"},
 					Args: []string{
 						"echo ${POD_NAME} >> /mnt/data/regional-pd/pods.txt;" +

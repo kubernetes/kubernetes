@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,15 +7,17 @@ go_library(
         "csi_volumes.go",
         "empty_dir_wrapper.go",
         "flexvolume.go",
+        "generic_persistent_volume-disruptive.go",
         "mounted_volume_resize.go",
+        "nfs_persistent_volume-disruptive.go",
         "pd.go",
         "persistent_volumes.go",
-        "persistent_volumes-disruptive.go",
         "persistent_volumes-gce.go",
         "persistent_volumes-local.go",
         "pv_protection.go",
         "pvc_protection.go",
         "regional_pd.go",
+        "subpath.go",
         "volume_expand.go",
         "volume_io.go",
         "volume_metrics.go",
@@ -28,10 +25,10 @@ go_library(
         "volumes.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/storage",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
@@ -70,6 +67,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -77,6 +75,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
     ],
 )
 
@@ -95,4 +94,5 @@ filegroup(
         "//test/e2e/storage/vsphere:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -236,102 +236,106 @@ func TestTaint(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-		new_node := &v1.Node{}
-		tainted := false
-		tf := cmdtesting.NewTestFactory()
-		codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-		ns := legacyscheme.Codecs
+		t.Run(test.description, func(t *testing.T) {
+			oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
+			new_node := &v1.Node{}
+			tainted := false
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
 
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				m := &MyReq{req}
-				switch {
-				case m.isFor("GET", "/nodes"):
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
-				case m.isFor("GET", "/nodes/node-name"):
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
-				case m.isFor("PATCH", "/nodes/node-name"):
-					tainted = true
-					data, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					defer req.Body.Close()
+			codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
+			ns := legacyscheme.Codecs
 
-					// apply the patch
-					oldJSON, err := runtime.Encode(codec, oldNode)
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &v1.Node{})
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					m := &MyReq{req}
+					switch {
+					case m.isFor("GET", "/nodes"):
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
+					case m.isFor("GET", "/nodes/node-name"):
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
+					case m.isFor("PATCH", "/nodes/node-name"):
+						tainted = true
+						data, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						defer req.Body.Close()
 
-					// decode the patch
-					if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
-						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
-					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
-				case m.isFor("PUT", "/nodes/node-name"):
-					tainted = true
-					data, err := ioutil.ReadAll(req.Body)
-					if err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					defer req.Body.Close()
-					if err := runtime.DecodeInto(codec, data, new_node); err != nil {
-						t.Fatalf("%s: unexpected error: %v", test.description, err)
-					}
-					if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
-						t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
-					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
-				default:
-					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.ClientConfigVal = defaultClientConfig()
+						// apply the patch
+						oldJSON, err := runtime.Encode(codec, oldNode)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &v1.Node{})
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
 
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdTaint(tf, buf)
+						// decode the patch
+						if err := runtime.DecodeInto(codec, appliedPatch, new_node); err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
+							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					case m.isFor("PUT", "/nodes/node-name"):
+						tainted = true
+						data, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						defer req.Body.Close()
+						if err := runtime.DecodeInto(codec, data, new_node); err != nil {
+							t.Fatalf("%s: unexpected error: %v", test.description, err)
+						}
+						if !equalTaints(expectNewNode.Spec.Taints, new_node.Spec.Taints) {
+							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, new_node.Spec.Taints)
+						}
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.ClientConfigVal = defaultClientConfig()
 
-		saw_fatal := false
-		func() {
-			defer func() {
-				// Recover from the panic below.
-				_ = recover()
-				// Restore cmdutil behavior
-				cmdutil.DefaultBehaviorOnFatal()
+			buf := bytes.NewBuffer([]byte{})
+			cmd := NewCmdTaint(tf, buf)
+
+			saw_fatal := false
+			func() {
+				defer func() {
+					// Recover from the panic below.
+					_ = recover()
+					// Restore cmdutil behavior
+					cmdutil.DefaultBehaviorOnFatal()
+				}()
+				cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
+				cmd.SetArgs(test.args)
+				cmd.Execute()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
-			cmd.SetArgs(test.args)
-			cmd.Execute()
-		}()
 
-		if test.expectFatal {
-			if !saw_fatal {
-				t.Fatalf("%s: unexpected non-error", test.description)
+			if test.expectFatal {
+				if !saw_fatal {
+					t.Fatalf("%s: unexpected non-error", test.description)
+				}
 			}
-		}
 
-		if test.expectTaint {
-			if !tainted {
-				t.Fatalf("%s: node not tainted", test.description)
+			if test.expectTaint {
+				if !tainted {
+					t.Fatalf("%s: node not tainted", test.description)
+				}
 			}
-		}
-		if !test.expectTaint {
-			if tainted {
-				t.Fatalf("%s: unexpected taint", test.description)
+			if !test.expectTaint {
+				if tainted {
+					t.Fatalf("%s: unexpected taint", test.description)
+				}
 			}
-		}
+		})
 	}
 }
 

@@ -23,17 +23,17 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
 type mustRunAs struct {
-	opts *extensions.SELinuxStrategyOptions
+	opts *policy.SELinuxStrategyOptions
 }
 
 var _ SELinuxStrategy = &mustRunAs{}
 
-func NewMustRunAs(options *extensions.SELinuxStrategyOptions) (SELinuxStrategy, error) {
+func NewMustRunAs(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, error) {
 	if options == nil {
 		return nil, fmt.Errorf("MustRunAs requires SELinuxContextStrategyOptions")
 	}

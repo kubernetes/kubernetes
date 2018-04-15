@@ -144,7 +144,10 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 	apiGroups, err := cl.ServerGroups()
 	if err != nil {
-		return nil, err
+		if apiGroups == nil || len(apiGroups.Groups) == 0 {
+			return nil, err
+		}
+		// TODO track the errors and update callers to handle partial errors.
 	}
 	var result []*APIGroupResources
 	for _, group := range apiGroups.Groups {
@@ -157,7 +160,9 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 			if err != nil {
 				// continue as best we can
 				// TODO track the errors and update callers to handle partial errors.
-				continue
+				if resources == nil || len(resources.APIResources) == 0 {
+					continue
+				}
 			}
 			groupResources.VersionedResources[version.Version] = resources.APIResources
 		}

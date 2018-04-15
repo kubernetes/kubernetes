@@ -32,6 +32,10 @@ go_test(
             "local_test.go",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "local_linux_test.go",
+            "local_test.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "local_test.go",
         ],
         "//conditions:default": [],
@@ -47,6 +51,14 @@ go_test(
             "//vendor/k8s.io/client-go/util/testing:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/volume:go_default_library",
+            "//pkg/volume/testing:go_default_library",
+            "//vendor/k8s.io/api/core/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//vendor/k8s.io/client-go/util/testing:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/volume:go_default_library",
             "//pkg/volume/testing:go_default_library",
             "//vendor/k8s.io/api/core/v1:go_default_library",

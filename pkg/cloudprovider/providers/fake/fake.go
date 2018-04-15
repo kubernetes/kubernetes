@@ -208,14 +208,6 @@ func (f *FakeCloud) NodeAddressesByProviderID(ctx context.Context, providerID st
 	return f.Addresses, f.Err
 }
 
-// ExternalID is a test-spy implementation of Instances.ExternalID.
-// It adds an entry "external-id" into the internal method call record.
-// It returns an external id to the mapped instance name, if not found, it will return "ext-{instance}"
-func (f *FakeCloud) ExternalID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	f.addCall("external-id")
-	return f.ExtID[nodeName], f.Err
-}
-
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (f *FakeCloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")

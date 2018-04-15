@@ -119,7 +119,7 @@ type Eviction struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Pod Security Policy governs the ability to make requests that affect the Security Context
+// PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
 type PodSecurityPolicy struct {
 	metav1.TypeMeta `json:",inline"`
@@ -133,28 +133,28 @@ type PodSecurityPolicy struct {
 	Spec PodSecurityPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
-// Pod Security Policy Spec defines the policy enforced.
+// PodSecurityPolicySpec defines the policy enforced.
 type PodSecurityPolicySpec struct {
 	// privileged determines if a pod can request to be run as privileged.
 	// +optional
 	Privileged bool `json:"privileged,omitempty" protobuf:"varint,1,opt,name=privileged"`
-	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
+	// defaultAddCapabilities is the default set of capabilities that will be added to the container
 	// unless the pod spec specifically drops the capability.  You may not list a capability in both
-	// DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly
-	// allowed, and need not be included in the AllowedCapabilities list.
+	// defaultAddCapabilities and requiredDropCapabilities. Capabilities added here are implicitly
+	// allowed, and need not be included in the allowedCapabilities list.
 	// +optional
 	DefaultAddCapabilities []v1.Capability `json:"defaultAddCapabilities,omitempty" protobuf:"bytes,2,rep,name=defaultAddCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+	// requiredDropCapabilities are the capabilities that will be dropped from the container.  These
 	// are required to be dropped and cannot be added.
 	// +optional
 	RequiredDropCapabilities []v1.Capability `json:"requiredDropCapabilities,omitempty" protobuf:"bytes,3,rep,name=requiredDropCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+	// allowedCapabilities is a list of capabilities that can be requested to add to the container.
 	// Capabilities in this field may be added at the pod author's discretion.
-	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	// You must not list a capability in both allowedCapabilities and requiredDropCapabilities.
 	// +optional
 	AllowedCapabilities []v1.Capability `json:"allowedCapabilities,omitempty" protobuf:"bytes,4,rep,name=allowedCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
-	// may be used.
+	// volumes is a white list of allowed volume plugins. Empty indicates that
+	// no volumes may be used. To allow all volumes you may use '*'.
 	// +optional
 	Volumes []FSType `json:"volumes,omitempty" protobuf:"bytes,5,rep,name=volumes,casttype=FSType"`
 	// hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
@@ -173,39 +173,40 @@ type PodSecurityPolicySpec struct {
 	SELinux SELinuxStrategyOptions `json:"seLinux" protobuf:"bytes,10,opt,name=seLinux"`
 	// runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions `json:"runAsUser" protobuf:"bytes,11,opt,name=runAsUser"`
-	// SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+	// supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
 	SupplementalGroups SupplementalGroupsStrategyOptions `json:"supplementalGroups" protobuf:"bytes,12,opt,name=supplementalGroups"`
-	// FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+	// fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.
 	FSGroup FSGroupStrategyOptions `json:"fsGroup" protobuf:"bytes,13,opt,name=fsGroup"`
-	// ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+	// readOnlyRootFilesystem when set to true will force containers to run with a read only root file
 	// system.  If the container specifically requests to run with a non-read only root file system
 	// the PSP should deny the pod.
 	// If set to false the container may run with a read only root file system if it wishes but it
 	// will not be forced to.
 	// +optional
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
-	// DefaultAllowPrivilegeEscalation controls the default setting for whether a
+	// defaultAllowPrivilegeEscalation controls the default setting for whether a
 	// process can gain more privileges than its parent process.
 	// +optional
 	DefaultAllowPrivilegeEscalation *bool `json:"defaultAllowPrivilegeEscalation,omitempty" protobuf:"varint,15,opt,name=defaultAllowPrivilegeEscalation"`
-	// AllowPrivilegeEscalation determines if a pod can request to allow
+	// allowPrivilegeEscalation determines if a pod can request to allow
 	// privilege escalation. If unspecified, defaults to true.
 	// +optional
 	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,16,opt,name=allowPrivilegeEscalation"`
-	// is a white list of allowed host paths. Empty indicates that all host paths may be used.
+	// allowedHostPaths is a white list of allowed host paths. Empty indicates
+	// that all host paths may be used.
 	// +optional
 	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,17,rep,name=allowedHostPaths"`
-	// AllowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+	// allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
 	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
-	// is allowed in the "Volumes" field.
+	// is allowed in the "volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 }
 
-// defines the host volume conditions that will be enabled by a policy
+// AllowedHostPath defines the host volume conditions that will be enabled by a policy
 // for pods to use. It requires the path prefix to be defined.
 type AllowedHostPath struct {
-	// is the path prefix that the host volume must match.
+	// pathPrefix is the path prefix that the host volume must match.
 	// It does not support `*`.
 	// Trailing slashes are trimmed when validating the path prefix with a host path.
 	//
@@ -215,7 +216,7 @@ type AllowedHostPath struct {
 	PathPrefix string `json:"pathPrefix,omitempty" protobuf:"bytes,1,rep,name=pathPrefix"`
 }
 
-// FS Type gives strong typing to different file systems that are used by volumes.
+// FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
 var (
@@ -245,11 +246,11 @@ var (
 
 // AllowedFlexVolume represents a single Flexvolume that is allowed to be used.
 type AllowedFlexVolume struct {
-	// Driver is the name of the Flexvolume driver.
+	// driver is the name of the Flexvolume driver.
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 }
 
-// Host Port Range defines a range of host ports that will be enabled by a policy
+// HostPortRange defines a range of host ports that will be enabled by a policy
 // for pods to use.  It requires both the start and end to be defined.
 type HostPortRange struct {
 	// min is the start of the range, inclusive.
@@ -258,9 +259,9 @@ type HostPortRange struct {
 	Max int32 `json:"max" protobuf:"varint,2,opt,name=max"`
 }
 
-// SELinux  Strategy Options defines the strategy type and any options used to create the strategy.
+// SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
 type SELinuxStrategyOptions struct {
-	// type is the strategy that will dictate the allowable labels that may be set.
+	// rule is the strategy that will dictate the allowable labels that may be set.
 	Rule SELinuxStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=SELinuxStrategy"`
 	// seLinuxOptions required to run as; required for MustRunAs
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
@@ -273,26 +274,27 @@ type SELinuxStrategyOptions struct {
 type SELinuxStrategy string
 
 const (
-	// container must have SELinux labels of X applied.
+	// SELinuxStrategyMustRunAs means that container must have SELinux labels of X applied.
 	SELinuxStrategyMustRunAs SELinuxStrategy = "MustRunAs"
-	// container may make requests for any SELinux context labels.
+	// SELinuxStrategyRunAsAny means that container may make requests for any SELinux context labels.
 	SELinuxStrategyRunAsAny SELinuxStrategy = "RunAsAny"
 )
 
-// Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.
+// RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
 type RunAsUserStrategyOptions struct {
-	// Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+	// rule is the strategy that will dictate the allowable RunAsUser values that may be set.
 	Rule RunAsUserStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsUserStrategy"`
-	// Ranges are the allowed ranges of uids that may be used.
+	// ranges are the allowed ranges of uids that may be used. If you would like to force a single uid
+	// then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
 
-// ID Range provides a min/max of an allowed range of IDs.
+// IDRange provides a min/max of an allowed range of IDs.
 type IDRange struct {
-	// Min is the start of the range, inclusive.
+	// min is the start of the range, inclusive.
 	Min int64 `json:"min" protobuf:"varint,1,opt,name=min"`
-	// Max is the end of the range, inclusive.
+	// max is the end of the range, inclusive.
 	Max int64 `json:"max" protobuf:"varint,2,opt,name=max"`
 }
 
@@ -301,21 +303,21 @@ type IDRange struct {
 type RunAsUserStrategy string
 
 const (
-	// container must run as a particular uid.
+	// RunAsUserStrategyMustRunAs means that container must run as a particular uid.
 	RunAsUserStrategyMustRunAs RunAsUserStrategy = "MustRunAs"
-	// container must run as a non-root uid
+	// RunAsUserStrategyMustRunAsNonRoot means that container must run as a non-root uid.
 	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategy = "MustRunAsNonRoot"
-	// container may make requests for any uid.
+	// RunAsUserStrategyRunAsAny means that container may make requests for any uid.
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
 )
 
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
 type FSGroupStrategyOptions struct {
-	// Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
+	// rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
 	// +optional
 	Rule FSGroupStrategyType `json:"rule,omitempty" protobuf:"bytes,1,opt,name=rule,casttype=FSGroupStrategyType"`
-	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
-	// fs group then supply a single range with the same start and end.
+	// ranges are the allowed ranges of fs groups.  If you would like to force a single
+	// fs group then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
@@ -325,19 +327,19 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
-	// container must have FSGroup of X applied.
+	// FSGroupStrategyMustRunAs meant that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
-	// container may make requests for any FSGroup labels.
+	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
 	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
 )
 
 // SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
 type SupplementalGroupsStrategyOptions struct {
-	// Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+	// rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
 	// +optional
 	Rule SupplementalGroupsStrategyType `json:"rule,omitempty" protobuf:"bytes,1,opt,name=rule,casttype=SupplementalGroupsStrategyType"`
-	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
-	// supplemental group then supply a single range with the same start and end.
+	// ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+	// supplemental group then supply a single range with the same start and end. Required for MustRunAs.
 	// +optional
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
@@ -347,15 +349,15 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
-	// container must run as a particular gid.
+	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
-	// container may make requests for any gid.
+	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Pod Security Policy List is a list of PodSecurityPolicy objects.
+// PodSecurityPolicyList is a list of PodSecurityPolicy objects.
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -363,6 +365,6 @@ type PodSecurityPolicyList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of schema objects.
+	// items is a list of schema objects.
 	Items []PodSecurityPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

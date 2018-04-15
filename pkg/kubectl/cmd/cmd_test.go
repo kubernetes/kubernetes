@@ -122,31 +122,6 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
-type testPrinter struct {
-	Objects        []runtime.Object
-	Err            error
-	GenericPrinter bool
-}
-
-func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Objects = append(t.Objects, obj)
-	fmt.Fprintf(out, "%#v", obj)
-	return t.Err
-}
-
-// TODO: implement HandledResources()
-func (t *testPrinter) HandledResources() []string {
-	return []string{}
-}
-
-func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
-	return nil
-}
-
-func (t *testPrinter) IsGeneric() bool {
-	return t.GenericPrinter
-}
-
 type testDescriber struct {
 	Name, Namespace string
 	Settings        printers.DescriberSettings
@@ -178,6 +153,8 @@ func stringBody(body string) io.ReadCloser {
 
 func Example_printMultiContainersReplicationControllerWithWide() {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -228,6 +205,8 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 
 func Example_printReplicationController() {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -277,6 +256,8 @@ func Example_printReplicationController() {
 
 func Example_printPodWithWideFormat() {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -315,6 +296,8 @@ func Example_printPodWithWideFormat() {
 
 func Example_printPodWithShowLabels() {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -448,6 +431,8 @@ func newAllPhasePodList() *api.PodList {
 
 func Example_printPodShowTerminated() {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{
@@ -456,45 +441,15 @@ func Example_printPodShowTerminated() {
 	}
 	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
 	podList := newAllPhasePodList()
-	// filter pods
-	filterFuncs := tf.DefaultResourceFilterFunc()
-	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, false)
-	_, filteredPodList, errs := cmdutil.FilterResourceList(podList, filterFuncs, filterOpts)
-	if errs != nil {
-		fmt.Printf("Unexpected filter error: %v\n", errs)
-	}
 	printer, err := cmdutil.PrinterForOptions(cmdutil.ExtractCmdPrintOptions(cmd, false))
 	if err != nil {
-		fmt.Printf("Unexpected printer get error: %v\n", errs)
+		fmt.Printf("Unexpected printer get error: %v\n", err)
 	}
-	for _, pod := range filteredPodList {
+	for _, pod := range []runtime.Object{podList} {
 		err := printer.PrintObj(pod, os.Stdout)
 		if err != nil {
 			fmt.Printf("Unexpected error: %v", err)
 		}
-	}
-	// Output:
-	// NAME      READY     STATUS    RESTARTS   AGE
-	// test1     1/2       Pending   6          10y
-	// test2     1/2       Running   6         10y
-	// test3     1/2       Succeeded   6         10y
-	// test4     1/2       Failed    6         10y
-	// test5     1/2       Unknown   6         10y
-}
-
-func Example_printPodShowAll() {
-	tf := cmdtesting.NewTestFactory()
-	ns := legacyscheme.Codecs
-
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client:               nil,
-	}
-	cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
-	podList := newAllPhasePodList()
-	err := cmdutil.PrintObject(cmd, podList, os.Stdout)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
 	// NAME      READY     STATUS      RESTARTS   AGE
@@ -507,6 +462,8 @@ func Example_printPodShowAll() {
 
 func Example_printServiceWithLabels() {
 	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
 	ns := legacyscheme.Codecs
 
 	tf.Client = &fake.RESTClient{

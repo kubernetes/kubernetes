@@ -112,7 +112,7 @@ type OperationExecutor interface {
 	// For 'Block' volumeMode, this method unmaps symbolic link to the volume
 	// from both the pod device map path in volumeToUnmount and global map path.
 	// And then, updates the actual state of the world to reflect that.
-	UnmountVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	UnmountVolume(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) error
 
 	// If a volume has 'Filesystem' volumeMode, UnmountDevice unmounts the
 	// volumes global mount path from the device (for attachable volumes only,
@@ -163,7 +163,7 @@ func NewOperationExecutor(
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as mounted to the specified pod
-	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string) error
+	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string, volumeSpec *volume.Spec) error
 
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
@@ -746,7 +746,8 @@ func (oe *operationExecutor) MountVolume(
 
 func (oe *operationExecutor) UnmountVolume(
 	volumeToUnmount MountedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	podsDir string) error {
 	fsVolume, err := util.CheckVolumeModeFilesystem(volumeToUnmount.VolumeSpec)
 	if err != nil {
 		return err
@@ -756,7 +757,7 @@ func (oe *operationExecutor) UnmountVolume(
 		// Filesystem volume case
 		// Unmount a volume if a volume is mounted
 		generatedOperations, err = oe.operationGenerator.GenerateUnmountVolumeFunc(
-			volumeToUnmount, actualStateOfWorld)
+			volumeToUnmount, actualStateOfWorld, podsDir)
 	} else {
 		// Block volume case
 		// Unmap a volume if a volume is mapped
