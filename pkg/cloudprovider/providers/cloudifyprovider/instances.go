@@ -23,6 +23,7 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"errors"
 )
 
 // Instances - struct with connection settings
@@ -30,6 +31,46 @@ type Instances struct {
 	deployment string
 	client     *cloudify.Client
 }
+
+func (r *Instances) GetDeploymentNodeInfo() (map[string] string, error) {
+	deploymentInfo := make(map[string]string)
+
+	data, err := cloudify.ParseDeploymentFile(r.deployment)
+	if err != nil {
+		fmt.Errorf("Error While trying to parse deployment file")
+		return nil, err
+	}
+
+	for _, deployment :=  range data.Deployments {
+		dep := deployment.(map[string]interface{})
+
+		if dep["deployment_type"] == "node" {
+			deploymentInfo["id"] = dep["id"].(string)
+			deploymentInfo["node_data_data_type"] = dep["node_data_data_type"].(string)
+			return deploymentInfo, nil
+		}
+	}
+
+	return deploymentInfo, nil
+}
+
+
+func (r *Instances) GetDeploymentNodeID() (map[string]string, error) {
+	deploymentInfo, err := r.GetDeploymentNodeInfo()
+	if err != nil {
+		glog.Errorf("Error: %+v", err)
+		return nil, err
+	}
+
+	if deploymentInfo == nil {
+		errorMessage := "cloudify deployment info is empty"
+		glog.Errorf(errorMessage)
+		return nil, errors.New(errorMessage)
+	}
+
+	return deploymentInfo, nil
+}
+
 
 // NodeAddresses returns the addresses of the specified instance.
 // This implementation only returns the address of the calling instance. This is ok
@@ -41,11 +82,18 @@ func (r *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, e
 	glog.V(4).Infof("NodeAddresses [%s]", name)
 
 	var params = map[string]string{}
-	// Add filter by deployment
-	params["deployment_id"] = r.deployment
+	deploymentInfo, err := r.GetDeploymentNodeID()
+	if err != nil {
+		return nil, err
+	}
 
+	if deploymentInfo == nil {
+		return nil, errors.New("cannot find the deployment info")
+	}
+
+	params["deployment_id"] = deploymentInfo["id"]
 	nodeInstances, err := r.client.GetAliveNodeInstancesWithType(
-		params, cloudify.KubernetesNode)
+		params, deploymentInfo["node_data_data_type"])
 	if err != nil {
 		glog.Infof("Not found instances: %+v", err)
 		return nil, err
@@ -136,12 +184,18 @@ func (r *Instances) InstanceID(nodeName types.NodeName) (string, error) {
 	glog.V(4).Infof("InstanceID [%s]", name)
 
 	var params = map[string]string{}
+	deploymentInfo, err := r.GetDeploymentNodeID()
+	if err != nil {
+		return "", err
+	}
 
-	// Add filter by deployment
-	params["deployment_id"] = r.deployment
+	if deploymentInfo == nil {
+		return "", errors.New("cannot find the deployment info")
+	}
+	params["deployment_id"] = deploymentInfo["id"]
 
 	nodeInstances, err := r.client.GetAliveNodeInstancesWithType(
-		params, cloudify.KubernetesNode)
+		params, deploymentInfo["node_data_data_type"])
 	if err != nil {
 		glog.Infof("Not found instances: %+v", err)
 		return "", err

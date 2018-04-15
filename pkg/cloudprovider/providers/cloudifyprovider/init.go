@@ -123,7 +123,7 @@ func newCloudifyCloud(config io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 	return &CloudProvider{
-		deployment: cloudConfig.Deployment,
+		deployment: cloudConfig.DeploymentsFile,
 		client:     cloudify.NewClient(cloudConfig.ClientConfig),
 	}, nil
 }

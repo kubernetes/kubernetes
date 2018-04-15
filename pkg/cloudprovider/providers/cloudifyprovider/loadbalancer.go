@@ -18,15 +18,54 @@ package cloudifyprovider
 
 import (
 	"fmt"
-	cloudify "github.com/cloudify-incubator/cloudify-rest-go-client/cloudify"
+	"github.com/cloudify-incubator/cloudify-rest-go-client/cloudify"
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
+	"errors"
 )
 
 // Balancer - struct with connection settings
 type Balancer struct {
 	deployment string
 	client     *cloudify.Client
+}
+
+func (r *Balancer) GetDeploymentBalancerInfo() (map[string]string, error) {
+	deploymentInfo := make(map[string]string)
+
+	data, err := cloudify.ParseDeploymentFile(r.deployment)
+	if err != nil {
+		fmt.Errorf("Error While trying to parse deployment file")
+		return nil, err
+	}
+
+	for _, deployment := range data.Deployments {
+		dep := deployment.(map[string]interface{})
+
+		if dep["deployment_type"] == "load" {
+			deploymentInfo["id"] = dep["id"].(string)
+			deploymentInfo["node_data_type"] = dep["node_data_type"].(string)
+			return deploymentInfo, nil
+		}
+	}
+
+	return deploymentInfo, nil
+}
+
+func (r *Balancer) GetDeploymentBalancerID() (map[string]string, error) {
+	deploymentInfo, err := r.GetDeploymentBalancerInfo()
+	if err != nil {
+		glog.Errorf("Error: %+v", err)
+		return nil, err
+	}
+
+	if deploymentInfo == nil {
+		errorMessage := "cloudify deployment info is empty"
+		glog.Errorf(errorMessage)
+		return nil, errors.New(errorMessage)
+	}
+
+	return deploymentInfo, nil
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
@@ -47,11 +86,16 @@ func (r *Balancer) getLoadBalancerNode(clusterName string, service *api.Service)
 		nameSpace = string(service.Namespace)
 	}
 	var params = map[string]string{}
+	deploymentInfo, err := r.GetDeploymentBalancerID()
+	if err != nil || deploymentInfo == nil {
+		return nil
+	}
+
 	// Add filter by deployment
-	params["deployment_id"] = r.deployment
+	params["deployment_id"] = deploymentInfo["id"]
 
 	instances, err := r.client.GetLoadBalancerInstances(params, clusterName, nameSpace, name,
-		cloudify.KubernetesLoadBalancer)
+		deploymentInfo["node_data_type"])
 	if err != nil {
 		glog.Infof("Not found instances: %+v", err)
 		return nil
@@ -116,14 +160,26 @@ func (r *Balancer) EnsureLoadBalancerDeleted(clusterName string, service *api.Se
 	nodeInstance := r.getLoadBalancerNode(clusterName, service)
 
 	glog.Infof("Delete for node %+v", nodeInstance.ID)
+
+	// Get The deployment ID For Load Balancer node
+	deploymentInfo, err := r.GetDeploymentBalancerID()
+	if err != nil {
+		return err
+	}
+
+	if deploymentInfo == nil {
+		return errors.New("cannot find the deployment info")
+	}
+
 	if nodeInstance != nil {
-		err := r.client.WaitBeforeRunExecution(r.deployment)
+		err := r.client.WaitBeforeRunExecution(deploymentInfo["id"])
 		if err != nil {
 			return err
 		}
+
 		var exec cloudify.ExecutionPost
 		exec.WorkflowID = "execute_operation"
-		exec.DeploymentID = r.deployment
+		exec.DeploymentID = deploymentInfo["id"]
 		exec.Parameters = map[string]interface{}{}
 		exec.Parameters["operation"] = "maintenance.delete"
 		exec.Parameters["node_ids"] = []string{}
@@ -152,13 +208,21 @@ func (r *Balancer) EnsureLoadBalancerDeleted(clusterName string, service *api.Se
 func (r *Balancer) getLoadbalancerScaleGroup() (string, error) {
 	var params = map[string]string{}
 	// Add filter by deployment
-	params["deployment_id"] = r.deployment
+	deploymentInfo, err := r.GetDeploymentBalancerID()
+	if err != nil {
+		return "", err
+	}
+
+	if deploymentInfo == nil {
+		return "", errors.New("cannot find the deployment info")
+	}
+	params["deployment_id"] = deploymentInfo["id"]
 	nodes, err := r.client.GetNodesFull(params)
 	if err != nil {
 		return "", err
 	}
 	for _, node := range nodes.Items {
-		if node.Type == cloudify.KubernetesLoadBalancer {
+		if node.Type == deploymentInfo["node_data_type"] {
 			if node.ScalingGroupName != "" {
 				return node.ScalingGroupName, nil
 			}
@@ -189,9 +253,18 @@ func (r *Balancer) createOrGetLoadBalancer(clusterName string, service *api.Serv
 		return nil, err
 	}
 
+	deploymentInfo, err := r.GetDeploymentBalancerID()
+	if err != nil {
+		return nil, err
+	}
+
+	if deploymentInfo == nil {
+		return nil, errors.New("cannot find the deployment info")
+	}
+
 	var exec cloudify.ExecutionPost
 	exec.WorkflowID = "scale"
-	exec.DeploymentID = r.deployment
+	exec.DeploymentID = deploymentInfo["id"]
 	exec.Parameters = map[string]interface{}{}
 	exec.Parameters["scalable_entity_name"] = loadScalingGroup
 	execution, err := r.client.RunExecution(exec, false)
@@ -260,14 +333,24 @@ func (r *Balancer) updateNode(clusterName string, service *api.Service, nodes []
 	if err != nil {
 		return nil, err
 	}
+
+	deploymentInfo, err := r.GetDeploymentBalancerID()
+	if err != nil {
+		return nil, err
+	}
+
+	if deploymentInfo == nil {
+		return nil, errors.New("cannot find the deployment info")
+	}
+
 	if nodeInstance != nil {
-		err := r.client.WaitBeforeRunExecution(r.deployment)
+		err := r.client.WaitBeforeRunExecution(deploymentInfo["id"])
 		if err != nil {
 			return nil, err
 		}
 		var exec cloudify.ExecutionPost
 		exec.WorkflowID = "execute_operation"
-		exec.DeploymentID = r.deployment
+		exec.DeploymentID = deploymentInfo["id"]
 		exec.Parameters = map[string]interface{}{}
 		exec.Parameters["operation"] = "maintenance.init"
 		exec.Parameters["node_ids"] = []string{}
