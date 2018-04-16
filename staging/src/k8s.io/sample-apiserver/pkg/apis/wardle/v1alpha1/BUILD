@@ -1,7 +1,9 @@
+load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_conversion")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
-    "@io_bazel_rules_go//go:def.bzl",
+    "//build:go.bzl",
     "go_library",
 )
 
@@ -13,7 +15,6 @@ go_library(
         "types.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
     importpath = "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
     deps = [
@@ -37,3 +38,7 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])
+
+k8s_conversion(outs = ["zz_generated.conversion.go"])

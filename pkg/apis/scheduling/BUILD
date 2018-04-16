@@ -1,7 +1,9 @@
+load("//build:deepcopy.bzl", "k8s_deepcopy")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
-    "@io_bazel_rules_go//go:def.bzl",
+    "//build:go.bzl",
     "go_library",
     "go_test",
 )
@@ -48,3 +50,5 @@ go_test(
     embed = [":go_default_library"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])

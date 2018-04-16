@@ -18,6 +18,7 @@ package testing
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	_ "k8s.io/apimachinery/pkg/runtime" // deepcopy-gen dep
 )
 
 // Test a weird version/kind embedding format.

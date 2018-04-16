@@ -1,9 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
+package(
+    default_visibility = ["//visibility:public"],
 )
+
+# generate zz_generated.deepcopy.go at build-time
+load("//build:deepcopy.bzl", "k8s_deepcopy")
+load("//build:go.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -40,3 +41,5 @@ filegroup(
     ],
     tags = ["automanaged"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])

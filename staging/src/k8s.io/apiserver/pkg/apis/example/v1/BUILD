@@ -1,7 +1,9 @@
+load("//build:deepcopy.bzl", "k8s_deepcopy", "k8s_defaulter", "k8s_conversion")
+
 package(default_visibility = ["//visibility:public"])
 
 load(
-    "@io_bazel_rules_go//go:def.bzl",
+    "//build:go.bzl",
     "go_library",
 )
 
@@ -48,3 +50,9 @@ filegroup(
     srcs = ["generated.proto"],
     visibility = ["//visibility:public"],
 )
+
+k8s_deepcopy(outs = ["zz_generated.deepcopy.go"])
+
+k8s_conversion(outs = ["zz_generated.conversion.go"])
+
+k8s_defaulter(outs = ["zz_generated.defaults.go"])
