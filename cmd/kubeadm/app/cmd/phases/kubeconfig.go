@@ -103,6 +103,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 	legacyscheme.Scheme.Default(cfg)
 
 	var cfgPath, token, clientName string
+	var organizations []string
 	var subCmds []*cobra.Command
 
 	subCmdProperties := []struct {
@@ -159,7 +160,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 				}
 
 				// Otherwise, write a kubeconfig file with a generate client cert
-				return kubeconfigphase.WriteKubeConfigWithClientCert(out, cfg, clientName)
+				return kubeconfigphase.WriteKubeConfigWithClientCert(out, cfg, clientName, organizations)
 			},
 		},
 	}
@@ -188,6 +189,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 		if properties.use == "user" {
 			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 			cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
+			cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The orgnizations of the client certificate. It will be used as the O if client certificates are created")
 		}
 
 		subCmds = append(subCmds, cmd)
