@@ -204,7 +204,6 @@ type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
-	certDirectory string,
 	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
@@ -329,7 +328,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
-	certDirectory string,
 	rootDirectory string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
@@ -735,7 +733,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
 	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
+		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
 		}

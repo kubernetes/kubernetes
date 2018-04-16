@@ -43,6 +43,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Authorization.Webhook.CacheAuthorizedTTL = metav1.Duration{Duration: 5 * time.Minute}
 			obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
 			obj.Address = "0.0.0.0"
+			obj.CertDirectory = "/var/lib/kubelet/pki"
 			obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 			obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
 			obj.CPUCFSQuota = true
