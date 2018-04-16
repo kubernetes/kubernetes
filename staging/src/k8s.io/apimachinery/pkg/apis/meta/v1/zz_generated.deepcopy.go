@@ -681,6 +681,13 @@ func (in *ObjectMeta) DeepCopyInto(out *ObjectMeta) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.LastApplied != nil {
+		in, out := &in.LastApplied, &out.LastApplied
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
