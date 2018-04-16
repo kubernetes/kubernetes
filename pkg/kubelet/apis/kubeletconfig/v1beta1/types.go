@@ -62,6 +62,10 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// cloudConfigFile is the path to the cloud provider configuration file.
+	// Default: ""
+	// +optional
+	CloudConfigFile string `json:"cloudConfigFile,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that

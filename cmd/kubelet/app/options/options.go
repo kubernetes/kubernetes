@@ -92,10 +92,6 @@ type KubeletFlags struct {
 	// +optional
 	CloudProvider string
 
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	// +optional
-	CloudConfigFile string
-
 	// rootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string
@@ -362,7 +358,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Specify empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
-	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 
@@ -438,6 +433,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 		mainfs.AddFlagSet(fs)
 	}()
 
+	fs.StringVar(&c.CloudConfigFile, "cloud-config", c.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.BoolVar(&c.FailSwapOn, "fail-swap-on", c.FailSwapOn, "Makes the Kubelet fail to start if swap is enabled on the node. ")
 	fs.BoolVar(&c.FailSwapOn, "experimental-fail-swap-on", c.FailSwapOn, "DEPRECATED: please use --fail-swap-on instead.")
 
