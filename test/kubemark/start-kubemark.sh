@@ -207,8 +207,9 @@ function create-and-upload-hollow-node-image {
   CURR_DIR=`pwd`
   cd "${MAKE_DIR}"
   RETRIES=3
+  KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! REGISTRY="${FULL_REGISTRY}" IMAGE_TAG="${KUBEMARK_IMAGE_TAG}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
+    if ! REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" IMAGE_TAG="${KUBEMARK_IMAGE_TAG}" make "${KUBEMARK_IMAGE_MAKE_TARGET}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Make failed. Exiting.${color_norm}"
         exit 1
@@ -233,7 +234,7 @@ function create-and-upload-hollow-node-image-bazel {
 
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
-    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${FULL_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then
+    if ! bazel run //cluster/images/kubemark:push --define REGISTRY="${KUBEMARK_IMAGE_REGISTRY}" --define IMAGE_TAG="${KUBEMARK_IMAGE_TAG}"; then
       if [[ $((attempt)) -eq "${RETRIES}" ]]; then
         echo "${color_red}Image push failed. Exiting.${color_norm}"
         exit 1
@@ -407,7 +408,7 @@ current-context: kubemark-context")
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s'{{full_registry}}'${FULL_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubemark_image_tag}}/${KUBEMARK_IMAGE_TAG}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"

@@ -35,7 +35,7 @@ spec:
         emptyDir: {}
       containers:
       - name: hollow-kubelet
-        image: {{full_registry}}/kubemark:{{kubemark_image_tag}}
+        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
         ports:
         - containerPort: 4194
         - containerPort: 10250
@@ -67,7 +67,7 @@ spec:
         securityContext:
           privileged: true
       - name: hollow-proxy
-        image: {{full_registry}}/kubemark:{{kubemark_image_tag}}
+        image: {{kubemark_image_registry}}/kubemark:{{kubemark_image_tag}}
         env:
         - name: CONTENT_TYPE
           valueFrom:
