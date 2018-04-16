@@ -57,7 +57,7 @@ func NewCmdUploadConfig() *cobra.Command {
 		Aliases: []string{"uploadconfig"},
 		Run: func(_ *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
+				kubeadmutil.CheckErr(fmt.Errorf("the --config flag is mandatory"))
 			}
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
@@ -72,7 +72,7 @@ func NewCmdUploadConfig() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
-	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!")
+	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental")
 
 	return cmd
 }

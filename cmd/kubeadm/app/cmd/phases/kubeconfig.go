@@ -127,7 +127,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 		},
 		{
 			use:     "kubelet",
-			short:   "Generates a kubeconfig file for the kubelet to use. Please note that this should be used *only* for bootstrapping purposes.",
+			short:   "Generates a kubeconfig file for the kubelet to use. Please note that this should be used *only* for bootstrapping purposes",
 			long:    kubeletKubeconfigLongDesc,
 			cmdFunc: kubeconfigphase.CreateKubeletKubeConfigFile,
 		},
@@ -176,7 +176,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 
 		// Add flags to the command
 		if properties.use != "user" {
-			cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+			cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
 		}
 		cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where certificates are stored")
 		cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API server is accessible on")
@@ -186,7 +186,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			cmd.Flags().StringVar(&cfg.NodeName, "node-name", cfg.NodeName, `The node name that should be used for the kubelet client certificate`)
 		}
 		if properties.use == "user" {
-			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig (instead of client certificates)")
+			cmd.Flags().StringVar(&token, "token", token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 			cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 		}
 
