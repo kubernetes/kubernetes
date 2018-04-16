@@ -27,10 +27,12 @@ type MemStore struct {
 	sync.Mutex
 }
 
+// NewMemStore returns an instance of MemStore
 func NewMemStore() *MemStore {
 	return &MemStore{mem: make(map[string][]byte)}
 }
 
+// Write writes the data to the store
 func (mstore *MemStore) Write(key string, data []byte) error {
 	mstore.Lock()
 	defer mstore.Unlock()
@@ -38,6 +40,7 @@ func (mstore *MemStore) Write(key string, data []byte) error {
 	return nil
 }
 
+// Read returns data read from store
 func (mstore *MemStore) Read(key string) ([]byte, error) {
 	mstore.Lock()
 	defer mstore.Unlock()
@@ -48,6 +51,7 @@ func (mstore *MemStore) Read(key string) ([]byte, error) {
 	return data, nil
 }
 
+// Delete deletes data from the store
 func (mstore *MemStore) Delete(key string) error {
 	mstore.Lock()
 	defer mstore.Unlock()
@@ -55,6 +59,7 @@ func (mstore *MemStore) Delete(key string) error {
 	return nil
 }
 
+// List returns all the keys from the store
 func (mstore *MemStore) List() ([]string, error) {
 	mstore.Lock()
 	defer mstore.Unlock()

@@ -14,20 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockershim
+package errors
 
-import (
-	"testing"
+import "fmt"
 
-	"github.com/stretchr/testify/assert"
-)
+// ErrCorruptCheckpoint error is reported when checksum does not match
+var ErrCorruptCheckpoint = fmt.Errorf("checkpoint is corrupted")
 
-func TestPodSandboxCheckpoint(t *testing.T) {
-	data := &CheckpointData{HostNetwork: true}
-	checkpoint := NewPodSandboxCheckpoint("ns1", "sandbox1", data)
-	version, name, namespace, _, hostNetwork := checkpoint.GetData()
-	assert.Equal(t, schemaVersion, version)
-	assert.Equal(t, "ns1", namespace)
-	assert.Equal(t, "sandbox1", name)
-	assert.Equal(t, true, hostNetwork)
-}
+// ErrCheckpointNotFound is reported when checkpoint is not found for a given key
+var ErrCheckpointNotFound = fmt.Errorf("checkpoint is not found")

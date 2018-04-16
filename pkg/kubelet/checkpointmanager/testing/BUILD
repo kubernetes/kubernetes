@@ -8,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/testing",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/testing",
 )
 
 filegroup(
@@ -20,6 +20,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1:all-srcs",
+    ],
     tags = ["automanaged"],
 )
