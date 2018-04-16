@@ -25,7 +25,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
@@ -119,75 +121,93 @@ func TestRemoteConfigMapAPIPath(t *testing.T) {
 func TestRemoteConfigMapDownload(t *testing.T) {
 	cm := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "name",
-			Namespace: "namespace",
-			UID:       "uid",
+			Name:            "name",
+			Namespace:       "namespace",
+			UID:             "uid",
+			ResourceVersion: "1",
 		}}
-	client := fakeclient.NewSimpleClientset(cm)
-	payload, err := NewConfigMapPayload(cm)
+
+	source := &apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+		Name:             "name",
+		Namespace:        "namespace",
+		KubeletConfigKey: "kubelet",
+	}}
+
+	expectPayload, err := NewConfigMapPayload(cm)
 	if err != nil {
 		t.Fatalf("error constructing payload: %v", err)
 	}
 
-	makeSource := func(source *apiv1.NodeConfigSource) RemoteConfigSource {
-		s, _, err := NewRemoteConfigSource(source)
-		if err != nil {
-			t.Fatalf("error constructing remote config source %v", err)
-		}
-		return s
+	missingStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	hasStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
+	if err := hasStore.Add(cm); err != nil {
+		t.Fatalf("unexpected error constructing hasStore")
 	}
+
+	missingClient := fakeclient.NewSimpleClientset()
+	hasClient := fakeclient.NewSimpleClientset(cm)
 
 	cases := []struct {
 		desc   string
-		source RemoteConfigSource
-		expect Payload
+		client clientset.Interface
+		store  cache.Store
 		err    string
 	}{
 		{
-			desc: "object doesn't exist",
-			source: makeSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-				Name:             "bogus",
-				Namespace:        "namespace",
-				UID:              "bogus",
-				KubeletConfigKey: "kubelet",
-			}}),
-			expect: nil,
+			desc:   "nil store, object does not exist in API server",
+			client: missingClient,
 			err:    "not found",
 		},
 		{
-			desc: "UID is incorrect for namespace/name",
-			source: makeSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-				Name:             "name",
-				Namespace:        "namespace",
-				UID:              "bogus",
-				KubeletConfigKey: "kubelet",
-			}}),
-			expect: nil,
-			err:    "does not match",
+			desc:   "nil store, object exists in API server",
+			client: hasClient,
 		},
 		{
-			desc: "object exists and reference is correct",
-			source: makeSource(&apiv1.NodeConfigSource{ConfigMap: &apiv1.ConfigMapNodeConfigSource{
-				Name:             "name",
-				Namespace:        "namespace",
-				UID:              "uid",
-				KubeletConfigKey: "kubelet",
-			}}),
-			expect: payload,
-			err:    "",
+			desc:   "object exists in store and API server",
+			store:  hasStore,
+			client: hasClient,
+		},
+		{
+			desc:   "object exists in store, but does not exist in API server",
+			store:  hasStore,
+			client: missingClient,
+		},
+		{
+			desc:   "object does not exist in store, but exists in API server",
+			store:  missingStore,
+			client: hasClient,
+		},
+		{
+			desc:   "object does not exist in store or API server",
+			client: missingClient,
+			store:  missingStore,
+			err:    "not found",
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			payload, _, err := c.source.Download(client)
+			// deep copy so we can always check the UID/ResourceVersion are set after Download
+			s, _, err := NewRemoteConfigSource(source.DeepCopy())
+			if err != nil {
+				t.Fatalf("error constructing remote config source %v", err)
+			}
+			// attempt download
+			p, _, err := s.Download(c.client, c.store)
 			utiltest.ExpectError(t, err, c.err)
 			if err != nil {
 				return
 			}
 			// downloaded object should match the expected
-			if !apiequality.Semantic.DeepEqual(c.expect.object(), payload.object()) {
-				t.Errorf("case %q, expect Checkpoint %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(payload))
+			if !apiequality.Semantic.DeepEqual(expectPayload.object(), p.object()) {
+				t.Errorf("expect Checkpoint %s but got %s", spew.Sdump(expectPayload), spew.Sdump(p))
+			}
+			// source UID and ResourceVersion should be updated by Download
+			if p.UID() != s.UID() {
+				t.Errorf("expect UID to be updated by Download to match payload: %s, but got source UID: %s", p.UID(), s.UID())
+			}
+			if p.ResourceVersion() != s.ResourceVersion() {
+				t.Errorf("expect ResourceVersion to be updated by Download to match payload: %s, but got source ResourceVersion: %s", p.ResourceVersion(), s.ResourceVersion())
 			}
 		})
 	}

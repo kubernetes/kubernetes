@@ -34,9 +34,11 @@ var _ Payload = (*configMapPayload)(nil)
 // NewConfigMapPayload constructs a Payload backed by a ConfigMap, which must have a non-empty UID
 func NewConfigMapPayload(cm *apiv1.ConfigMap) (Payload, error) {
 	if cm == nil {
-		return nil, fmt.Errorf("ConfigMap must be non-nil to be a Payload")
-	} else if len(cm.ObjectMeta.UID) == 0 {
-		return nil, fmt.Errorf("ConfigMap must have a UID to be a Payload")
+		return nil, fmt.Errorf("ConfigMap must be non-nil")
+	} else if cm.ObjectMeta.UID == "" {
+		return nil, fmt.Errorf("ConfigMap must have a non-empty UID")
+	} else if cm.ObjectMeta.ResourceVersion == "" {
+		return nil, fmt.Errorf("ConfigMap must have a non-empty ResourceVersion")
 	}
 
 	return &configMapPayload{cm}, nil
@@ -44,6 +46,10 @@ func NewConfigMapPayload(cm *apiv1.ConfigMap) (Payload, error) {
 
 func (p *configMapPayload) UID() string {
 	return string(p.cm.UID)
+}
+
+func (p *configMapPayload) ResourceVersion() string {
+	return p.cm.ResourceVersion
 }
 
 func (p *configMapPayload) Files() map[string]string {
