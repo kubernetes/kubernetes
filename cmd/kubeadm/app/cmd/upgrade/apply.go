@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -268,7 +269,23 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 		return err
 	}
 
-	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg, etcdUpgrade)
+	// These are the same because kubeadm currently does not support reconciling a new config against an older one.
+	// For instance, currently, changing CertificatesDir or EtcdDataDir breaks the upgrade, because oldcfg is not fetchable.
+	// There would need to be additional upgrade code to handle copying the certs/data over to the new filepaths.
+	// It's still useful to have these parameterized as separate clusters though, because it allows us to mock these
+	// interfaces for tests.
+	oldEtcdCluster := etcdutil.StaticPodCluster{
+		Endpoints:       []string{"localhost:2379"},
+		ManifestDir:     constants.GetStaticPodDirectory(),
+		CertificatesDir: internalcfg.CertificatesDir,
+	}
+	newEtcdCluster := etcdutil.StaticPodCluster{
+		Endpoints:       []string{"localhost:2379"},
+		ManifestDir:     constants.GetStaticPodDirectory(),
+		CertificatesDir: internalcfg.CertificatesDir,
+	}
+
+	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg, etcdUpgrade, oldEtcdCluster, newEtcdCluster)
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane

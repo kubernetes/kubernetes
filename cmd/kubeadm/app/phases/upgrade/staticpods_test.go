@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -33,6 +35,7 @@ import (
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -56,7 +59,7 @@ controllerManagerExtraArgs: null
 etcd:
   caFile: ""
   certFile: ""
-  dataDir: /var/lib/etcd
+  dataDir: %s
   endpoints: null
   extraArgs: null
   image: ""
@@ -128,6 +131,7 @@ func (w *fakeWaiter) WaitForHealthyKubelet(_ time.Duration, _ string) error {
 }
 
 type fakeStaticPodPathManager struct {
+	kubernetesDir     string
 	realManifestDir   string
 	tempManifestDir   string
 	backupManifestDir string
@@ -136,29 +140,36 @@ type fakeStaticPodPathManager struct {
 }
 
 func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (StaticPodPathManager, error) {
-	realManifestsDir, err := ioutil.TempDir("", "kubeadm-upgraded-manifests")
+	kubernetesDir, err := ioutil.TempDir("", "kubeadm-pathmanager-")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create a temporary directory for the upgrade: %v", err)
 	}
 
-	upgradedManifestsDir, err := ioutil.TempDir("", "kubeadm-upgraded-manifests")
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create a temporary directory for the upgrade: %v", err)
+	realManifestDir := filepath.Join(kubernetesDir, constants.ManifestsSubDirName)
+	if err := os.Mkdir(realManifestDir, 0700); err != nil {
+		return nil, fmt.Errorf("couldn't create a realManifestDir for the upgrade: %v", err)
 	}
 
-	backupManifestsDir, err := ioutil.TempDir("", "kubeadm-backup-manifests")
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create a temporary directory for the upgrade: %v", err)
+	upgradedManifestDir := filepath.Join(kubernetesDir, "upgraded-manifests")
+	if err := os.Mkdir(upgradedManifestDir, 0700); err != nil {
+		return nil, fmt.Errorf("couldn't create a upgradedManifestDir for the upgrade: %v", err)
 	}
-	backupEtcdDir, err := ioutil.TempDir("", "kubeadm-backup-etcd")
-	if err != nil {
+
+	backupManifestDir := filepath.Join(kubernetesDir, "backup-manifests")
+	if err := os.Mkdir(backupManifestDir, 0700); err != nil {
+		return nil, fmt.Errorf("couldn't create a backupManifestDir for the upgrade: %v", err)
+	}
+
+	backupEtcdDir := filepath.Join(kubernetesDir, "kubeadm-backup-etcd")
+	if err := os.Mkdir(backupEtcdDir, 0700); err != nil {
 		return nil, err
 	}
 
 	return &fakeStaticPodPathManager{
-		realManifestDir:   realManifestsDir,
-		tempManifestDir:   upgradedManifestsDir,
-		backupManifestDir: backupManifestsDir,
+		kubernetesDir:     kubernetesDir,
+		realManifestDir:   realManifestDir,
+		tempManifestDir:   upgradedManifestDir,
+		backupManifestDir: backupManifestDir,
 		backupEtcdDir:     backupEtcdDir,
 		MoveFileFunc:      moveFileFunc,
 	}, nil
@@ -166,6 +177,10 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 
 func (spm *fakeStaticPodPathManager) MoveFile(oldPath, newPath string) error {
 	return spm.MoveFileFunc(oldPath, newPath)
+}
+
+func (spm *fakeStaticPodPathManager) KubernetesDir() string {
+	return spm.kubernetesDir
 }
 
 func (spm *fakeStaticPodPathManager) RealManifestPath(component string) string {
@@ -193,14 +208,43 @@ func (spm *fakeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
 }
 
+type fakeTLSEtcdCluster struct{ TLS bool }
+
+func (cluster fakeTLSEtcdCluster) HasTLS() (bool, error) {
+	return cluster.TLS, nil
+}
+
+func (cluster fakeTLSEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
+	client := &clientv3.StatusResponse{}
+	client.Version = "3.1.12"
+	return client, nil
+}
+
+type fakePodManifestEtcdCluster struct{ ManifestDir, CertificatesDir string }
+
+func (cluster fakePodManifestEtcdCluster) HasTLS() (bool, error) {
+	return etcdutil.PodManifestsHaveTLS(cluster.ManifestDir)
+}
+
+func (cluster fakePodManifestEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
+	// Make sure the certificates generated from the upgrade are readable from disk
+	etcdutil.NewTLSConfig(cluster.CertificatesDir)
+
+	client := &clientv3.StatusResponse{}
+	client.Version = "3.1.12"
+	return client, nil
+}
+
 func TestStaticPodControlPlane(t *testing.T) {
 	tests := []struct {
+		description          string
 		waitErrsToReturn     map[string]error
 		moveFileFunc         func(string, string) error
 		expectedErr          bool
 		manifestShouldChange bool
 	}{
-		{ // error-free case should succeed
+		{
+			description: "error-free case should succeed",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -212,7 +256,8 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          false,
 			manifestShouldChange: true,
 		},
-		{ // any wait error should result in a rollback and an abort
+		{
+			description: "any wait error should result in a rollback and an abort",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        fmt.Errorf("boo! failed"),
 				waitForHashChange:    nil,
@@ -224,7 +269,8 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
-		{ // any wait error should result in a rollback and an abort
+		{
+			description: "any wait error should result in a rollback and an abort",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    fmt.Errorf("boo! failed"),
@@ -236,7 +282,8 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
-		{ // any wait error should result in a rollback and an abort
+		{
+			description: "any wait error should result in a rollback and an abort",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -248,7 +295,8 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
-		{ // any path-moving error should result in a rollback and an abort
+		{
+			description: "any path-moving error should result in a rollback and an abort",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -264,7 +312,8 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
-		{ // any path-moving error should result in a rollback and an abort
+		{
+			description: "any path-moving error should result in a rollback and an abort",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -280,7 +329,8 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
-		{ // any path-moving error should result in a rollback and an abort; even though this is the last component (kube-apiserver and kube-controller-manager healthy)
+		{
+			description: "any path-moving error should result in a rollback and an abort; even though this is the last component (kube-apiserver and kube-controller-manager healthy)",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -304,15 +354,19 @@ func TestStaticPodControlPlane(t *testing.T) {
 		if err != nil {
 			t.Fatalf("couldn't run NewFakeStaticPodPathManager: %v", err)
 		}
-		defer os.RemoveAll(pathMgr.RealManifestDir())
-		defer os.RemoveAll(pathMgr.TempManifestDir())
-		defer os.RemoveAll(pathMgr.BackupManifestDir())
+		defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
+		constants.KubernetesDir = pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
 
 		tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
 		if err != nil {
 			t.Fatalf("couldn't create temporary certificates directory: %v", err)
 		}
 		defer os.RemoveAll(tempCertsDir)
+		tmpEtcdDataDir, err := ioutil.TempDir("", "kubeadm-etcd-data")
+		if err != nil {
+			t.Fatalf("couldn't create temporary etcd data directory: %v", err)
+		}
+		defer os.RemoveAll(tmpEtcdDataDir)
 
 		oldcfg, err := getConfig("v1.7.0", tempCertsDir)
 		if err != nil {
@@ -361,10 +415,23 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't create config: %v", err)
 		}
 
-		actualErr := StaticPodControlPlane(waiter, pathMgr, newcfg, false)
+		actualErr := StaticPodControlPlane(
+			waiter,
+			pathMgr,
+			newcfg,
+			true,
+			fakeTLSEtcdCluster{
+				TLS: false,
+			},
+			fakePodManifestEtcdCluster{
+				ManifestDir:     pathMgr.RealManifestDir(),
+				CertificatesDir: newcfg.CertificatesDir,
+			},
+		)
 		if (actualErr != nil) != rt.expectedErr {
 			t.Errorf(
-				"failed UpgradeStaticPodControlPlane\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				"failed UpgradeStaticPodControlPlane\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
 				rt.expectedErr,
 				(actualErr != nil),
 				actualErr,
@@ -378,12 +445,13 @@ func TestStaticPodControlPlane(t *testing.T) {
 
 		if (oldHash != newHash) != rt.manifestShouldChange {
 			t.Errorf(
-				"failed StaticPodControlPlane\n\texpected manifest change: %t\n\tgot: %t",
+				"failed StaticPodControlPlane\n%s\n\texpected manifest change: %t\n\tgot: %t",
+				rt.description,
 				rt.manifestShouldChange,
 				(oldHash != newHash),
 			)
 		}
-
+		return
 	}
 }
 
@@ -398,10 +466,10 @@ func getAPIServerHash(dir string) (string, error) {
 	return fmt.Sprintf("%x", sha256.Sum256(fileBytes)), nil
 }
 
-func getConfig(version string, certsDir string) (*kubeadmapi.MasterConfiguration, error) {
+func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.MasterConfiguration, error) {
 	externalcfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, version)), externalcfg); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version)), externalcfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config: %v", err)
 	}
 	legacyscheme.Scheme.Convert(externalcfg, internalcfg, nil)
