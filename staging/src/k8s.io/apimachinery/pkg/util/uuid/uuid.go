@@ -35,7 +35,7 @@ func NewUUID() types.UID {
 	// time interval is quick enough.
 	// The UUID uses 100 ns increments so it's short enough to actively
 	// wait for a new value.
-	for uuid.Equal(lastUUID, result) == true {
+	for uuid.Equal(lastUUID, result) {
 		result = uuid.NewUUID()
 	}
 	lastUUID = result
