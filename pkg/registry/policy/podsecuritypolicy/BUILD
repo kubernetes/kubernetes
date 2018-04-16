@@ -11,7 +11,7 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy",
+    importpath = "k8s.io/kubernetes/pkg/registry/policy/podsecuritypolicy",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/policy:go_default_library",
@@ -35,7 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/extensions/podsecuritypolicy/storage:all-srcs",
+        "//pkg/registry/policy/podsecuritypolicy/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

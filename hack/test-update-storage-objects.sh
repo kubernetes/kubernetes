@@ -109,7 +109,7 @@ examples/persistent-volume-provisioning/rbd/rbd-storage-class.yaml,storageclasse
 )
 
 KUBE_OLD_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1beta1,extensions/v1beta1"
-KUBE_NEW_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1,extensions/v1beta1"
+KUBE_NEW_API_VERSION="networking.k8s.io/v1,storage.k8s.io/v1,extensions/v1beta1,policy/v1beta1"
 KUBE_OLD_STORAGE_VERSIONS="storage.k8s.io/v1beta1"
 KUBE_NEW_STORAGE_VERSIONS="storage.k8s.io/v1"
 
