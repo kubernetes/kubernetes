@@ -138,7 +138,7 @@ func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) s
 }
 
 // TestKubeletRestartsAndRestoresMount tests that a volume mounted to a pod remains mounted after a kubelet restarts
-func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim) {
+func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
 	By("Writing to the volume.")
 	file := "/mnt/_SUCCESS"
 	out, err := PodExec(clientPod, fmt.Sprintf("touch %s", file))
@@ -156,17 +156,25 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 }
 
 // TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
-// forceDelete is true indicating whether the pod is forcelly deleted.
-func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim, forceDelete bool) {
+// forceDelete is true indicating whether the pod is forcefully deleted.
+func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
 	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
 
 	By("Expecting the volume mount to be found.")
-	result, err := framework.SSH(fmt.Sprintf("mount | grep %s", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err := framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	framework.LogSSHResult(result)
 	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
 	Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+
+	if checkSubpath {
+		By("Expecting the volume subpath mount to be found.")
+		result, err := framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		framework.LogSSHResult(result)
+		Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+		Expect(result.Code).To(BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+	}
 
 	By("Stopping the kubelet.")
 	KubeletCommand(KStop, c, clientPod)
@@ -182,8 +190,10 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
 	}
 	Expect(err).NotTo(HaveOccurred())
+
 	// Wait for pod to enter "Terminating state"
 	time.Sleep(30 * time.Second)
+
 	By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
 	err = f.WaitForPodTerminated(clientPod.Name, "")
@@ -196,22 +206,32 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		// so wait some time to finish
 		time.Sleep(30 * time.Second)
 	}
+
 	By("Expecting the volume mount not to be found.")
-	result, err = framework.SSH(fmt.Sprintf("mount | grep %s", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	result, err = framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	framework.LogSSHResult(result)
 	Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
 	Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
 	framework.Logf("Volume unmounted on node %s", clientPod.Spec.NodeName)
+
+	if checkSubpath {
+		By("Expecting the volume subpath mount not to be found.")
+		result, err = framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		framework.LogSSHResult(result)
+		Expect(err).NotTo(HaveOccurred(), "Encountered SSH error.")
+		Expect(result.Stdout).To(BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
+		framework.Logf("Subpath volume unmounted on node %s", clientPod.Spec.NodeName)
+	}
 }
 
 // TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
-func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, pvc, false)
+func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false)
 }
 
-// TestVolumeUnmountsFromFoceDeletedPod tests that a volume unmounts if the client pod was forcelly deleted while the kubelet was down.
-func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, pvc, true)
+// TestVolumeUnmountsFromFoceDeletedPod tests that a volume unmounts if the client pod was forcefully deleted while the kubelet was down.
+func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false)
 }
 
 // RunInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
