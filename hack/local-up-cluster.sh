@@ -667,89 +667,86 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
+    # Enable dns
+    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+      dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
+    else
+      # To start a private DNS server set ENABLE_CLUSTER_DNS and
+      # DNS_SERVER_IP/DOMAIN. This will at least provide a working
+      # DNS server for real world hostnames.
+      dns_args="--cluster-dns=8.8.8.8"
+    fi
+    net_plugin_args=""
+    if [[ -n "${NET_PLUGIN}" ]]; then
+      net_plugin_args="--network-plugin=${NET_PLUGIN}"
+    fi
+
+    auth_args=""
+    if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
+      auth_args="${auth_args} --authorization-mode=Webhook"
+    fi
+    if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
+      auth_args="${auth_args} --authentication-token-webhook"
+    fi
+    if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+      auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
+    fi
+
+    cni_conf_dir_args=""
+    if [[ -n "${CNI_CONF_DIR}" ]]; then
+      cni_conf_dir_args="--cni-conf-dir=${CNI_CONF_DIR}"
+    fi
+
+    cni_bin_dir_args=""
+    if [[ -n "${CNI_BIN_DIR}" ]]; then
+      cni_bin_dir_args="--cni-bin-dir=${CNI_BIN_DIR}"
+    fi
+
+    container_runtime_endpoint_args=""
+    if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
+      container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+    fi
+
+    image_service_endpoint_args=""
+    if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
+      image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
+    fi
+
+    all_kubelet_flags=(
+      ${priv_arg}
+      --v="${LOG_LEVEL}"
+      --vmodule="${LOG_SPEC}"
+      --chaos-chance="${CHAOS_CHANCE}"
+      --container-runtime="${CONTAINER_RUNTIME}"
+      --hostname-override="${HOSTNAME_OVERRIDE}"
+      ${cloud_config_arg}
+      --address="${KUBELET_HOST}"
+      --kubeconfig "$CERT_DIR"/kubelet.kubeconfig
+      --feature-gates="${FEATURE_GATES}"
+      --cpu-cfs-quota="${CPU_CFS_QUOTA}"
+      --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
+      --cgroups-per-qos="${CGROUPS_PER_QOS}"
+      --cgroup-driver="${CGROUP_DRIVER}"
+      --keep-terminated-pod-volumes="${KEEP_TERMINATED_POD_VOLUMES}"
+      --eviction-hard="${EVICTION_HARD}"
+      --eviction-soft="${EVICTION_SOFT}"
+      --eviction-pressure-transition-period="${EVICTION_PRESSURE_TRANSITION_PERIOD}"
+      --pod-manifest-path="${POD_MANIFEST_PATH}"
+      --fail-swap-on="${FAIL_SWAP_ON}"
+      ${auth_args}
+      ${dns_args}
+      ${cni_conf_dir_args}
+      ${cni_bin_dir_args}
+      ${net_plugin_args}
+      ${container_runtime_endpoint_args}
+      ${image_service_endpoint_args}
+      --port="$KUBELET_PORT"
+      ${KUBELET_FLAGS}
+    )
+
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
-      # Enable dns
-      if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-         dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
-      else
-         # To start a private DNS server set ENABLE_CLUSTER_DNS and
-         # DNS_SERVER_IP/DOMAIN. This will at least provide a working
-         # DNS server for real world hostnames.
-         dns_args="--cluster-dns=8.8.8.8"
-      fi
-
-      net_plugin_args=""
-      if [[ -n "${NET_PLUGIN}" ]]; then
-        net_plugin_args="--network-plugin=${NET_PLUGIN}"
-      fi
-
-      auth_args=""
-      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
-        auth_args="${auth_args} --authorization-mode=Webhook"
-      fi
-      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
-        auth_args="${auth_args} --authentication-token-webhook"
-      fi
-      if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
-        auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
-      fi
-
-      cni_conf_dir_args=""
-      if [[ -n "${CNI_CONF_DIR}" ]]; then
-        cni_conf_dir_args="--cni-conf-dir=${CNI_CONF_DIR}"
-      fi
-
-      cni_bin_dir_args=""
-      if [[ -n "${CNI_BIN_DIR}" ]]; then
-        cni_bin_dir_args="--cni-bin-dir=${CNI_BIN_DIR}"
-      fi
-
-      container_runtime_endpoint_args=""
-      if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
-        container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
-      fi
-
-      image_service_endpoint_args=""
-      if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
-        image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
-      fi
-
-      sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
-        --v=${LOG_LEVEL} \
-        --vmodule="${LOG_SPEC}" \
-        --chaos-chance="${CHAOS_CHANCE}" \
-        --container-runtime="${CONTAINER_RUNTIME}" \
-        --hostname-override="${HOSTNAME_OVERRIDE}" \
-        ${cloud_config_arg} \
-        --address="${KUBELET_HOST}" \
-        --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
-        --feature-gates="${FEATURE_GATES}" \
-        --cpu-cfs-quota=${CPU_CFS_QUOTA} \
-        --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
-        --cgroups-per-qos=${CGROUPS_PER_QOS} \
-        --cgroup-driver=${CGROUP_DRIVER} \
-        --keep-terminated-pod-volumes=${KEEP_TERMINATED_POD_VOLUMES} \
-        --eviction-hard=${EVICTION_HARD} \
-        --eviction-soft=${EVICTION_SOFT} \
-        --eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD} \
-        --pod-manifest-path="${POD_MANIFEST_PATH}" \
-        --fail-swap-on="${FAIL_SWAP_ON}" \
-        ${auth_args} \
-        ${dns_args} \
-        ${cni_conf_dir_args} \
-        ${cni_bin_dir_args} \
-        ${net_plugin_args} \
-        ${container_runtime_endpoint_args} \
-        ${image_service_endpoint_args} \
-        --port="$KUBELET_PORT" \
-	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
+      sudo -E "${GO_OUT}/hyperkube" kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
-      # Quick check that kubelet is running.
-      if ps -p $KUBELET_PID > /dev/null ; then
-	echo "kubelet ( $KUBELET_PID ) is running."
-      else
-	cat ${KUBELET_LOG} ; exit 1
-      fi
     else
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
@@ -770,22 +767,42 @@ function start_kubelet {
       if  [[ -n "${cloud_cred}" ]]; then
           cred_bind="--volume=${cloud_cred}:${cloud_cred}:ro"
       fi
+      all_kubelet_flags+=(--containerized)
 
-      docker run \
-        --volume=/:/rootfs:ro \
+      docker run --rm --name kubelet \
+        --volume=/:/rootfs:ro,rslave \
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
-        --volume=/var/lib/docker/:/var/lib/docker:ro \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
+        --volume=/var/lib/docker/:/var/lib/docker:rslave \
+        --volume=/var/lib/kubelet/:/var/lib/kubelet:rslave \
         --volume=/dev:/dev \
         --volume=/run/xtables.lock:/run/xtables.lock:rw \
         ${cred_bind} \
         --net=host \
+        --pid=host \
         --privileged=true \
         -i \
         --cidfile=$KUBELET_CIDFILE \
         k8s.gcr.io/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --pod-manifest-path="${POD_MANIFEST_PATH}" --hostname-override="${HOSTNAME_OVERRIDE}" ${cloud_config_arg} \ --address="127.0.0.1" --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
+      # Get PID of kubelet container.
+      for i in {1..3}; do
+        echo -n "Trying to get PID of kubelet container..."
+        KUBELET_PID=$(docker inspect kubelet -f '{{.State.Pid}}' 2>/dev/null || true)
+        if [ -n "$KUBELET_PID" ]; then
+            echo " ok, $KUBELET_PID."
+            break
+        else
+            echo " failed, retry in 1 second."
+            sleep 1
+        fi
+      done
+    fi
+    # Quick check that kubelet is running.
+    if [ -n "$KUBELET_PID" ] && ps -p $KUBELET_PID > /dev/null; then
+      echo "kubelet ( $KUBELET_PID ) is running."
+    else
+      cat ${KUBELET_LOG} ; exit 1
     fi
 }
 
