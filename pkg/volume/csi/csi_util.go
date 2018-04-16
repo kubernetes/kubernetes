@@ -23,16 +23,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) map[string]string {
+func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {
 	credentials := map[string]string{}
 	secret, err := k8s.CoreV1().Secrets(secretRef.Namespace).Get(secretRef.Name, meta.GetOptions{})
 	if err != nil {
-		glog.Warningf("failed to find the secret %s in the namespace %s with error: %v\n", secretRef.Name, secretRef.Namespace, err)
-		return credentials
+		glog.Errorf("failed to find the secret %s in the namespace %s with error: %v\n", secretRef.Name, secretRef.Namespace, err)
+		return credentials, err
 	}
 	for key, value := range secret.Data {
 		credentials[key] = string(value)
 	}
 
-	return credentials
+	return credentials, nil
 }

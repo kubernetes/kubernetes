@@ -318,6 +318,15 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	publishVolumeInfo := attachment.Status.AttachmentMetadata
 
+	nodeStageSecrets := map[string]string{}
+	if csiSource.NodeStageSecretRef != nil {
+		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
+		if err != nil {
+			return fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
+				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
+		}
+	}
+
 	// create target_dir before call to NodeStageVolume
 	if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
 		glog.Error(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
@@ -334,11 +343,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	fsType := csiSource.FSType
 	if len(fsType) == 0 {
 		fsType = defaultFSType
-	}
-
-	nodeStageSecrets := map[string]string{}
-	if csiSource.NodeStageSecretRef != nil {
-		nodeStageSecrets = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
 	}
 
 	err = csi.NodeStageVolume(ctx,
