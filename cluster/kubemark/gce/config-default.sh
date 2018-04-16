@@ -117,6 +117,10 @@ if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
   fi
 fi
 
+#Optional: Enable kube dns.
+ENABLE_KUBEMARK_KUBE_DNS="${ENABLE_KUBEMARK_KUBE_DNS:-true}"
+KUBE_DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
+
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
