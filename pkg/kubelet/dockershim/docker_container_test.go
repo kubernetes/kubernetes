@@ -108,6 +108,7 @@ func TestListContainers(t *testing.T) {
 func TestContainerStatus(t *testing.T) {
 	ds, fDocker, fClock := newTestDockerService()
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
+	sConfig.Linux = &runtimeapi.LinuxPodSandboxConfig{CgroupParent: "abcd/efg"}
 	labels := map[string]string{"abc.xyz": "foo"}
 	annotations := map[string]string{"foo.bar.baz": "abc"}
 	imageName := "iamimage"
@@ -153,8 +154,11 @@ func TestContainerStatus(t *testing.T) {
 	// Check internal labels
 	c, err := fDocker.InspectContainer(id)
 	require.NoError(t, err)
-	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelContainer)
-	assert.Equal(t, c.Config.Labels[sandboxIDLabelKey], sandboxId)
+	assert.Equal(t, containerTypeLabelContainer, c.Config.Labels[containerTypeLabelKey])
+	assert.Equal(t, sandboxId, c.Config.Labels[sandboxIDLabelKey])
+
+	// Check container CgroupParent
+	assert.Equal(t, sConfig.Linux.CgroupParent, c.HostConfig.CgroupParent)
 
 	// Set the id manually since we don't know the id until it's created.
 	expected.Id = id

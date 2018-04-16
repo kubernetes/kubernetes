@@ -97,9 +97,9 @@ func TestSandboxStatus(t *testing.T) {
 	labels := map[string]string{"label": "foobar1"}
 	annotations := map[string]string{"annotation": "abc"}
 	config := makeSandboxConfigWithLabelsAndAnnotations("foo", "bar", "1", 0, labels, annotations)
+	config.Linux = &runtimeapi.LinuxPodSandboxConfig{CgroupParent: "abcd/efg"}
 	r := rand.New(rand.NewSource(0)).Uint32()
 	podIP := fmt.Sprintf("10.%d.%d.%d", byte(r>>16), byte(r>>8), byte(r))
-
 	state := runtimeapi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
 	expected := &runtimeapi.PodSandboxStatus{
@@ -128,8 +128,11 @@ func TestSandboxStatus(t *testing.T) {
 	// Check internal labels
 	c, err := fDocker.InspectContainer(id)
 	assert.NoError(t, err)
-	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelSandbox)
-	assert.Equal(t, c.Config.Labels[types.KubernetesContainerNameLabel], sandboxContainerName)
+	assert.Equal(t, containerTypeLabelSandbox, c.Config.Labels[containerTypeLabelKey])
+	assert.Equal(t, sandboxContainerName, c.Config.Labels[types.KubernetesContainerNameLabel])
+
+	// Check sandbox parent cgroup
+	assert.Equal(t, config.Linux.CgroupParent, c.HostConfig.CgroupParent)
 
 	expected.Id = id // ID is only known after the creation.
 	statusResp, err := ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
