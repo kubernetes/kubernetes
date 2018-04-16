@@ -123,26 +123,37 @@ func convertAndInsertAlphaForwardingRule(key *meta.Key, obj gceObject, mRules ma
 // InsertFwdRuleHook mocks inserting a ForwardingRule. ForwardingRules are
 // expected to default to Premium tier if no NetworkTier is specified.
 func InsertFwdRuleHook(ctx context.Context, key *meta.Key, obj *ga.ForwardingRule, m *cloud.MockForwardingRules) (bool, error) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionGA, "forwardingRules")
 	return convertAndInsertAlphaForwardingRule(key, obj, m.Objects, meta.VersionGA, projectID)
 }
 
 // InsertBetaFwdRuleHook mocks inserting a BetaForwardingRule.
 func InsertBetaFwdRuleHook(ctx context.Context, key *meta.Key, obj *beta.ForwardingRule, m *cloud.MockForwardingRules) (bool, error) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionBeta, "forwardingRules")
 	return convertAndInsertAlphaForwardingRule(key, obj, m.Objects, meta.VersionBeta, projectID)
 }
 
 // InsertAlphaFwdRuleHook mocks inserting an AlphaForwardingRule.
 func InsertAlphaFwdRuleHook(ctx context.Context, key *meta.Key, obj *alpha.ForwardingRule, m *cloud.MockForwardingRules) (bool, error) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionAlpha, "forwardingRules")
 	return convertAndInsertAlphaForwardingRule(key, obj, m.Objects, meta.VersionAlpha, projectID)
 }
 
-// Used to assign Addresses with no IP a unique IP address
-var ipCounter = 1
+// AddressAttributes maps from Address key to a map of Instances
+type AddressAttributes struct {
+	IPCounter int // Used to assign Addresses with no IP a unique IP address
+}
 
-func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.Key]*cloud.MockAddressesObj, version meta.Version, projectID string) (bool, error) {
+func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.Key]*cloud.MockAddressesObj, version meta.Version, projectID string, addressAttrs AddressAttributes) (bool, error) {
 	if !key.Valid() {
 		return false, fmt.Errorf("invalid GCE key (%+v)", key)
 	}
@@ -197,8 +208,8 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 	}
 
 	if addr.Address == "" {
-		addr.Address = fmt.Sprintf("1.2.3.%d", ipCounter)
-		ipCounter++
+		addr.Address = fmt.Sprintf("1.2.3.%d", addressAttrs.IPCounter)
+		addressAttrs.IPCounter++
 	}
 
 	// Set the default values for the Alpha fields.
@@ -212,21 +223,30 @@ func convertAndInsertAlphaAddress(key *meta.Key, obj gceObject, mAddrs map[meta.
 
 // InsertAddressHook mocks inserting an Address.
 func InsertAddressHook(ctx context.Context, key *meta.Key, obj *ga.Address, m *cloud.MockAddresses) (bool, error) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionGA, "addresses")
-	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionGA, projectID)
+	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionGA, projectID, m.X.(AddressAttributes))
 }
 
 // InsertBetaAddressHook mocks inserting a BetaAddress.
 func InsertBetaAddressHook(ctx context.Context, key *meta.Key, obj *beta.Address, m *cloud.MockAddresses) (bool, error) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionBeta, "addresses")
-	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionBeta, projectID)
+	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionBeta, projectID, m.X.(AddressAttributes))
 }
 
 // InsertAlphaAddressHook mocks inserting an Address. Addresses are expected to
 // default to Premium tier if no NetworkTier is specified.
 func InsertAlphaAddressHook(ctx context.Context, key *meta.Key, obj *alpha.Address, m *cloud.MockAlphaAddresses) (bool, error) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+
 	projectID := m.ProjectRouter.ProjectID(ctx, meta.VersionBeta, "addresses")
-	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionAlpha, projectID)
+	return convertAndInsertAlphaAddress(key, obj, m.Objects, meta.VersionAlpha, projectID, m.X.(AddressAttributes))
 }
 
 // InstanceGroupAttributes maps from InstanceGroup key to a map of Instances
