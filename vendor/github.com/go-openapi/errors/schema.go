@@ -63,6 +63,34 @@ const (
 	unallowedPropertyNoIn     = "%s.%s is a forbidden property"
 	failedAllPatternProps     = "%s.%s in %s failed all pattern properties"
 	failedAllPatternPropsNoIn = "%s.%s failed all pattern properties"
+	multipleOfMustBePositive  = "factor MultipleOf declared for %s must be positive: %v"
+)
+
+// All code responses can be used to differentiate errors for different handling
+// by the consuming program
+const (
+	// CompositeErrorCode remains 422 for backwards-compatibility
+	// and to separate it from validation errors with cause
+	CompositeErrorCode = 422
+	// InvalidTypeCode is used for any subclass of invalid types
+	InvalidTypeCode = 600 + iota
+	RequiredFailCode
+	TooLongFailCode
+	TooShortFailCode
+	PatternFailCode
+	EnumFailCode
+	MultipleOfFailCode
+	MaxFailCode
+	MinFailCode
+	UniqueFailCode
+	MaxItemsFailCode
+	MinItemsFailCode
+	NoAdditionalItemsCode
+	TooFewPropertiesCode
+	TooManyPropertiesCode
+	UnallowedPropertyCode
+	FailedAllPatternPropsCode
+	MultipleOfMustBePositiveCode
 )
 
 // CompositeError is an error that groups several errors together
@@ -91,7 +119,7 @@ func (c *CompositeError) Error() string {
 // CompositeValidationError an error to wrap a bunch of other errors
 func CompositeValidationError(errors ...error) *CompositeError {
 	return &CompositeError{
-		code:    422,
+		code:    CompositeErrorCode,
 		Errors:  append([]error{}, errors...),
 		message: "validation failure list",
 	}
@@ -104,7 +132,7 @@ func FailedAllPatternProperties(name, in, key string) *Validation {
 		msg = fmt.Sprintf(failedAllPatternPropsNoIn, name, key)
 	}
 	return &Validation{
-		code:    422,
+		code:    FailedAllPatternPropsCode,
 		Name:    name,
 		In:      in,
 		Value:   key,
@@ -119,7 +147,7 @@ func PropertyNotAllowed(name, in, key string) *Validation {
 		msg = fmt.Sprintf(unallowedPropertyNoIn, name, key)
 	}
 	return &Validation{
-		code:    422,
+		code:    UnallowedPropertyCode,
 		Name:    name,
 		In:      in,
 		Value:   key,
@@ -134,7 +162,7 @@ func TooFewProperties(name, in string, n int64) *Validation {
 		msg = fmt.Sprintf(tooFewPropertiesNoIn, name, n)
 	}
 	return &Validation{
-		code:    422,
+		code:    TooFewPropertiesCode,
 		Name:    name,
 		In:      in,
 		Value:   n,
@@ -149,7 +177,7 @@ func TooManyProperties(name, in string, n int64) *Validation {
 		msg = fmt.Sprintf(tooManyPropertiesNoIn, name, n)
 	}
 	return &Validation{
-		code:    422,
+		code:    TooManyPropertiesCode,
 		Name:    name,
 		In:      in,
 		Value:   n,
@@ -164,7 +192,7 @@ func AdditionalItemsNotAllowed(name, in string) *Validation {
 		msg = fmt.Sprintf(noAdditionalItemsNoIn, name)
 	}
 	return &Validation{
-		code:    422,
+		code:    NoAdditionalItemsCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -174,7 +202,7 @@ func AdditionalItemsNotAllowed(name, in string) *Validation {
 // InvalidCollectionFormat another flavor of invalid type error
 func InvalidCollectionFormat(name, in, format string) *Validation {
 	return &Validation{
-		code:    422,
+		code:    InvalidTypeCode,
 		Name:    name,
 		In:      in,
 		Value:   format,
@@ -185,7 +213,7 @@ func InvalidCollectionFormat(name, in, format string) *Validation {
 // InvalidTypeName an error for when the type is invalid
 func InvalidTypeName(typeName string) *Validation {
 	return &Validation{
-		code:    422,
+		code:    InvalidTypeCode,
 		Value:   typeName,
 		message: fmt.Sprintf(invalidType, typeName),
 	}
@@ -216,7 +244,7 @@ func InvalidType(name, in, typeName string, value interface{}) *Validation {
 	}
 
 	return &Validation{
-		code:    422,
+		code:    InvalidTypeCode,
 		Name:    name,
 		In:      in,
 		Value:   value,
@@ -232,7 +260,7 @@ func DuplicateItems(name, in string) *Validation {
 		msg = fmt.Sprintf(uniqueFailNoIn, name)
 	}
 	return &Validation{
-		code:    422,
+		code:    UniqueFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -247,7 +275,7 @@ func TooManyItems(name, in string, max int64) *Validation {
 	}
 
 	return &Validation{
-		code:    422,
+		code:    MaxItemsFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -261,7 +289,7 @@ func TooFewItems(name, in string, min int64) *Validation {
 		msg = fmt.Sprintf(minItemsFailNoIn, name, min)
 	}
 	return &Validation{
-		code:    422,
+		code:    MinItemsFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -285,7 +313,7 @@ func ExceedsMaximumInt(name, in string, max int64, exclusive bool) *Validation {
 		message = fmt.Sprintf(m, name, in, max)
 	}
 	return &Validation{
-		code:    422,
+		code:    MaxFailCode,
 		Name:    name,
 		In:      in,
 		Value:   max,
@@ -310,7 +338,7 @@ func ExceedsMaximumUint(name, in string, max uint64, exclusive bool) *Validation
 		message = fmt.Sprintf(m, name, in, max)
 	}
 	return &Validation{
-		code:    422,
+		code:    MaxFailCode,
 		Name:    name,
 		In:      in,
 		Value:   max,
@@ -335,7 +363,7 @@ func ExceedsMaximum(name, in string, max float64, exclusive bool) *Validation {
 		message = fmt.Sprintf(m, name, in, max)
 	}
 	return &Validation{
-		code:    422,
+		code:    MaxFailCode,
 		Name:    name,
 		In:      in,
 		Value:   max,
@@ -360,7 +388,7 @@ func ExceedsMinimumInt(name, in string, min int64, exclusive bool) *Validation {
 		message = fmt.Sprintf(m, name, in, min)
 	}
 	return &Validation{
-		code:    422,
+		code:    MinFailCode,
 		Name:    name,
 		In:      in,
 		Value:   min,
@@ -385,7 +413,7 @@ func ExceedsMinimumUint(name, in string, min uint64, exclusive bool) *Validation
 		message = fmt.Sprintf(m, name, in, min)
 	}
 	return &Validation{
-		code:    422,
+		code:    MinFailCode,
 		Name:    name,
 		In:      in,
 		Value:   min,
@@ -410,7 +438,7 @@ func ExceedsMinimum(name, in string, min float64, exclusive bool) *Validation {
 		message = fmt.Sprintf(m, name, in, min)
 	}
 	return &Validation{
-		code:    422,
+		code:    MinFailCode,
 		Name:    name,
 		In:      in,
 		Value:   min,
@@ -419,7 +447,7 @@ func ExceedsMinimum(name, in string, min float64, exclusive bool) *Validation {
 }
 
 // NotMultipleOf error for when multiple of validation fails
-func NotMultipleOf(name, in string, multiple float64) *Validation {
+func NotMultipleOf(name, in string, multiple interface{}) *Validation {
 	var msg string
 	if in == "" {
 		msg = fmt.Sprintf(multipleOfFailNoIn, name, multiple)
@@ -427,7 +455,7 @@ func NotMultipleOf(name, in string, multiple float64) *Validation {
 		msg = fmt.Sprintf(multipleOfFail, name, in, multiple)
 	}
 	return &Validation{
-		code:    422,
+		code:    MultipleOfFailCode,
 		Name:    name,
 		In:      in,
 		Value:   multiple,
@@ -445,7 +473,7 @@ func EnumFail(name, in string, value interface{}, values []interface{}) *Validat
 	}
 
 	return &Validation{
-		code:    422,
+		code:    EnumFailCode,
 		Name:    name,
 		In:      in,
 		Value:   value,
@@ -463,7 +491,7 @@ func Required(name, in string) *Validation {
 		msg = fmt.Sprintf(requiredFail, name, in)
 	}
 	return &Validation{
-		code:    422,
+		code:    RequiredFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -479,7 +507,7 @@ func TooLong(name, in string, max int64) *Validation {
 		msg = fmt.Sprintf(tooLongMessage, name, in, max)
 	}
 	return &Validation{
-		code:    422,
+		code:    TooLongFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -496,7 +524,7 @@ func TooShort(name, in string, min int64) *Validation {
 	}
 
 	return &Validation{
-		code:    422,
+		code:    TooShortFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
@@ -514,9 +542,21 @@ func FailedPattern(name, in, pattern string) *Validation {
 	}
 
 	return &Validation{
-		code:    422,
+		code:    PatternFailCode,
 		Name:    name,
 		In:      in,
 		message: msg,
+	}
+}
+
+// MultipleOfMustBePositive error for when a
+// multipleOf factor is negative
+func MultipleOfMustBePositive(name, in string, factor interface{}) *Validation {
+	return &Validation{
+		code:    MultipleOfMustBePositiveCode,
+		Name:    name,
+		In:      in,
+		Value:   factor,
+		message: fmt.Sprintf(multipleOfMustBePositive, name, factor),
 	}
 }

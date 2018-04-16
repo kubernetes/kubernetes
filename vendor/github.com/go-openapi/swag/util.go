@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -40,6 +41,7 @@ var commonInitialisms = map[string]bool{
 	"IP":    true,
 	"JSON":  true,
 	"LHS":   true,
+	"OAI":   true,
 	"QPS":   true,
 	"RAM":   true,
 	"RHS":   true,
@@ -66,7 +68,9 @@ var commonInitialisms = map[string]bool{
 }
 var initialisms []string
 
-func init() {
+var once sync.Once
+
+func sortInitialisms() {
 	for k := range commonInitialisms {
 		initialisms = append(initialisms, k)
 	}
@@ -163,8 +167,9 @@ func split(str string) (words []string) {
 
 	// Split when uppercase is found (needed for Snake)
 	str = rex1.ReplaceAllString(str, " $1")
-	// check if consecutive single char things make up an initialism
 
+	// check if consecutive single char things make up an initialism
+	once.Do(sortInitialisms)
 	for _, k := range initialisms {
 		str = strings.Replace(str, rex1.ReplaceAllString(k, " $1"), " "+k, -1)
 	}
@@ -189,12 +194,26 @@ func lower(str string) string {
 	return strings.ToLower(trim(str))
 }
 
+// Camelize an uppercased word
+func Camelize(word string) (camelized string) {
+	for pos, ru := range word {
+		if pos > 0 {
+			camelized += string(unicode.ToLower(ru))
+		} else {
+			camelized += string(unicode.ToUpper(ru))
+		}
+	}
+	return
+}
+
 // ToFileName lowercases and underscores a go type name
 func ToFileName(name string) string {
 	var out []string
+
 	for _, w := range split(name) {
 		out = append(out, lower(w))
 	}
+
 	return strings.Join(out, "_")
 }
 
@@ -326,6 +345,13 @@ func IsZero(data interface{}) bool {
 		return true
 	}
 	return false
+}
+
+// AddInitialisms add additional initialisms
+func AddInitialisms(words ...string) {
+	for _, word := range words {
+		commonInitialisms[upper(word)] = true
+	}
 }
 
 // CommandLineOptionsGroup represents a group of user-defined command line options

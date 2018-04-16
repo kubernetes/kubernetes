@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/go-openapi/errors"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 )
@@ -58,30 +57,29 @@ func (s *schemaSliceValidator) Validate(data interface{}) *Result {
 		for i := 0; i < size; i++ {
 			validator.SetPath(fmt.Sprintf("%s.%d", s.Path, i))
 			value := val.Index(i)
-			result.Merge(validator.Validate(value.Interface()))
+			result.mergeForSlice(val, i, validator.Validate(value.Interface()))
 		}
 	}
 
-	itemsSize := int64(0)
+	itemsSize := 0
 	if s.Items != nil && len(s.Items.Schemas) > 0 {
-		itemsSize = int64(len(s.Items.Schemas))
-		for i := int64(0); i < itemsSize; i++ {
+		itemsSize = len(s.Items.Schemas)
+		for i := 0; i < itemsSize; i++ {
 			validator := NewSchemaValidator(&s.Items.Schemas[i], s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats)
-			if val.Len() <= int(i) {
+			if val.Len() <= i {
 				break
 			}
-			result.Merge(validator.Validate(val.Index(int(i)).Interface()))
+			result.mergeForSlice(val, int(i), validator.Validate(val.Index(i).Interface()))
 		}
-
 	}
-	if s.AdditionalItems != nil && itemsSize < int64(size) {
+	if s.AdditionalItems != nil && itemsSize < size {
 		if s.Items != nil && len(s.Items.Schemas) > 0 && !s.AdditionalItems.Allows {
-			result.AddErrors(errors.New(422, "array doesn't allow for additional items"))
+			result.AddErrors(arrayDoesNotAllowAdditionalItemsMsg())
 		}
 		if s.AdditionalItems.Schema != nil {
-			for i := itemsSize; i < (int64(size)-itemsSize)+1; i++ {
+			for i := itemsSize; i < size-itemsSize+1; i++ {
 				validator := NewSchemaValidator(s.AdditionalItems.Schema, s.Root, fmt.Sprintf("%s.%d", s.Path, i), s.KnownFormats)
-				result.Merge(validator.Validate(val.Index(int(i)).Interface()))
+				result.mergeForSlice(val, int(i), validator.Validate(val.Index(int(i)).Interface()))
 			}
 		}
 	}
