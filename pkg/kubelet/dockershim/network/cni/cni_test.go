@@ -71,7 +71,7 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	pluginExec := path.Join(testBinDir, binName)
 	f, err = os.Create(pluginExec)
 
-	const execScriptTempl = `#!/bin/bash
+	const execScriptTempl = `#!/usr/bin/env bash
 cat > {{.InputFile}}
 env > {{.OutputEnv}}
 echo "%@" >> {{.OutputEnv}}
