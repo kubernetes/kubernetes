@@ -80,14 +80,6 @@ func createAggregatorConfig(
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
-	// override MergedResourceConfig with aggregator defaults and registry
-	if err := commandOptions.APIEnablement.ApplyTo(
-		&genericConfig,
-		aggregatorapiserver.DefaultAPIResourceConfigSource(),
-		aggregatorscheme.Registry); err != nil {
-		return nil, err
-	}
-
 	var err error
 	var certBytes, keyBytes []byte
 	if len(commandOptions.ProxyClientCertFile) > 0 && len(commandOptions.ProxyClientKeyFile) > 0 {

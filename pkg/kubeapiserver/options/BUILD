@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "admission.go",
+        "api_enablement.go",
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
