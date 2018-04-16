@@ -25,8 +25,6 @@ import (
 )
 
 func TestGetLoadBalancer(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -52,8 +50,6 @@ func TestGetLoadBalancer(t *testing.T) {
 }
 
 func TestEnsureLoadBalancerCreatesExternalLb(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -70,8 +66,6 @@ func TestEnsureLoadBalancerCreatesExternalLb(t *testing.T) {
 }
 
 func TestEnsureLoadBalancerCreatesInternalLb(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -88,8 +82,6 @@ func TestEnsureLoadBalancerCreatesInternalLb(t *testing.T) {
 }
 
 func TestEnsureLoadBalancerDeletesExistingInternalLb(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -110,8 +102,6 @@ func TestEnsureLoadBalancerDeletesExistingInternalLb(t *testing.T) {
 }
 
 func TestEnsureLoadBalancerDeletesExistingExternalLb(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -133,8 +123,6 @@ func TestEnsureLoadBalancerDeletesExistingExternalLb(t *testing.T) {
 }
 
 func TestEnsureLoadBalancerDeletedDeletesExternalLb(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -152,8 +140,6 @@ func TestEnsureLoadBalancerDeletedDeletesExternalLb(t *testing.T) {
 }
 
 func TestEnsureLoadBalancerDeletedDeletesInternalLb(t *testing.T) {
-	t.Parallel()
-
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
