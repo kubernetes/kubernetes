@@ -61,9 +61,11 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 	}, nil
 }
 
-type fakeEtcdCluster struct{}
+type fakeEtcdCluster struct{ TLS bool }
 
-func (f fakeEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse, error) {
+func (f fakeEtcdCluster) HasTLS() (bool, error) { return f.TLS, nil }
+
+func (f fakeEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
 	client := &clientv3.StatusResponse{}
 	client.Version = "3.1.12"
 	return client, nil
