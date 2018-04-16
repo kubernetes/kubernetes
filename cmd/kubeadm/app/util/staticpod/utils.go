@@ -198,6 +198,23 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 	return nil
 }
 
+// ReadStaticPodFromDisk reads a static pod file from disk
+func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
+	buf, err := ioutil.ReadFile(manifestPath)
+	if err != nil {
+		return &v1.Pod{}, fmt.Errorf("failed to read manifest for %q: %v", manifestPath, err)
+	}
+
+	obj, err := util.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
+	if err != nil {
+		return &v1.Pod{}, fmt.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
+	}
+
+	pod := obj.(*v1.Pod)
+
+	return pod, nil
+}
+
 // GetProbeAddress returns an IP address or 127.0.0.1 to use for liveness probes
 // in static pod manifests.
 func GetProbeAddress(cfg *kubeadmapi.MasterConfiguration, componentName string) string {
