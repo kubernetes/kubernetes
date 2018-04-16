@@ -1177,10 +1177,10 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod *v1.Pod, targetPod *
 	if err != nil {
 		return false, false, err
 	}
-	affinityTermPropertiesMatch := podMatchesAffinityTermProperties(targetPod, props)
-	if !affinityTermPropertiesMatch {
+	if !podMatchesAffinityTermProperties(targetPod, props) {
 		return false, false, nil
 	}
+	// Namespace and selector of the terms have matched. Now we check topology of the terms.
 	targetPodNode, err := c.info.GetNodeInfo(targetPod.Spec.NodeName)
 	if err != nil {
 		return false, false, err
@@ -1190,10 +1190,10 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod *v1.Pod, targetPod *
 			return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 		}
 		if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNode, term.TopologyKey) {
-			return false, affinityTermPropertiesMatch, nil
+			return false, true, nil
 		}
 	}
-	return true, affinityTermPropertiesMatch, nil
+	return true, true, nil
 }
 
 // GetPodAffinityTerms gets pod affinity terms by a pod affinity object.
@@ -1490,7 +1490,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 
 		if !matchFound && len(affinityTerms) > 0 {
 			// We have not been able to find any matches for the pod's affinity rules.
-			// This pod may the first pod in a series that have affinity to themselves. In order
+			// This pod may be the first pod in a series that have affinity to themselves. In order
 			// to not leave such pods in pending state forever, we check that if no other pod
 			// in the cluster matches the namespace and selector of this pod and the pod matches
 			// its own terms, then we allow the pod to pass the affinity check.
