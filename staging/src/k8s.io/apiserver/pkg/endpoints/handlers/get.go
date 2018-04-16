@@ -40,7 +40,7 @@ import (
 
 // getterFunc performs a get request with the given context and object name. The request
 // may be used to deserialize an options object to pass to the getter.
-type getterFunc func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error)
+type getterFunc func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error, bool)
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
@@ -57,7 +57,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		result, err := getter(ctx, name, req, trace)
+		result, err, export := getter(ctx, name, req, trace)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -67,9 +67,11 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			scope.err(fmt.Errorf("missing requestInfo"), w, req)
 			return
 		}
-		if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
+		if !export {
+			if err := setSelfLink(result, requestInfo, scope.Namer); err != nil {
+				scope.err(err, w, req)
+				return
+			}
 		}
 
 		trace.Step("About to write a response")
@@ -80,47 +82,50 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error, bool) {
 			// check for export
 			options := metav1.GetOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
 				exports := metav1.ExportOptions{}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
 					err = errors.NewBadRequest(err.Error())
-					return nil, err
+					return nil, err, exports.Export
 				}
 				if exports.Export {
 					if e == nil {
-						return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
+						return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource)), exports.Export
 					}
-					return e.Export(ctx, name, exports)
+					obj, err := e.Export(ctx, name, exports)
+					return obj, err, exports.Export
 				}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
 					err = errors.NewBadRequest(err.Error())
-					return nil, err
+					return nil, err, exports.Export
 				}
 			}
 			if trace != nil {
 				trace.Step("About to Get from storage")
 			}
-			return r.Get(ctx, name, &options)
+			obj, err := r.Get(ctx, name, &options)
+			return obj, err, false
 		})
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error, bool) {
 			opts, subpath, subpathKey := r.NewGetOptions()
 			trace.Step("About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
 				err = errors.NewBadRequest(err.Error())
-				return nil, err
+				return nil, err, false
 			}
 			if trace != nil {
 				trace.Step("About to Get from storage")
 			}
-			return r.Get(ctx, name, opts)
+			obj, err := r.Get(ctx, name, opts)
+			return obj, err, false
 		})
 }
 
