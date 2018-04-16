@@ -222,11 +222,11 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	// Need to check currently used version and version from constants, if differs then upgrade
 	desiredEtcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
 	if err != nil {
-		return true, fmt.Errorf("failed to parse the desired etcd version(%s): %v", desiredEtcdVersion.String(), err)
+		return true, fmt.Errorf("failed to retrieve an etcd version for the target kubernetes version: %v", err)
 	}
 	currentEtcdVersion, err := version.ParseSemantic(etcdStatus.Version)
 	if err != nil {
-		return true, fmt.Errorf("failed to parse the current etcd version(%s): %v", currentEtcdVersion.String(), err)
+		return true, fmt.Errorf("failed to parse the current etcd version(%s): %v", etcdStatus.Version, err)
 	}
 
 	// Comparing current etcd version with desired to catch the same version or downgrade condition and fail on them.

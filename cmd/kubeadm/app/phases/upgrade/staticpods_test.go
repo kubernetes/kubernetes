@@ -368,7 +368,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpEtcdDataDir)
 
-		oldcfg, err := getConfig("v1.7.0", tempCertsDir)
+		oldcfg, err := getConfig("v1.9.0", tempCertsDir, tmpEtcdDataDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
@@ -410,7 +410,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't read temp file: %v", err)
 		}
 
-		newcfg, err := getConfig("v1.8.0", tempCertsDir)
+		newcfg, err := getConfig("v1.10.0", tempCertsDir, tmpEtcdDataDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
