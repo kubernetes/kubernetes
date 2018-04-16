@@ -46,29 +46,29 @@ import (
 )
 
 const (
-	secretName                   = "sample-webhook-secret"
-	deploymentName               = "sample-webhook-deployment"
-	serviceName                  = "e2e-test-webhook"
-	roleBindingName              = "webhook-auth-reader"
-	webhookConfigName            = "e2e-test-webhook-config"
-	mutatingWebhookConfigName    = "e2e-test-mutating-webhook-config"
-	skipNamespaceLabelKey        = "skip-webhook-admission"
-	skipNamespaceLabelValue      = "yes"
-	skippedNamespaceName         = "exempted-namesapce"
-	disallowedPodName            = "disallowed-pod"
-	disallowedConfigMapName      = "disallowed-configmap"
-	allowedConfigMapName         = "allowed-configmap"
-	crdName                      = "e2e-test-webhook-crd"
-	crdKind                      = "E2e-test-webhook-crd"
-	crWebhookConfigName          = "e2e-test-webhook-config-cr"
-	crdWebhookConfigName         = "e2e-test-webhook-config-crd"
-	crMutatingWebhookConfigName  = "e2e-test-mutating-webhook-config-cr"
-	crdAPIGroup                  = "webhook-crd-test.k8s.io"
-	crdAPIVersion                = "v1"
-	webhookFailClosedConfigName  = "e2e-test-webhook-fail-closed"
-	failNamespaceLabelKey        = "fail-closed-webhook"
-	failNamespaceLabelValue      = "yes"
-	failNamespaceName            = "fail-closed-namesapce"
+	secretName                  = "sample-webhook-secret"
+	deploymentName              = "sample-webhook-deployment"
+	serviceName                 = "e2e-test-webhook"
+	roleBindingName             = "webhook-auth-reader"
+	webhookConfigName           = "e2e-test-webhook-config"
+	mutatingWebhookConfigName   = "e2e-test-mutating-webhook-config"
+	skipNamespaceLabelKey       = "skip-webhook-admission"
+	skipNamespaceLabelValue     = "yes"
+	skippedNamespaceName        = "exempted-namesapce"
+	disallowedPodName           = "disallowed-pod"
+	disallowedConfigMapName     = "disallowed-configmap"
+	allowedConfigMapName        = "allowed-configmap"
+	crdName                     = "e2e-test-webhook-crd"
+	crdKind                     = "E2e-test-webhook-crd"
+	crWebhookConfigName         = "e2e-test-webhook-config-cr"
+	crdWebhookConfigName        = "e2e-test-webhook-config-crd"
+	crMutatingWebhookConfigName = "e2e-test-mutating-webhook-config-cr"
+	crdAPIGroup                 = "webhook-crd-test.k8s.io"
+	crdAPIVersion               = "v1"
+	webhookFailClosedConfigName = "e2e-test-webhook-fail-closed"
+	failNamespaceLabelKey       = "fail-closed-webhook"
+	failNamespaceLabelValue     = "yes"
+	failNamespaceName           = "fail-closed-namesapce"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -1035,7 +1035,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	}
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   name + "s." + group,
+			Name: name + "s." + group,
 			Labels: map[string]string{
 				"webhook-e2e-test": "webhook-disallow",
 			},
