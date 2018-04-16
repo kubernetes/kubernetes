@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 // upgradeVariables holds variables needed for performing an upgrade or planning to do so
@@ -60,7 +61,23 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	cfg, err := upgrade.FetchConfiguration(client, os.Stdout, flags.cfgPath)
+	cfgMap, err := upgrade.FetchConfiguration(client, os.Stdout, flags.cfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+	}
+
+	versionGetter := upgrade.NewKubeVersionGetter(client, os.Stdout)
+	_, oldK8sVersion, err := versionGetter.ClusterVersion()
+	if err != nil {
+		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+	}
+
+	newK8sVersionParsed, err := versionutil.ParseGeneric(newK8sVersion)
+	if err != nil {
+		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
+	}
+
+	cfg, err := upgrade.LoadConfigMap(cfgMap, oldK8sVersion, newK8sVersionParsed)
 	if err != nil {
 		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}
@@ -87,7 +104,7 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 		client: client,
 		cfg:    cfg,
 		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-		versionGetter: upgrade.NewKubeVersionGetter(client, os.Stdout),
+		versionGetter: versionGetter,
 		// Use the waiter conditionally based on the dryrunning variable
 		waiter: getWaiter(dryRun, client),
 	}, nil
