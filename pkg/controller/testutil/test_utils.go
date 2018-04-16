@@ -58,11 +58,12 @@ type FakeNodeHandler struct {
 	Existing   []*v1.Node
 
 	// Output
-	CreatedNodes        []*v1.Node
-	DeletedNodes        []*v1.Node
-	UpdatedNodes        []*v1.Node
-	UpdatedNodeStatuses []*v1.Node
-	RequestCount        int
+	CreatedNodes             []*v1.Node
+	DeletedNodes             []*v1.Node
+	UpdatedNodes             []*v1.Node
+	UpdatedNodeStatuses      []*v1.Node
+	UpdatedNodeConfigSources []*v1.Node
+	RequestCount             int
 
 	// Synchronization
 	lock           sync.Mutex
@@ -239,7 +240,7 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 	}
 
 	if !found {
-		return nil, fmt.Errorf("Not found node %v", node)
+		return nil, fmt.Errorf("node not found: %v", node)
 	}
 
 	origNodeCopy.Status = node.Status
@@ -258,6 +259,49 @@ func (m *FakeNodeHandler) UpdateStatus(node *v1.Node) (*v1.Node, error) {
 func (m *FakeNodeHandler) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
 	m.RequestCount++
 	return &v1.Node{}, nil
+}
+
+// UpdateConfigSource updates the configsource of a Node in the fake store.
+func (m *FakeNodeHandler) UpdateConfigSource(nodeName string, node *v1.Node) (*v1.Node, error) {
+	m.lock.Lock()
+	defer func() {
+		m.RequestCount++
+		m.lock.Unlock()
+	}()
+
+	var origNodeCopy v1.Node
+	found := false
+	for i := range m.Existing {
+		if m.Existing[i].Name == nodeName {
+			origNodeCopy = *m.Existing[i]
+			found = true
+			break
+		}
+	}
+	updatedNodeIndex := -1
+	for i := range m.UpdatedNodes {
+		if m.UpdatedNodes[i].Name == nodeName {
+			origNodeCopy = *m.UpdatedNodes[i]
+			updatedNodeIndex = i
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("node not found: %v", node)
+	}
+
+	origNodeCopy.Spec.ConfigSource = node.Spec.ConfigSource
+	if updatedNodeIndex < 0 {
+		m.UpdatedNodes = append(m.UpdatedNodes, &origNodeCopy)
+	} else {
+		m.UpdatedNodes[updatedNodeIndex] = &origNodeCopy
+	}
+
+	nodeCopy := *node
+	m.UpdatedNodeConfigSources = append(m.UpdatedNodeConfigSources, &nodeCopy)
+	return node, nil
 }
 
 // Watch watches Nodes in a fake store.

@@ -40,9 +40,10 @@ import (
 
 // NodeStorage includes storage for nodes and all sub resources
 type NodeStorage struct {
-	Node   *REST
-	Status *StatusREST
-	Proxy  *noderest.ProxyREST
+	Node         *REST
+	Status       *StatusREST
+	Proxy        *noderest.ProxyREST
+	ConfigSource *ConfigSourceREST
 
 	KubeletConnectionInfo client.ConnectionInfoGetter
 }
@@ -53,7 +54,7 @@ type REST struct {
 	proxyTransport http.RoundTripper
 }
 
-// StatusREST implements the REST endpoint for changing the status of a pod.
+// StatusREST implements the REST endpoint for changing the status of a node.
 type StatusREST struct {
 	store *genericregistry.Store
 }
@@ -70,6 +71,21 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+}
+
+// ConfigSourceREST implements the configsource subresource for a Node
+type ConfigSourceREST struct {
+	Store *genericregistry.Store
+}
+
+var _ = rest.Updater(&ConfigSourceREST{})
+
+func (r *ConfigSourceREST) New() runtime.Object {
+	return &api.Node{}
+}
+
+func (r *ConfigSourceREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.Store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }
 
 // NewStorage returns a NodeStorage object that will work against nodes.
@@ -95,10 +111,14 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	statusStore := *store
 	statusStore.UpdateStrategy = node.StatusStrategy
 
+	configSourceStore := *store
+	configSourceStore.UpdateStrategy = node.ConfigSourceStrategy
+
 	// Set up REST handlers
 	nodeREST := &REST{Store: store, proxyTransport: proxyTransport}
 	statusREST := &StatusREST{store: &statusStore}
 	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
+	configSourceREST := &ConfigSourceREST{Store: &configSourceStore}
 
 	// Build a NodeGetter that looks up nodes using the REST handler
 	nodeGetter := client.NodeGetterFunc(func(nodeName string, options metav1.GetOptions) (*v1.Node, error) {
@@ -126,9 +146,10 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	proxyREST.Connection = connectionInfoGetter
 
 	return &NodeStorage{
-		Node:   nodeREST,
-		Status: statusREST,
-		Proxy:  proxyREST,
+		Node:                  nodeREST,
+		Status:                statusREST,
+		Proxy:                 proxyREST,
+		ConfigSource:          configSourceREST,
 		KubeletConnectionInfo: connectionInfoGetter,
 	}, nil
 }
