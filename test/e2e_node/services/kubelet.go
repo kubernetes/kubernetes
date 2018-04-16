@@ -55,12 +55,6 @@ func (a *args) String() string {
 
 // Set function of flag.Value
 func (a *args) Set(value string) error {
-	// Someone else is calling flag.Parse after the flags are parsed in the
-	// test framework. Use this to avoid the flag being parsed twice.
-	// TODO(random-liu): Figure out who is parsing the flags.
-	if flag.Parsed() {
-		return nil
-	}
 	// Note that we assume all white space in flag string is separating fields
 	na := strings.Fields(value)
 	*a = append(*a, na...)
