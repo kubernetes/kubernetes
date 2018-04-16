@@ -1856,6 +1856,10 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
     params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
   fi
+  # If the cluster is large, up the qps to cope-up with increased expected load.
+  if [[ "${NUM_NODES}" -ge 1000 ]]; then
+    params+=" --kube-api-qps=100 --kube-api-burst=100"
+  fi
   # Disable using HPA metrics REST clients if metrics-server isn't enabled,
   # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
   if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
@@ -1916,6 +1920,10 @@ function start-kube-scheduler {
     create-kubescheduler-policy-config
     params+=" --use-legacy-policy-config"
     params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
+  fi
+  # If the cluster is large, up the qps to cope-up with increased expected load.
+  if [[ "${NUM_NODES}" -ge 1000 ]]; then
+    params+=" --kube-api-qps=100 --kube-api-burst=100"
   fi
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 

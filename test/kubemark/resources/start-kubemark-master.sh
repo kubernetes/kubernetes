@@ -561,6 +561,10 @@ function compute-kube-controller-manager-params {
 	params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+  # If the cluster is large, up the qps to cope-up with increased expected load.
+  if [[ "${NUM_NODES}" -ge 1000 ]]; then
+    params+=" --kube-api-qps=100 --kube-api-burst=100"
+  fi
 	echo "${params}"
 }
 
@@ -568,6 +572,10 @@ function compute-kube-controller-manager-params {
 function compute-kube-scheduler-params {
 	local params="${SCHEDULER_TEST_ARGS:-}"
 	params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
+  # If the cluster is large, up the qps to cope-up with increased expected load.
+  if [[ "${NUM_NODES}" -ge 1000 ]]; then
+    params+=" --kube-api-qps=100 --kube-api-burst=100"
+  fi
 	echo "${params}"
 }
 
