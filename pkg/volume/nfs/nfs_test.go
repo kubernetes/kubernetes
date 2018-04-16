@@ -245,3 +245,44 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		t.Errorf("Expected true for mounter.IsReadOnly")
 	}
 }
+
+func TestConstructVolumeSpec(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	testVolName := "vol1"
+	volPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/%s", tmpDir, testVolName)
+	spec, err := plug.ConstructVolumeSpec(testVolName, volPath)
+	if err != nil {
+		t.Errorf("ConstructVolumeSpec() failed: %v", err)
+	}
+	if spec == nil {
+		t.Fatalf("ConstructVolumeSpec() returned nil")
+	}
+
+	volName := spec.Name()
+	if volName != testVolName {
+		t.Errorf("Expected volume name %q, got %q", testVolName, volName)
+	}
+
+	vol := spec.Volume
+	if vol == nil {
+		t.Fatalf("Volume object nil")
+	}
+
+	nfsSource := vol.VolumeSource.NFS
+	if nfsSource == nil {
+		t.Fatalf("NFSVolumeSource object nil")
+	}
+}
