@@ -38,6 +38,9 @@ type CustomResourceDefinitionSpec struct {
 	// subresources via the CustomResourceSubresources feature gate.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,6,opt,name=subresources"`
+	// Prune enables pruning of unspecified fields. This required validation to be enabled.
+	// Note: this will default to true in version v1.
+	Prune bool `json:"prune" protobuf:"prune,7,opt,name=prune"`
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition

@@ -117,6 +117,11 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("subresources"), "disabled by feature-gate CustomResourceSubresources"))
 	}
 
+	validationEnabled := spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil
+	if spec.Prune && !validationEnabled {
+		allErrs = append(allErrs, field.Required(fldPath.Child("validation").Child("openAPIV3Schema"), "must be set if spec.prune is true"))
+	}
+
 	return allErrs
 }
 
