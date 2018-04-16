@@ -249,6 +249,15 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+
+	// LastApplied is a map of workflow-id to last applied
+	// configuration. A workflow can be the user's name, a
+	// controller's name, or the name of a specific apply path like
+	// "ci-cd". It keeps track of the ownership of fields. The last
+	// applied configuration is always in the same version as the
+	// parent object. It's used to keep track of the intent of the
+	// workflow-id that submitted that configuration.
+	LastApplied map[string]string `json:"lastApplied,omitempty" protobuf:"bytes,17,rep,name=lastApplied"`
 }
 
 // Initializers tracks the progress of initialization.
