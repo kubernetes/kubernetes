@@ -607,3 +607,7 @@ func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
 func (adc *attachDetachController) GetNodeName() types.NodeName {
 	return ""
 }
+
+func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
+	return adc.recorder
+}
