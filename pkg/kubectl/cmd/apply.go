@@ -26,6 +26,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -303,6 +304,8 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
 
+	var objs []runtime.Object
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -353,6 +356,11 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 
 			count++
+
+			if printObject {
+				objs = append(objs, info.Object)
+				return nil
+			}
 
 			printer, err := o.ToPrinter("created")
 			if err != nil {
@@ -416,18 +424,50 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 		count++
 
+		if printObject {
+			objs = append(objs, info.Object)
+			return nil
+		}
+
 		printer, err := o.ToPrinter("configured")
 		if err != nil {
 			return err
 		}
 		return printer.PrintObj(info.AsVersioned(), o.Out)
 	})
-
 	if err != nil {
 		return err
 	}
+
 	if count == 0 {
 		return fmt.Errorf("no objects passed to apply")
+	}
+
+	// print objects
+	if len(objs) > 0 {
+		printer, err := o.ToPrinter("")
+		if err != nil {
+			return err
+		}
+
+		objToPrint := objs[0]
+		if len(objs) > 1 {
+			list := &v1.List{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{},
+			}
+			if err := meta.SetList(list, objs); err != nil {
+				return err
+			}
+
+			objToPrint = list
+		}
+		if err := printer.PrintObj(objToPrint, o.Out); err != nil {
+			return err
+		}
 	}
 
 	if !o.Prune {
