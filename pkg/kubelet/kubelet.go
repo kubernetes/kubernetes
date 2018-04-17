@@ -715,7 +715,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) && kubeDeps.TLSOptions != nil {
+	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		var (
 			ips   []net.IP
 			names []string
@@ -1241,8 +1241,8 @@ func (kl *Kubelet) initializeModules() error {
 	// Start the image manager.
 	kl.imageManager.Start()
 
-	// Start the certificate manager.
-	if utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+	// Start the certificate manager if it was enabled.
+	if kl.serverCertificateManager != nil {
 		kl.serverCertificateManager.Start()
 	}
 

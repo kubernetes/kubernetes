@@ -187,6 +187,7 @@ var (
 		"KubeReserved[*]",
 		"KubeletCgroups",
 		"MakeIPTablesUtilChains",
+		"ServerTLSBootstrap",
 		"StaticPodURL",
 		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",
