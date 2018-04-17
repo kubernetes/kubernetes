@@ -14,7 +14,7 @@
 
 build:
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o webhook .
-	docker build --no-cache -t gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.9v1 .
+	docker build --no-cache -t gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.10v2 .
 	rm -rf webhook
 push:
-	gcloud docker -- push gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.9v1
+	gcloud docker -- push gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.10v2
