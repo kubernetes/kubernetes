@@ -60,10 +60,6 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 // shouldPullImage returns whether we should pull an image according to
 // the presence and pull policy of the image.
 func shouldPullImage(container *v1.Container, imagePresent bool) bool {
-	if container.ImagePullPolicy == v1.PullNever {
-		return false
-	}
-
 	if container.ImagePullPolicy == v1.PullAlways ||
 		(container.ImagePullPolicy == v1.PullIfNotPresent && (!imagePresent)) {
 		return true
