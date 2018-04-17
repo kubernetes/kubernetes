@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, pvc *v1.PersistentVolumeClaim)
+type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
 type disruptiveTest struct {
 	testItStmt string
 	runTest    testBody
@@ -233,7 +233,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			func(t disruptiveTest) {
 				It(t.testItStmt, func() {
 					By("Executing Spec")
-					t.runTest(c, f, clientPod, pvc)
+					t.runTest(c, f, clientPod)
 				})
 			}(test)
 		}

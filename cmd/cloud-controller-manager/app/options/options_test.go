@@ -35,46 +35,89 @@ func TestDefaultFlags(t *testing.T) {
 	s := NewCloudControllerManagerOptions()
 
 	expected := &CloudControllerManagerOptions{
-		Generic: cmoptions.GenericControllerManagerOptions{
-			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
-				CloudProvider:                                   "",
-				CloudConfigFile:                                 "",
-				Port:                                            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				ConcurrentEndpointSyncs:                         5,
-				ConcurrentRSSyncs:                               5,
-				ConcurrentResourceQuotaSyncs:                    5,
-				ConcurrentDeploymentSyncs:                       5,
-				ConcurrentDaemonSetSyncs:                        2,
-				ConcurrentJobSyncs:                              5,
-				ConcurrentNamespaceSyncs:                        10,
-				ConcurrentSATokenSyncs:                          5,
-				ConcurrentServiceSyncs:                          1,
-				ConcurrentGCSyncs:                               20,
-				ConcurrentRCSyncs:                               5,
-				MinResyncPeriod:                                 metav1.Duration{Duration: 12 * time.Hour},
-				NodeMonitorPeriod:                               metav1.Duration{Duration: 5 * time.Second},
-				ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
-				NamespaceSyncPeriod:                             metav1.Duration{Duration: 5 * time.Minute},
-				PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 15 * time.Second},
+		Generic: &cmoptions.GenericControllerManagerOptions{
+			CloudProvider: &cmoptions.CloudProviderOptions{
+				Name:            "",
+				CloudConfigFile: "",
+			},
+			Debugging: &cmoptions.DebuggingOptions{
+				EnableContentionProfiling: false,
+			},
+			GenericComponent: &cmoptions.GenericComponentConfigOptions{
+				MinResyncPeriod:         metav1.Duration{Duration: 12 * time.Hour},
+				ContentType:             "application/vnd.kubernetes.protobuf",
+				KubeAPIQPS:              20.0,
+				KubeAPIBurst:            30,
+				ControllerStartInterval: metav1.Duration{Duration: 0},
+				LeaderElection: componentconfig.LeaderElectionConfiguration{
+					ResourceLock:  "endpoints",
+					LeaderElect:   true,
+					LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
+				},
+			},
+			KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
+				Port:                      10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:                   "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
+				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
+				ClusterName:               "kubernetes",
+				ClusterCIDR:               "",
+				AllocateNodeCIDRs:         false,
+				CIDRAllocatorType:         "",
+				ConfigureCloudRoutes:      true,
+			},
+			AttachDetachController: &cmoptions.AttachDetachControllerOptions{
+				ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 1 * time.Minute},
+			},
+			CSRSigningController: &cmoptions.CSRSigningControllerOptions{
+				ClusterSigningCertFile: "/etc/kubernetes/ca/ca.pem",
+				ClusterSigningKeyFile:  "/etc/kubernetes/ca/ca.key",
+				ClusterSigningDuration: metav1.Duration{Duration: 8760 * time.Hour},
+			},
+			DaemonSetController: &cmoptions.DaemonSetControllerOptions{
+				ConcurrentDaemonSetSyncs: 2,
+			},
+			DeploymentController: &cmoptions.DeploymentControllerOptions{
+				ConcurrentDeploymentSyncs:      5,
+				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+			},
+			DeprecatedFlags: &cmoptions.DeprecatedControllerOptions{
+				RegisterRetryCount: 10,
+			},
+			EndPointController: &cmoptions.EndPointControllerOptions{
+				ConcurrentEndpointSyncs: 5,
+			},
+			GarbageCollectorController: &cmoptions.GarbageCollectorControllerOptions{
+				EnableGarbageCollector: true,
+				ConcurrentGCSyncs:      20,
+			},
+			HPAController: &cmoptions.HPAControllerOptions{
 				HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 30 * time.Second},
 				HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 3 * time.Minute},
 				HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 5 * time.Minute},
 				HorizontalPodAutoscalerTolerance:                0.1,
-				DeploymentControllerSyncPeriod:                  metav1.Duration{Duration: 30 * time.Second},
-				PodEvictionTimeout:                              metav1.Duration{Duration: 5 * time.Minute},
-				NodeMonitorGracePeriod:                          metav1.Duration{Duration: 40 * time.Second},
-				NodeStartupGracePeriod:                          metav1.Duration{Duration: 1 * time.Minute},
-				ClusterSigningDuration:                          metav1.Duration{Duration: 8760 * time.Hour},
-				ReconcilerSyncLoopPeriod:                        metav1.Duration{Duration: 1 * time.Minute},
-				TerminatedPodGCThreshold:                        12500,
-				RegisterRetryCount:                              10,
-				ClusterName:                                     "kubernetes",
-				ConfigureCloudRoutes:                            true,
-				AllocateNodeCIDRs:                               false,
-				EnableGarbageCollector:                          true,
-				EnableTaintManager:                              true,
 				HorizontalPodAutoscalerUseRESTClients:           true,
+			},
+			JobController: &cmoptions.JobControllerOptions{
+				ConcurrentJobSyncs: 5,
+			},
+			NamespaceController: &cmoptions.NamespaceControllerOptions{
+				ConcurrentNamespaceSyncs: 10,
+				NamespaceSyncPeriod:      metav1.Duration{Duration: 5 * time.Minute},
+			},
+			NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+				NodeCIDRMaskSize: 24,
+			},
+			NodeLifecycleController: &cmoptions.NodeLifecycleControllerOptions{
+				EnableTaintManager:     true,
+				NodeMonitorGracePeriod: metav1.Duration{Duration: 40 * time.Second},
+				NodeStartupGracePeriod: metav1.Duration{Duration: 1 * time.Minute},
+				PodEvictionTimeout:     metav1.Duration{Duration: 5 * time.Minute},
+			},
+			PersistentVolumeBinderController: &cmoptions.PersistentVolumeBinderControllerOptions{
+				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 				VolumeConfiguration: componentconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  true,
 					EnableHostPathProvisioning: false,
@@ -87,26 +130,27 @@ func TestDefaultFlags(t *testing.T) {
 						IncrementTimeoutHostPath: 30,
 					},
 				},
-				ContentType:               "application/vnd.kubernetes.protobuf",
-				ClusterSigningCertFile:    "/etc/kubernetes/ca/ca.pem",
-				ClusterSigningKeyFile:     "/etc/kubernetes/ca/ca.key",
-				EnableContentionProfiling: false,
-				KubeAPIQPS:                20.0,
-				KubeAPIBurst:              30,
-				LeaderElection: componentconfig.LeaderElectionConfiguration{
-					ResourceLock:  "endpoints",
-					LeaderElect:   true,
-					LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
-				},
-				ControllerStartInterval:   metav1.Duration{Duration: 0},
-				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
-				ClusterCIDR:               "",
-				NodeCIDRMaskSize:          24,
-				CIDRAllocatorType:         "",
-				Controllers:               []string{"*"},
 			},
+			PodGCController: &cmoptions.PodGCControllerOptions{
+				TerminatedPodGCThreshold: 12500,
+			},
+			ReplicaSetController: &cmoptions.ReplicaSetControllerOptions{
+				ConcurrentRSSyncs: 5,
+			},
+			ReplicationController: &cmoptions.ReplicationControllerOptions{
+				ConcurrentRCSyncs: 5,
+			},
+			ResourceQuotaController: &cmoptions.ResourceQuotaControllerOptions{
+				ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 5 * time.Minute},
+				ConcurrentResourceQuotaSyncs: 5,
+			},
+			SAController: &cmoptions.SAControllerOptions{
+				ConcurrentSATokenSyncs: 5,
+			},
+			ServiceController: &cmoptions.ServiceControllerOptions{
+				ConcurrentServiceSyncs: 1,
+			},
+			Controllers: []string{"*"},
 			SecureServing: &apiserveroptions.SecureServingOptions{
 				BindPort:    0,
 				BindAddress: net.ParseIP("0.0.0.0"),
@@ -139,6 +183,8 @@ func TestAddFlags(t *testing.T) {
 	args := []string{
 		"--address=192.168.4.10",
 		"--allocate-node-cidrs=true",
+		"--bind-address=192.168.4.21",
+		"--cert-dir=/a/b/c",
 		"--cloud-config=/cloud-config",
 		"--cloud-provider=gce",
 		"--cluster-cidr=1.2.3.4/24",
@@ -163,55 +209,96 @@ func TestAddFlags(t *testing.T) {
 		"--profiling=false",
 		"--node-status-update-frequency=10m",
 		"--route-reconciliation-period=30s",
+		"--secure-port=10001",
 		"--min-resync-period=100m",
 		"--use-service-account-credentials=false",
-		"--cert-dir=/a/b/c",
-		"--bind-address=192.168.4.21",
-		"--secure-port=10001",
 	}
 	f.Parse(args)
 
 	expected := &CloudControllerManagerOptions{
-		Generic: cmoptions.GenericControllerManagerOptions{
-			ComponentConfig: componentconfig.KubeControllerManagerConfiguration{
-				CloudProvider:                                   "gce",
-				CloudConfigFile:                                 "/cloud-config",
-				Port:                                            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				Address:                                         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-				ConcurrentEndpointSyncs:                         5,
-				ConcurrentRSSyncs:                               5,
-				ConcurrentResourceQuotaSyncs:                    5,
-				ConcurrentDeploymentSyncs:                       5,
-				ConcurrentDaemonSetSyncs:                        2,
-				ConcurrentJobSyncs:                              5,
-				ConcurrentNamespaceSyncs:                        10,
-				ConcurrentSATokenSyncs:                          5,
-				ConcurrentServiceSyncs:                          1,
-				ConcurrentGCSyncs:                               20,
-				ConcurrentRCSyncs:                               5,
-				MinResyncPeriod:                                 metav1.Duration{Duration: 100 * time.Minute},
-				NodeMonitorPeriod:                               metav1.Duration{Duration: 5 * time.Second},
-				ResourceQuotaSyncPeriod:                         metav1.Duration{Duration: 5 * time.Minute},
-				NamespaceSyncPeriod:                             metav1.Duration{Duration: 5 * time.Minute},
-				PVClaimBinderSyncPeriod:                         metav1.Duration{Duration: 15 * time.Second},
+		Generic: &cmoptions.GenericControllerManagerOptions{
+			CloudProvider: &cmoptions.CloudProviderOptions{
+				Name:            "gce",
+				CloudConfigFile: "/cloud-config",
+			},
+			Debugging: &cmoptions.DebuggingOptions{
+				EnableContentionProfiling: true,
+			},
+			GenericComponent: &cmoptions.GenericComponentConfigOptions{
+				MinResyncPeriod:         metav1.Duration{Duration: 100 * time.Minute},
+				ContentType:             "application/vnd.kubernetes.protobuf",
+				KubeAPIQPS:              50.0,
+				KubeAPIBurst:            100,
+				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
+				LeaderElection: componentconfig.LeaderElectionConfiguration{
+					ResourceLock:  "configmap",
+					LeaderElect:   false,
+					LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
+					RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
+					RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
+				Port:                      10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				Address:                   "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
+				ClusterName:               "k8s",
+				ClusterCIDR:               "1.2.3.4/24",
+				AllocateNodeCIDRs:         true,
+				CIDRAllocatorType:         "RangeAllocator",
+				ConfigureCloudRoutes:      false,
+			},
+			AttachDetachController: &cmoptions.AttachDetachControllerOptions{
+				ReconcilerSyncLoopPeriod: metav1.Duration{Duration: 1 * time.Minute},
+			},
+			CSRSigningController: &cmoptions.CSRSigningControllerOptions{
+				ClusterSigningCertFile: "/etc/kubernetes/ca/ca.pem",
+				ClusterSigningKeyFile:  "/etc/kubernetes/ca/ca.key",
+				ClusterSigningDuration: metav1.Duration{Duration: 8760 * time.Hour},
+			},
+			DaemonSetController: &cmoptions.DaemonSetControllerOptions{
+				ConcurrentDaemonSetSyncs: 2,
+			},
+			DeploymentController: &cmoptions.DeploymentControllerOptions{
+				ConcurrentDeploymentSyncs:      5,
+				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+			},
+			DeprecatedFlags: &cmoptions.DeprecatedControllerOptions{
+				RegisterRetryCount: 10,
+			},
+			EndPointController: &cmoptions.EndPointControllerOptions{
+				ConcurrentEndpointSyncs: 5,
+			},
+			GarbageCollectorController: &cmoptions.GarbageCollectorControllerOptions{
+				ConcurrentGCSyncs:      20,
+				EnableGarbageCollector: true,
+			},
+			HPAController: &cmoptions.HPAControllerOptions{
 				HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 30 * time.Second},
 				HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 3 * time.Minute},
 				HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 5 * time.Minute},
 				HorizontalPodAutoscalerTolerance:                0.1,
-				DeploymentControllerSyncPeriod:                  metav1.Duration{Duration: 30 * time.Second},
-				PodEvictionTimeout:                              metav1.Duration{Duration: 5 * time.Minute},
-				NodeMonitorGracePeriod:                          metav1.Duration{Duration: 40 * time.Second},
-				NodeStartupGracePeriod:                          metav1.Duration{Duration: 1 * time.Minute},
-				ClusterSigningDuration:                          metav1.Duration{Duration: 8760 * time.Hour},
-				ReconcilerSyncLoopPeriod:                        metav1.Duration{Duration: 1 * time.Minute},
-				TerminatedPodGCThreshold:                        12500,
-				RegisterRetryCount:                              10,
-				ClusterName:                                     "k8s",
-				ConfigureCloudRoutes:                            false,
-				AllocateNodeCIDRs:                               true,
-				EnableGarbageCollector:                          true,
-				EnableTaintManager:                              true,
 				HorizontalPodAutoscalerUseRESTClients:           true,
+			},
+			JobController: &cmoptions.JobControllerOptions{
+				ConcurrentJobSyncs: 5,
+			},
+			NamespaceController: &cmoptions.NamespaceControllerOptions{
+				NamespaceSyncPeriod:      metav1.Duration{Duration: 5 * time.Minute},
+				ConcurrentNamespaceSyncs: 10,
+			},
+			NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+				NodeCIDRMaskSize: 24,
+			},
+			NodeLifecycleController: &cmoptions.NodeLifecycleControllerOptions{
+				EnableTaintManager:     true,
+				NodeMonitorGracePeriod: metav1.Duration{Duration: 40 * time.Second},
+				NodeStartupGracePeriod: metav1.Duration{Duration: 1 * time.Minute},
+				PodEvictionTimeout:     metav1.Duration{Duration: 5 * time.Minute},
+			},
+			PersistentVolumeBinderController: &cmoptions.PersistentVolumeBinderControllerOptions{
+				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 				VolumeConfiguration: componentconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  true,
 					EnableHostPathProvisioning: false,
@@ -224,26 +311,27 @@ func TestAddFlags(t *testing.T) {
 						IncrementTimeoutHostPath: 30,
 					},
 				},
-				ContentType:               "application/vnd.kubernetes.protobuf",
-				ClusterSigningCertFile:    "/etc/kubernetes/ca/ca.pem",
-				ClusterSigningKeyFile:     "/etc/kubernetes/ca/ca.key",
-				EnableContentionProfiling: true,
-				KubeAPIQPS:                50.0,
-				KubeAPIBurst:              100,
-				LeaderElection: componentconfig.LeaderElectionConfiguration{
-					ResourceLock:  "configmap",
-					LeaderElect:   false,
-					LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
-					RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
-					RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
-				},
-				ControllerStartInterval:   metav1.Duration{Duration: 2 * time.Minute},
-				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
-				ClusterCIDR:               "1.2.3.4/24",
-				NodeCIDRMaskSize:          24,
-				CIDRAllocatorType:         "RangeAllocator",
-				Controllers:               []string{"*"},
 			},
+			PodGCController: &cmoptions.PodGCControllerOptions{
+				TerminatedPodGCThreshold: 12500,
+			},
+			ReplicaSetController: &cmoptions.ReplicaSetControllerOptions{
+				ConcurrentRSSyncs: 5,
+			},
+			ReplicationController: &cmoptions.ReplicationControllerOptions{
+				ConcurrentRCSyncs: 5,
+			},
+			ResourceQuotaController: &cmoptions.ResourceQuotaControllerOptions{
+				ResourceQuotaSyncPeriod:      metav1.Duration{Duration: 5 * time.Minute},
+				ConcurrentResourceQuotaSyncs: 5,
+			},
+			SAController: &cmoptions.SAControllerOptions{
+				ConcurrentSATokenSyncs: 5,
+			},
+			ServiceController: &cmoptions.ServiceControllerOptions{
+				ConcurrentServiceSyncs: 1,
+			},
+			Controllers: []string{"*"},
 			SecureServing: &apiserveroptions.SecureServingOptions{
 				BindPort:    10001,
 				BindAddress: net.ParseIP("192.168.4.21"),

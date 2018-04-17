@@ -40,6 +40,6 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(ctx.ComponentConfig.ConcurrentDeploymentSyncs), ctx.Stop)
+	go dc.Run(int(ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }

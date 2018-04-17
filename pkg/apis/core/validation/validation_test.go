@@ -4704,6 +4704,7 @@ func TestValidateMountPropagation(t *testing.T) {
 
 	propagationBidirectional := core.MountPropagationBidirectional
 	propagationHostToContainer := core.MountPropagationHostToContainer
+	propagationNone := core.MountPropagationNone
 	propagationInvalid := core.MountPropagationMode("invalid")
 
 	tests := []struct {
@@ -4720,6 +4721,12 @@ func TestValidateMountPropagation(t *testing.T) {
 		{
 			// implicitly non-privileged container + HostToContainer
 			core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			defaultContainer,
+			false,
+		},
+		{
+			// non-privileged container + None
+			core.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationNone},
 			defaultContainer,
 			false,
 		},

@@ -37,9 +37,9 @@ type GoTemplatePrintFlags struct {
 // ToPrinter receives an templateFormat and returns a printer capable of
 // handling --template format printing.
 // Returns false if the specified templateFormat does not match a template format.
-func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, bool, error) {
+func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter, error) {
 	if (f.TemplateArgument == nil || len(*f.TemplateArgument) == 0) && len(templateFormat) == 0 {
-		return nil, false, fmt.Errorf("missing --template argument")
+		return nil, NoCompatiblePrinterError{f}
 	}
 
 	templateValue := ""
@@ -68,17 +68,17 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 	}
 
 	if _, supportedFormat := supportedFormats[templateFormat]; !supportedFormat {
-		return nil, false, nil
+		return nil, NoCompatiblePrinterError{f}
 	}
 
 	if len(templateValue) == 0 {
-		return nil, true, fmt.Errorf("template format specified but no template given")
+		return nil, fmt.Errorf("template format specified but no template given")
 	}
 
 	if templateFormat == "templatefile" || templateFormat == "go-template-file" {
 		data, err := ioutil.ReadFile(templateValue)
 		if err != nil {
-			return nil, true, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
 		}
 
 		templateValue = string(data)
@@ -86,7 +86,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 
 	p, err := NewGoTemplatePrinter([]byte(templateValue))
 	if err != nil {
-		return nil, true, fmt.Errorf("error parsing template %s, %v\n", templateValue, err)
+		return nil, fmt.Errorf("error parsing template %s, %v\n", templateValue, err)
 	}
 
 	allowMissingKeys := true
@@ -95,7 +95,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (ResourcePrinter
 	}
 
 	p.AllowMissingKeys(allowMissingKeys)
-	return p, true, nil
+	return p, nil
 }
 
 // AddFlags receives a *cobra.Command reference and binds

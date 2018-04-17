@@ -37,10 +37,36 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration,
+		Convert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration,
+		Convert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration,
+		Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration,
 		Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration,
 		Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration,
+		Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration,
+		Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration,
+		Convert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration,
+		Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration,
+		Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration,
+		Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration,
+		Convert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration,
+		Convert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration,
+		Convert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration,
+		Convert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration,
+		Convert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration,
+		Convert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration,
+		Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration,
+		Convert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration,
+		Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration,
+		Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration,
 		Convert_v1alpha1_GroupResource_To_componentconfig_GroupResource,
 		Convert_componentconfig_GroupResource_To_v1alpha1_GroupResource,
+		Convert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration,
+		Convert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration,
+		Convert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration,
+		Convert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration,
+		Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration,
+		Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration,
 		Convert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_KubeControllerManagerConfiguration,
 		Convert_componentconfig_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration,
 		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
@@ -49,8 +75,26 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_componentconfig_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration,
 		Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration,
 		Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration,
+		Convert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration,
+		Convert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration,
+		Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration,
+		Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration,
+		Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration,
+		Convert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration,
+		Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration,
+		Convert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration,
 		Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_componentconfig_PersistentVolumeRecyclerConfiguration,
 		Convert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration,
+		Convert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration,
+		Convert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration,
+		Convert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration,
+		Convert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration,
+		Convert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration,
+		Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration,
+		Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration,
+		Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration,
+		Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration,
+		Convert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration,
 		Convert_v1alpha1_SchedulerAlgorithmSource_To_componentconfig_SchedulerAlgorithmSource,
 		Convert_componentconfig_SchedulerAlgorithmSource_To_v1alpha1_SchedulerAlgorithmSource,
 		Convert_v1alpha1_SchedulerPolicyConfigMapSource_To_componentconfig_SchedulerPolicyConfigMapSource,
@@ -59,9 +103,57 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_componentconfig_SchedulerPolicyFileSource_To_v1alpha1_SchedulerPolicyFileSource,
 		Convert_v1alpha1_SchedulerPolicySource_To_componentconfig_SchedulerPolicySource,
 		Convert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPolicySource,
+		Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration,
+		Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration,
 		Convert_v1alpha1_VolumeConfiguration_To_componentconfig_VolumeConfiguration,
 		Convert_componentconfig_VolumeConfiguration_To_v1alpha1_VolumeConfiguration,
 	)
+}
+
+func autoConvert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration(in *AttachDetachControllerConfiguration, out *componentconfig.AttachDetachControllerConfiguration, s conversion.Scope) error {
+	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
+	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
+	return nil
+}
+
+// Convert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration(in *AttachDetachControllerConfiguration, out *componentconfig.AttachDetachControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(in *componentconfig.AttachDetachControllerConfiguration, out *AttachDetachControllerConfiguration, s conversion.Scope) error {
+	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
+	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
+	return nil
+}
+
+// Convert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(in *componentconfig.AttachDetachControllerConfiguration, out *AttachDetachControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration(in *CSRSigningControllerConfiguration, out *componentconfig.CSRSigningControllerConfiguration, s conversion.Scope) error {
+	out.ClusterSigningCertFile = in.ClusterSigningCertFile
+	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
+	out.ClusterSigningDuration = in.ClusterSigningDuration
+	return nil
+}
+
+// Convert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration(in *CSRSigningControllerConfiguration, out *componentconfig.CSRSigningControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(in *componentconfig.CSRSigningControllerConfiguration, out *CSRSigningControllerConfiguration, s conversion.Scope) error {
+	out.ClusterSigningCertFile = in.ClusterSigningCertFile
+	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
+	out.ClusterSigningDuration = in.ClusterSigningDuration
+	return nil
+}
+
+// Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(in *componentconfig.CSRSigningControllerConfiguration, out *CSRSigningControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentconfig.ClientConnectionConfiguration, s conversion.Scope) error {
@@ -92,6 +184,198 @@ func Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientCon
 	return autoConvert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in, out, s)
 }
 
+func autoConvert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(in *CloudProviderConfiguration, out *componentconfig.CloudProviderConfiguration, s conversion.Scope) error {
+	out.Name = in.Name
+	out.CloudConfigFile = in.CloudConfigFile
+	return nil
+}
+
+// Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(in *CloudProviderConfiguration, out *componentconfig.CloudProviderConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(in *componentconfig.CloudProviderConfiguration, out *CloudProviderConfiguration, s conversion.Scope) error {
+	out.Name = in.Name
+	out.CloudConfigFile = in.CloudConfigFile
+	return nil
+}
+
+// Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(in *componentconfig.CloudProviderConfiguration, out *CloudProviderConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration(in *DaemonSetControllerConfiguration, out *componentconfig.DaemonSetControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
+	return nil
+}
+
+// Convert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration(in *DaemonSetControllerConfiguration, out *componentconfig.DaemonSetControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(in *componentconfig.DaemonSetControllerConfiguration, out *DaemonSetControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
+	return nil
+}
+
+// Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(in *componentconfig.DaemonSetControllerConfiguration, out *DaemonSetControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(in *DebuggingConfiguration, out *componentconfig.DebuggingConfiguration, s conversion.Scope) error {
+	out.EnableProfiling = in.EnableProfiling
+	out.EnableContentionProfiling = in.EnableContentionProfiling
+	return nil
+}
+
+// Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(in *DebuggingConfiguration, out *componentconfig.DebuggingConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *componentconfig.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
+	out.EnableProfiling = in.EnableProfiling
+	out.EnableContentionProfiling = in.EnableContentionProfiling
+	return nil
+}
+
+// Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *componentconfig.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration(in *DeploymentControllerConfiguration, out *componentconfig.DeploymentControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
+	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
+	return nil
+}
+
+// Convert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration(in *DeploymentControllerConfiguration, out *componentconfig.DeploymentControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(in *componentconfig.DeploymentControllerConfiguration, out *DeploymentControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
+	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
+	return nil
+}
+
+// Convert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(in *componentconfig.DeploymentControllerConfiguration, out *DeploymentControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration(in *DeprecatedControllerConfiguration, out *componentconfig.DeprecatedControllerConfiguration, s conversion.Scope) error {
+	out.DeletingPodsQps = in.DeletingPodsQps
+	out.DeletingPodsBurst = in.DeletingPodsBurst
+	out.RegisterRetryCount = in.RegisterRetryCount
+	return nil
+}
+
+// Convert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration(in *DeprecatedControllerConfiguration, out *componentconfig.DeprecatedControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(in *componentconfig.DeprecatedControllerConfiguration, out *DeprecatedControllerConfiguration, s conversion.Scope) error {
+	out.DeletingPodsQps = in.DeletingPodsQps
+	out.DeletingPodsBurst = in.DeletingPodsBurst
+	out.RegisterRetryCount = in.RegisterRetryCount
+	return nil
+}
+
+// Convert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(in *componentconfig.DeprecatedControllerConfiguration, out *DeprecatedControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration(in *EndPointControllerConfiguration, out *componentconfig.EndPointControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
+	return nil
+}
+
+// Convert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration(in *EndPointControllerConfiguration, out *componentconfig.EndPointControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration(in *componentconfig.EndPointControllerConfiguration, out *EndPointControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
+	return nil
+}
+
+// Convert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration(in *componentconfig.EndPointControllerConfiguration, out *EndPointControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration(in *GarbageCollectorControllerConfiguration, out *componentconfig.GarbageCollectorControllerConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableGarbageCollector, &out.EnableGarbageCollector, s); err != nil {
+		return err
+	}
+	out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
+	out.GCIgnoredResources = *(*[]componentconfig.GroupResource)(unsafe.Pointer(&in.GCIgnoredResources))
+	return nil
+}
+
+// Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration(in *GarbageCollectorControllerConfiguration, out *componentconfig.GarbageCollectorControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(in *componentconfig.GarbageCollectorControllerConfiguration, out *GarbageCollectorControllerConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableGarbageCollector, &out.EnableGarbageCollector, s); err != nil {
+		return err
+	}
+	out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
+	out.GCIgnoredResources = *(*[]GroupResource)(unsafe.Pointer(&in.GCIgnoredResources))
+	return nil
+}
+
+// Convert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(in *componentconfig.GarbageCollectorControllerConfiguration, out *GarbageCollectorControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(in *GenericComponentConfiguration, out *componentconfig.GenericComponentConfiguration, s conversion.Scope) error {
+	out.MinResyncPeriod = in.MinResyncPeriod
+	out.ContentType = in.ContentType
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.ControllerStartInterval = in.ControllerStartInterval
+	if err := Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(in *GenericComponentConfiguration, out *componentconfig.GenericComponentConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(in *componentconfig.GenericComponentConfiguration, out *GenericComponentConfiguration, s conversion.Scope) error {
+	out.MinResyncPeriod = in.MinResyncPeriod
+	out.ContentType = in.ContentType
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.ControllerStartInterval = in.ControllerStartInterval
+	if err := Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(in *componentconfig.GenericComponentConfiguration, out *GenericComponentConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(in, out, s)
+}
+
 func autoConvert_v1alpha1_GroupResource_To_componentconfig_GroupResource(in *GroupResource, out *componentconfig.GroupResource, s conversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
@@ -114,87 +398,178 @@ func Convert_componentconfig_GroupResource_To_v1alpha1_GroupResource(in *compone
 	return autoConvert_componentconfig_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration, out *componentconfig.KubeControllerManagerConfiguration, s conversion.Scope) error {
-	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
-	out.Port = in.Port
-	out.Address = in.Address
-	out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
-	out.CloudProvider = in.CloudProvider
-	out.CloudConfigFile = in.CloudConfigFile
-	out.ExternalCloudVolumePlugin = in.ExternalCloudVolumePlugin
-	out.AllowUntaggedCloud = in.AllowUntaggedCloud
-	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
-	out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
-	out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
-	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
-	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
-	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
-	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
-	out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
-	out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
-	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
-	out.NodeSyncPeriod = in.NodeSyncPeriod
-	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
-	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
-	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
-	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
-	out.MinResyncPeriod = in.MinResyncPeriod
-	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
+func autoConvert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration(in *HPAControllerConfiguration, out *componentconfig.HPAControllerConfiguration, s conversion.Scope) error {
 	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
 	out.HorizontalPodAutoscalerTolerance = in.HorizontalPodAutoscalerTolerance
-	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
-	out.PodEvictionTimeout = in.PodEvictionTimeout
-	out.DeletingPodsQps = in.DeletingPodsQps
-	out.DeletingPodsBurst = in.DeletingPodsBurst
-	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-	out.RegisterRetryCount = in.RegisterRetryCount
-	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	if err := v1.Convert_Pointer_bool_To_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration(in *HPAControllerConfiguration, out *componentconfig.HPAControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(in *componentconfig.HPAControllerConfiguration, out *HPAControllerConfiguration, s conversion.Scope) error {
+	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
+	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
+	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
+	out.HorizontalPodAutoscalerTolerance = in.HorizontalPodAutoscalerTolerance
+	if err := v1.Convert_bool_To_Pointer_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(in *componentconfig.HPAControllerConfiguration, out *HPAControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration(in *JobControllerConfiguration, out *componentconfig.JobControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
+	return nil
+}
+
+// Convert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration(in *JobControllerConfiguration, out *componentconfig.JobControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(in *componentconfig.JobControllerConfiguration, out *JobControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
+	return nil
+}
+
+// Convert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(in *componentconfig.JobControllerConfiguration, out *JobControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration(in *KubeCloudSharedConfiguration, out *componentconfig.KubeCloudSharedConfiguration, s conversion.Scope) error {
+	out.Port = in.Port
+	out.Address = in.Address
+	out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
+	out.AllowUntaggedCloud = in.AllowUntaggedCloud
+	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
-	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
-	out.ClusterSigningCertFile = in.ClusterSigningCertFile
-	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
-	out.ClusterSigningDuration = in.ClusterSigningDuration
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
 	out.ClusterName = in.ClusterName
 	out.ClusterCIDR = in.ClusterCIDR
-	out.ServiceCIDR = in.ServiceCIDR
-	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
 	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
 	out.CIDRAllocatorType = in.CIDRAllocatorType
 	if err := v1.Convert_Pointer_bool_To_bool(&in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes, s); err != nil {
 		return err
 	}
-	out.RootCAFile = in.RootCAFile
-	out.ContentType = in.ContentType
-	out.KubeAPIQPS = in.KubeAPIQPS
-	out.KubeAPIBurst = in.KubeAPIBurst
-	if err := Convert_v1alpha1_LeaderElectionConfiguration_To_componentconfig_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
+	out.NodeSyncPeriod = in.NodeSyncPeriod
+	return nil
+}
+
+// Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration(in *KubeCloudSharedConfiguration, out *componentconfig.KubeCloudSharedConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(in *componentconfig.KubeCloudSharedConfiguration, out *KubeCloudSharedConfiguration, s conversion.Scope) error {
+	out.Port = in.Port
+	out.Address = in.Address
+	out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
+	out.AllowUntaggedCloud = in.AllowUntaggedCloud
+	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
+	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.ClusterName = in.ClusterName
+	out.ClusterCIDR = in.ClusterCIDR
+	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
+	out.CIDRAllocatorType = in.CIDRAllocatorType
+	if err := v1.Convert_bool_To_Pointer_bool(&in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_VolumeConfiguration_To_componentconfig_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
+	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
+	out.NodeSyncPeriod = in.NodeSyncPeriod
+	return nil
+}
+
+// Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(in *componentconfig.KubeCloudSharedConfiguration, out *KubeCloudSharedConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration, out *componentconfig.KubeControllerManagerConfiguration, s conversion.Scope) error {
+	if err := Convert_v1alpha1_CloudProviderConfiguration_To_componentconfig_CloudProviderConfiguration(&in.CloudProvider, &out.CloudProvider, s); err != nil {
 		return err
 	}
-	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableGarbageCollector, &out.EnableGarbageCollector, s); err != nil {
+	if err := Convert_v1alpha1_DebuggingConfiguration_To_componentconfig_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
-	out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
-	out.GCIgnoredResources = *(*[]componentconfig.GroupResource)(unsafe.Pointer(&in.GCIgnoredResources))
-	out.NodeEvictionRate = in.NodeEvictionRate
-	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
-	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
-	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
-	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
-	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
+	if err := Convert_v1alpha1_GenericComponentConfiguration_To_componentconfig_GenericComponentConfiguration(&in.GenericComponent, &out.GenericComponent, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_bool_To_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
+	if err := Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
+	if err := Convert_v1alpha1_AttachDetachControllerConfiguration_To_componentconfig_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_CSRSigningControllerConfiguration_To_componentconfig_CSRSigningControllerConfiguration(&in.CSRSigningController, &out.CSRSigningController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_DaemonSetControllerConfiguration_To_componentconfig_DaemonSetControllerConfiguration(&in.DaemonSetController, &out.DaemonSetController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_DeploymentControllerConfiguration_To_componentconfig_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_DeprecatedControllerConfiguration_To_componentconfig_DeprecatedControllerConfiguration(&in.DeprecatedController, &out.DeprecatedController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_EndPointControllerConfiguration_To_componentconfig_EndPointControllerConfiguration(&in.EndPointController, &out.EndPointController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_componentconfig_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration(&in.HPAController, &out.HPAController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_JobControllerConfiguration_To_componentconfig_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration(&in.NodeIpamController, &out.NodeIpamController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration(&in.NodeLifecycleController, &out.NodeLifecycleController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration(&in.PersistentVolumeBinderController, &out.PersistentVolumeBinderController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration(&in.PodGCController, &out.PodGCController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration(&in.ReplicaSetController, &out.ReplicaSetController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration(&in.ReplicationController, &out.ReplicationController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration(&in.ResourceQuotaController, &out.ResourceQuotaController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration(&in.SAController, &out.SAController, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
+		return err
+	}
+	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
+	out.ExternalCloudVolumePlugin = in.ExternalCloudVolumePlugin
 	return nil
 }
 
@@ -204,86 +579,77 @@ func Convert_v1alpha1_KubeControllerManagerConfiguration_To_componentconfig_Kube
 }
 
 func autoConvert_componentconfig_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration(in *componentconfig.KubeControllerManagerConfiguration, out *KubeControllerManagerConfiguration, s conversion.Scope) error {
+	if err := Convert_componentconfig_CloudProviderConfiguration_To_v1alpha1_CloudProviderConfiguration(&in.CloudProvider, &out.CloudProvider, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_GenericComponentConfiguration_To_v1alpha1_GenericComponentConfiguration(&in.GenericComponent, &out.GenericComponent, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigningControllerConfiguration(&in.CSRSigningController, &out.CSRSigningController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_DaemonSetControllerConfiguration_To_v1alpha1_DaemonSetControllerConfiguration(&in.DaemonSetController, &out.DaemonSetController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_DeploymentControllerConfiguration_To_v1alpha1_DeploymentControllerConfiguration(&in.DeploymentController, &out.DeploymentController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_DeprecatedControllerConfiguration_To_v1alpha1_DeprecatedControllerConfiguration(&in.DeprecatedController, &out.DeprecatedController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_EndPointControllerConfiguration_To_v1alpha1_EndPointControllerConfiguration(&in.EndPointController, &out.EndPointController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAControllerConfiguration(&in.HPAController, &out.HPAController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration(&in.NodeIpamController, &out.NodeIpamController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(&in.NodeLifecycleController, &out.NodeLifecycleController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(&in.PersistentVolumeBinderController, &out.PersistentVolumeBinderController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(&in.PodGCController, &out.PodGCController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration(&in.ReplicaSetController, &out.ReplicaSetController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(&in.ReplicationController, &out.ReplicationController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(&in.ResourceQuotaController, &out.ResourceQuotaController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(&in.SAController, &out.SAController, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
+		return err
+	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
-	out.Port = in.Port
-	out.Address = in.Address
-	out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
-	out.CloudProvider = in.CloudProvider
-	out.CloudConfigFile = in.CloudConfigFile
 	out.ExternalCloudVolumePlugin = in.ExternalCloudVolumePlugin
-	out.AllowUntaggedCloud = in.AllowUntaggedCloud
-	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
-	out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
-	out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
-	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
-	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
-	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
-	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
-	out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
-	out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
-	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
-	out.NodeSyncPeriod = in.NodeSyncPeriod
-	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
-	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
-	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
-	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
-	out.MinResyncPeriod = in.MinResyncPeriod
-	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
-	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
-	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
-	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
-	out.HorizontalPodAutoscalerTolerance = in.HorizontalPodAutoscalerTolerance
-	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
-	out.PodEvictionTimeout = in.PodEvictionTimeout
-	out.DeletingPodsQps = in.DeletingPodsQps
-	out.DeletingPodsBurst = in.DeletingPodsBurst
-	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-	out.RegisterRetryCount = in.RegisterRetryCount
-	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
-	out.NodeMonitorPeriod = in.NodeMonitorPeriod
-	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
-	out.ClusterSigningCertFile = in.ClusterSigningCertFile
-	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
-	out.ClusterSigningDuration = in.ClusterSigningDuration
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
-	out.ClusterName = in.ClusterName
-	out.ClusterCIDR = in.ClusterCIDR
-	out.ServiceCIDR = in.ServiceCIDR
-	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
-	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
-	out.CIDRAllocatorType = in.CIDRAllocatorType
-	if err := v1.Convert_bool_To_Pointer_bool(&in.ConfigureCloudRoutes, &out.ConfigureCloudRoutes, s); err != nil {
-		return err
-	}
-	out.RootCAFile = in.RootCAFile
-	out.ContentType = in.ContentType
-	out.KubeAPIQPS = in.KubeAPIQPS
-	out.KubeAPIBurst = in.KubeAPIBurst
-	if err := Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
-		return err
-	}
-	if err := Convert_componentconfig_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
-		return err
-	}
-	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableGarbageCollector, &out.EnableGarbageCollector, s); err != nil {
-		return err
-	}
-	out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
-	out.GCIgnoredResources = *(*[]GroupResource)(unsafe.Pointer(&in.GCIgnoredResources))
-	out.NodeEvictionRate = in.NodeEvictionRate
-	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
-	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
-	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
-	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
-	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_bool_To_Pointer_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -402,6 +768,114 @@ func Convert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElect
 	return autoConvert_componentconfig_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in, out, s)
 }
 
+func autoConvert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration(in *NamespaceControllerConfiguration, out *componentconfig.NamespaceControllerConfiguration, s conversion.Scope) error {
+	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
+	out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
+	return nil
+}
+
+// Convert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration(in *NamespaceControllerConfiguration, out *componentconfig.NamespaceControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_NamespaceControllerConfiguration_To_componentconfig_NamespaceControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(in *componentconfig.NamespaceControllerConfiguration, out *NamespaceControllerConfiguration, s conversion.Scope) error {
+	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
+	out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
+	return nil
+}
+
+// Convert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(in *componentconfig.NamespaceControllerConfiguration, out *NamespaceControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration(in *NodeIpamControllerConfiguration, out *componentconfig.NodeIpamControllerConfiguration, s conversion.Scope) error {
+	out.ServiceCIDR = in.ServiceCIDR
+	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	return nil
+}
+
+// Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration(in *NodeIpamControllerConfiguration, out *componentconfig.NodeIpamControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration(in *componentconfig.NodeIpamControllerConfiguration, out *NodeIpamControllerConfiguration, s conversion.Scope) error {
+	out.ServiceCIDR = in.ServiceCIDR
+	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	return nil
+}
+
+// Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration(in *componentconfig.NodeIpamControllerConfiguration, out *NodeIpamControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration(in *NodeLifecycleControllerConfiguration, out *componentconfig.NodeLifecycleControllerConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
+		return err
+	}
+	out.NodeEvictionRate = in.NodeEvictionRate
+	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
+	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
+	out.PodEvictionTimeout = in.PodEvictionTimeout
+	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
+	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+	return nil
+}
+
+// Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration(in *NodeLifecycleControllerConfiguration, out *componentconfig.NodeLifecycleControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_componentconfig_NodeLifecycleControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(in *componentconfig.NodeLifecycleControllerConfiguration, out *NodeLifecycleControllerConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
+		return err
+	}
+	out.NodeEvictionRate = in.NodeEvictionRate
+	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
+	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
+	out.PodEvictionTimeout = in.PodEvictionTimeout
+	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
+	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+	return nil
+}
+
+// Convert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(in *componentconfig.NodeLifecycleControllerConfiguration, out *NodeLifecycleControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration(in *PersistentVolumeBinderControllerConfiguration, out *componentconfig.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
+	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	if err := Convert_v1alpha1_VolumeConfiguration_To_componentconfig_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration(in *PersistentVolumeBinderControllerConfiguration, out *componentconfig.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_componentconfig_PersistentVolumeBinderControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *componentconfig.PersistentVolumeBinderControllerConfiguration, out *PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
+	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	if err := Convert_componentconfig_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *componentconfig.PersistentVolumeBinderControllerConfiguration, out *PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in, out, s)
+}
+
 func autoConvert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_componentconfig_PersistentVolumeRecyclerConfiguration(in *PersistentVolumeRecyclerConfiguration, out *componentconfig.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
 	out.MaximumRetry = in.MaximumRetry
 	out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
@@ -432,6 +906,110 @@ func autoConvert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alph
 // Convert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration is an autogenerated conversion function.
 func Convert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in *componentconfig.PersistentVolumeRecyclerConfiguration, out *PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
 	return autoConvert_componentconfig_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration(in *PodGCControllerConfiguration, out *componentconfig.PodGCControllerConfiguration, s conversion.Scope) error {
+	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
+	return nil
+}
+
+// Convert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration(in *PodGCControllerConfiguration, out *componentconfig.PodGCControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_PodGCControllerConfiguration_To_componentconfig_PodGCControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(in *componentconfig.PodGCControllerConfiguration, out *PodGCControllerConfiguration, s conversion.Scope) error {
+	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
+	return nil
+}
+
+// Convert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(in *componentconfig.PodGCControllerConfiguration, out *PodGCControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration(in *ReplicaSetControllerConfiguration, out *componentconfig.ReplicaSetControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
+	return nil
+}
+
+// Convert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration(in *ReplicaSetControllerConfiguration, out *componentconfig.ReplicaSetControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ReplicaSetControllerConfiguration_To_componentconfig_ReplicaSetControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration(in *componentconfig.ReplicaSetControllerConfiguration, out *ReplicaSetControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
+	return nil
+}
+
+// Convert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration(in *componentconfig.ReplicaSetControllerConfiguration, out *ReplicaSetControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ReplicaSetControllerConfiguration_To_v1alpha1_ReplicaSetControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration(in *ReplicationControllerConfiguration, out *componentconfig.ReplicationControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
+	return nil
+}
+
+// Convert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration(in *ReplicationControllerConfiguration, out *componentconfig.ReplicationControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ReplicationControllerConfiguration_To_componentconfig_ReplicationControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(in *componentconfig.ReplicationControllerConfiguration, out *ReplicationControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
+	return nil
+}
+
+// Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(in *componentconfig.ReplicationControllerConfiguration, out *ReplicationControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ReplicationControllerConfiguration_To_v1alpha1_ReplicationControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration(in *ResourceQuotaControllerConfiguration, out *componentconfig.ResourceQuotaControllerConfiguration, s conversion.Scope) error {
+	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
+	return nil
+}
+
+// Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration(in *ResourceQuotaControllerConfiguration, out *componentconfig.ResourceQuotaControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ResourceQuotaControllerConfiguration_To_componentconfig_ResourceQuotaControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(in *componentconfig.ResourceQuotaControllerConfiguration, out *ResourceQuotaControllerConfiguration, s conversion.Scope) error {
+	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
+	return nil
+}
+
+// Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(in *componentconfig.ResourceQuotaControllerConfiguration, out *ResourceQuotaControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration(in *SAControllerConfiguration, out *componentconfig.SAControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
+	out.RootCAFile = in.RootCAFile
+	return nil
+}
+
+// Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration(in *SAControllerConfiguration, out *componentconfig.SAControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_SAControllerConfiguration_To_componentconfig_SAControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(in *componentconfig.SAControllerConfiguration, out *SAControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
+	out.RootCAFile = in.RootCAFile
+	return nil
+}
+
+// Convert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(in *componentconfig.SAControllerConfiguration, out *SAControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_SchedulerAlgorithmSource_To_componentconfig_SchedulerAlgorithmSource(in *SchedulerAlgorithmSource, out *componentconfig.SchedulerAlgorithmSource, s conversion.Scope) error {
@@ -518,6 +1096,26 @@ func autoConvert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPoli
 // Convert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPolicySource is an autogenerated conversion function.
 func Convert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPolicySource(in *componentconfig.SchedulerPolicySource, out *SchedulerPolicySource, s conversion.Scope) error {
 	return autoConvert_componentconfig_SchedulerPolicySource_To_v1alpha1_SchedulerPolicySource(in, out, s)
+}
+
+func autoConvert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration(in *ServiceControllerConfiguration, out *componentconfig.ServiceControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
+	return nil
+}
+
+// Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration is an autogenerated conversion function.
+func Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration(in *ServiceControllerConfiguration, out *componentconfig.ServiceControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in *componentconfig.ServiceControllerConfiguration, out *ServiceControllerConfiguration, s conversion.Scope) error {
+	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
+	return nil
+}
+
+// Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration is an autogenerated conversion function.
+func Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in *componentconfig.ServiceControllerConfiguration, out *ServiceControllerConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_VolumeConfiguration_To_componentconfig_VolumeConfiguration(in *VolumeConfiguration, out *componentconfig.VolumeConfiguration, s conversion.Scope) error {

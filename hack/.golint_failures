@@ -163,8 +163,12 @@ pkg/kubelet/apis/kubeletconfig
 pkg/kubelet/apis/kubeletconfig/v1beta1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
+pkg/kubelet/checkpoint
+pkg/kubelet/checkpointmanager/checksum
+pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/client
 pkg/kubelet/cm
+pkg/kubelet/cm/devicemanager/checkpoint
 pkg/kubelet/cm/util
 pkg/kubelet/config
 pkg/kubelet/configmap
@@ -181,7 +185,6 @@ pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
-pkg/kubelet/dockershim/testing
 pkg/kubelet/events
 pkg/kubelet/images
 pkg/kubelet/kuberuntime
@@ -398,7 +401,6 @@ pkg/volume/vsphere_volume
 plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
-plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
 plugin/pkg/admission/podnodeselector

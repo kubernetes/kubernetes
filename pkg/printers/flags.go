@@ -23,14 +23,18 @@ import (
 )
 
 type NoCompatiblePrinterError struct {
-	options interface{}
+	Options interface{}
 }
 
 func (e NoCompatiblePrinterError) Error() string {
-	return fmt.Sprintf("unable to match a printer suitable for the options specified: %#v", e.options)
+	return fmt.Sprintf("unable to match a printer suitable for the options specified: %#v", e.Options)
 }
 
 func IsNoCompatiblePrinterError(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	_, ok := err.(NoCompatiblePrinterError)
 	return ok
 }
@@ -45,9 +49,8 @@ type PrintFlags struct {
 	OutputFormat *string
 }
 
-func (f *PrintFlags) Complete(messageTemplate string) error {
-	f.NamePrintFlags.Operation = fmt.Sprintf(messageTemplate, f.NamePrintFlags.Operation)
-	return nil
+func (f *PrintFlags) Complete(successTemplate string) error {
+	return f.NamePrintFlags.Complete(successTemplate)
 }
 
 func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
@@ -56,12 +59,15 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 		outputFormat = *f.OutputFormat
 	}
 
-	p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat)
-	if err == nil {
-		return p, nil
+	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+		return p, err
 	}
 
-	return f.NamePrintFlags.ToPrinter(outputFormat)
+	if p, err := f.NamePrintFlags.ToPrinter(outputFormat); !IsNoCompatiblePrinterError(err) {
+		return p, err
+	}
+
+	return nil, NoCompatiblePrinterError{f}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {

@@ -1113,7 +1113,8 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
 
   local -r kubelet_env_file="/etc/default/kubelet"
-  echo "KUBELET_OPTS=\"${KUBELET_ARGS}\"" > "${kubelet_env_file}"
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-}"
+  echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
 
   # Write the systemd service file for kubelet.
   cat <<EOF >/etc/systemd/system/kubelet.service
@@ -1454,7 +1455,9 @@ function start-kube-apiserver {
   fi
   if [[ -n "${NUM_NODES:-}" ]]; then
     # If the cluster is large, increase max-requests-inflight limit in apiserver.
-    if [[ "${NUM_NODES}" -ge 1000 ]]; then
+    if [[ "${NUM_NODES}" -ge 3000 ]]; then
+      params+=" --max-requests-inflight=3000 --max-mutating-requests-inflight=1000"
+    elif [[ "${NUM_NODES}" -ge 1000 ]]; then
       params+=" --max-requests-inflight=1500 --max-mutating-requests-inflight=500"
     fi
     # Set amount of memory available for apiserver based on number of nodes.
@@ -2482,6 +2485,12 @@ if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
 fi
 
 source "${KUBE_HOME}/kube-env"
+
+
+if [[ -f "${KUBE_HOME}/kubelet-config.yaml" ]]; then
+  echo "Found Kubelet config file at ${KUBE_HOME}/kubelet-config.yaml"
+  KUBELET_CONFIG_FILE_ARG="--config ${KUBE_HOME}/kubelet-config.yaml"
+fi
 
 if [[ -e "${KUBE_HOME}/kube-master-certs" ]]; then
   source "${KUBE_HOME}/kube-master-certs"

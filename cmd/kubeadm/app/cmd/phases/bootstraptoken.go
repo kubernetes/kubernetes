@@ -281,7 +281,7 @@ func NewSubCmdNodeBootstrapTokenAutoApprove(kubeConfigFile *string) *cobra.Comma
 func addBootstrapTokenFlags(flagSet *pflag.FlagSet, cfg *kubeadmapiext.MasterConfiguration, cfgPath, description *string, skipTokenPrint *bool) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
-		"Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)",
+		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental",
 	)
 	flagSet.StringVar(
 		&cfg.Token, "token", cfg.Token,

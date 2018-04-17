@@ -29,8 +29,8 @@ import (
 	replicasetstore "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
 	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
 	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
-	pspstore "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
+	pspstore "k8s.io/kubernetes/pkg/registry/policy/podsecuritypolicy/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -74,8 +74,8 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	storage["ingresses/status"] = ingressStatusStorage
 
 	// podsecuritypolicy
-	podSecurityExtensionsStorage := pspstore.NewREST(restOptionsGetter)
-	storage["podSecurityPolicies"] = podSecurityExtensionsStorage
+	podSecurityPolicyStorage := pspstore.NewREST(restOptionsGetter)
+	storage["podSecurityPolicies"] = podSecurityPolicyStorage
 
 	// replicasets
 	replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)

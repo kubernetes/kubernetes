@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
-func createInternalLoadBalancer(gce *GCECloud, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
+func createInternalLoadBalancer(gce *GCECloud, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, zoneName)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func createInternalLoadBalancer(gce *GCECloud, existingFwdRule *compute.Forwardi
 	return gce.ensureInternalLoadBalancer(
 		clusterName,
 		clusterID,
-		fakeApiService,
+		apiService,
 		existingFwdRule,
 		nodes,
 	)
@@ -54,15 +54,16 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
 
-	sharedBackend := shareBackendService(fakeApiService)
-	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", fakeApiService.Spec.SessionAffinity)
-	err = gce.ensureInternalBackendService(bsName, "description", fakeApiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, "")
+	sharedBackend := shareBackendService(apiService)
+	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
+	err = gce.ensureInternalBackendService(bsName, "description", apiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, "")
 	require.NoError(t, err)
 
 	// Update the Internal Backend Service with a new ServiceAffinity
@@ -81,15 +82,16 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
 	igName := makeInstanceGroupName(vals.ClusterID)
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
 
-	sharedBackend := shareBackendService(fakeApiService)
-	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", fakeApiService.Spec.SessionAffinity)
-	err = gce.ensureInternalBackendService(bsName, "description", fakeApiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, "")
+	sharedBackend := shareBackendService(apiService)
+	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
+	err = gce.ensureInternalBackendService(bsName, "description", apiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, "")
 	require.NoError(t, err)
 
 	// Update the BackendService with new Instances
@@ -109,65 +111,16 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 
 func TestEnsureInternalLoadBalancer(t *testing.T) {
 	vals := DefaultTestClusterValues()
-	nodeName := "test-node-1"
+	nodeNames := []string{"test-node-1"}
 
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	status, err := createInternalLoadBalancer(gce, nil, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	status, err := createInternalLoadBalancer(gce, apiService, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
-
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-
-	// Check that Instance Group is created
-	igName := makeInstanceGroupName(vals.ClusterID)
-	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
-	assert.NoError(t, err)
-	assert.Equal(t, igName, ig.Name)
-
-	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
-	fwNames := []string{
-		lbName,
-		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
-	}
-
-	for _, fwName := range fwNames {
-		firewall, err := gce.GetFirewall(fwName)
-		require.NoError(t, err)
-		assert.Equal(t, []string{nodeName}, firewall.TargetTags)
-		assert.NotEmpty(t, firewall.SourceRanges)
-	}
-
-	// Check that HealthCheck is created
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(fakeApiService)
-	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
-	healthcheck, err := gce.GetHealthCheck(hcName)
-	require.NoError(t, err)
-	assert.Equal(t, hcName, healthcheck.Name)
-
-	// Check that BackendService exists
-	sharedBackend := shareBackendService(fakeApiService)
-	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", fakeApiService.Spec.SessionAffinity)
-	backendServiceLink := gce.getBackendServiceLink(backendServiceName)
-
-	bs, err := gce.GetRegionBackendService(backendServiceName, gce.region)
-	require.NoError(t, err)
-	assert.Equal(t, "TCP", bs.Protocol)
-	assert.Equal(
-		t,
-		[]string{healthcheck.SelfLink},
-		bs.HealthChecks,
-	)
-
-	// Check that ForwardingRule is created
-	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-	require.NoError(t, err)
-	assert.Equal(t, lbName, fwdRule.Name)
-	assert.Equal(t, "TCP", fwdRule.IPProtocol)
-	assert.Equal(t, backendServiceLink, fwdRule.BackendService)
-	// if no Subnetwork specified, defaults to the GCE NetworkURL
-	assert.Equal(t, gce.NetworkURL(), fwdRule.Subnetwork)
+	assertInternalLbResources(t, gce, apiService, vals, nodeNames)
 }
 
 func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
@@ -177,11 +130,12 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	// Create the expected resources necessary for an Internal Load Balancer
-	nm := types.NamespacedName{Name: fakeApiService.Name, Namespace: fakeApiService.Namespace}
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	nm := types.NamespacedName{Name: apiService.Name, Namespace: apiService.Namespace}
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(fakeApiService)
+	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	existingHC := newInternalLBHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
@@ -193,13 +147,13 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
 	require.NoError(t, err)
 
-	sharedBackend := shareBackendService(fakeApiService)
+	sharedBackend := shareBackendService(apiService)
 	bsDescription := makeBackendServiceDescription(nm, sharedBackend)
-	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", fakeApiService.Spec.SessionAffinity)
-	err = gce.ensureInternalBackendService(bsName, bsDescription, fakeApiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, existingHC.SelfLink)
+	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
+	err = gce.ensureInternalBackendService(bsName, bsDescription, apiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, existingHC.SelfLink)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, apiService, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 }
 
@@ -208,7 +162,8 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
 
 	// Create a ForwardingRule that's missing an IP address
 	existingFwdRule := &compute.ForwardingRule{
@@ -233,10 +188,10 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	}
 	gce.CreateFirewall(existingFirewall)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(fakeApiService)
+	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
-	nm := types.NamespacedName{Name: fakeApiService.Name, Namespace: fakeApiService.Namespace}
+	nm := types.NamespacedName{Name: apiService.Name, Namespace: apiService.Namespace}
 
 	// Create a healthcheck with an incorrect threshold
 	existingHC := newInternalLBHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
@@ -244,20 +199,20 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	gce.CreateHealthCheck(existingHC)
 
 	// Create a backend Service that's missing Description and Backends
-	sharedBackend := shareBackendService(fakeApiService)
-	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", fakeApiService.Spec.SessionAffinity)
+	sharedBackend := shareBackendService(apiService)
+	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
 	existingBS := &compute.BackendService{
 		Name:                lbName,
 		Protocol:            "TCP",
 		HealthChecks:        []string{existingHC.SelfLink},
-		SessionAffinity:     translateAffinityType(fakeApiService.Spec.SessionAffinity),
+		SessionAffinity:     translateAffinityType(apiService.Spec.SessionAffinity),
 		LoadBalancingScheme: string(cloud.SchemeInternal),
 	}
 
 	gce.CreateRegionBackendService(existingBS, gce.region)
 	existingFwdRule.BackendService = existingBS.Name
 
-	_, err = createInternalLoadBalancer(gce, existingFwdRule, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	_, err = createInternalLoadBalancer(gce, apiService, existingFwdRule, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Expect new resources with the correct attributes to be created
@@ -284,20 +239,21 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// BackendService exists prior to updateInternalLoadBalancer call, but has
 	// incorrect (missing) attributes.
 	// ensureInternalBackendServiceGroups is called and creates the correct
 	// BackendService
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-	sharedBackend := shareBackendService(fakeApiService)
-	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", fakeApiService.Spec.SessionAffinity)
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	sharedBackend := shareBackendService(apiService)
+	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
 	existingBS := &compute.BackendService{
 		Name:                backendServiceName,
 		Protocol:            "TCP",
-		SessionAffinity:     translateAffinityType(fakeApiService.Spec.SessionAffinity),
+		SessionAffinity:     translateAffinityType(apiService.Spec.SessionAffinity),
 		LoadBalancingScheme: string(cloud.SchemeInternal),
 	}
 
@@ -306,7 +262,7 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	nodes, err := createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
 	require.NoError(t, err)
 
-	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, fakeApiService, nodes)
+	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, apiService, nodes)
 	assert.NoError(t, err)
 
 	bs, err := gce.GetRegionBackendService(backendServiceName, gce.region)
@@ -334,7 +290,8 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
 	// Remove the old Node and insert a new Node.
@@ -342,7 +299,7 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	newNodes, err := createAndInsertNodes(gce, []string{newNodeName}, vals.ZoneName)
 	require.NoError(t, err)
 
-	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, fakeApiService, newNodes)
+	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, apiService, newNodes)
 	assert.NoError(t, err)
 
 	// Expect node 1 to be deleted and node 2 to still exist
@@ -363,43 +320,14 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
-	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
+	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, apiService)
 	assert.NoError(t, err)
 
-	lbName := cloudprovider.GetLoadBalancerName(fakeApiService)
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(fakeApiService)
-	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
-
-	// Check that Firewalls are deleted for the LoadBalancer and the HealthCheck
-	fwNames := []string{
-		MakeFirewallName(lbName),
-		MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
-	}
-
-	for _, fwName := range fwNames {
-		firewall, err := gce.GetFirewall(fwName)
-		require.Error(t, err)
-		assert.Nil(t, firewall)
-	}
-
-	// Check that Instance Group is deleted
-	igName := makeInstanceGroupName(vals.ClusterID)
-	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
-	assert.Error(t, err)
-	assert.Nil(t, ig)
-
-	// Check that HealthCheck is deleted
-	healthcheck, err := gce.GetHealthCheck(hcName)
-	require.Error(t, err)
-	assert.Nil(t, healthcheck)
-
-	// Check forwarding rule is deleted
-	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-	require.Error(t, err)
-	assert.Nil(t, fwdRule)
+	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
 }
 
 func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
@@ -407,13 +335,15 @@ func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
 
-	_, err = createInternalLoadBalancer(gce, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
 
-	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
+	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, apiService)
 	assert.NoError(t, err)
 
 	// Deleting the loadbalancer and resources again should not cause an error.
-	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeApiService)
+	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, apiService)
 	assert.NoError(t, err)
+	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
 }

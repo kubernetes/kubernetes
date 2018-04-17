@@ -529,6 +529,11 @@ function compute-kube-apiserver-params {
 	if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]]; then
 		params+=" --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
 	fi
+	if [[ "${NUM_NODES}" -ge 3000 ]]; then
+		params+=" --max-requests-inflight=3000 --max-mutating-requests-inflight=1000"
+	elif [[ "${NUM_NODES}" -ge 1000 ]]; then
+		params+=" --max-requests-inflight=1500 --max-mutating-requests-inflight=500"
+	fi
 	if [[ -n "${RUNTIME_CONFIG:-}" ]]; then
 		params+=" --runtime-config=${RUNTIME_CONFIG}"
 	fi

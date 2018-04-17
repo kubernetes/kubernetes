@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -126,18 +127,9 @@ func (pdev podDevices) devices() map[string]sets.String {
 	return ret
 }
 
-// podDevicesCheckpointEntry is used to record <pod, container> to device allocation information.
-type podDevicesCheckpointEntry struct {
-	PodUID        string
-	ContainerName string
-	ResourceName  string
-	DeviceIDs     []string
-	AllocResp     []byte
-}
-
 // Turns podDevices to checkpointData.
-func (pdev podDevices) toCheckpointData() []podDevicesCheckpointEntry {
-	var data []podDevicesCheckpointEntry
+func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
+	var data []checkpoint.PodDevicesEntry
 	for podUID, containerDevices := range pdev {
 		for conName, resources := range containerDevices {
 			for resource, devices := range resources {
@@ -152,7 +144,12 @@ func (pdev podDevices) toCheckpointData() []podDevicesCheckpointEntry {
 					glog.Errorf("Can't marshal allocResp for %v %v %v: %v", podUID, conName, resource, err)
 					continue
 				}
-				data = append(data, podDevicesCheckpointEntry{podUID, conName, resource, devIds, allocResp})
+				data = append(data, checkpoint.PodDevicesEntry{
+					PodUID:        podUID,
+					ContainerName: conName,
+					ResourceName:  resource,
+					DeviceIDs:     devIds,
+					AllocResp:     allocResp})
 			}
 		}
 	}
@@ -160,7 +157,7 @@ func (pdev podDevices) toCheckpointData() []podDevicesCheckpointEntry {
 }
 
 // Populates podDevices from the passed in checkpointData.
-func (pdev podDevices) fromCheckpointData(data []podDevicesCheckpointEntry) {
+func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {
 		glog.V(2).Infof("Get checkpoint entry: %v %v %v %v %v\n",
 			entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, entry.AllocResp)

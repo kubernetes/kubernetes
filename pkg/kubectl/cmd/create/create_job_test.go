@@ -84,13 +84,24 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
+	printFlags := NewPrintFlags("created")
+
 	buf := bytes.NewBuffer([]byte{})
 	cmdOptions := &CreateJobOptions{
-		Name:      testJobName,
-		Namespace: testNamespaceName,
-		Client:    clientset.BatchV1(),
-		Out:       buf,
-		Cmd:       NewCmdCreateJob(f, buf),
+		PrintFlags: printFlags,
+		Name:       testJobName,
+		Namespace:  testNamespaceName,
+		Client:     clientset.BatchV1(),
+		Out:        buf,
+		Cmd:        NewCmdCreateJob(f, buf),
+		PrintObj: func(obj runtime.Object) error {
+			p, err := printFlags.ToPrinter()
+			if err != nil {
+				return err
+			}
+
+			return p.PrintObj(obj, buf)
+		},
 	}
 
 	err := cmdOptions.createJob(cronJob)

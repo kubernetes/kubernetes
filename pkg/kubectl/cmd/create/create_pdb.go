@@ -41,8 +41,19 @@ var (
 		kubectl create pdb my-pdb --selector=app=nginx --min-available=50%`))
 )
 
+type PodDisruptionBudgetOpts struct {
+	CreateSubcommandOptions *CreateSubcommandOptions
+}
+
 // NewCmdCreatePodDisruptionBudget is a macro command to create a new pod disruption budget.
 func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+	options := &PodDisruptionBudgetOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: NewPrintFlags("created"),
+			CmdOut:     cmdOut,
+		},
+	}
+
 	cmd := &cobra.Command{
 		Use: "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
 		DisableFlagsInUseLine: true,
@@ -51,14 +62,15 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 		Long:                  pdbLong,
 		Example:               pdbExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreatePodDisruptionBudget(f, cmdOut, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(options.Complete(cmd, args))
+			cmdutil.CheckErr(options.Run(f))
 		},
 	}
 
+	options.CreateSubcommandOptions.PrintFlags.AddFlags(cmd)
+
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.PodDisruptionBudgetV2GeneratorName)
 
 	cmd.Flags().String("min-available", "", i18n.T("The minimum number or percentage of available pods this budget requires."))
@@ -67,12 +79,12 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	return cmd
 }
 
-// CreatePodDisruptionBudget implements the behavior to run the create pdb command.
-func CreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func (o *PodDisruptionBudgetOpts) Complete(cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.PodDisruptionBudgetV1GeneratorName:
@@ -91,10 +103,11 @@ func CreatePodDisruptionBudget(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.C
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
-		Name:                name,
-		StructuredGenerator: generator,
-		DryRun:              cmdutil.GetDryRunFlag(cmd),
-		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
-	})
+
+	return o.CreateSubcommandOptions.Complete(cmd, args, generator)
+}
+
+// CreatePodDisruptionBudget implements the behavior to run the create pdb command.
+func (o *PodDisruptionBudgetOpts) Run(f cmdutil.Factory) error {
+	return RunCreateSubcommand(f, o.CreateSubcommandOptions)
 }

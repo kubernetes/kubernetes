@@ -23,14 +23,18 @@ package gce
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
+	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
@@ -65,7 +69,19 @@ func DefaultTestClusterValues() TestClusterValues {
 	}
 }
 
-var fakeApiService *v1.Service
+func fakeLoadbalancerService(lbType string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "",
+			Annotations: map[string]string{ServiceAnnotationLoadBalancerType: lbType},
+		},
+		Spec: v1.ServiceSpec{
+			SessionAffinity: v1.ServiceAffinityClientIP,
+			Type:            v1.ServiceTypeLoadBalancer,
+			Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
+		},
+	}
+}
 
 type fakeRoundTripper struct{}
 
@@ -100,6 +116,7 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 		AlphaFeatureGate:   alphaFeatureGate,
 		nodeZones:          zonesWithNodes,
 		nodeInformerSynced: func() bool { return true },
+		ClusterID:          fakeClusterID(vals.ClusterID),
 	}
 
 	c := cloud.NewMockGCE(&gceProjectRouter{gce})
@@ -180,18 +197,176 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([
 	return nodes, nil
 }
 
-func setup() {
-	fakeApiService = &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: ""},
-		Spec: v1.ServiceSpec{
-			SessionAffinity: v1.ServiceAffinityClientIP,
-			Type:            v1.ServiceTypeClusterIP,
-			Ports:           []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: int32(123)}},
-		},
+// Stubs ClusterID so that ClusterID.getOrInitialize() does not require calling
+// gce.Initialize()
+func fakeClusterID(clusterID string) ClusterID {
+	return ClusterID{
+		clusterID: &clusterID,
+		store: cache.NewStore(func(obj interface{}) (string, error) {
+			return "", nil
+		}),
 	}
 }
 
-func TestMain(m *testing.M) {
-	setup()
-	os.Exit(m.Run())
+func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	hcName := MakeNodesHealthCheckName(vals.ClusterID)
+
+	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
+	fwNames := []string{
+		MakeFirewallName(lbName), // Firewalls for external LBs are prefixed with k8s-fw-
+		MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
+	}
+
+	for _, fwName := range fwNames {
+		firewall, err := gce.GetFirewall(fwName)
+		require.NoError(t, err)
+		assert.Equal(t, nodeNames, firewall.TargetTags)
+		assert.NotEmpty(t, firewall.SourceRanges)
+	}
+
+	// Check that TargetPool is Created
+	pool, err := gce.GetTargetPool(lbName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, pool.Name)
+	assert.NotEmpty(t, pool.HealthChecks)
+	assert.Equal(t, 1, len(pool.Instances))
+
+	// Check that HealthCheck is created
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.NoError(t, err)
+	assert.Equal(t, hcName, healthcheck.Name)
+
+	// Check that ForwardingRule is created
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, fwdRule.Name)
+	assert.Equal(t, "TCP", fwdRule.IPProtocol)
+	assert.Equal(t, "123-123", fwdRule.PortRange)
+}
+
+func assertExternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	hcName := MakeNodesHealthCheckName(vals.ClusterID)
+
+	if firewallsDeleted {
+		// Check that Firewalls are deleted for the LoadBalancer and the HealthCheck
+		fwNames := []string{
+			MakeFirewallName(lbName),
+			MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
+		}
+
+		for _, fwName := range fwNames {
+			firewall, err := gce.GetFirewall(fwName)
+			require.Error(t, err)
+			assert.Nil(t, firewall)
+		}
+
+		// Check forwarding rule is deleted
+		fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+		require.Error(t, err)
+		assert.Nil(t, fwdRule)
+	}
+
+	// Check that TargetPool is deleted
+	pool, err := gce.GetTargetPool(lbName, gce.region)
+	require.Error(t, err)
+	assert.Nil(t, pool)
+
+	// Check that HealthCheck is deleted
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.Error(t, err)
+	assert.Nil(t, healthcheck)
+
+}
+
+func assertInternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+
+	// Check that Instance Group is created
+	igName := makeInstanceGroupName(vals.ClusterID)
+	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
+	assert.NoError(t, err)
+	assert.Equal(t, igName, ig.Name)
+
+	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
+	fwNames := []string{
+		lbName, // Firewalls for internal LBs are named the same name as the loadbalancer.
+		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
+	}
+
+	for _, fwName := range fwNames {
+		firewall, err := gce.GetFirewall(fwName)
+		require.NoError(t, err)
+		assert.Equal(t, nodeNames, firewall.TargetTags)
+		assert.NotEmpty(t, firewall.SourceRanges)
+	}
+
+	// Check that HealthCheck is created
+	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
+	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
+	healthcheck, err := gce.GetHealthCheck(hcName)
+	require.NoError(t, err)
+	assert.Equal(t, hcName, healthcheck.Name)
+
+	// Check that BackendService exists
+	sharedBackend := shareBackendService(apiService)
+	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
+	backendServiceLink := gce.getBackendServiceLink(backendServiceName)
+
+	bs, err := gce.GetRegionBackendService(backendServiceName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, "TCP", bs.Protocol)
+	assert.Equal(
+		t,
+		[]string{healthcheck.SelfLink},
+		bs.HealthChecks,
+	)
+
+	// Check that ForwardingRule is created
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, fwdRule.Name)
+	assert.Equal(t, "TCP", fwdRule.IPProtocol)
+	assert.Equal(t, backendServiceLink, fwdRule.BackendService)
+	// if no Subnetwork specified, defaults to the GCE NetworkURL
+	assert.Equal(t, gce.NetworkURL(), fwdRule.Subnetwork)
+}
+
+func assertInternalLbResourcesDeleted(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(apiService)
+	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
+
+	// ensureExternalLoadBalancer and ensureInternalLoadBalancer both create
+	// Firewalls with the same name.
+	if firewallsDeleted {
+		// Check that Firewalls are deleted for the LoadBalancer and the HealthCheck
+		fwNames := []string{
+			MakeFirewallName(lbName),
+			MakeHealthCheckFirewallName(vals.ClusterID, hcName, true),
+		}
+
+		for _, fwName := range fwNames {
+			firewall, err := gce.GetFirewall(fwName)
+			require.Error(t, err)
+			assert.Nil(t, firewall)
+		}
+
+		// Check forwarding rule is deleted
+		fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+		require.Error(t, err)
+		assert.Nil(t, fwdRule)
+	}
+
+	// Check that Instance Group is deleted
+	igName := makeInstanceGroupName(vals.ClusterID)
+	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
+	assert.Error(t, err)
+	assert.Nil(t, ig)
+
+	// Check that HealthCheck is deleted
+	healthcheck, err := gce.GetHealthCheck(hcName)
+	require.Error(t, err)
+	assert.Nil(t, healthcheck)
 }

@@ -141,7 +141,8 @@ func TestMounterSetUp(t *testing.T) {
 	}
 
 	// Mounter.SetUp()
-	if err := csiMounter.SetUp(nil); err != nil {
+	fsGroup := int64(2000)
+	if err := csiMounter.SetUp(&fsGroup); err != nil {
 		t.Fatalf("mounter.Setup failed: %v", err)
 	}
 	path := csiMounter.GetPath()

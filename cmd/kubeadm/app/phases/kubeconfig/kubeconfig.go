@@ -271,7 +271,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 }
 
 // WriteKubeConfigWithClientCert writes a kubeconfig file - with a client certificate as authentication info  - to the given writer.
-func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.MasterConfiguration, clientName string) error {
+func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.MasterConfiguration, clientName string, organizations []string) error {
 
 	// creates the KubeConfigSpecs, actualized for the current MasterConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -289,7 +289,8 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.MasterConfigur
 		APIServer:  masterEndpoint,
 		CACert:     caCert,
 		ClientCertAuth: &clientCertAuth{
-			CAKey: caKey,
+			CAKey:         caKey,
+			Organizations: organizations,
 		},
 	}
 

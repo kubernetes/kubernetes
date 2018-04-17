@@ -13,6 +13,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/pod/testing",
     deps = [
+        "//pkg/kubelet/checkpoint:go_default_library",
+        "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",

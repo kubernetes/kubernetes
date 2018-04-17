@@ -30,6 +30,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

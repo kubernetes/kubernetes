@@ -123,13 +123,13 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	defer tf.Cleanup()
 
 	ns := legacyscheme.Codecs
-
+	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte(fakeDiscovery))),
 			}, nil
 		}),
 	}
@@ -137,9 +137,23 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	tf.Namespace = "test"
 
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateDeployment(tf, buf, buf)
-	cmd.Flags().Set("dry-run", "true")
+	errBuff := bytes.NewBuffer([]byte{})
+	cmd := NewCmdCreateDeployment(tf, buf, errBuff)
 	cmd.Flags().Set("output", "name")
-	err := createDeployment(tf, buf, buf, cmd, []string{depName})
+	options := &DeploymentOpts{
+		CreateSubcommandOptions: &CreateSubcommandOptions{
+			PrintFlags: NewPrintFlags("created"),
+			CmdOut:     buf,
+			CmdErr:     errBuff,
+			DryRun:     true,
+		},
+	}
+
+	err := options.Complete(tf, cmd, []string{depName})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = options.Run(tf)
 	assert.Error(t, err, "at least one image must be specified")
 }

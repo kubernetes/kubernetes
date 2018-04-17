@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -15,6 +9,7 @@ go_library(
         "controlplane.go",
         "etcd.go",
         "kubeconfig.go",
+        "kubelet.go",
         "markmaster.go",
         "phase.go",
         "preflight.go",
@@ -23,6 +18,7 @@ go_library(
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases",
+    visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
@@ -38,6 +34,7 @@ go_library(
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/markmaster:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/phases/uploadconfig:go_default_library",
@@ -47,11 +44,13 @@ go_library(
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
@@ -68,6 +67,7 @@ go_test(
         "controlplane_test.go",
         "etcd_test.go",
         "kubeconfig_test.go",
+        "kubelet_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -79,6 +79,7 @@ go_test(
         "//cmd/kubeadm/test/cmd:go_default_library",
         "//cmd/kubeadm/test/kubeconfig:go_default_library",
         "//pkg/util/node:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
     ],
 )
@@ -94,4 +95,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
