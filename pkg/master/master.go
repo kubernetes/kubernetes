@@ -48,6 +48,7 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -158,6 +159,10 @@ type ExtraConfig struct {
 
 	ServiceAccountIssuer       serviceaccount.TokenGenerator
 	ServiceAccountAPIAudiences []string
+
+	// TokenAuthenticator is seperatored from the rest of the authenticator stack
+	// for use in the TokenReview registry.
+	TokenAuthenticator authenticator.Token
 }
 
 type Config struct {
@@ -332,7 +337,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator},
+		authenticationrest.RESTStorageProvider{Authenticator: c.ExtraConfig.TokenAuthenticator},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},

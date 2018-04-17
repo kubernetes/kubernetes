@@ -61,19 +61,18 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	aud := []string{"api"}
 
 	gcs := &clientset.Clientset{}
-
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(
+		iss,
+		[]interface{}{&pk},
+		serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
+	)
 	// Start the server
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
-		serviceaccount.JWTTokenAuthenticator(
-			iss,
-			[]interface{}{&pk},
-			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
-		),
-	)
+	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenAuthenticator)
 	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
 	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
+	masterConfig.ExtraConfig.TokenAuthenticator = tokenAuthenticator
 
 	master, _, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
