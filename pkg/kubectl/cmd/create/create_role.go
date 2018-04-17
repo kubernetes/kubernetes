@@ -140,7 +140,6 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&c.Verbs, "verb", c.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
 	cmd.Flags().StringArrayVar(&c.ResourceNames, "resource-name", c.ResourceNames, "Resource in the white list that the rule applies to, repeat this flag for multiple items")
@@ -204,9 +203,6 @@ func (c *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	c.DryRun = cmdutil.GetDryRunFlag(cmd)
 	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
-	if c.DryRun {
-		c.PrintFlags.Complete("%s (dry run)")
-	}
 	printer, err := c.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

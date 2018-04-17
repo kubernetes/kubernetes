@@ -80,7 +80,6 @@ func NewCmdCreateJob(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().String("from", "", "The name of the resource to create a Job from (only cronjob is supported).")
 
 	return cmd
@@ -104,13 +103,13 @@ func (c *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 	c.Client = clientset.BatchV1()
 	c.Builder = f.NewBuilder()
-	c.DryRun = cmdutil.GetDryRunFlag(cmd)
 	c.Cmd = cmd
 	c.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
-	if c.DryRun {
-		c.PrintFlags.Complete("%s (dry run)")
+	if c.PrintFlags.DryRun != nil {
+		c.DryRun = *c.PrintFlags.DryRun
 	}
+
 	printer, err := c.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
