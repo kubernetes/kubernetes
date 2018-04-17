@@ -62,7 +62,7 @@ type legacyValidator struct {
 
 var _ = Validator(&legacyValidator{})
 
-func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, privateObj interface{}) (string, string, string, error) {
+func (v *legacyValidator) Validate(_ []string, tokenData string, public *jwt.Claims, privateObj interface{}) (string, string, string, error) {
 	private, ok := privateObj.(*legacyPrivateClaims)
 	if !ok {
 		glog.Errorf("jwt validator expected private claim of type *legacyPrivateClaims but got: %T", privateObj)

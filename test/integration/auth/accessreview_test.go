@@ -46,7 +46,7 @@ func (sarAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, st
 	return authorizer.DecisionAllow, "you're not dave", nil
 }
 
-func alwaysAlice(req *http.Request) (user.Info, bool, error) {
+func alwaysAlice(audiences []string, req *http.Request) (user.Info, bool, error) {
 	return &user.DefaultInfo{
 		Name: "alice",
 	}, true, nil
@@ -145,7 +145,7 @@ func TestSubjectAccessReview(t *testing.T) {
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(audiences []string, req *http.Request) (user.Info, bool, error) {
 		return &user.DefaultInfo{Name: username}, true, nil
 	})
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}

@@ -80,6 +80,7 @@ type Server struct {
 	restfulCont      containerInterface
 	resourceAnalyzer stats.ResourceAnalyzer
 	runtime          kubecontainer.Runtime
+	apiAudiences     []string
 }
 
 type TLSOptions struct {
@@ -223,7 +224,7 @@ func NewServer(
 func (s *Server) InstallAuthFilter() {
 	s.restfulCont.Filter(func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 		// Authenticate
-		u, ok, err := s.auth.AuthenticateRequest(req.Request)
+		u, ok, err := s.auth.AuthenticateRequest(s.apiAudiences, req.Request)
 		if err != nil {
 			glog.Errorf("Unable to authenticate the request due to an error: %v", err)
 			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")

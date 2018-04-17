@@ -46,7 +46,7 @@ func NewProtocolAuthenticator(auth authenticator.Token) *ProtocolAuthenticator {
 	return &ProtocolAuthenticator{auth}
 }
 
-func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *ProtocolAuthenticator) AuthenticateRequest(audiences []string, req *http.Request) (user.Info, bool, error) {
 	// Only accept websocket connections
 	if !wsstream.IsWebSocketRequest(req) {
 		return nil, false, nil
@@ -91,7 +91,7 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 		return nil, false, nil
 	}
 
-	user, ok, err := a.auth.AuthenticateToken(token)
+	user, ok, err := a.auth.AuthenticateToken(audiences, token)
 
 	// on success, remove the protocol with the token
 	if ok {

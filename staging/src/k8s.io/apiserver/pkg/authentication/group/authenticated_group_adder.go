@@ -36,8 +36,8 @@ func NewAuthenticatedGroupAdder(auth authenticator.Request) authenticator.Reques
 	return &AuthenticatedGroupAdder{auth}
 }
 
-func (g *AuthenticatedGroupAdder) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	u, ok, err := g.Authenticator.AuthenticateRequest(req)
+func (g *AuthenticatedGroupAdder) AuthenticateRequest(audiences []string, req *http.Request) (user.Info, bool, error) {
+	u, ok, err := g.Authenticator.AuthenticateRequest(audiences, req)
 	if err != nil || !ok {
 		return nil, ok, err
 	}

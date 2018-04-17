@@ -49,10 +49,10 @@ func NewFailOnError(authTokenHandlers ...authenticator.Token) authenticator.Toke
 }
 
 // AuthenticateToken authenticates the token using a chain of authenticator.Token objects.
-func (authHandler *unionAuthTokenHandler) AuthenticateToken(token string) (user.Info, bool, error) {
+func (authHandler *unionAuthTokenHandler) AuthenticateToken(audiences []string, token string) (user.Info, bool, error) {
 	var errlist []error
 	for _, currAuthRequestHandler := range authHandler.Handlers {
-		info, ok, err := currAuthRequestHandler.AuthenticateToken(token)
+		info, ok, err := currAuthRequestHandler.AuthenticateToken(audiences, token)
 		if err != nil {
 			if authHandler.FailOnError {
 				return info, ok, err

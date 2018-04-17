@@ -64,12 +64,12 @@ func newWithClock(authenticator authenticator.Token, successTTL, failureTTL time
 }
 
 // AuthenticateToken implements authenticator.Token
-func (a *cachedTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (a *cachedTokenAuthenticator) AuthenticateToken(audiences []string, token string) (user.Info, bool, error) {
 	if record, ok := a.cache.get(token); ok {
 		return record.user, record.ok, record.err
 	}
 
-	user, ok, err := a.authenticator.AuthenticateToken(token)
+	user, ok, err := a.authenticator.AuthenticateToken(audiences, token)
 
 	switch {
 	case ok && a.successTTL > 0:

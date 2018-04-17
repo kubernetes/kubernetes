@@ -237,6 +237,8 @@ type AuthenticationInfo struct {
 	// If this is true, a basic auth challenge is returned on authentication failure
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
 	SupportsBasicAuth bool
+
+	APIAudiences []string
 }
 
 type AuthorizationInfo struct {
@@ -555,7 +557,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config, contextMapper 
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
 		failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, contextMapper, c.AuditBackend, c.AuditPolicyChecker)
 	}
-	handler = genericapifilters.WithAuthentication(handler, contextMapper, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithAuthentication(handler, contextMapper, c.Authentication.APIAudiences, c.Authentication.Authenticator, failedHandler)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, contextMapper, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)

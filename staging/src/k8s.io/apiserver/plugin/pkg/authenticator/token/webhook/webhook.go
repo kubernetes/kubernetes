@@ -68,9 +68,12 @@ func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, 
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (w *WebhookTokenAuthenticator) AuthenticateToken(audiences []string, token string) (user.Info, bool, error) {
 	r := &authentication.TokenReview{
-		Spec: authentication.TokenReviewSpec{Token: token},
+		Spec: authentication.TokenReviewSpec{
+			Audiences: audiences,
+			Token:     token,
+		},
 	}
 	if entry, ok := w.responseCache.Get(r.Spec); ok {
 		r.Status = entry.(authentication.TokenReviewStatus)

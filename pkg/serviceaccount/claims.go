@@ -80,21 +80,19 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	return sc, pc
 }
 
-func NewValidator(audiences []string, getter ServiceAccountTokenGetter) Validator {
+func NewValidator(getter ServiceAccountTokenGetter) Validator {
 	return &validator{
-		auds:   audiences,
 		getter: getter,
 	}
 }
 
 type validator struct {
-	auds   []string
 	getter ServiceAccountTokenGetter
 }
 
 var _ = Validator(&validator{})
 
-func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{}) (string, string, string, error) {
+func (v *validator) Validate(auds []string, _ string, public *jwt.Claims, privateObj interface{}) (string, string, string, error) {
 	private, ok := privateObj.(*privateClaims)
 	if !ok {
 		glog.Errorf("jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
@@ -114,7 +112,7 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 
 	var audValid bool
 
-	for _, aud := range v.auds {
+	for _, aud := range auds {
 		audValid = public.Audience.Contains(aud)
 		if audValid {
 			break

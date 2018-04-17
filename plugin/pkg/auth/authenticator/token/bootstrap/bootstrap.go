@@ -89,7 +89,7 @@ func tokenErrorf(s *api.Secret, format string, i ...interface{}) {
 //
 //     ( token-id ).( token-secret )
 //
-func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (t *TokenAuthenticator) AuthenticateToken(audiences []string, token string) (user.Info, bool, error) {
 	tokenID, tokenSecret, err := parseToken(token)
 	if err != nil {
 		// Token isn't of the correct form, ignore it.

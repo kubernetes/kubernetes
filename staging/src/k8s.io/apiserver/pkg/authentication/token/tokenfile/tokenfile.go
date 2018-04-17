@@ -88,7 +88,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 	}, nil
 }
 
-func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
+func (a *TokenAuthenticator) AuthenticateToken(audiences []string, value string) (user.Info, bool, error) {
 	user, ok := a.tokens[value]
 	if !ok {
 		return nil, false, nil

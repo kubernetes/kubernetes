@@ -85,7 +85,7 @@ func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateRequest(audiences []string, req *http.Request) (user.Info, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
 	}
@@ -137,7 +137,7 @@ func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCom
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
-func (a *Verifier) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *Verifier) AuthenticateRequest(audiences []string, req *http.Request) (user.Info, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
 	}
@@ -157,7 +157,7 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (user.Info, bool, erro
 	if err := a.verifySubject(req.TLS.PeerCertificates[0].Subject); err != nil {
 		return nil, false, err
 	}
-	return a.auth.AuthenticateRequest(req)
+	return a.auth.AuthenticateRequest(audiences, req)
 }
 
 func (a *Verifier) verifySubject(subject pkix.Name) error {

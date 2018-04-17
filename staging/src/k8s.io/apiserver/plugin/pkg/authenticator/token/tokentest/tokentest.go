@@ -27,7 +27,7 @@ func New() *TokenAuthenticator {
 		Tokens: make(map[string]*user.DefaultInfo),
 	}
 }
-func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
+func (a *TokenAuthenticator) AuthenticateToken(audiences []string, value string) (user.Info, bool, error) {
 	user, ok := a.Tokens[value]
 	if !ok {
 		return nil, false, nil
