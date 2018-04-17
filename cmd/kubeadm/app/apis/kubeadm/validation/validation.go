@@ -389,17 +389,12 @@ func ValidateAPIEndpoint(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
-func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflightChecks bool) (sets.String, error) {
+func ValidateIgnorePreflightErrors(ignorePreflightErrors []string) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
 	for _, item := range ignorePreflightErrors {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
-	}
-
-	// TODO: remove once deprecated flag --skip-preflight-checks is removed.
-	if skipPreflightChecks {
-		ignoreErrors.Insert("all")
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {

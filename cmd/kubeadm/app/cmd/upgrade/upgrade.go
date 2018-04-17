@@ -37,7 +37,6 @@ type applyPlanFlags struct {
 	allowExperimentalUpgrades bool
 	allowRCUpgrades           bool
 	printConfig               bool
-	skipPreFlight             bool
 	ignorePreflightErrors     []string
 	ignorePreflightErrorsSet  sets.String
 	out                       io.Writer
@@ -52,7 +51,6 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		allowExperimentalUpgrades: false,
 		allowRCUpgrades:           false,
 		printConfig:               false,
-		skipPreFlight:             false,
 		ignorePreflightErrorsSet:  sets.NewString(),
 		out: out,
 	}
@@ -78,7 +76,6 @@ func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
 	fs.BoolVar(&flags.allowRCUpgrades, "allow-release-candidate-upgrades", flags.allowRCUpgrades, "Show release candidate versions of Kubernetes as an upgrade alternative and allow upgrading to a release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Specifies whether the configuration file that will be used in the upgrade should be printed or not.")
 	fs.StringSliceVar(&flags.ignorePreflightErrors, "ignore-preflight-errors", flags.ignorePreflightErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
-	fs.BoolVar(&flags.skipPreFlight, "skip-preflight-checks", flags.skipPreFlight, "Skip preflight checks that normally run before modifying the system.")
 	fs.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 	fs.StringVar(&flags.featureGatesString, "feature-gates", flags.featureGatesString, "A set of key=value pairs that describe feature gates for various features."+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))

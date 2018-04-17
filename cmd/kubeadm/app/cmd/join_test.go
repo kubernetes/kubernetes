@@ -163,7 +163,7 @@ func TestNewValidJoin(t *testing.T) {
 			}
 		}
 
-		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.args, tc.skipPreFlight, tc.cfgPath, tc.featureGatesString, tc.ignorePreflightErrors)
+		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.args, tc.cfgPath, tc.featureGatesString, tc.ignorePreflightErrors)
 
 		if tc.nodeConfig != nil {
 			join.cfg = tc.nodeConfig

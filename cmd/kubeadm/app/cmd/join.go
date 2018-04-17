@@ -120,7 +120,6 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapiv1alpha3.JoinConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var skipPreFlight bool
 	var cfgPath string
 	var featureGatesString string
 	var ignorePreflightErrors []string
@@ -130,20 +129,20 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
-			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, args, skipPreFlight, cfgPath, featureGatesString, ignorePreflightErrors)
+			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, args, cfgPath, featureGatesString, ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
 
 	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &ignorePreflightErrors)
+	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &ignorePreflightErrors)
 
 	return cmd
 }
 
 // NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfiguration, args []string, skipPreFlight bool, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
+func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfiguration, args []string, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
 	cfg.DiscoveryTokenAPIServers = args
 
 	var err error
@@ -155,7 +154,7 @@ func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfigurati
 		return nil, err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +196,7 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfi
 }
 
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
-func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool, ignorePreflightErrors *[]string) {
+func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file.")
@@ -206,11 +205,6 @@ func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bo
 		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
-	flagSet.BoolVar(
-		skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks which normally run before modifying the system.",
-	)
-	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 }
 
 // Join defines struct used by kubeadm join command
