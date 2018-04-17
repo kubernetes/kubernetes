@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/fatih/camelcase"
+
 	versionedextension "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -45,7 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
-	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	externalclient "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
@@ -122,7 +123,7 @@ func (pw *prefixWriter) Flush() {
 	}
 }
 
-func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer {
+func describerMap(c clientset.Interface, externalclient externalclient.Interface) map[schema.GroupKind]printers.Describer {
 	m := map[schema.GroupKind]printers.Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
 		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
@@ -144,12 +145,12 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		extensions.Kind("PodSecurityPolicy"):           &PodSecurityPolicyDescriber{c},
 		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
 		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):                  &DeploymentDescriber{c, versionedExtensionsClientV1beta1(c)},
+		extensions.Kind("Deployment"):                  &DeploymentDescriber{c, externalclient},
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
-		batch.Kind("CronJob"):                          &CronJobDescriber{c},
+		batch.Kind("CronJob"):                          &CronJobDescriber{c, externalclient},
 		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
-		apps.Kind("Deployment"):                        &DeploymentDescriber{c, versionedExtensionsClientV1beta1(c)},
+		apps.Kind("Deployment"):                        &DeploymentDescriber{c, externalclient},
 		apps.Kind("DaemonSet"):                         &DaemonSetDescriber{c},
 		apps.Kind("ReplicaSet"):                        &ReplicaSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
@@ -170,7 +171,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 func DescribableResources() []string {
 	keys := make([]string, 0)
 
-	for k := range describerMap(nil) {
+	for k := range describerMap(nil, nil) {
 		resource := strings.ToLower(k.Kind)
 		keys = append(keys, resource)
 	}
@@ -179,8 +180,8 @@ func DescribableResources() []string {
 
 // DescriberFor returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind schema.GroupKind, c clientset.Interface) (printers.Describer, bool) {
-	f, ok := describerMap(c)[kind]
+func DescriberFor(kind schema.GroupKind, c clientset.Interface, externalclient externalclient.Interface) (printers.Describer, bool) {
+	f, ok := describerMap(c, externalclient)[kind]
 	return f, ok
 }
 
@@ -1854,10 +1855,11 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 // CronJobDescriber generates information about a cron job and the jobs it has created.
 type CronJobDescriber struct {
 	clientset.Interface
+	external externalclient.Interface
 }
 
 func (d *CronJobDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	cronJob, err := d.Batch().CronJobs(namespace).Get(name, metav1.GetOptions{})
+	cronJob, err := d.external.BatchV1beta1().CronJobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -1867,7 +1869,12 @@ func (d *CronJobDescriber) Describe(namespace, name string, describerSettings pr
 		events, _ = d.Core().Events(namespace).Search(legacyscheme.Scheme, cronJob)
 	}
 
-	return describeCronJob(cronJob, events)
+	internalCronJob := &batch.CronJob{}
+	if err := legacyscheme.Scheme.Convert(cronJob, internalCronJob, nil); err != nil {
+		return "", err
+	}
+
+	return describeCronJob(internalCronJob, events)
 }
 
 func describeCronJob(cronJob *batch.CronJob, events *api.EventList) (string, error) {
@@ -3066,11 +3073,11 @@ func DescribeEvents(el *api.EventList, w PrefixWriter) {
 // DeploymentDescriber generates information about a deployment.
 type DeploymentDescriber struct {
 	clientset.Interface
-	extensionV1beta1Client clientextensionsv1beta1.ExtensionsV1beta1Interface
+	external externalclient.Interface
 }
 
 func (dd *DeploymentDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	d, err := dd.extensionV1beta1Client.Deployments(namespace).Get(name, metav1.GetOptions{})
+	d, err := dd.external.ExtensionsV1beta1().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -3115,7 +3122,7 @@ func describeDeployment(d *versionedextension.Deployment, selector labels.Select
 				w.Write(LEVEL_1, "%v \t%v\t%v\n", c.Type, c.Status, c.Reason)
 			}
 		}
-		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.extensionV1beta1Client)
+		oldRSs, _, newRS, err := deploymentutil.GetAllReplicaSets(d, dd.external.ExtensionsV1beta1())
 		if err == nil {
 			w.Write(LEVEL_0, "OldReplicaSets:\t%s\n", printReplicaSetsByLabels(oldRSs))
 			var newRSs []*versionedextension.ReplicaSet
@@ -3950,14 +3957,6 @@ func (list SortableVolumeDevices) Swap(i, j int) {
 
 func (list SortableVolumeDevices) Less(i, j int) bool {
 	return list[i].DevicePath < list[j].DevicePath
-}
-
-// TODO: get rid of this and plumb the caller correctly
-func versionedExtensionsClientV1beta1(internalClient clientset.Interface) clientextensionsv1beta1.ExtensionsV1beta1Interface {
-	if internalClient == nil {
-		return &clientextensionsv1beta1.ExtensionsV1beta1Client{}
-	}
-	return clientextensionsv1beta1.New(internalClient.Extensions().RESTClient())
 }
 
 var maxAnnotationLen = 200
