@@ -19,6 +19,7 @@ package downwardapi
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -229,7 +230,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 	data := make(map[string]volumeutil.FileProjection)
 	for _, fileInfo := range items {
 		var fileProjection volumeutil.FileProjection
-		fPath := path.Clean(fileInfo.Path)
+		fPath := filepath.Clean(fileInfo.Path)
 		if fileInfo.Mode != nil {
 			fileProjection.Mode = *fileInfo.Mode
 		} else {

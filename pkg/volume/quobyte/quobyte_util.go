@@ -18,7 +18,8 @@ package quobyte
 
 import (
 	"net"
-	"path"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -101,7 +102,7 @@ func (mounter *quobyteMounter) pluginDirIsMounted(pluginDir string) (bool, error
 }
 
 func (mounter *quobyteMounter) correctTraillingSlash(regStr string) string {
-	return path.Clean(regStr) + "/"
+	return filepath.Clean(regStr) + string(os.PathSeparator)
 }
 
 func validateRegistry(registry string) bool {
