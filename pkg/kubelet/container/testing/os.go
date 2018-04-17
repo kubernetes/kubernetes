@@ -115,3 +115,13 @@ func (f *FakeOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 func (f *FakeOS) Glob(pattern string) ([]string, error) {
 	return nil, nil
 }
+
+// Dir returns all but the last element of path
+func (f *FakeOS) Dir(path string) string {
+	return ""
+}
+
+// Readlink returns the destination of the named symbolic link
+func (f *FakeOS) Readlink(name string) (string, error) {
+	return "", nil
+}
