@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
+
 	authentication "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,6 +86,8 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 			return err
 		})
 		if err != nil {
+			// An error here indicates bad configuration or an outage. Log for debugging.
+			glog.Errorf("Failed to make webhook authenticator request: %v", err)
 			return nil, false, err
 		}
 		r.Status = result.Status
