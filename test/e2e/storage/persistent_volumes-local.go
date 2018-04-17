@@ -122,7 +122,7 @@ const (
 	// volumeConfigName is the configmap passed to bootstrapper and provisioner
 	volumeConfigName = "local-volume-config"
 	// provisioner image used for e2e tests
-	provisionerImageName = "quay.io/external_storage/local-volume-provisioner:v2.0.0"
+	provisionerImageName = "quay.io/external_storage/local-volume-provisioner:v2.1.0"
 	// provisioner daemonSetName name
 	daemonSetName = "local-volume-provisioner"
 	// provisioner default mount point folder
