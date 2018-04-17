@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -182,19 +183,38 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 	fmt.Printf("[upgrade/staticpods] Moved new manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
 	fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
 
-	// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
-	// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
-	// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
-	// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
-	if err := waiter.WaitForStaticPodHashChange(cfg.NodeName, component, beforePodHash); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-	}
+	if component == constants.Etcd {
+		// Because we may be updating the tls settings for etcd during the upgrade, we cannot use the api server to verify the deployment
+		// instead poll for the etcd version after a short delay
+		etcdCluster := util.LocalEtcdCluster{
+			TLS:           true,
+			CertFile:      "/etc/kubernetes/pki/etcd/peer.crt",
+			KeyFile:       "/etc/kubernetes/pki/etcd/peer.key",
+			TrustedCAFile: "/etc/kubernetes/pki/etcd/ca.crt",
+		}
+		delay := 30 * time.Second
+		retries := 5
+		retryInterval := 30 * time.Second
 
-	// Wait for the static pod component to come up and register itself as a mirror pod
-	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-	}
+		_, err := etcdCluster.WaitForEtcdClusterStatus(delay, retries, retryInterval)
+		if err != nil {
+			err = fmt.Errorf("error verifying etcd cluster is up: %v", err)
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
+	} else {
+		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
+		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
+		// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
+		// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
+		if err := waiter.WaitForStaticPodHashChange(cfg.NodeName, component, beforePodHash); err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
 
+		// Wait for the static pod component to come up and register itself as a mirror pod
+		if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
+	}
 	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
 	return nil
 }
@@ -277,6 +297,12 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	}
 
 	// Checking health state of etcd after the upgrade
+	etcdCluster = util.LocalEtcdCluster{
+		TLS:           true,
+		CertFile:      "/etc/kubernetes/pki/etcd/peer.crt",
+		KeyFile:       "/etc/kubernetes/pki/etcd/peer.key",
+		TrustedCAFile: "/etc/kubernetes/pki/etcd/ca.crt",
+	}
 	if _, err = etcdCluster.GetEtcdClusterStatus(); err != nil {
 		// Despite the fact that upgradeComponent was successful, there is something wrong with etcd cluster
 		// First step is to restore back up of datastore
@@ -305,6 +331,11 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) error {
 	recoverManifests := map[string]string{}
 
+	beforePodHashMap, err := waiter.WaitForStaticPodControlPlaneHashes(cfg.NodeName)
+	if err != nil {
+		return err
+	}
+
 	// etcd upgrade is done prior to other control plane components
 	if etcdUpgrade {
 		// Perform etcd upgrade using common to all control plane components function
@@ -315,11 +346,6 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 			}
 			fmt.Printf("[upgrade/etcd] non fatal issue encountered during upgrade: %v\n", err)
 		}
-	}
-
-	beforePodHashMap, err := waiter.WaitForStaticPodControlPlaneHashes(cfg.NodeName)
-	if err != nil {
-		return err
 	}
 
 	// Write the updated static Pod manifests into the temporary directory
