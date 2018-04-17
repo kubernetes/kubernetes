@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//vendor/k8s.io/sample-apiserver/pkg/client/informers/externalversions/internalinterfaces:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/client/informers/externalversions/wardle/v1alpha1:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/externalversions/wardle/v1beta1:go_default_library",
     ],
 )
 
@@ -23,6 +24,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/externalversions/wardle/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/externalversions/wardle/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

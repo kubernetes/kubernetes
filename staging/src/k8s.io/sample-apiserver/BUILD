@@ -44,6 +44,7 @@ filegroup(
         "//staging/src/k8s.io/sample-apiserver/pkg/client/informers/internalversion:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/client/listers/wardle/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/sample-apiserver/pkg/client/listers/wardle/v1beta1:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/cmd/server:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/registry:all-srcs",
     ],

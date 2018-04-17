@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/validation"
 
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
@@ -77,7 +78,8 @@ func (flunderStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old 
 }
 
 func (flunderStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
-	return field.ErrorList{}
+	flunder := obj.(*wardle.Flunder)
+	return validation.ValidateFlunder(flunder)
 }
 
 func (flunderStrategy) AllowCreateOnUpdate() bool {

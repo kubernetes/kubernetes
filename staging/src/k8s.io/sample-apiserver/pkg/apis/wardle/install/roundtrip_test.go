@@ -19,9 +19,10 @@ package install
 import (
 	"testing"
 
-	roundtrip "k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	wardlefuzzer "k8s.io/sample-apiserver/pkg/apis/wardle/fuzzer"
 )
 
 func TestRoundTripTypes(t *testing.T) {
-	roundtrip.RoundTripTestForAPIGroup(t, Install, nil)
+	roundtrip.RoundTripTestForAPIGroup(t, Install, wardlefuzzer.Funcs)
 }
