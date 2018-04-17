@@ -59,7 +59,7 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil {
+	if tlsConfig == nil && config.Dial == nil {
 		return http.DefaultTransport, nil
 	}
 
@@ -88,5 +88,5 @@ func tlsConfigKey(c *Config) (string, error) {
 		return "", err
 	}
 	// Only include the things that actually affect the tls.Config
-	return fmt.Sprintf("%v/%x/%x/%x/%v", c.TLS.Insecure, c.TLS.CAData, c.TLS.CertData, c.TLS.KeyData, c.TLS.ServerName), nil
+	return fmt.Sprintf("%v/%x/%x/%x/%v/%v", c.TLS.Insecure, c.TLS.CAData, c.TLS.CertData, c.TLS.KeyData, c.TLS.ServerName, fmt.Sprintf("%p", c.Dial)), nil
 }
