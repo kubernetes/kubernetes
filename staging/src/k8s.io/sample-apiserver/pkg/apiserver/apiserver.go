@@ -112,8 +112,10 @@ func (c completedConfig) New() (*WardleServer, error) {
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(wardle.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
+	flunderStorage := wardleregistry.RESTInPeace(flunderstorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter))
 	v1alpha1storage := map[string]rest.Storage{}
-	v1alpha1storage["flunders"] = wardleregistry.RESTInPeace(flunderstorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter))
+	v1alpha1storage["flunders"] = flunderStorage
+	v1alpha1storage["flunders/status"] = flunderstorage.NewStatusREST(Scheme, flunderStorage.(*wardleregistry.REST))
 	v1alpha1storage["fischers"] = wardleregistry.RESTInPeace(fischerstorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter))
 	apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"] = v1alpha1storage
 
