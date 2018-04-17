@@ -113,7 +113,12 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 	}
 
 	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
-		cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
+		// Combine CAData from the config with any existing CA bundle provided
+		if len(cfg.TLSClientConfig.CAData) > 0 {
+			cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, '\n')
+		}
+		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, h.ClientConfig.CABundle...)
+
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 		client, err := rest.UnversionedRESTClientFor(cfg)
@@ -135,7 +140,10 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		if svc.Path != nil {
 			cfg.APIPath = *svc.Path
 		}
-		cfg.TLSClientConfig.ServerName = serverName
+		// Set the server name if not already set
+		if len(cfg.TLSClientConfig.ServerName) == 0 {
+			cfg.TLSClientConfig.ServerName = serverName
+		}
 
 		delegateDialer := cfg.Dial
 		if delegateDialer == nil {
