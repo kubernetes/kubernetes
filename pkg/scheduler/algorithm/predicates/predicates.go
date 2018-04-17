@@ -1493,14 +1493,24 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			}
 		}
 
+		allTermMatches := true
 		// Check all anti-affinity terms.
 		for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
 			termMatches, _, err := c.anyPodMatchesPodAffinityTerm(pod, filteredPods, nodeInfo, &term)
-			if err != nil || termMatches {
+			if err != nil {
 				glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinityTerm %v, err: %v",
 					podName(pod), node.Name, term, err)
 				return ErrPodAntiAffinityRulesNotMatch, nil
 			}
+			if !termMatches {
+				allTermMatches = false
+				break
+			}
+		}
+		if allTermMatches {
+			glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinityTerm %v",
+				podName(pod), node.Name, affinity.PodAntiAffinity)
+			return ErrPodAntiAffinityRulesNotMatch, nil
 		}
 	}
 	if glog.V(10) {
