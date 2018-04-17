@@ -53,7 +53,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	}
 
 	// Generate Master Enpoint kubeconfig file
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
 	if err != nil {
 		return err
 	}

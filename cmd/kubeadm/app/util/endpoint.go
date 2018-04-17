@@ -28,9 +28,9 @@ import (
 
 // GetMasterEndpoint returns a properly formatted Master Endpoint
 // or passes the error from GetMasterHostPort.
-func GetMasterEndpoint(cfg *kubeadmapi.MasterConfiguration) (string, error) {
+func GetMasterEndpoint(api *kubeadmapi.API) (string, error) {
 
-	hostPort, err := GetMasterHostPort(cfg)
+	hostPort, err := GetMasterHostPort(api)
 	if err != nil {
 		return "", err
 	}
@@ -39,27 +39,27 @@ func GetMasterEndpoint(cfg *kubeadmapi.MasterConfiguration) (string, error) {
 
 // GetMasterHostPort returns a properly formatted Master hostname or IP and port pair, or error
 // if the hostname or IP address can not be parsed or port is outside the valid TCP range.
-func GetMasterHostPort(cfg *kubeadmapi.MasterConfiguration) (string, error) {
+func GetMasterHostPort(api *kubeadmapi.API) (string, error) {
 	var masterIP string
 	var portStr string
-	if len(cfg.API.ControlPlaneEndpoint) > 0 {
-		if strings.Contains(cfg.API.ControlPlaneEndpoint, ":") {
+	if len(api.ControlPlaneEndpoint) > 0 {
+		if strings.Contains(api.ControlPlaneEndpoint, ":") {
 			var err error
-			masterIP, portStr, err = net.SplitHostPort(cfg.API.ControlPlaneEndpoint)
+			masterIP, portStr, err = net.SplitHostPort(api.ControlPlaneEndpoint)
 			if err != nil {
-				return "", fmt.Errorf("invalid value `%s` given for `ControlPlaneEndpoint`: %s", cfg.API.ControlPlaneEndpoint, err)
+				return "", fmt.Errorf("invalid value `%s` given for `ControlPlaneEndpoint`: %s", api.ControlPlaneEndpoint, err)
 			}
 		} else {
-			masterIP = cfg.API.ControlPlaneEndpoint
+			masterIP = api.ControlPlaneEndpoint
 		}
 		errs := validation.IsDNS1123Subdomain(masterIP)
 		if len(errs) > 0 {
 			return "", fmt.Errorf("error parsing `ControlPlaneEndpoint` to valid dns subdomain with errors: %s", errs)
 		}
 	} else {
-		ip := net.ParseIP(cfg.API.AdvertiseAddress)
+		ip := net.ParseIP(api.AdvertiseAddress)
 		if ip == nil {
-			return "", fmt.Errorf("error parsing address %s", cfg.API.AdvertiseAddress)
+			return "", fmt.Errorf("error parsing address %s", api.AdvertiseAddress)
 		}
 		masterIP = ip.String()
 	}
@@ -73,7 +73,7 @@ func GetMasterHostPort(cfg *kubeadmapi.MasterConfiguration) (string, error) {
 		port = int32(portInt)
 		fmt.Println("[endpoint] WARNING: specifying a port for `ControlPlaneEndpoint` overrides `BindPort`")
 	} else {
-		port = cfg.API.BindPort
+		port = api.BindPort
 	}
 
 	if port < 0 || port > 65535 {
