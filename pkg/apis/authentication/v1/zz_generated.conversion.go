@@ -200,6 +200,7 @@ func Convert_authentication_TokenReview_To_v1_TokenReview(in *authentication.Tok
 
 func autoConvert_v1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *v1.TokenReviewSpec, out *authentication.TokenReviewSpec, s conversion.Scope) error {
 	out.Token = in.Token
+	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
 	return nil
 }
 
@@ -210,6 +211,7 @@ func Convert_v1_TokenReviewSpec_To_authentication_TokenReviewSpec(in *v1.TokenRe
 
 func autoConvert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec(in *authentication.TokenReviewSpec, out *v1.TokenReviewSpec, s conversion.Scope) error {
 	out.Token = in.Token
+	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
 	return nil
 }
 
@@ -223,6 +225,7 @@ func autoConvert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *v1
 	if err := Convert_v1_UserInfo_To_authentication_UserInfo(&in.User, &out.User, s); err != nil {
 		return err
 	}
+	out.Audience = in.Audience
 	out.Error = in.Error
 	return nil
 }
@@ -237,6 +240,7 @@ func autoConvert_authentication_TokenReviewStatus_To_v1_TokenReviewStatus(in *au
 	if err := Convert_authentication_UserInfo_To_v1_UserInfo(&in.User, &out.User, s); err != nil {
 		return err
 	}
+	out.Audience = in.Audience
 	out.Error = in.Error
 	return nil
 }
