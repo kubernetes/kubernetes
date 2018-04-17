@@ -222,7 +222,7 @@ func TestDoSafeMakeDir(t *testing.T) {
 		}
 		assert.Nil(t, err, "Expect no error during doSafeMakeDir(%s, %s)", test.subPath, test.volumePath)
 		if _, err := os.Stat(test.subPath); os.IsNotExist(err) {
-			t.Errorf("subPath should exists after doSafeMakeDir(%s, %s)", test.subPath, test.volumePath)
+			t.Errorf("subPath should exist after doSafeMakeDir(%s, %s)", test.subPath, test.volumePath)
 		}
 	}
 }
