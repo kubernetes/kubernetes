@@ -27,8 +27,6 @@ spec:
         effect: "NoExecute"
       - operator: "Exists"
         effect: "NoSchedule"
-      hostNetwork: true
-      hostPID: true
       volumes:
       - name: device-plugin
         hostPath:
