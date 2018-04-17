@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.9",
+	"GoVersion": "go1.10",
 	"GodepVersion": "v80",
 	"Packages": [
 		"github.com/onsi/ginkgo/ginkgo",
@@ -1023,10 +1023,6 @@
 			"Rev": "511bcaf42ccd42c38aba7427b6673277bf19e2a1"
 		},
 		{
-			"ImportPath": "github.com/dchest/safefile",
-			"Rev": "855e8d98f1852d48dde521e0522408d1fe7e836a"
-		},
-		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
 			"Comment": "v3.0.0-4-g01aeca5",
 			"Rev": "01aeca54ebda6e0fbfafd0a524d234159c05ec20"
@@ -1988,11 +1984,6 @@
 			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
 		},
 		{
-			"ImportPath": "github.com/hawkular/hawkular-client-go/metrics",
-			"Comment": "v0.5.1-1-g1d46ce7",
-			"Rev": "1d46ce7e1eca635f372357a8ccbf1fa7cc28b7d2"
-		},
-		{
 			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
 			"Comment": "v4.0.0-95-gaaf4061",
 			"Rev": "aaf40619d85fda757e7a1c1ea1b5118cea65594b"
@@ -2016,11 +2007,6 @@
 			"ImportPath": "github.com/inconshreveable/mousetrap",
 			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
-		},
-		{
-			"ImportPath": "github.com/influxdata/influxdb/client",
-			"Comment": "v1.1.1",
-			"Rev": "e47cf1f2e83a02443d7115c54f838be8ee959644"
 		},
 		{
 			"ImportPath": "github.com/influxdata/influxdb/client/v2",
@@ -3082,10 +3068,6 @@
 		{
 			"ImportPath": "golang.org/x/tools/imports",
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
-		},
-		{
-			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "7f657476956314fee258816aaf81c0ff65cf8bee"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.alpha",
