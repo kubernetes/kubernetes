@@ -76,6 +76,9 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	}
 	return err
 }
+// Set strict parsing to report unknown or duplicate fields, noop for YAML
+func (d *YAMLToJSONDecoder) DisallowUnknownFields() {
+}
 
 // YAMLDecoder reads chunks of objects and returns ErrShortBuffer if
 // the data is not sufficient.
@@ -171,6 +174,7 @@ func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err 
 // decoder is a convenience interface for Decode.
 type decoder interface {
 	Decode(into interface{}) error
+	DisallowUnknownFields()
 }
 
 // YAMLOrJSONDecoder attempts to decode a stream of JSON documents or
@@ -224,6 +228,7 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 			glog.V(4).Infof("decoding stream as YAML")
 			d.decoder = NewYAMLToJSONDecoder(buffer)
 		}
+		d.decoder.DisallowUnknownFields()
 	}
 	err := d.decoder.Decode(into)
 	if jsonDecoder, ok := d.decoder.(*json.Decoder); ok {
@@ -249,6 +254,10 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 		}
 	}
 	return err
+}
+// Do not allow unknown fields
+func (d *YAMLOrJSONDecoder) DisallowUnknownFields() {
+	d.decoder.DisallowUnknownFields()
 }
 
 type Reader interface {
