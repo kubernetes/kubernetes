@@ -275,9 +275,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 // If the pod network size is /113 or larger, the node CIDR will be set to the same
 // size and this will be rejected later in validation.
 //
-// NOTE: Currently, the pod network must be /66 or larger. It is not reflected here,
-// but a smaller value will fail later validation.
-//
 // NOTE: Currently, the design allows a maximum of 64K nodes. This algorithm splits
 // the available bits to maximize the number used for nodes, but still have the node
 // CIDR be a multiple of eight.

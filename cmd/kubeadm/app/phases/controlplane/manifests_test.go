@@ -823,14 +823,19 @@ func TestCalcNodeCidrSize(t *testing.T) {
 			expectedPrefix: "104",
 		},
 		{
-			name:           "V6: Largest subnet currently supported",
-			podSubnet:      "2001:db8::/66",
-			expectedPrefix: "80",
-		},
-		{
 			name:           "V6: For /64 pod net, use /80",
 			podSubnet:      "2001:db8::/64",
 			expectedPrefix: "80",
+		},
+		{
+			name:           "V6: For /48 pod net, use /64",
+			podSubnet:      "2001:db8::/48",
+			expectedPrefix: "64",
+		},
+		{
+			name:           "V6: For /32 pod net, use /48",
+			podSubnet:      "2001:db8::/32",
+			expectedPrefix: "48",
 		},
 	}
 	for _, test := range tests {
