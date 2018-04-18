@@ -436,6 +436,21 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 	return nil
 }
 
+type JSONFallbackEncoder struct {
+	runtime.Encoder
+}
+
+func (c JSONFallbackEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	err := c.Encoder.Encode(obj, w)
+	if runtime.IsNotRegisteredError(err) {
+		switch obj.(type) {
+		case *Unstructured, *UnstructuredList:
+			return UnstructuredJSONScheme.Encode(obj, w)
+		}
+	}
+	return err
+}
+
 // UnstructuredObjectConverter is an ObjectConverter for use with
 // Unstructured objects. Since it has no schema or type information,
 // it will only succeed for no-op conversions. This is provided as a

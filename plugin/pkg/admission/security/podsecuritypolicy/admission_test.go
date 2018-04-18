@@ -2340,7 +2340,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)
 			assert.Len(t, validationErrs, tc.expectValidationErrs)
-			assert.Equal(t, pspName, tc.expectedPSP)
+			assert.Equal(t, tc.expectedPSP, pspName)
 		})
 	}
 }

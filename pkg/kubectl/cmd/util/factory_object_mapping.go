@@ -166,16 +166,14 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	clientset, err := f.clientAccessFactory.ClientSet()
 	if err != nil {
-		// if we can't make a client for this group/version, go generic if possible
-		if genericDescriber, genericErr := genericDescriber(f.clientAccessFactory, mapping); genericErr == nil {
-			return genericDescriber, nil
-		}
-		// otherwise return the original error
 		return nil, err
 	}
-
+	externalclientset, err := f.clientAccessFactory.KubernetesClientSet()
+	if err != nil {
+		return nil, err
+	}
 	// try to get a describer
-	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset); ok {
+	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientset, externalclientset); ok {
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible

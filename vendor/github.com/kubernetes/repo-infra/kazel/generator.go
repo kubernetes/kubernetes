@@ -17,19 +17,23 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
 
 const (
-	openAPIGenTag = "// +k8s:openapi-gen"
+	openAPITagName = "openapi-gen"
+	staging        = "staging/src/"
+)
 
-	staging = "staging/src/"
+var (
+	// Generator tags are specified using the format "// +k8s:name=value"
+	genTagRe = regexp.MustCompile(`//\s*\+k8s:([^\s=]+)(?:=(\S+))\s*\n`)
 )
 
 // walkGenerated updates the rule for kubernetes' OpenAPI generated file.
@@ -75,8 +79,12 @@ func (v *Vendorer) findOpenAPI(root string) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			if bytes.Contains(b, []byte(openAPIGenTag)) {
-				includeMe = true
+			matches := genTagRe.FindAllSubmatch(b, -1)
+			for _, m := range matches {
+				if len(m) >= 2 && string(m[1]) == openAPITagName {
+					includeMe = true
+					break
+				}
 			}
 		}
 	}

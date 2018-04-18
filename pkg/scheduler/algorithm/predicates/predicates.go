@@ -1377,34 +1377,27 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	return nil, nil
 }
 
-// anyMatchingPodInTopology checks that any of the given Pods are in the
-// topology specified by the affinity term.
-func (c *PodAffinityChecker) anyMatchingPodInTopology(pod *v1.Pod, matchingPods map[string][]*v1.Pod, nodeInfo *schedulercache.NodeInfo, term *v1.PodAffinityTerm) (bool, error) {
-	if len(term.TopologyKey) == 0 {
-		return false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
-	}
-	if len(matchingPods) == 0 {
-		return false, nil
-	}
-	// Special case: When the topological domain is node, we can limit our
-	// search to pods on that node without searching the entire cluster.
-	if term.TopologyKey == kubeletapis.LabelHostname {
-		if pods, ok := matchingPods[nodeInfo.Node().Name]; ok {
-			// It may seem odd that we are comparing a node with itself to see if it
-			// has the same topology key, but it is necessary to check extra conditions
-			// that the function performs, such as checking that node labels are not nil.
-			return len(pods) > 0 && priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), nodeInfo.Node(), term.TopologyKey), nil
-		}
-		return false, nil
-	}
-	// Topology key is not "Hostname". Checking all matching pods.
-	for nodeName, pods := range matchingPods {
-		matchingPodNodeInfo, err := c.info.GetNodeInfo(nodeName)
+// anyPodsMatchingTopologyTerms checks whether any of the nodes given via
+// "targetPods" matches topology of all the "terms" for the give "pod" and "nodeInfo".
+func (c *PodAffinityChecker) anyPodsMatchingTopologyTerms(pod *v1.Pod, targetPods map[string][]*v1.Pod, nodeInfo *schedulercache.NodeInfo, terms []v1.PodAffinityTerm) (bool, error) {
+	for nodeName, targetPods := range targetPods {
+		targetPodNodeInfo, err := c.info.GetNodeInfo(nodeName)
 		if err != nil {
 			return false, err
 		}
-		if len(pods) > 0 && priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), matchingPodNodeInfo, term.TopologyKey) {
-			return true, nil
+		if len(targetPods) > 0 {
+			allTermsMatched := true
+			for _, term := range terms {
+				if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNodeInfo, term.TopologyKey) {
+					allTermsMatched = false
+					break
+				}
+			}
+			if allTermsMatched {
+				// We have 1 or more pods on the target node that have already matched namespace and selector
+				// and all of the terms topologies matched the target node. So, there is at least 1 matching pod on the node.
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -1421,21 +1414,21 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		// Check all affinity terms.
 		matchingPods := predicateMeta.nodeNameToMatchingAffinityPods
-		for _, term := range GetPodAffinityTerms(affinity.PodAffinity) {
-			termMatches, err := c.anyMatchingPodInTopology(pod, matchingPods, nodeInfo, &term)
+		if affinityTerms := GetPodAffinityTerms(affinity.PodAffinity); len(affinityTerms) > 0 {
+			matchExists, err := c.anyPodsMatchingTopologyTerms(pod, matchingPods, nodeInfo, affinityTerms)
 			if err != nil {
-				errMessage := fmt.Sprintf("Cannot schedule pod %+v onto node %v, because of PodAffinityTerm %v, err: %v", podName(pod), node.Name, term, err)
+				errMessage := fmt.Sprintf("Cannot schedule pod %+v onto node %v, because of PodAffinity, err: %v", podName(pod), node.Name, err)
 				glog.Errorf(errMessage)
 				return ErrPodAffinityRulesNotMatch, errors.New(errMessage)
 			}
-			if !termMatches {
+			if !matchExists {
 				// This pod may the first pod in a series that have affinity to themselves. In order
 				// to not leave such pods in pending state forever, we check that if no other pod
 				// in the cluster matches the namespace and selector of this pod and the pod matches
 				// its own terms, then we allow the pod to pass the affinity check.
 				if !(len(matchingPods) == 0 && targetPodMatchesAffinityOfPod(pod, pod)) {
-					glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinityTerm %v",
-						podName(pod), node.Name, term)
+					glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
+						podName(pod), node.Name)
 					return ErrPodAffinityRulesNotMatch, nil
 				}
 			}
@@ -1443,11 +1436,11 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 
 		// Check all anti-affinity terms.
 		matchingPods = predicateMeta.nodeNameToMatchingAntiAffinityPods
-		for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-			termMatches, err := c.anyMatchingPodInTopology(pod, matchingPods, nodeInfo, &term)
-			if err != nil || termMatches {
-				glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinityTerm %v, err: %v",
-					podName(pod), node.Name, term, err)
+		if antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
+			matchExists, err := c.anyPodsMatchingTopologyTerms(pod, matchingPods, nodeInfo, antiAffinityTerms)
+			if err != nil || matchExists {
+				glog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinity, err: %v",
+					podName(pod), node.Name, err)
 				return ErrPodAntiAffinityRulesNotMatch, nil
 			}
 		}

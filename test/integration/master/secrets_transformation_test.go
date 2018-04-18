@@ -124,6 +124,7 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 	b.StartTimer()
 	test.benchmark(b)
 	b.StopTimer()
+	test.printMetrics()
 }
 
 func unSealWithGCMTransformer(cipherText []byte, ctx value.Context,

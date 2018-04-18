@@ -342,5 +342,5 @@ func TestGenerateMountBindings(t *testing.T) {
 	}
 	result := generateMountBindings(mounts)
 
-	assert.Equal(t, result, expectedResult)
+	assert.Equal(t, expectedResult, result)
 }

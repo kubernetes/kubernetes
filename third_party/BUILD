@@ -4,8 +4,13 @@ licenses(["notice"])
 
 filegroup(
     name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
+    srcs = glob(
+        ["**"],
+        exclude = [
+            "etcd*/**",
+            "etcd*.tar.gz",
+        ],
+    ),
     visibility = ["//visibility:private"],
 )
 

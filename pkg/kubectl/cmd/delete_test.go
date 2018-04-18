@@ -44,12 +44,17 @@ import (
 
 var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
 
-var fakecmd = &cobra.Command{
-	Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
-	DisableFlagsInUseLine: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
-	},
+func fakecmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		DisableFlagsInUseLine: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+		},
+	}
+
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones.")
+	return cmd
 }
 
 func TestDeleteObjectByTuple(t *testing.T) {
@@ -366,7 +371,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 		Cascade:     false,
 		Output:      "name",
 	}
-	err := options.Complete(tf, buf, errBuf, []string{}, fakecmd)
+	err := options.Complete(tf, buf, errBuf, []string{}, fakecmd())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -448,7 +453,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 		IgnoreNotFound:  false,
 		Output:          "name",
 	}
-	err := options.Complete(tf, buf, errBuf, []string{"services"}, fakecmd)
+	err := options.Complete(tf, buf, errBuf, []string{"services"}, fakecmd())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -573,7 +578,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 		Cascade:     false,
 		Output:      "name",
 	}
-	err := options.Complete(tf, buf, errBuf, []string{}, fakecmd)
+	err := options.Complete(tf, buf, errBuf, []string{}, fakecmd())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -749,7 +754,7 @@ func TestResourceErrors(t *testing.T) {
 				Cascade:         false,
 				Output:          "name",
 			}
-			err := options.Complete(tf, buf, errBuf, testCase.args, fakecmd)
+			err := options.Complete(tf, buf, errBuf, testCase.args, fakecmd())
 			if !testCase.errFn(err) {
 				t.Errorf("%s: unexpected error: %v", k, err)
 				return

@@ -45,6 +45,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -707,5 +708,6 @@ func InternalVersionDecoder() runtime.Decoder {
 }
 
 func InternalVersionJSONEncoder() runtime.Encoder {
-	return legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
+	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
+	return unstructured.JSONFallbackEncoder{Encoder: encoder}
 }

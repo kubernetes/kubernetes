@@ -51,19 +51,26 @@ import (
 )
 
 type ApplyOptions struct {
+	RecordFlags     *RecordFlags
 	FilenameOptions resource.FilenameOptions
-	Selector        string
-	Force           bool
-	Prune           bool
-	Cascade         bool
-	GracePeriod     int
-	PruneResources  []pruneResource
-	Timeout         time.Duration
-	cmdBaseName     string
-	All             bool
-	Overwrite       bool
-	OpenApiPatch    bool
-	PruneWhitelist  []string
+
+	Recorder Recorder
+
+	Selector       string
+	Force          bool
+	Prune          bool
+	Cascade        bool
+	GracePeriod    int
+	PruneResources []pruneResource
+	Timeout        time.Duration
+	cmdBaseName    string
+	All            bool
+	Overwrite      bool
+	OpenApiPatch   bool
+	PruneWhitelist []string
+
+	Out    io.Writer
+	ErrOut io.Writer
 }
 
 const (
@@ -102,17 +109,22 @@ var (
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
-func NewApplyOptions() *ApplyOptions {
+func NewApplyOptions(out, errout io.Writer) *ApplyOptions {
 	return &ApplyOptions{
+		RecordFlags: NewRecordFlags(),
+
 		Overwrite:    true,
 		Cascade:      true,
 		GracePeriod:  -1,
 		OpenApiPatch: true,
+
+		Out:    out,
+		ErrOut: errout,
 	}
 }
 
 func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := NewApplyOptions()
+	options := NewApplyOptions(out, errOut)
 
 	// Store baseName for use in printing warnings / messages involving the base command name.
 	// This is useful for downstream command that wrap this one.
@@ -127,9 +139,13 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(validatePruneAll(options.Prune, options.All, options.Selector))
-			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, options))
+			cmdutil.CheckErr(options.Complete(f, cmd))
+			cmdutil.CheckErr(options.Run(f, cmd))
 		},
 	}
+
+	// bind flag structs
+	options.RecordFlags.AddFlags(cmd)
 
 	usage := "that contains the configuration to apply"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
@@ -147,7 +163,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.Flags().BoolVar(&options.OpenApiPatch, "openapi-patch", options.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
@@ -207,14 +222,27 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	return pruneResources, nil
 }
 
-func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *ApplyOptions) error {
+func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.RecordFlags.Complete(f.Command(cmd, false))
+
+	var err error
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// TODO(juanvallejo): break dependency on factory and cmd
+func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
 		return err
 	}
 
 	var openapiSchema openapi.Resources
-	if options.OpenApiPatch {
+	if o.OpenApiPatch {
 		openapiSchema, err = f.OpenAPISchema()
 		if err != nil {
 			openapiSchema = nil
@@ -228,14 +256,14 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 	// include the uninitialized objects by default if --prune is true
 	// unless explicitly set --include-uninitialized=false
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, options.Prune)
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, o.Prune)
 	r := f.NewBuilder().
 		Unstructured().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
-		LabelSelectorParam(options.Selector).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.Selector).
 		IncludeUninitialized(includeUninitialized).
 		Flatten().
 		Do()
@@ -243,8 +271,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return err
 	}
 
-	if options.Prune {
-		options.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, options.PruneWhitelist)
+	if o.Prune {
+		o.PruneResources, err = parsePruneResources(r.Mapper().RESTMapper, o.PruneWhitelist)
 		if err != nil {
 			return err
 		}
@@ -271,12 +299,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 			visitedNamespaces.Insert(info.Namespace)
 		}
 
-		// Add change-cause annotation to resource info if it should be recorded
-		if cmdutil.ShouldRecord(cmd, info) {
-			recordInObj := info.Object
-			if err := cmdutil.RecordChangeCause(recordInObj, f.Command(cmd, false)); err != nil {
-				glog.V(4).Infof("error recording current command: %v", err)
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		// Get the modified configuration of the object. Embed the result
@@ -316,9 +340,9 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			count++
 			if printObject {
-				return cmdutil.PrintObject(cmd, info.Object, out)
+				return cmdutil.PrintObject(cmd, info.Object, o.Out)
 			}
-			cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "created")
+			cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "created")
 			return nil
 		}
 
@@ -328,7 +352,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				return err
 			}
 			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
-				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation, options.cmdBaseName)
+				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 			scaler, err := f.ScaleClient()
 			if err != nil {
@@ -342,17 +366,17 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				helper:        helper,
 				clientFunc:    f.UnstructuredClientForMapping,
 				clientsetFunc: f.ClientSet,
-				overwrite:     options.Overwrite,
+				overwrite:     o.Overwrite,
 				backOff:       clockwork.NewRealClock(),
-				force:         options.Force,
-				cascade:       options.Cascade,
-				timeout:       options.Timeout,
-				gracePeriod:   options.GracePeriod,
+				force:         o.Force,
+				cascade:       o.Cascade,
+				timeout:       o.Timeout,
+				gracePeriod:   o.GracePeriod,
 				openapiSchema: openapiSchema,
 				scaleClient:   scaler,
 			}
 
-			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, errOut)
+			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
@@ -367,15 +391,15 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			if string(patchBytes) == "{}" && !printObject {
 				count++
-				cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "unchanged")
+				cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "unchanged")
 				return nil
 			}
 		}
 		count++
 		if printObject {
-			return cmdutil.PrintObject(cmd, info.Object, out)
+			return cmdutil.PrintObject(cmd, info.Object, o.Out)
 		}
-		cmdutil.PrintSuccess(shortOutput, out, info.Object, dryRun, "configured")
+		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "configured")
 		return nil
 	})
 
@@ -386,7 +410,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return fmt.Errorf("no objects passed to apply")
 	}
 
-	if !options.Prune {
+	if !o.Prune {
 		return nil
 	}
 
@@ -395,17 +419,17 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		clientFunc:    f.UnstructuredClientForMapping,
 		clientsetFunc: f.ClientSet,
 
-		labelSelector: options.Selector,
+		labelSelector: o.Selector,
 		visitedUids:   visitedUids,
 
-		cascade:     options.Cascade,
+		cascade:     o.Cascade,
 		dryRun:      dryRun,
-		gracePeriod: options.GracePeriod,
+		gracePeriod: o.GracePeriod,
 
-		out: out,
+		out: o.Out,
 	}
 
-	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(mapper, &(options.PruneResources))
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(mapper, &(o.PruneResources))
 	if err != nil {
 		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
 	}

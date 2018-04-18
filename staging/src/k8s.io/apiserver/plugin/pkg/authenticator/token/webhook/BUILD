@@ -26,6 +26,7 @@ go_library(
     srcs = ["webhook.go"],
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
     deps = [
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

@@ -356,27 +356,27 @@ cleanup()
 
   # Check if the API server is still running
   [[ -n "${APISERVER_PID-}" ]] && APISERVER_PIDS=$(pgrep -P ${APISERVER_PID} ; ps -o pid= -p ${APISERVER_PID})
-  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS}
+  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill ${APISERVER_PIDS} 2>/dev/null
 
   # Check if the controller-manager is still running
   [[ -n "${CTLRMGR_PID-}" ]] && CTLRMGR_PIDS=$(pgrep -P ${CTLRMGR_PID} ; ps -o pid= -p ${CTLRMGR_PID})
-  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS}
+  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill ${CTLRMGR_PIDS} 2>/dev/null
 
   if [[ -n "$DOCKERIZE_KUBELET" ]]; then
     cleanup_dockerized_kubelet
   else
     # Check if the kubelet is still running
     [[ -n "${KUBELET_PID-}" ]] && KUBELET_PIDS=$(pgrep -P ${KUBELET_PID} ; ps -o pid= -p ${KUBELET_PID})
-    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS}
+    [[ -n "${KUBELET_PIDS-}" ]] && sudo kill ${KUBELET_PIDS} 2>/dev/null
   fi
 
   # Check if the proxy is still running
   [[ -n "${PROXY_PID-}" ]] && PROXY_PIDS=$(pgrep -P ${PROXY_PID} ; ps -o pid= -p ${PROXY_PID})
-  [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS}
+  [[ -n "${PROXY_PIDS-}" ]] && sudo kill ${PROXY_PIDS} 2>/dev/null
 
   # Check if the scheduler is still running
   [[ -n "${SCHEDULER_PID-}" ]] && SCHEDULER_PIDS=$(pgrep -P ${SCHEDULER_PID} ; ps -o pid= -p ${SCHEDULER_PID})
-  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS}
+  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill ${SCHEDULER_PIDS} 2>/dev/null
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
@@ -384,6 +384,43 @@ cleanup()
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
   exit 0
+}
+
+# Check if all processes are still running. Prints a warning once each time
+# a process dies unexpectedly.
+function healthcheck {
+  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 ${APISERVER_PID} 2>/dev/null; then
+    warning "API server terminated unexpectedly, see ${APISERVER_LOG}"
+    APISERVER_PID=
+  fi
+
+  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 ${CTLRMGR_PID} 2>/dev/null; then
+    warning "kube-controller-manager terminated unexpectedly, see ${CTLRMGR_LOG}"
+    CTLRMGR_PID=
+  fi
+
+  if [[ -n "$DOCKERIZE_KUBELET" ]]; then
+    # TODO (https://github.com/kubernetes/kubernetes/issues/62474): check health also in this case
+    :
+  elif [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 ${KUBELET_PID} 2>/dev/null; then
+    warning "kubelet terminated unexpectedly, see ${KUBELET_LOG}"
+    KUBELET_PID=
+  fi
+
+  if [[ -n "${PROXY_PID-}" ]] && ! sudo kill -0 ${PROXY_PID} 2>/dev/null; then
+    warning "kube-proxy terminated unexpectedly, see ${PROXY_LOG}"
+    PROXY_PID=
+  fi
+
+  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 ${SCHEDULER_PID} 2>/dev/null; then
+    warning "scheduler terminated unexpectedly, see ${SCHEDULER_LOG}"
+    SCHEDULER_PID=
+  fi
+
+  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 ${ETCD_PID} 2>/dev/null; then
+    warning "etcd terminated unexpectedly"
+    ETCD_PID=
+  fi
 }
 
 function warning {
@@ -817,10 +854,18 @@ clientConnection:
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
 EOF
+    if [[ -n ${FEATURE_GATES} ]]; then
+      echo "featureGates:"
+      # Convert from foo=true,bar=false to
+      #   foo: true
+      #   bar: false
+      for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
+        echo $gate | sed -e 's/\(.*\)=\(.*\)/  \1: \2/'
+      done
+    fi >>/tmp/kube-proxy.yaml
 
     sudo "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
-      --feature-gates="${FEATURE_GATES}" \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
@@ -1025,7 +1070,7 @@ fi
 print_success
 
 if [[ "${ENABLE_DAEMON}" = false ]]; then
-  while true; do sleep 1; done
+  while true; do sleep 1; healthcheck; done
 fi
 
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then

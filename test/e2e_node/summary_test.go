@@ -175,7 +175,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(100000, 1E9),
+							"UsageNanoCores":       bounded(10000, 1E9),
 							"UsageCoreNanoSeconds": bounded(10000000, 1E11),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -222,7 +222,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
-					"UsageNanoCores":       bounded(100000, 1E9),
+					"UsageNanoCores":       bounded(10000, 1E9),
 					"UsageCoreNanoSeconds": bounded(10000000, 1E11),
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{

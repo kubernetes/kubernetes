@@ -65,7 +65,7 @@ func TestReplaceObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(tf, buf)
+	cmd := NewCmdReplace(tf, buf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -136,7 +136,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(tf, buf)
+	cmd := NewCmdReplace(tf, buf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.yaml")
 	cmd.Flags().Set("output", "name")
@@ -194,7 +194,7 @@ func TestReplaceDirectory(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(tf, buf)
+	cmd := NewCmdReplace(tf, buf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy")
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("output", "name")
@@ -241,7 +241,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdReplace(tf, buf)
+	cmd := NewCmdReplace(tf, buf, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")

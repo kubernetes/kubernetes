@@ -125,6 +125,8 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 	c.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
 	c.MockAddresses.InsertHook = mock.InsertAddressHook
 	c.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
+	c.MockAlphaAddresses.X = mock.AddressAttributes{}
+	c.MockAddresses.X = mock.AddressAttributes{}
 
 	c.MockInstanceGroups.X = mock.InstanceGroupAttributes{
 		InstanceMap: make(map[meta.Key]map[string]*compute.InstanceWithNamedPorts),
