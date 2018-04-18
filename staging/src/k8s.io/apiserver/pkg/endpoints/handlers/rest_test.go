@@ -293,7 +293,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	convertor := runtime.UnsafeObjectConvertor(scheme)
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
-	versionedObj := &examplev1.Pod{}
+	schemaReferenceObj := &examplev1.Pod{}
 
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
@@ -323,7 +323,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		patch := []byte{}
 		switch patchType {
 		case types.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, versionedObj)
+			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, schemaReferenceObj)
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				continue
@@ -338,18 +338,33 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(
-			ctx,
-			admissionMutation,
-			rest.ValidateAllObjectFunc,
-			admissionValidation,
-			1*time.Second,
-			versionedObj,
-			testPatcher,
-			name,
-			patchType,
-			patch,
-			namer, creater, defaulter, convertor, kind, resource, codec, utiltrace.New("Patch"+name))
+		p := patcher{
+			namer:           namer,
+			creater:         creater,
+			defaulter:       defaulter,
+			unsafeConvertor: convertor,
+			kind:            kind,
+			resource:        resource,
+
+			createValidation: rest.ValidateAllObjectFunc,
+			updateValidation: admissionValidation,
+			admissionCheck:   admissionMutation,
+
+			codec: codec,
+
+			timeout: 1 * time.Second,
+
+			schemaReferenceObj: schemaReferenceObj,
+
+			restPatcher: testPatcher,
+			name:        name,
+			patchType:   patchType,
+			patchJS:     patch,
+
+			trace: utiltrace.New("Patch" + name),
+		}
+
+		resultObj, err := p.patchResource(ctx)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -407,11 +422,11 @@ func TestNumberConversion(t *testing.T) {
 		},
 	}
 	versionedObjToUpdate := &examplev1.Pod{}
-	versionedObj := &examplev1.Pod{}
+	schemaReferenceObj := &examplev1.Pod{}
 
 	patchJS := []byte(`{"spec":{"terminationGracePeriodSeconds":42,"activeDeadlineSeconds":120}}`)
 
-	err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj)
+	err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,6 +552,8 @@ func TestPatchResourceWithConflict(t *testing.T) {
 
 		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
 	}
+
+	// See issue #63104 for discussion of how much sense this makes.
 
 	tc.startingPod.Name = name
 	tc.startingPod.Namespace = namespace
