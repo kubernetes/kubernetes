@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/kubernetes/pkg/printers"
+
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 
@@ -85,17 +87,20 @@ var (
 )
 
 type RunObject struct {
-	Object  runtime.Object
-	Kind    string
-	Mapping *meta.RESTMapping
+	Versioned runtime.Object
+	Object    runtime.Object
+	Kind      string
+	Mapping   *meta.RESTMapping
 }
 
 type RunOpts struct {
-	DeleteFlags *DeleteFlags
-
+	PrintFlags    *printers.PrintFlags
+	DeleteFlags   *DeleteFlags
 	DeleteOptions *DeleteOptions
 
 	DryRun bool
+
+	PrintObj func(runtime.Object) error
 
 	ArgsLenAtDash  int
 	Attach         bool
@@ -117,6 +122,7 @@ type RunOpts struct {
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &RunOpts{
+		PrintFlags:  printers.NewPrintFlags("created"),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
 
 		In:     cmdIn,
@@ -137,8 +143,8 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 	}
 
 	options.DeleteFlags.AddFlags(cmd)
+	options.PrintFlags.AddFlags(cmd)
 
-	cmdutil.AddPrinterFlags(cmd)
 	addRunFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -193,6 +199,17 @@ func (o *RunOpts) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.Attach = cmdutil.GetFlagBool(cmd, "attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
+	}
+
+	if o.DryRun {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.PrintObj = func(obj runtime.Object) error {
+		return printer.PrintObj(obj, o.Out)
 	}
 
 	deleteOpts := o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
@@ -269,14 +286,13 @@ func (o *RunOpts) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) erro
 	}
 
 	generatorName := o.Generator
-	schedule := o.Schedule
-	if len(schedule) != 0 && len(generatorName) == 0 {
+	if len(o.Schedule) != 0 && len(generatorName) == 0 {
 		generatorName = cmdutil.CronJobV1Beta1GeneratorName
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
-			generatorName = cmdutil.DeploymentV1Beta1GeneratorName
+			generatorName = cmdutil.DeploymentAppsV1Beta1GeneratorName
 		case api.RestartPolicyOnFailure:
 			generatorName = cmdutil.JobV1GeneratorName
 		case api.RestartPolicyNever:
@@ -408,11 +424,9 @@ func (o *RunOpts) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) erro
 
 	}
 	if runObject != nil {
-		outputFormat := cmdutil.GetFlagString(cmd, "output")
-		if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
-			return cmdutil.PrintObject(cmd, runObject.Object, o.Out)
+		if err := o.PrintObj(runObject.Versioned); err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(false, o.Out, runObject.Object, cmdutil.GetDryRunFlag(cmd), "created")
 	}
 
 	return utilerrors.NewAggregate(allErrs)
@@ -592,17 +606,13 @@ func (o *RunOpts) generateService(f cmdutil.Factory, cmd *cobra.Command, service
 		return nil, err
 	}
 
-	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
-		err := cmdutil.PrintObject(cmd, runObject.Object, o.Out)
-		if err != nil {
-			return nil, err
-		}
-		if cmdutil.GetFlagString(cmd, "output") == "yaml" {
-			fmt.Fprintln(o.Out, "---")
-		}
-		return runObject, nil
+	if err := o.PrintObj(runObject.Versioned); err != nil {
+		return nil, err
 	}
-	cmdutil.PrintSuccess(false, o.Out, runObject.Object, cmdutil.GetDryRunFlag(cmd), "created")
+	// separate yaml objects
+	if o.PrintFlags.OutputFormat != nil && *o.PrintFlags.OutputFormat == "yaml" {
+		fmt.Fprintln(o.Out, "---")
+	}
 
 	return runObject, nil
 }
@@ -653,6 +663,7 @@ func (o *RunOpts) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, g
 		}
 	}
 
+	versioned := obj
 	if !o.DryRun {
 		resourceMapper := &resource.Mapper{
 			ObjectTyper:  typer,
@@ -673,10 +684,13 @@ func (o *RunOpts) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, g
 		if err != nil {
 			return nil, err
 		}
+
+		versioned = info.AsVersioned()
 	}
 	return &RunObject{
-		Object:  obj,
-		Kind:    groupVersionKind.Kind,
-		Mapping: mapping,
+		Versioned: versioned,
+		Object:    obj,
+		Kind:      groupVersionKind.Kind,
+		Mapping:   mapping,
 	}, nil
 }
