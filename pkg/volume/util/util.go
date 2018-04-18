@@ -289,10 +289,12 @@ func checkAlphaNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]strin
 			if err != nil {
 				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
 			}
-			if !selector.Matches(labels.Set(nodeLabels)) {
-				return fmt.Errorf("NodeSelectorTerm %+v does not match node labels", term.MatchExpressions)
+			if selector.Matches(labels.Set(nodeLabels)) {
+				// Terms are ORed, so only one needs to match
+				return nil
 			}
 		}
+		return fmt.Errorf("No matching NodeSelectorTerms")
 	}
 	return nil
 }
@@ -310,10 +312,12 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 			if err != nil {
 				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
 			}
-			if !selector.Matches(labels.Set(nodeLabels)) {
-				return fmt.Errorf("NodeSelectorTerm %+v does not match node labels", term.MatchExpressions)
+			if selector.Matches(labels.Set(nodeLabels)) {
+				// Terms are ORed, so only one needs to match
+				return nil
 			}
 		}
+		return fmt.Errorf("No matching NodeSelectorTerms")
 	}
 	return nil
 }
