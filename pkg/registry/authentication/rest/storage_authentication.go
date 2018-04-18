@@ -30,7 +30,7 @@ import (
 )
 
 type RESTStorageProvider struct {
-	Authenticator authenticator.Request
+	Authenticator authenticator.Token
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {

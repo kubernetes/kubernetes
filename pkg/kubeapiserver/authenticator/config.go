@@ -79,7 +79,7 @@ type AuthenticatorConfig struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
+func (config AuthenticatorConfig) New() (authenticator.Request, authenticator.Token, *spec.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
 	var tokenAuthenticators []authenticator.Token
 	securityDefinitions := spec.SecurityDefinitions{}
@@ -95,7 +95,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 			config.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		authenticators = append(authenticators, requestHeaderAuthenticator)
 	}
@@ -104,7 +104,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		authenticators = append(authenticators, basicAuth)
 
@@ -120,7 +120,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	if len(config.ClientCAFile) > 0 {
 		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		authenticators = append(authenticators, certAuth)
 	}
@@ -129,21 +129,21 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	if len(config.TokenAuthFile) > 0 {
 		tokenAuth, err := newAuthenticatorFromTokenFile(config.TokenAuthFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, tokenAuth)
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
 		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) && config.ServiceAccountIssuer != "" {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuer, config.ServiceAccountAPIAudiences, config.ServiceAccountKeyFiles, config.ServiceAccountTokenGetter)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
@@ -162,21 +162,22 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix, config.OIDCSigningAlgs, config.OIDCRequiredClaims)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, oidcAuth)
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, webhookTokenAuth)
 	}
 
+	var tokenAuth authenticator.Token
 	if len(tokenAuthenticators) > 0 {
 		// Union the token authenticators
-		tokenAuth := tokenunion.New(tokenAuthenticators...)
+		tokenAuth = tokenunion.New(tokenAuthenticators...)
 		// Optionally cache authentication results
 		if config.TokenSuccessCacheTTL > 0 || config.TokenFailureCacheTTL > 0 {
 			tokenAuth = tokencache.New(tokenAuth, config.TokenSuccessCacheTTL, config.TokenFailureCacheTTL)
@@ -194,12 +195,12 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 
 	if len(authenticators) == 0 {
 		if config.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+			return anonymous.NewAuthenticator(), nil, &securityDefinitions, nil
 		}
 	}
 
 	if len(authenticators) == 0 {
-		return nil, &securityDefinitions, nil
+		return nil, nil, &securityDefinitions, nil
 	}
 
 	authenticator := union.New(authenticators...)
@@ -212,7 +213,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}
 
-	return authenticator, &securityDefinitions, nil
+	return authenticator, tokenAuth, &securityDefinitions, nil
 }
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file

@@ -291,7 +291,8 @@ func CreateKubeAPIServerConfig(
 	lastErr error,
 ) {
 	var genericConfig *genericapiserver.Config
-	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, lastErr = BuildGenericConfig(s.ServerRunOptions, proxyTransport)
+	var tokenAuthenticator authenticator.Token
+	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, tokenAuthenticator, lastErr = BuildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if lastErr != nil {
 		return
 	}
@@ -391,6 +392,8 @@ func CreateKubeAPIServerConfig(
 
 			ServiceAccountIssuer:       issuer,
 			ServiceAccountAPIAudiences: apiAudiences,
+
+			TokenAuthenticator: tokenAuthenticator,
 		},
 	}
 
@@ -413,6 +416,7 @@ func BuildGenericConfig(
 	insecureServingInfo *kubeserver.InsecureServingInfo,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	pluginInitializers []admission.PluginInitializer,
+	tokenAuthenticator authenticator.Token,
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
@@ -501,7 +505,7 @@ func BuildGenericConfig(
 		)
 	}
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
+	genericConfig.Authentication.Authenticator, tokenAuthenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authentication config: %v", err)
 		return
@@ -594,7 +598,7 @@ func BuildAdmissionPluginInitializers(
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, authenticator.Token, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)

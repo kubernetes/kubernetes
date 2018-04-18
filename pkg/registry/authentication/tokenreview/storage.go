@@ -18,7 +18,6 @@ package tokenreview
 
 import (
 	"fmt"
-	"net/http"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,10 +28,10 @@ import (
 )
 
 type REST struct {
-	tokenAuthenticator authenticator.Request
+	tokenAuthenticator authenticator.Token
 }
 
-func NewREST(tokenAuthenticator authenticator.Request) *REST {
+func NewREST(tokenAuthenticator authenticator.Token) *REST {
 	return &REST{tokenAuthenticator: tokenAuthenticator}
 }
 
@@ -58,11 +57,7 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createV
 		return tokenReview, nil
 	}
 
-	// create a header that contains nothing but the token
-	fakeReq := &http.Request{Header: http.Header{}}
-	fakeReq.Header.Add("Authorization", "Bearer "+tokenReview.Spec.Token)
-
-	tokenUser, ok, err := r.tokenAuthenticator.AuthenticateRequest(fakeReq)
+	tokenUser, ok, err := r.tokenAuthenticator.AuthenticateToken(tokenReview.Spec.Token)
 	tokenReview.Status.Authenticated = ok
 	if err != nil {
 		tokenReview.Status.Error = err.Error()
