@@ -1,11 +1,13 @@
-<!-- This form is for bug reports and feature requests ONLY! 
+<!-- This form is for bug reports and feature requests ONLY!
 
 If you're looking for help check [Stack Overflow](https://stackoverflow.com/questions/tagged/kubernetes) and the [troubleshooting guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/).
+
+If this may be security issue, please disclose it privately via https://kubernetes.io/security/.
 -->
 
 **Is this a BUG REPORT or FEATURE REQUEST?**:
 
-> Uncomment only one, leave it on its own line: 
+> Uncomment only one, leave it on its own line:
 >
 > /kind bug
 > /kind feature
