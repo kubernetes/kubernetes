@@ -12,6 +12,7 @@ go_test(
         "apiserver_test.go",
         "audit_test.go",
         "installer_test.go",
+        "patchhandler_test.go",
         "watch_test.go",
     ],
     embed = [":go_default_library"],
