@@ -40,6 +40,8 @@ import (
 )
 
 func TestEnsureStaticIP(t *testing.T) {
+	t.Parallel()
+
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
@@ -61,6 +63,8 @@ func TestEnsureStaticIP(t *testing.T) {
 }
 
 func TestEnsureStaticIPWithTier(t *testing.T) {
+	t.Parallel()
+
 	s, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
@@ -97,6 +101,8 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 }
 
 func TestVerifyRequestedIP(t *testing.T) {
+	t.Parallel()
+
 	lbRef := "test-lb"
 
 	for desc, tc := range map[string]struct {
@@ -152,6 +158,8 @@ func TestVerifyRequestedIP(t *testing.T) {
 }
 
 func TestCreateForwardingRuleWithTier(t *testing.T) {
+	t.Parallel()
+
 	// Common variables among the tests.
 	ports := []v1.ServicePort{{Name: "foo", Protocol: v1.ProtocolTCP, Port: int32(123)}}
 	target := "test-target-pool"
@@ -209,6 +217,8 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 }
 
 func TestDeleteAddressWithWrongTier(t *testing.T) {
+	t.Parallel()
+
 	lbRef := "test-lb"
 
 	s, err := fakeGCECloud(DefaultTestClusterValues())
@@ -284,6 +294,8 @@ func createExternalLoadBalancer(gce *GCECloud, apiService *v1.Service, nodeNames
 }
 
 func TestEnsureExternalLoadBalancer(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeNames := []string{"test-node-1"}
 
@@ -299,6 +311,8 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 }
 
 func TestUpdateExternalLoadBalancer(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeName := "test-node-1"
 
@@ -355,6 +369,8 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 }
 
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -370,6 +386,8 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 }
 
 func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -423,6 +441,8 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 }
 
 func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -442,6 +462,8 @@ func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
 }
 
 func TestEnsureExternalLoadBalancerFailsWithNoNodes(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -453,6 +475,8 @@ func TestEnsureExternalLoadBalancerFailsWithNoNodes(t *testing.T) {
 }
 
 func TestForwardingRuleNeedsUpdate(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -535,6 +559,8 @@ func TestForwardingRuleNeedsUpdate(t *testing.T) {
 }
 
 func TestTargetPoolNeedsRecreation(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -581,6 +607,8 @@ func TestTargetPoolNeedsRecreation(t *testing.T) {
 }
 
 func TestFirewallNeedsUpdate(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -743,6 +771,8 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 }
 
 func TestDeleteWrongNetworkTieredResourcesSucceedsWhenNotFound(t *testing.T) {
+	t.Parallel()
+
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 
@@ -751,6 +781,8 @@ func TestDeleteWrongNetworkTieredResourcesSucceedsWhenNotFound(t *testing.T) {
 }
 
 func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -833,6 +865,8 @@ func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, sh
 }
 
 func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
+	t.Parallel()
+
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 	vals := DefaultTestClusterValues()
@@ -882,6 +916,8 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 }
 
 func TestEnsureExternalLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
@@ -929,6 +965,8 @@ func newEnsureELBParams(nodes []*v1.Node, apiService *v1.Service) *EnsureELBPara
 // ensureExternalLoadBalancer, making sure the system won't panic when
 // exceptions raised by gce.
 func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	var params *EnsureELBParams
 

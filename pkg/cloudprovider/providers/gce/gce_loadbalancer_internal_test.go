@@ -48,6 +48,8 @@ func createInternalLoadBalancer(gce *GCECloud, apiService *v1.Service, existingF
 }
 
 func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeNames := []string{"test-node-1"}
 
@@ -76,6 +78,8 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 }
 
 func TestEnsureInternalBackendServiceGroups(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeNames := []string{"test-node-1"}
 
@@ -110,6 +114,8 @@ func TestEnsureInternalBackendServiceGroups(t *testing.T) {
 }
 
 func TestEnsureInternalLoadBalancer(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeNames := []string{"test-node-1"}
 
@@ -124,6 +130,8 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 }
 
 func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeNames := []string{"test-node-1"}
 
@@ -158,6 +166,8 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 }
 
 func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -233,6 +243,8 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 }
 
 func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	nodeName := "test-node-1"
 
@@ -286,6 +298,8 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 }
 
 func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -316,6 +330,8 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 }
 
 func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
@@ -331,6 +347,8 @@ func TestEnsureInternalLoadBalancerDeleted(t *testing.T) {
 }
 
 func TestEnsureInternalLoadBalancerDeletedTwiceDoesNotError(t *testing.T) {
+	t.Parallel()
+
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
