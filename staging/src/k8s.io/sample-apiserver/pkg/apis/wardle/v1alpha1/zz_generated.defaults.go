@@ -28,5 +28,18 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&Flunder{}, func(obj interface{}) { SetObjectDefaults_Flunder(obj.(*Flunder)) })
+	scheme.AddTypeDefaultingFunc(&FlunderList{}, func(obj interface{}) { SetObjectDefaults_FlunderList(obj.(*FlunderList)) })
 	return nil
+}
+
+func SetObjectDefaults_Flunder(in *Flunder) {
+	SetDefaults_FlunderSpec(&in.Spec)
+}
+
+func SetObjectDefaults_FlunderList(in *FlunderList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Flunder(a)
+	}
 }
