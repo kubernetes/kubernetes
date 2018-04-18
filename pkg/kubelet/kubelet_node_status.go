@@ -592,7 +592,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 		devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = kl.containerManager.GetDevicePluginResourceCapacity()
 		if devicePluginCapacity != nil {
 			for k, v := range devicePluginCapacity {
-				glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
 				node.Status.Capacity[k] = v
 			}
 		}
@@ -637,7 +636,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 	}
 	if devicePluginAllocatable != nil {
 		for k, v := range devicePluginAllocatable {
-			glog.V(2).Infof("Update allocatable for %s to %d", k, v.Value())
 			node.Status.Allocatable[k] = v
 		}
 	}
