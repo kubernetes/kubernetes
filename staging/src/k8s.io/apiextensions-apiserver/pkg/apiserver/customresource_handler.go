@@ -31,7 +31,6 @@ import (
 	postvalidationalgorithms "github.com/go-openapi/validate/post"
 	"github.com/golang/glog"
 
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -485,7 +484,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			return ret
 		},
 
-		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, defaulter: openAPIdefaulter},
+		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator},
 		ParameterCodec: parameterCodec,
 
 		Creater: creator,
@@ -567,9 +566,8 @@ func (c crdObjectConverter) ConvertFieldLabel(version, kind, label, value string
 }
 
 type unstructuredNegotiatedSerializer struct {
-	typer     runtime.ObjectTyper
-	creator   runtime.ObjectCreater
-	defaulter *validate.SchemaValidator
+	typer   runtime.ObjectTyper
+	creator runtime.ObjectCreater
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -600,6 +598,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, decoder, nil, gv)
 	// TODODODODOD: return defaultingDecoder{unstructuredDecoder{delegate: Codecs.DecoderToVersion(serializer, gv)}, s.defaulter}
+	// TODODODODOD: 	return unstructuredDecoder{delegate: Codecs.DecoderToVersion(serializer, gv)}
 }
 
 type UnstructuredObjectTyper struct {
