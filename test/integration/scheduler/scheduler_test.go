@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -686,6 +687,7 @@ func TestPDBCache(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: context.ns.Name,
 			Name:      "test-pdb",
+			UID:       types.UID("test-pdb-uid"),
 			Labels:    map[string]string{"tkey1": "tval1", "tkey2": "tval2"},
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
