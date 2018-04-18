@@ -99,6 +99,7 @@ function generate-pki-config {
   NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   HEAPSTER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   CLUSTER_AUTOSCALER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_DNS_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   echo "Generated PKI authentication data for kubemark."
 }
 
@@ -126,6 +127,7 @@ function write-pki-config-to-master {
     sudo bash -c \"echo \"${HEAPSTER_TOKEN},system:heapster,uid:heapster\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
     sudo bash -c \"echo \"${CLUSTER_AUTOSCALER_TOKEN},system:cluster-autoscaler,uid:cluster-autoscaler\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
     sudo bash -c \"echo \"${NODE_PROBLEM_DETECTOR_TOKEN},system:node-problem-detector,uid:system:node-problem-detector\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
+    sudo bash -c \"echo \"${KUBE_DNS_TOKEN},system:kube-dns,uid:kube-dns\" >> /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
     sudo bash -c \"echo ${KUBE_PASSWORD},admin,admin > /home/kubernetes/k8s_auth_data/basic_auth.csv\""
   execute-cmd-on-master-with-retries "${PKI_SETUP_CMD}" 3
   echo "Wrote PKI certs, keys, tokens and admin password to master."
@@ -348,6 +350,25 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context")
 
+  # Create kubeconfig for Kube DNS.
+  KUBE_DNS_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+kind: Config
+users:
+- name: kube-dns
+  user:
+    token: ${KUBE_DNS_TOKEN}
+clusters:
+- name: kubemark
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://${MASTER_IP}
+contexts:
+- context:
+    cluster: kubemark
+    user: kube-dns
+  name: kubemark-context
+current-context: kubemark-context")
+
   # Create kubemark namespace.
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
 
@@ -362,7 +383,8 @@ current-context: kubemark-context")
     --from-literal=kubeproxy.kubeconfig="${KUBEPROXY_KUBECONFIG_CONTENTS}" \
     --from-literal=heapster.kubeconfig="${HEAPSTER_KUBECONFIG_CONTENTS}" \
     --from-literal=cluster_autoscaler.kubeconfig="${CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS}" \
-    --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}"
+    --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}" \
+    --from-literal=dns.kubeconfig="${KUBE_DNS_KUBECONFIG_CONTENTS}"
 
   # Create addon pods.
   # Heapster.
@@ -380,7 +402,7 @@ current-context: kubemark-context")
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
-  if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Setting up Cluster Autoscaler"
     KUBEMARK_AUTOSCALER_MIG_NAME="${KUBEMARK_AUTOSCALER_MIG_NAME:-${NODE_INSTANCE_PREFIX}-group}"
     KUBEMARK_AUTOSCALER_MIN_NODES="${KUBEMARK_AUTOSCALER_MIN_NODES:-0}"
@@ -392,6 +414,12 @@ current-context: kubemark-context")
     sed -i'' -e "s/{{kubemark_autoscaler_mig_name}}/${KUBEMARK_AUTOSCALER_MIG_NAME}/g" "${RESOURCE_DIRECTORY}/addons/cluster-autoscaler.json"
     sed -i'' -e "s/{{kubemark_autoscaler_min_nodes}}/${KUBEMARK_AUTOSCALER_MIN_NODES}/g" "${RESOURCE_DIRECTORY}/addons/cluster-autoscaler.json"
     sed -i'' -e "s/{{kubemark_autoscaler_max_nodes}}/${KUBEMARK_AUTOSCALER_MAX_NODES}/g" "${RESOURCE_DIRECTORY}/addons/cluster-autoscaler.json"
+  fi
+
+  # Kube DNS.
+  if [[ "${ENABLE_KUBEMARK_KUBE_DNS:-}" == "true" ]]; then
+    echo "Setting up kube-dns"
+    sed "s/{{dns_domain}}/${KUBE_DNS_DOMAIN}/g" "${RESOURCE_DIRECTORY}/kube_dns_template.yaml" > "${RESOURCE_DIRECTORY}/addons/kube_dns.yaml"
   fi
 
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
