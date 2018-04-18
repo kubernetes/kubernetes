@@ -2120,7 +2120,8 @@ function update-prometheus-to-sd-parameters {
 
 # Updates parameters in yaml file for event-exporter configuration
 function update-event-exporter {
-    sed -i -e "s@{{ *event_exporter_zone *}}@${ZONE:-}@g" "$1"
+    local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
+    sed -i -e "s@{{ exporter_sd_resource_model }}@${stackdriver_resource_model}@g" "$1"
 }
 
 function update-dashboard-controller {
