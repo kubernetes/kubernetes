@@ -534,6 +534,29 @@ func TestParseClassParameters(t *testing.T) {
 				thinPoolSnapFactor: float32(50),
 			},
 		},
+
+		{
+			"valid volumenameprefix: dept-dev",
+			map[string]string{
+				"resturl":          "https://localhost:8080",
+				"restauthenabled":  "false",
+				"gidMin":           "4000",
+				"gidMax":           "5000",
+				"volumetype":       "disperse:4:2",
+				"snapfactor":       "50",
+				"volumenameprefix": "dept-dev",
+			},
+			&secret,
+			false, // expect error
+			&provisionerConfig{
+				url:                "https://localhost:8080",
+				gidMin:             4000,
+				gidMax:             5000,
+				volumeType:         gapi.VolumeDurabilityInfo{Type: "disperse", Replicate: gapi.ReplicaDurability{Replica: 0}, Disperse: gapi.DisperseDurability{Data: 4, Redundancy: 2}},
+				thinPoolSnapFactor: float32(50),
+				volumeNamePrefix:   "dept-dev",
+			},
+		},
 		{
 			"invalid volumetype (disperse) parameter",
 			map[string]string{
@@ -584,6 +607,28 @@ func TestParseClassParameters(t *testing.T) {
 				"resturl":         "https://localhost:8080",
 				"restauthenabled": "false",
 				"snapfactor":      "0.5",
+			},
+			&secret,
+			true, // expect error
+			nil,
+		},
+		{
+			"invalid volumenameprefix: string starting with '_'",
+			map[string]string{
+				"resturl":          "https://localhost:8080",
+				"restauthenabled":  "false",
+				"volumenameprefix": "_",
+			},
+			&secret,
+			true, // expect error
+			nil,
+		},
+		{
+			"invalid volumenameprefix: string with '_'",
+			map[string]string{
+				"resturl":          "https://localhost:8080",
+				"restauthenabled":  "false",
+				"volumenameprefix": "qe_dept",
 			},
 			&secret,
 			true, // expect error
