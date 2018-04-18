@@ -14,7 +14,7 @@ DaemonSets must be enabled on your cluster. Instructions for enabling DaemonSet 
 
 The New Relic Infrastructure agent is configured via environment variables. We will configure these environment variables in a sourced bash script, encode the environment file data, and store it in a secret which will be loaded at container runtime. (Reread this sentence a few times, it's *HOW* the entire container works.)
 
-The [New Relic Linux Infrastructure Server configuration page](https://docs.newrelic.com/docs/servers/new-relic-servers-linux/installation-configuration/configuring-servers-linux) lists all the other settings for the Infrastructure process.
+The [New Relic Linux Infrastructure Server configuration page](https://docs.newrelic.com/docs/infrastructure/new-relic-infrastructure/installation/install-infrastructure-linux) lists all the other settings for the Infrastructure process.
 
 To create an environment variable for a setting, prepend NRIA_ to its name and capitalize all of the env variable.  For example,
 
