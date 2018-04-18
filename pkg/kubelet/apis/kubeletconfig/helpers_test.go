@@ -150,6 +150,7 @@ var (
 		"CgroupDriver",
 		"CgroupRoot",
 		"CgroupsPerQOS",
+		"CloudProvider",
 		"ClusterDNS[*]",
 		"ClusterDomain",
 		"ContainerLogMaxFiles",

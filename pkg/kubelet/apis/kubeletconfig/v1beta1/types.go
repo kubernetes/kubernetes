@@ -85,6 +85,10 @@ type KubeletConfiguration struct {
 	// Default: 0 (disabled)
 	// +optional
 	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
+	// cloudProvider is the provider for cloud services.
+	// Default: ""
+	// +optional
+	CloudProvider string `json:"cloudProvider,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate

@@ -150,6 +150,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_kubeletconfig_KubeletConfigurat
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.CloudProvider = in.CloudProvider
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))
@@ -272,6 +273,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1beta1_KubeletConfigurat
 	out.Address = in.Address
 	out.Port = in.Port
 	out.ReadOnlyPort = in.ReadOnlyPort
+	out.CloudProvider = in.CloudProvider
 	out.TLSCertFile = in.TLSCertFile
 	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 	out.TLSCipherSuites = *(*[]string)(unsafe.Pointer(&in.TLSCipherSuites))
