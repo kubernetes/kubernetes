@@ -45,16 +45,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type ApplyOptions struct {
-	RecordFlags     *RecordFlags
+	RecordFlags     *genericclioptions.RecordFlags
 	FilenameOptions resource.FilenameOptions
 
-	Recorder Recorder
+	Recorder genericclioptions.Recorder
 
 	Selector       string
 	Force          bool
@@ -111,7 +112,7 @@ var (
 
 func NewApplyOptions(out, errout io.Writer) *ApplyOptions {
 	return &ApplyOptions{
-		RecordFlags: NewRecordFlags(),
+		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Overwrite:    true,
 		Cascade:      true,

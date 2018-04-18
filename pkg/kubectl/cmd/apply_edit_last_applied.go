@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"io"
-	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -59,11 +58,8 @@ var (
 )
 
 func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &editor.EditOptions{
-		EditMode:           editor.ApplyEditMode,
-		Output:             "yaml",
-		WindowsLineEndings: runtime.GOOS == "windows",
-	}
+	o := editor.NewEditOptions(editor.ApplyEditMode, out, errOut)
+
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -73,11 +69,10 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 		Long:    applyEditLastAppliedLong,
 		Example: applyEditLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.ChangeCause = f.Command(cmd, false)
-			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
+			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
-			if err := options.Run(); err != nil {
+			if err := o.Run(); err != nil {
 				cmdutil.CheckErr(err)
 			}
 		},
@@ -85,12 +80,14 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
+	// bind flag structs
+	o.RecordFlags.AddFlags(cmd)
+
 	usage := "to use to edit the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&options.Output, "output", "o", options.Output, "Output format. One of: yaml|json.")
-	cmd.Flags().BoolVar(&options.WindowsLineEndings, "windows-line-endings", options.WindowsLineEndings,
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: yaml|json.")
+	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
-	cmdutil.AddRecordVarFlag(cmd, &options.Record)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd

@@ -54,8 +54,9 @@ type SetLastAppliedOptions struct {
 	Output           string
 	PatchBufferList  []PatchBuffer
 	Factory          cmdutil.Factory
-	Out              io.Writer
-	ErrOut           io.Writer
+
+	Out    io.Writer
+	ErrOut io.Writer
 }
 
 type PatchBuffer struct {
@@ -81,8 +82,15 @@ var (
 		`))
 )
 
-func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	options := &SetLastAppliedOptions{Out: out, ErrOut: err}
+func NewSetLastAppliedOptions(out, errout io.Writer) *SetLastAppliedOptions {
+	return &SetLastAppliedOptions{
+		Out:    out,
+		ErrOut: errout,
+	}
+}
+
+func NewCmdApplySetLastApplied(f cmdutil.Factory, out, errout io.Writer) *cobra.Command {
+	options := NewSetLastAppliedOptions(out, errout)
 	cmd := &cobra.Command{
 		Use: "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,
@@ -97,7 +105,6 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Com
 	}
 
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.CreateAnnotation, "create-annotation", options.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
 	usage := "that contains the last-applied-configuration annotations"
@@ -111,12 +118,9 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ShortOutput = o.Output == "name"
 
-	var err error
 	o.Mapper, o.Typer = f.Object()
-	if err != nil {
-		return err
-	}
 
+	var err error
 	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
 	return err
 }

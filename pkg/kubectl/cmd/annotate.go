@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -42,21 +43,22 @@ import (
 type AnnotateOptions struct {
 	// Filename options
 	resource.FilenameOptions
+	RecordFlags *genericclioptions.RecordFlags
 
 	// Common user flags
-	overwrite         bool
-	local             bool
-	dryrun            bool
-	all               bool
-	resourceVersion   string
-	selector          string
-	outputFormat      string
-	recordChangeCause bool
+	overwrite       bool
+	local           bool
+	dryrun          bool
+	all             bool
+	resourceVersion string
+	selector        string
+	outputFormat    string
 
 	// results of arg parsing
 	resources         []string
 	newAnnotations    map[string]string
 	removeAnnotations []string
+	Recorder          genericclioptions.Recorder
 
 	// Common share fields
 	out io.Writer
@@ -97,8 +99,15 @@ var (
     kubectl annotate pods foo description-`))
 )
 
+func NewAnnotateOptions(out io.Writer) *AnnotateOptions {
+	return &AnnotateOptions{
+		out:         out,
+		RecordFlags: genericclioptions.NewRecordFlags(),
+	}
+}
+
 func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &AnnotateOptions{}
+	options := NewAnnotateOptions(out)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -108,7 +117,7 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    annotateLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(out, cmd, args); err != nil {
+			if err := options.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
 			if err := options.Validate(); err != nil {
@@ -119,6 +128,10 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
+
+	// bind flag structs
+	options.RecordFlags.AddFlags(cmd)
+
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
@@ -129,18 +142,23 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *AnnotateOptions) Complete(out io.Writer, cmd *cobra.Command, args []string) (err error) {
-	o.out = out
+func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	o.RecordFlags.Complete(f.Command(cmd, false))
+
+	var err error
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
-	o.recordChangeCause = cmdutil.GetRecordFlag(cmd)
 
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
@@ -173,8 +191,6 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 	if err != nil {
 		return err
 	}
-
-	changeCause := f.Command(cmd, false)
 
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	b := f.NewBuilder().
@@ -232,9 +248,8 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			if err != nil {
 				return err
 			}
-			// If we should record change-cause, add it to new annotations
-			if cmdutil.ContainsChangeCause(info) || o.recordChangeCause {
-				o.newAnnotations[kubectl.ChangeCauseAnnotation] = changeCause
+			if err := o.Recorder.Record(info.Object); err != nil {
+				glog.V(4).Infof("error recording current command: %v", err)
 			}
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
