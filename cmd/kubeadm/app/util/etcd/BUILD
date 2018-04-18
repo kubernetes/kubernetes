@@ -17,10 +17,7 @@ go_test(
     name = "go_default_test",
     srcs = ["etcd_test.go"],
     embed = [":go_default_library"],
-    deps = [
-        "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/test:go_default_library",
-    ],
+    deps = ["//cmd/kubeadm/test:go_default_library"],
 )
 
 filegroup(

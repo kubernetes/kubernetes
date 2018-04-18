@@ -66,15 +66,18 @@ func RunPlan(parentFlags *cmdUpgradeFlags) error {
 	}
 
 	// Define Local Etcd cluster to be able to retrieve information
-	etcdCluster := etcdutil.StaticPodCluster{
-		Endpoints:       []string{"localhost:2379"},
-		ManifestDir:     constants.GetStaticPodDirectory(),
-		CertificatesDir: upgradeVars.cfg.CertificatesDir,
+	etcdClient, err := etcdutil.NewStaticPodClient(
+		[]string{"localhost:2379"},
+		constants.GetStaticPodDirectory(),
+		upgradeVars.cfg.CertificatesDir,
+	)
+	if err != nil {
+		return err
 	}
 
 	// Compute which upgrade possibilities there are
 	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades, etcdCluster, upgradeVars.cfg.FeatureGates)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, parentFlags.allowExperimentalUpgrades, parentFlags.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates)
 	if err != nil {
 		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
 	}

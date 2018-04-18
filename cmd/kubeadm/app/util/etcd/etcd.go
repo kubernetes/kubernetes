@@ -30,25 +30,22 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
-// Cluster is an interface to get etcd cluster related information
-type Cluster interface {
-	HasTLS() (bool, error)
+// Client is an interface to get etcd cluster related information
+type Client interface {
 	GetStatus() (*clientv3.StatusResponse, error)
+	WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error)
+	HasTLS() bool
 }
 
-// StaticPodCluster represents an instance of a static pod etcd cluster.
-// CertificatesDir should contain the etcd CA and healthcheck client TLS identity.
-// ManifestDir should contain the etcd static pod manifest.
-type StaticPodCluster struct {
-	Endpoints       []string
-	CertificatesDir string
-	ManifestDir     string
+// GenericClient is a common etcd client for supported etcd servers
+type GenericClient struct {
+	Endpoints []string
+	TLSConfig *tls.Config
 }
 
-// HasTLS returns a boolean representing whether the static pod etcd cluster implements TLS.
-// It may return an error for file I/O issues.
-func (cluster StaticPodCluster) HasTLS() (bool, error) {
-	return PodManifestsHaveTLS(cluster.ManifestDir)
+// HasTLS returns true if etcd is configured for TLS
+func (c GenericClient) HasTLS() bool {
+	return c.TLSConfig != nil
 }
 
 // PodManifestsHaveTLS reads the etcd staticpod manifest from disk and returns false if the TLS flags
@@ -86,55 +83,87 @@ FlagLoop:
 	return true, nil
 }
 
-// GetStatus invokes the proper protocol check based off of whether the cluster HasTLS() to get the cluster's status
-func (cluster StaticPodCluster) GetStatus() (*clientv3.StatusResponse, error) {
-	hasTLS, err := cluster.HasTLS()
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine if current etcd static pod is using TLS: %v", err)
-	}
-
-	var tlsConfig *tls.Config
-	if hasTLS {
-		tlsConfig, err = NewTLSConfig(cluster.CertificatesDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create a TLS Config using the cluster.CertificatesDir: %v", err)
-		}
-	}
-
-	return GetClusterStatus(cluster.Endpoints, tlsConfig)
-}
-
-// NewTLSConfig generates a tlsConfig using credentials from the default sub-paths of the certificates directory
-func NewTLSConfig(certificatesDir string) (*tls.Config, error) {
-	tlsInfo := transport.TLSInfo{
-		CertFile:      filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
-		KeyFile:       filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
-		TrustedCAFile: filepath.Join(certificatesDir, constants.EtcdCACertName),
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return tlsConfig, nil
-}
-
-// GetClusterStatus returns nil for status Up or error for status Down
-func GetClusterStatus(endpoints []string, tlsConfig *tls.Config) (*clientv3.StatusResponse, error) {
+// GetStatus gets server status
+func (c GenericClient) GetStatus() (*clientv3.StatusResponse, error) {
+	const dialTimeout = 5 * time.Second
 	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
-		TLS:         tlsConfig,
+		Endpoints:   c.Endpoints,
+		DialTimeout: dialTimeout,
+		TLS:         c.TLSConfig,
 	})
 	if err != nil {
 		return nil, err
 	}
 	defer cli.Close()
 
-	resp, err := cli.Status(context.Background(), endpoints[0])
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	resp, err := cli.Status(ctx, c.Endpoints[0])
+	cancel()
 	if err != nil {
 		return nil, err
 	}
 
 	return resp, nil
+}
+
+// WaitForStatus returns a StatusResponse after an initial delay and retry attempts
+func (c GenericClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+	fmt.Printf("[util/etcd] Waiting %v for initial delay\n", delay)
+	time.Sleep(delay)
+	for i := 0; i < retries; i++ {
+		if i > 0 {
+			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
+			time.Sleep(retryInterval)
+		}
+		fmt.Printf("[util/etcd] Attempting to get etcd status %d/%d\n", i+1, retries)
+		resp, err := c.GetStatus()
+		if err != nil {
+			switch err {
+			case context.DeadlineExceeded:
+				fmt.Println("[util/etcd] Attempt timed out")
+			default:
+				fmt.Printf("[util/etcd] Attempt failed with error: %v\n", err)
+			}
+			continue
+		}
+		return resp, nil
+	}
+	return nil, fmt.Errorf("timeout waiting for etcd cluster status")
+}
+
+// NewClient creates a new EtcdCluster client
+func NewClient(endpoints []string, caFile string, certFile string, keyFile string) (*GenericClient, error) {
+	client := GenericClient{Endpoints: endpoints}
+
+	if caFile != "" || certFile != "" || keyFile != "" {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      certFile,
+			KeyFile:       keyFile,
+			TrustedCAFile: caFile,
+		}
+		tlsConfig, err := tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+		client.TLSConfig = tlsConfig
+	}
+
+	return &client, nil
+}
+
+// NewStaticPodClient creates a GenericClient from the given endpoints, manifestDir, and certificatesDir
+func NewStaticPodClient(endpoints []string, manifestDir string, certificatesDir string) (*GenericClient, error) {
+	hasTLS, err := PodManifestsHaveTLS(manifestDir)
+	if err != nil {
+		return nil, fmt.Errorf("could not read manifests from: %s, error: %v", manifestDir, err)
+	}
+	if hasTLS {
+		return NewClient(
+			endpoints,
+			filepath.Join(certificatesDir, constants.EtcdCACertName),
+			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
+			filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
+		)
+	}
+	return NewClient(endpoints, "", "", "")
 }

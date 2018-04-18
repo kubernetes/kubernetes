@@ -179,9 +179,7 @@ func TestPodManifestHasTLS(t *testing.T) {
 			}
 		}
 
-		tmpEtcdCluster := StaticPodCluster{ManifestDir: tmpdir}
-
-		hasTLS, actualErr := tmpEtcdCluster.HasTLS()
+		hasTLS, actualErr := PodManifestsHaveTLS(tmpdir)
 		if (actualErr != nil) != rt.expectErr {
 			t.Errorf(
 				"PodManifestHasTLS failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
