@@ -24,8 +24,10 @@ import (
 // ParseResourceArg takes the common style of string which may be either `resource.group.com` or `resource.version.group.com`
 // and parses it out into both possibilities.  This code takes no responsibility for knowing which representation was intended
 // but with a knowledge of all GroupVersions, calling code can take a very good guess.  If there are only two segments, then
-// `*GroupVersionResource` is nil.
+// `*GroupVersionResource` is nil.  If there are only one segment, then `GroupResource` is `resource=resource`. The arg can be
+// "".
 // `resource.group.com` -> `group=com, version=group, resource=resource` and `group=group.com, resource=resource`
+// `resource.version.group.com` -> `group=group.com, version=version, resource=resource` and `group=version.group.com, resource=resource`
 func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 	var gvr *GroupVersionResource
 	if strings.Count(arg, ".") >= 2 {
@@ -39,8 +41,10 @@ func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 // ParseKindArg takes the common style of string which may be either `Kind.group.com` or `Kind.version.group.com`
 // and parses it out into both possibilities. This code takes no responsibility for knowing which representation was intended
 // but with a knowledge of all GroupKinds, calling code can take a very good guess. If there are only two segments, then
-// `*GroupVersionResource` is nil.
+// `*GroupVersionResource` is nil. If there are only one segment, then `GroupResource` is `resource=resource`. The arg can be
+// "".
 // `Kind.group.com` -> `group=com, version=group, kind=Kind` and `group=group.com, kind=Kind`
+// `Kind.version.group.com` -> `group=group.com, version=version, kind=Kind` and `group=version.group.com, kind=Kind`
 func ParseKindArg(arg string) (*GroupVersionKind, GroupKind) {
 	var gvk *GroupVersionKind
 	if strings.Count(arg, ".") >= 2 {
@@ -216,6 +220,7 @@ func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (targe
 func ParseGroupVersion(gv string) (GroupVersion, error) {
 	// this can be the internal version for the legacy kube types
 	// TODO once we've cleared the last uses as strings, this special case should be removed.
+	// NOTE: Why only judge here?
 	if (len(gv) == 0) || (gv == "/") {
 		return GroupVersion{}, nil
 	}

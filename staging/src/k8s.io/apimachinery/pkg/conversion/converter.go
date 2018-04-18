@@ -330,6 +330,8 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 	if ft.In(1).Kind() != reflect.Ptr {
 		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
 	}
+	// NOTE: reflect usage
+	// reflect.TypeOf(&scopeType).Elem() reflect.TypeOf(&forErrorType).Elem()
 	scopeType := Scope(nil)
 	if e, a := reflect.TypeOf(&scopeType).Elem(), ft.In(2); e != a {
 		return fmt.Errorf("expected '%v' arg for 'in' param 2, got '%v' (%v)", e, a, ft)
