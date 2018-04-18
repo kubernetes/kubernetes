@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -208,31 +209,48 @@ func (spm *fakeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
 }
 
-type fakeTLSEtcdCluster struct{ TLS bool }
+type fakeTLSEtcdClient struct{ TLS bool }
 
-func (cluster fakeTLSEtcdCluster) HasTLS() (bool, error) {
-	return cluster.TLS, nil
+func (c fakeTLSEtcdClient) HasTLS() bool {
+	return c.TLS
 }
 
-func (cluster fakeTLSEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
+func (c fakeTLSEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
 	client := &clientv3.StatusResponse{}
 	client.Version = "3.1.12"
 	return client, nil
 }
 
-type fakePodManifestEtcdCluster struct{ ManifestDir, CertificatesDir string }
-
-func (cluster fakePodManifestEtcdCluster) HasTLS() (bool, error) {
-	return etcdutil.PodManifestsHaveTLS(cluster.ManifestDir)
+func (c fakeTLSEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+	return c.GetStatus()
 }
 
-func (cluster fakePodManifestEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
+type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
+
+func (c fakePodManifestEtcdClient) HasTLS() bool {
+	hasTLS, _ := etcdutil.PodManifestsHaveTLS(c.ManifestDir)
+	return hasTLS
+}
+
+func (c fakePodManifestEtcdClient) GetStatus() (*clientv3.StatusResponse, error) {
 	// Make sure the certificates generated from the upgrade are readable from disk
-	etcdutil.NewTLSConfig(cluster.CertificatesDir)
+	tlsInfo := transport.TLSInfo{
+		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
+		KeyFile:       filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientCertName),
+		TrustedCAFile: filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientKeyName),
+	}
+	_, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	client := &clientv3.StatusResponse{}
 	client.Version = "3.1.12"
 	return client, nil
+}
+
+func (c fakePodManifestEtcdClient) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+	return c.GetStatus()
 }
 
 func TestStaticPodControlPlane(t *testing.T) {
@@ -420,10 +438,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 			pathMgr,
 			newcfg,
 			true,
-			fakeTLSEtcdCluster{
+			fakeTLSEtcdClient{
 				TLS: false,
 			},
-			fakePodManifestEtcdCluster{
+			fakePodManifestEtcdClient{
 				ManifestDir:     pathMgr.RealManifestDir(),
 				CertificatesDir: newcfg.CertificatesDir,
 			},
