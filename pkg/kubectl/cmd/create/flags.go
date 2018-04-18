@@ -30,17 +30,25 @@ type PrintFlags struct {
 	NamePrintFlags     *printers.NamePrintFlags
 	TemplateFlags      *printers.KubeTemplatePrintFlags
 
-	OutputFormat *string
-}
+	DryRunTemplate string
 
-func (f *PrintFlags) Complete(successTemplate string) error {
-	return f.NamePrintFlags.Complete(successTemplate)
+	DryRun       *bool
+	OutputFormat *string
 }
 
 func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
 		outputFormat = *f.OutputFormat
+	}
+
+	dryRun := false
+	if f.DryRun != nil {
+		dryRun = *f.DryRun
+	}
+
+	if dryRun && len(f.DryRunTemplate) > 0 {
+		f.NamePrintFlags.Complete(f.DryRunTemplate)
 	}
 
 	if p, err := f.JSONYamlPrintFlags.ToPrinter(outputFormat); !printers.IsNoCompatiblePrinterError(err) {
@@ -63,6 +71,9 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.NamePrintFlags.AddFlags(cmd)
 	f.TemplateFlags.AddFlags(cmd)
 
+	if f.DryRun != nil {
+		cmd.Flags().BoolVar(f.DryRun, "dry-run", *f.DryRun, "If true, only print the object that would be sent, without sending it.")
+	}
 	if f.OutputFormat != nil {
 		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
 	}
@@ -70,9 +81,13 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 func NewPrintFlags(operation string) *PrintFlags {
 	outputFormat := ""
+	dryRun := false
 
 	return &PrintFlags{
+		DryRun:       &dryRun,
 		OutputFormat: &outputFormat,
+
+		DryRunTemplate: "%s (dry run)",
 
 		JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 		NamePrintFlags:     printers.NewNamePrintFlags(operation),

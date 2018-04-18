@@ -104,7 +104,6 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
@@ -161,10 +160,8 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 }
 
 func (o *CreateOptions) Complete(cmd *cobra.Command) error {
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	if o.PrintFlags.DryRun != nil {
+		o.DryRun = *o.PrintFlags.DryRun
 	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -341,9 +338,6 @@ func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, ge
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

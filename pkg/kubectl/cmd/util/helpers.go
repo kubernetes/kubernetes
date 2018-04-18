@@ -432,7 +432,6 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 // TODO: need to take a pass at other generator commands to use this set of flags
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
-	AddDryRunFlag(cmd)
 }
 
 type ValidateOptions struct {

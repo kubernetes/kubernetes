@@ -83,7 +83,6 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringSliceVar(&c.Verbs, "verb", c.Verbs, "Verb that applies to the resources contained in the rule")
 	cmd.Flags().StringSliceVar(&c.NonResourceURLs, "non-resource-url", c.NonResourceURLs, "A partial url that user should have access to.")
 	cmd.Flags().StringSlice("resource", []string{}, "Resource that the rule applies to")
