@@ -127,7 +127,7 @@ type Config struct {
 	//===========================================================================
 
 	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
-	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) (secure http.Handler)
+	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
 	// HandlerChainWaitGroup allows you to wait for all chain handlers exit after the server shutdown.
 	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
@@ -452,11 +452,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
 	}
 
-	contextMapper := delegationTarget.RequestContextMapper()
 	handlerChainBuilder := func(handler http.Handler) http.Handler {
-		return c.BuildHandlerChainFunc(handler, c.Config, contextMapper)
+		return c.BuildHandlerChainFunc(handler, c.Config)
 	}
-	apiServerHandler := NewAPIServerHandler(name, contextMapper, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
+	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
@@ -487,7 +486,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		healthzChecks: c.HealthzChecks,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer, contextMapper),
+		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
 	}
@@ -542,25 +541,24 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	return s, nil
 }
 
-func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
-	handler := genericapifilters.WithAuthorization(apiHandler, contextMapper, c.Authorization.Authorizer, c.Serializer)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, contextMapper, c.LongRunningFunc)
-	handler = genericapifilters.WithImpersonation(handler, contextMapper, c.Authorization.Authorizer, c.Serializer)
+func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
+	handler := genericapifilters.WithAuthorization(apiHandler, c.Authorization.Authorizer, c.Serializer)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
-		handler = genericapifilters.WithAudit(handler, contextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+		handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
-		handler = genericapifilters.WithLegacyAudit(handler, contextMapper, c.LegacyAuditWriter)
+		handler = genericapifilters.WithLegacyAudit(handler, c.LegacyAuditWriter)
 	}
-	failedHandler := genericapifilters.Unauthorized(contextMapper, c.Serializer, c.Authentication.SupportsBasicAuth)
+	failedHandler := genericapifilters.Unauthorized(c.Serializer, c.Authentication.SupportsBasicAuth)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
-		failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, contextMapper, c.AuditBackend, c.AuditPolicyChecker)
+		failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
 	}
-	handler = genericapifilters.WithAuthentication(handler, contextMapper, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, contextMapper, c.LongRunningFunc, c.RequestTimeout)
-	handler = genericfilters.WithWaitGroup(handler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
-	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, contextMapper)
-	handler = apirequest.WithRequestContext(handler, contextMapper)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
+	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }

@@ -42,7 +42,6 @@ import (
 // RequestScope encapsulates common fields across all RESTful handler methods.
 type RequestScope struct {
 	Namer ScopeNamer
-	ContextFunc
 
 	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
@@ -63,8 +62,7 @@ type RequestScope struct {
 }
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
-	ctx := scope.ContextFunc(req)
-	responsewriters.ErrorNegotiated(ctx, err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
 func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind) bool {
@@ -102,7 +100,7 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 			scope.err(err, w, req)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
@@ -153,8 +151,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	ctx := r.scope.ContextFunc(r.req)
-	responsewriters.WriteObject(ctx, statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
+	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {

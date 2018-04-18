@@ -47,7 +47,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			scope.err(err, w, req)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		body, err := readBody(req)

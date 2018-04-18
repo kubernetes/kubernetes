@@ -159,7 +159,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/storage:go_default_library",

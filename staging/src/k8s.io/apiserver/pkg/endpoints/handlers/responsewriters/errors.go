@@ -53,7 +53,7 @@ func Forbidden(ctx request.Context, attributes authorizer.Attributes, w http.Res
 	}
 	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
 	gr := schema.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetResource()}
-	ErrorNegotiated(ctx, apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg)), s, gv, w, req)
+	ErrorNegotiated(apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg)), s, gv, w, req)
 }
 
 func forbiddenMessage(attributes authorizer.Attributes) string {

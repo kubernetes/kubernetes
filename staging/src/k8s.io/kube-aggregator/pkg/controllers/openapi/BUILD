@@ -34,7 +34,6 @@ go_test(
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
     ],
 )

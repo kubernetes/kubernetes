@@ -29,7 +29,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -70,8 +69,7 @@ type APIGroupVersion struct {
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
 
-	Admit   admission.Interface
-	Context request.RequestContextMapper
+	Admit admission.Interface
 
 	MinRequestTimeout time.Duration
 
@@ -93,7 +91,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	}
 
 	apiResources, ws, registrationErrors := installer.Install()
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources}, g.Context)
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)

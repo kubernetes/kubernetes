@@ -25,6 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// LongRunningRequestCheck is a predicate which is true for long-running http requests.
+type LongRunningRequestCheck func(r *http.Request, requestInfo *RequestInfo) bool
+
 type RequestInfoResolver interface {
 	NewRequestInfo(req *http.Request) (*RequestInfo, error)
 }
