@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 
 	"github.com/evanphx/json-patch"
@@ -44,6 +45,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/crlf"
@@ -53,6 +55,7 @@ import (
 // EditOptions contains all the options for running edit cli command.
 type EditOptions struct {
 	resource.FilenameOptions
+	RecordFlags *genericclioptions.RecordFlags
 
 	Output             string
 	OutputPatch        bool
@@ -67,16 +70,30 @@ type EditOptions struct {
 
 	CmdNamespace    string
 	ApplyAnnotation bool
-	Record          bool
 	ChangeCause     string
 	Include3rdParty bool
 
 	Out    io.Writer
 	ErrOut io.Writer
 
+	Recorder            genericclioptions.Recorder
 	f                   cmdutil.Factory
 	editPrinterOptions  *editPrinterOptions
 	updatedResultGetter func(data []byte) *resource.Result
+}
+
+func NewEditOptions(editMode EditMode, out, errOut io.Writer) *EditOptions {
+	return &EditOptions{
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		EditMode: editMode,
+
+		Output:             "yaml",
+		WindowsLineEndings: goruntime.GOOS == "windows",
+
+		Out:    out,
+		ErrOut: errOut,
+	}
 }
 
 type editPrinterOptions struct {
@@ -86,7 +103,15 @@ type editPrinterOptions struct {
 }
 
 // Complete completes all the required options
-func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
+func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
+	o.RecordFlags.Complete(f.Command(cmd, false))
+
+	var err error
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
@@ -137,10 +162,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 
 	o.CmdNamespace = cmdNamespace
 	o.f = f
-
-	// Set up writer
-	o.Out = out
-	o.ErrOut = errOut
 
 	return nil
 }
@@ -609,10 +630,8 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 				return err
 			}
 		}
-		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(info.Object, o.ChangeCause); err != nil {
-				return err
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		return nil

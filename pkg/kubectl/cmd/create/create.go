@@ -27,6 +27,7 @@ import (
 
 	"net/url"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,13 +35,14 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type CreateOptions struct {
-	PrintFlags *PrintFlags
-	PrintObj   func(obj kruntime.Object) error
+	PrintFlags  *PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
 
 	DryRun bool
 
@@ -50,6 +52,9 @@ type CreateOptions struct {
 	Raw              string
 	Out              io.Writer
 	ErrOut           io.Writer
+
+	Recorder genericclioptions.Recorder
+	PrintObj func(obj kruntime.Object) error
 }
 
 var (
@@ -69,13 +74,18 @@ var (
 		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
-func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &CreateOptions{
-		PrintFlags: NewPrintFlags("created"),
+func NewCreateOptions(out, errOut io.Writer) *CreateOptions {
+	return &CreateOptions{
+		PrintFlags:  NewPrintFlags("created"),
+		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Out:    out,
 		ErrOut: errOut,
 	}
+}
+
+func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+	o := NewCreateOptions(out, errOut)
 
 	cmd := &cobra.Command{
 		Use: "create -f FILENAME",
@@ -84,32 +94,34 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    createLong,
 		Example: createExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdutil.IsFilenameSliceEmpty(options.FilenameOptions.Filenames) {
+			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
 				defaultRunFunc(cmd, args)
 				return
 			}
-			cmdutil.CheckErr(options.Complete(cmd))
-			cmdutil.CheckErr(options.ValidateArgs(cmd, args))
-			cmdutil.CheckErr(options.RunCreate(f, cmd))
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.ValidateArgs(cmd, args))
+			cmdutil.CheckErr(o.RunCreate(f, cmd))
 		},
 	}
 
+	// bind flag structs
+	o.RecordFlags.AddFlags(cmd)
+
 	usage := "to use to create the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().BoolVar(&options.EditBeforeCreate, "edit", options.EditBeforeCreate, "Edit the API resource before creating")
+	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 
-	options.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
@@ -160,7 +172,15 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func (o *CreateOptions) Complete(cmd *cobra.Command) error {
+func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.RecordFlags.Complete(f.Command(cmd, false))
+
+	var err error
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.DryRun {
@@ -186,7 +206,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	if o.EditBeforeCreate {
-		return RunEditOnCreate(f, o.Out, o.ErrOut, cmd, &o.FilenameOptions)
+		return RunEditOnCreate(f, o.RecordFlags, o.Out, o.ErrOut, cmd, &o.FilenameOptions)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
@@ -221,10 +241,8 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
-		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command(cmd, false)); err != nil {
-				return cmdutil.AddSourceToErr("creating", info.Source, err)
-			}
+		if err := o.Recorder.Record(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if !o.DryRun {
@@ -273,21 +291,18 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 	return nil
 }
 
-func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
-	editOptions := &editor.EditOptions{
-		EditMode:        editor.EditBeforeCreateMode,
-		FilenameOptions: *options,
-		ValidateOptions: cmdutil.ValidateOptions{
-			EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
-		},
-		Output:             cmdutil.GetFlagString(cmd, "output"),
-		WindowsLineEndings: cmdutil.GetFlagBool(cmd, "windows-line-endings"),
-		ApplyAnnotation:    cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag),
-		Record:             cmdutil.GetFlagBool(cmd, "record"),
-		ChangeCause:        f.Command(cmd, false),
-		Include3rdParty:    cmdutil.GetFlagBool(cmd, "include-extended-apis"),
+func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFlags, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
+	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, out, errOut)
+	editOptions.FilenameOptions = *options
+	editOptions.ValidateOptions = cmdutil.ValidateOptions{
+		EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
 	}
-	err := editOptions.Complete(f, out, errOut, []string{}, cmd)
+	editOptions.Output = cmdutil.GetFlagString(cmd, "output")
+	editOptions.ApplyAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
+	editOptions.RecordFlags = recordFlags
+	editOptions.Include3rdParty = cmdutil.GetFlagBool(cmd, "include-extended-apis")
+
+	err := editOptions.Complete(f, []string{}, cmd)
 	if err != nil {
 		return err
 	}

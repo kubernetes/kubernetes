@@ -206,6 +206,7 @@ filegroup(
         "//pkg/kubectl/categories:all-srcs",
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/explain:all-srcs",
+        "//pkg/kubectl/genericclioptions:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
         "//pkg/kubectl/plugins:all-srcs",
         "//pkg/kubectl/proxy:all-srcs",
