@@ -70,7 +70,8 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 		gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
 		switch {
 		case gvk.Group == "" && gvk.Kind == "Pod":
-			podObj, err := r.pods.Get(ctx, ref.Name, &metav1.GetOptions{})
+			newCtx := newContext(ctx, "pods", ref.Name, gvk)
+			podObj, err := r.pods.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -80,7 +81,8 @@ func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runti
 			}
 			uid = pod.UID
 		case gvk.Group == "" && gvk.Kind == "Secret":
-			secretObj, err := r.secrets.Get(ctx, ref.Name, &metav1.GetOptions{})
+			newCtx := newContext(ctx, "secrets", ref.Name, gvk)
+			secretObj, err := r.secrets.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -119,4 +121,23 @@ func (r *TokenREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 
 type getter interface {
 	Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+}
+
+// newContext return a copy of ctx in which new RequestInfo is set
+func newContext(ctx genericapirequest.Context, resource, name string, gvk schema.GroupVersionKind) genericapirequest.Context {
+	oldInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	if !found {
+		return ctx
+	}
+	newInfo := genericapirequest.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "get",
+		Namespace:         oldInfo.Namespace,
+		Resource:          resource,
+		Name:              name,
+		Parts:             []string{resource, name},
+		APIGroup:          gvk.Group,
+		APIVersion:        gvk.Version,
+	}
+	return genericapirequest.WithRequestInfo(ctx, &newInfo)
 }
