@@ -337,7 +337,18 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(
+		p := patcher{
+			codec:           codec,
+			namer:           namer,
+			creater:         creater,
+			defaulter:       defaulter,
+			unsafeConvertor: convertor,
+			kind:            kind,
+			resource:        resource,
+			trace:           utiltrace.New("Patch" + name),
+		}
+
+		resultObj, err := p.patchResource(
 			ctx,
 			admissionMutation,
 			rest.ValidateAllObjectFunc,
@@ -348,7 +359,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			name,
 			patchType,
 			patch,
-			namer, creater, defaulter, convertor, kind, resource, codec, utiltrace.New("Patch"+name))
+		)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
