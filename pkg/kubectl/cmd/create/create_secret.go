@@ -200,7 +200,6 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer) *cobr
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the secret to its name.")
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 

@@ -71,7 +71,6 @@ var (
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	o := editor.NewEditOptions(editor.NormalEditMode, out, errOut)
 	o.ValidateOptions = cmdutil.ValidateOptions{EnableValidation: true}
-	o.Include3rdParty = true
 
 	validArgs := cmdutil.ValidArgList(f)
 
@@ -105,7 +104,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		"Defaults to the line ending native to your platform.")
 
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &o.ApplyAnnotation)
-	cmdutil.AddInclude3rdPartyVarFlags(cmd, &o.Include3rdParty)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }

@@ -104,7 +104,6 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	usage := "identifying the resource to update"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)

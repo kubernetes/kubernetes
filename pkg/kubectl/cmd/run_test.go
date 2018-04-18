@@ -393,7 +393,6 @@ func TestGenerateService(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().Bool(cmdutil.ApplyAnnotationsFlag, false, "")
 			cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
-			cmdutil.AddInclude3rdPartyFlags(cmd)
 			addRunFlags(cmd)
 
 			if !test.expectPOST {

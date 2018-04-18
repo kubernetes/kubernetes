@@ -102,7 +102,6 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	return cmd
 }

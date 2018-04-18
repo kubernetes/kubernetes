@@ -95,7 +95,6 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "identifying the resource to autoscale."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 

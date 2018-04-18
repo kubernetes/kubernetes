@@ -122,7 +122,6 @@ func NewCmdLogs(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().StringP("container", "c", "", "Print the logs of this container")
 	cmd.Flags().Bool("interactive", false, "If true, prompt the user for input when required.")
 	cmd.Flags().MarkDeprecated("interactive", "This flag is no longer respected and there is no replacement.")
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on.")
 	return cmd
