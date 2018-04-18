@@ -332,6 +332,7 @@ package_group(
     name = "pkg_kubectl_validation_CONSUMERS",
     packages = [
         "//pkg/kubectl",
+        "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/resource",
