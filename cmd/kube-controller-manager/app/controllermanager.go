@@ -145,7 +145,7 @@ func Run(c *config.CompletedConfig) error {
 		var clientBuilder controller.ControllerClientBuilder
 		if c.Generic.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
 			if len(c.Generic.ComponentConfig.KubeCloudShared.ServiceAccountKeyFile) == 0 {
-				// It'c possible another controller process is creating the tokens for us.
+				// It's possible another controller process is creating the tokens for us.
 				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
 				glog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 			}

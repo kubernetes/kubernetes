@@ -110,6 +110,9 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	}
 
 	for _, gvk := range gvks {
+		// NOTE
+		// internalGVK := gvk
+		// internalGVK.Version = "__internal"
 		internalGV := gvk.GroupVersion()
 		internalGV.Version = "__internal" // this is hacky and maybe should be passed in
 		internalGVK := internalGV.WithKind(gvk.Kind)
