@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -196,6 +197,10 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 
 func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 	return kvh.kubelet.nodeName
+}
+
+func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
+	return kvh.kubelet.recorder
 }
 
 func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {

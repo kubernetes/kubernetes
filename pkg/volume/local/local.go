@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/keymutex"
@@ -60,10 +59,7 @@ const (
 func (plugin *localVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.volumeLocks = keymutex.NewKeyMutex()
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(glog.Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "localvolume"})
-	plugin.recorder = recorder
+	plugin.recorder = host.GetEventRecorder()
 	return nil
 }
 

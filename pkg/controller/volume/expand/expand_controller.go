@@ -298,3 +298,7 @@ func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 func (expc *expandController) GetNodeName() types.NodeName {
 	return ""
 }
+
+func (expc *expandController) GetEventRecorder() record.EventRecorder {
+	return expc.recorder
+}

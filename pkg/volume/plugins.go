@@ -30,6 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -313,6 +314,9 @@ type VolumeHost interface {
 
 	// Returns the name of the node
 	GetNodeName() types.NodeName
+
+	// Returns the event recorder of kubelet.
+	GetEventRecorder() record.EventRecorder
 }
 
 // VolumePluginMgr tracks registered plugins.

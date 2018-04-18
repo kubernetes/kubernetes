@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -187,6 +188,10 @@ func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 
 func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 	return types.NodeName(f.nodeName)
+}
+
+func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
+	return nil
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
