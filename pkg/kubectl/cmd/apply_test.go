@@ -178,7 +178,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	originalLabels := originalAccessor.GetLabels()
 	originalLabels["DELETE_ME"] = "DELETE_ME"
 	originalAccessor.SetLabels(originalLabels)
-	original, err := runtime.Encode(testapi.Default.Codec(), originalObj)
+	original, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	}
 	currentAnnotations[api.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
-	current, err := runtime.Encode(testapi.Default.Codec(), currentObj)
+	current, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -971,7 +971,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	initTestErrorHandler(t)
 
 	serversideObject := readUnstructuredFromFile(t, filenameWidgetServerside)
-	serversideData, err := runtime.Encode(testapi.Default.Codec(), serversideObject)
+	serversideData, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, serversideObject)
 	if err != nil {
 		t.Fatal(err)
 	}
