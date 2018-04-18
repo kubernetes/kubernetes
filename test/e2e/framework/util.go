@@ -382,6 +382,22 @@ func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	}
 }
 
+func SkipUnlessSecretExistsAfterWait(c clientset.Interface, name, namespace string, timeout time.Duration) {
+	Logf("Waiting for secret %v in namespace %v to exist in duration %v", name, namespace, timeout)
+	start := time.Now()
+	if wait.PollImmediate(15*time.Second, timeout, func() (bool, error) {
+		_, err := c.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			Logf("Secret %v in namespace %v still does not exist after duration %v", name, namespace, time.Since(start))
+			return false, nil
+		}
+		return true, nil
+	}) != nil {
+		Skipf("Secret %v in namespace %v did not exist after timeout of %v", name, namespace, timeout)
+	}
+	Logf("Secret %v in namespace %v found after duration %v", name, namespace, time.Since(start))
+}
+
 func SkipIfContainerRuntimeIs(runtimes ...string) {
 	for _, runtime := range runtimes {
 		if runtime == TestContext.ContainerRuntime {

@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-gce-pd
+  labels:
+    app: csi-gce-pd
+spec:
+  selector:
+    app: csi-gce-pd
+  ports:
+    - name: dummy
+      port: 12345

@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "csi_hostpath.go",
+        "csi_objects.go",
         "csi_volumes.go",
         "empty_dir_wrapper.go",
         "flexvolume.go",
@@ -39,6 +39,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/generated:go_default_library",
+        "//test/e2e/manifest:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/e2e/storage/vsphere:go_default_library",
         "//test/utils/image:go_default_library",
