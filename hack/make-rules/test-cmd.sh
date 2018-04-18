@@ -49,7 +49,7 @@ function run_kube_apiserver() {
     --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
     --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-    --runtime-config=api/v1 \
+    --runtime-config=api/v1,batch/v2alpha1 \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \

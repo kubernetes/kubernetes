@@ -22,16 +22,16 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	fake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateJobFromCronJob(t *testing.T) {
-	var submittedJob *batchv1.Job
 	testNamespaceName := "test"
 	testCronJobName := "test-cronjob"
 	testJobName := "test-job"
@@ -58,56 +58,123 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		},
 	}
 
-	cronJob := &batchv1beta1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testCronJobName,
-			Namespace: testNamespaceName,
-		},
-		Spec: batchv1beta1.CronJobSpec{
-			Schedule: "* * * * *",
-			JobTemplate: batchv1beta1.JobTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testNamespaceName,
-					Labels:    expectedLabels,
-				},
-				Spec: expectJob.Spec,
+	t.Run("create Job from CronJob v1beta1", func(t *testing.T) {
+		var submittedJob *batchv1.Job
+
+		clientset := fake.Clientset{}
+		clientset.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			ca := action.(clienttesting.CreateAction)
+			submittedJob = ca.GetObject().(*batchv1.Job)
+			return true, expectJob, nil
+		})
+		f := cmdtesting.NewTestFactory()
+		defer f.Cleanup()
+
+		printFlags := NewPrintFlags("created")
+
+		buf := bytes.NewBuffer([]byte{})
+		cmdOptions := &CreateJobOptions{
+			PrintFlags: printFlags,
+			Name:       testJobName,
+			Namespace:  testNamespaceName,
+			Client:     clientset.BatchV1(),
+			Out:        buf,
+			Cmd:        NewCmdCreateJob(f, buf),
+			PrintObj: func(obj runtime.Object) error {
+				p, err := printFlags.ToPrinter()
+				if err != nil {
+					return err
+				}
+
+				return p.PrintObj(obj, buf)
 			},
-		},
-	}
+		}
 
-	clientset := fake.Clientset{}
-	clientset.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
-		ca := action.(clienttesting.CreateAction)
-		submittedJob = ca.GetObject().(*batchv1.Job)
-		return true, expectJob, nil
+		cronJob := &batchv1beta1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testCronJobName,
+				Namespace: testNamespaceName,
+			},
+			Spec: batchv1beta1.CronJobSpec{
+				Schedule: "* * * * *",
+				JobTemplate: batchv1beta1.JobTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespaceName,
+						Labels:    expectedLabels,
+					},
+					Spec: expectJob.Spec,
+				},
+			},
+		}
+
+		err := cmdOptions.createJobFromCronJobv1beta1(cronJob)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		verifyJob(t, submittedJob, testJobName, testImageName)
 	})
-	f := cmdtesting.NewTestFactory()
-	defer f.Cleanup()
 
-	printFlags := NewPrintFlags("created")
+	t.Run("create Job from CronJob v2alpha1", func(t *testing.T) {
+		var submittedJob *batchv1.Job
 
-	buf := bytes.NewBuffer([]byte{})
-	cmdOptions := &CreateJobOptions{
-		PrintFlags: printFlags,
-		Name:       testJobName,
-		Namespace:  testNamespaceName,
-		Client:     clientset.BatchV1(),
-		Out:        buf,
-		Cmd:        NewCmdCreateJob(f, buf),
-		PrintObj: func(obj runtime.Object) error {
-			p, err := printFlags.ToPrinter()
-			if err != nil {
-				return err
-			}
+		clientset := fake.Clientset{}
+		clientset.PrependReactor("create", "jobs", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			ca := action.(clienttesting.CreateAction)
+			submittedJob = ca.GetObject().(*batchv1.Job)
+			return true, expectJob, nil
+		})
+		f := cmdtesting.NewTestFactory()
+		defer f.Cleanup()
 
-			return p.PrintObj(obj, buf)
-		},
-	}
+		printFlags := NewPrintFlags("created")
 
-	err := cmdOptions.createJob(cronJob)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+		buf := bytes.NewBuffer([]byte{})
+		cmdOptions := &CreateJobOptions{
+			PrintFlags: printFlags,
+			Name:       testJobName,
+			Namespace:  testNamespaceName,
+			Client:     clientset.BatchV1(),
+			Out:        buf,
+			Cmd:        NewCmdCreateJob(f, buf),
+			PrintObj: func(obj runtime.Object) error {
+				p, err := printFlags.ToPrinter()
+				if err != nil {
+					return err
+				}
+
+				return p.PrintObj(obj, buf)
+			},
+		}
+
+		cronJob := &batchv2alpha1.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      testCronJobName,
+				Namespace: testNamespaceName,
+			},
+			Spec: batchv2alpha1.CronJobSpec{
+				Schedule: "* * * * *",
+				JobTemplate: batchv2alpha1.JobTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespaceName,
+						Labels:    expectedLabels,
+					},
+					Spec: expectJob.Spec,
+				},
+			},
+		}
+
+		err := cmdOptions.createJobFromCronJobv2alpha1(cronJob)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		verifyJob(t, submittedJob, testJobName, testImageName)
+	})
+}
+
+func verifyJob(t *testing.T, submittedJob *batchv1.Job, testJobName, testImageName string) {
+	t.Helper()
 
 	if submittedJob.ObjectMeta.Name != testJobName {
 		t.Errorf("expected '%s', got '%s'", testJobName, submittedJob.ObjectMeta.Name)

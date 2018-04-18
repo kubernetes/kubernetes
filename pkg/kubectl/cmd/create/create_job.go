@@ -24,6 +24,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
@@ -138,18 +139,26 @@ func (c *CreateJobOptions) RunCreateJob() error {
 	if len(infos) != 1 {
 		return fmt.Errorf("from must be an existing cronjob")
 	}
-	cronJob, ok := infos[0].AsVersioned().(*batchv1beta1.CronJob)
-	if !ok {
-		return fmt.Errorf("from must be an existing cronjob")
-	}
 
-	return c.createJob(cronJob)
+	switch cronJob := infos[0].AsVersioned().(type) {
+	case *batchv1beta1.CronJob:
+		return c.createJobFromCronJobv1beta1(cronJob)
+	case *batchv2alpha1.CronJob:
+		return c.createJobFromCronJobv2alpha1(cronJob)
+	default:
+		return fmt.Errorf(
+			"from must be %q or %q, but got %q",
+			batchv1beta1.SchemeGroupVersion.WithKind("CronJob").String(),
+			batchv2alpha1.SchemeGroupVersion.WithKind("CronJob").String(),
+			cronJob.GetObjectKind().GroupVersionKind().String(),
+		)
+	}
 }
 
-func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
+func (c *CreateJobOptions) createJob(jobAnnotations, jobLabels map[string]string, jobSpec batchv1.JobSpec) error {
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
-	for k, v := range cronJob.Spec.JobTemplate.Annotations {
+	for k, v := range jobAnnotations {
 		annotations[k] = v
 	}
 	job := &batchv1.Job{
@@ -157,9 +166,9 @@ func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 			Name:        c.Name,
 			Namespace:   c.Namespace,
 			Annotations: annotations,
-			Labels:      cronJob.Spec.JobTemplate.Labels,
+			Labels:      jobLabels,
 		},
-		Spec: cronJob.Spec.JobTemplate.Spec,
+		Spec: jobSpec,
 	}
 
 	if !c.DryRun {
@@ -171,4 +180,20 @@ func (c *CreateJobOptions) createJob(cronJob *batchv1beta1.CronJob) error {
 	}
 
 	return c.PrintObj(job)
+}
+
+func (c *CreateJobOptions) createJobFromCronJobv1beta1(cronJob *batchv1beta1.CronJob) error {
+	return c.createJob(
+		cronJob.Spec.JobTemplate.Annotations,
+		cronJob.Spec.JobTemplate.Labels,
+		cronJob.Spec.JobTemplate.Spec,
+	)
+}
+
+func (c *CreateJobOptions) createJobFromCronJobv2alpha1(cronJob *batchv2alpha1.CronJob) error {
+	return c.createJob(
+		cronJob.Spec.JobTemplate.Annotations,
+		cronJob.Spec.JobTemplate.Labels,
+		cronJob.Spec.JobTemplate.Spec,
+	)
 }
