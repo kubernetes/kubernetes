@@ -708,7 +708,7 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 }
 
 func addOpenAPIPrintColumnFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, true, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
+	cmd.Flags().Bool(useOpenAPIPrintColumnFlagLabel, false, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
 }
 
 func addServerPrintColumnFlags(cmd *cobra.Command) {
