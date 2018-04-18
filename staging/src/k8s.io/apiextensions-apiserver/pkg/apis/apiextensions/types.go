@@ -25,6 +25,9 @@ type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
 	Group string
 	// Version is the version this resource belongs in
+	// Should be always first item in Versions field if provided.
+	// Optional, but at least one of Version or Versions must be set.
+	// Deprecated: Please use `Versions`.
 	Version string
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames
@@ -34,6 +37,27 @@ type CustomResourceDefinitionSpec struct {
 	Validation *CustomResourceValidation
 	// Subresources describes the subresources for CustomResources
 	Subresources *CustomResourceSubresources
+	// Versions is the list of all supported versions for this resource.
+	// If Version field is provided, this field is optional.
+	// Validation: All versions must use the same validation schema for now. i.e., top
+	// level Validation field is applied to all of these versions.
+	// Order: The version name will be used to compute the order.
+	// If the version string is "kube-like", it will sort above non "kube-like" version strings, which are ordered
+	// lexicographically. "Kube-like" versions start with a "v", then are followed by a number (the major version),
+	// then optionally the string "alpha" or "beta" and another number (the minor version). These are sorted first
+	// by GA > beta > alpha, and then by comparing major version, then minor version. An example sorted list of
+	// versions: v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
+	Versions []CustomResourceDefinitionVersion
+}
+
+type CustomResourceDefinitionVersion struct {
+	// Name is the version name, e.g. “v1”, “v2beta1”, etc.
+	Name string
+	// Served is a flag enabling/disabling this version from being served via REST APIs
+	Served bool
+	// Storage flags the version as storage version. There must be exactly one flagged
+	// as storage version.
+	Storage bool
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
@@ -115,6 +139,14 @@ type CustomResourceDefinitionStatus struct {
 	// AcceptedNames are the names that are actually being used to serve discovery
 	// They may be different than the names in spec.
 	AcceptedNames CustomResourceDefinitionNames
+
+	// StoredVersions are all versions of CustomResources that were ever persisted. Tracking these
+	// versions allows a migration path for stored versions in etcd. The field is mutable
+	// so the migration controller can first finish a migration to another version (i.e.
+	// that no old objects are left in the storage), and then remove the rest of the
+	// versions from this list.
+	// None of the versions in this list can be removed from the spec.Versions field.
+	StoredVersions []string
 }
 
 // CustomResourceCleanupFinalizer is the name of the finalizer which will delete instances of
