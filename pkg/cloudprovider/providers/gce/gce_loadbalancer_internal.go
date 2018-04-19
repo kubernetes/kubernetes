@@ -563,6 +563,9 @@ func (gce *GCECloud) ensureInternalBackendServiceGroups(name string, igLinks []s
 		return nil
 	}
 
+	// Set the backend service's backends to the updated list.
+	bs.Backends = backends
+
 	glog.V(2).Infof("ensureInternalBackendServiceGroups: updating backend service %v", name)
 	if err := gce.UpdateRegionBackendService(bs, gce.region); err != nil {
 		return err
