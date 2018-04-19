@@ -51,7 +51,7 @@ type ImageOptions struct {
 	ChangeCause  string
 	Local        bool
 	Cmd          *cobra.Command
-	ResolveImage func(in string) (string, error)
+	ResolveImage resolveImageFn
 
 	PrintObj printers.ResourcePrinterFunc
 
@@ -60,17 +60,19 @@ type ImageOptions struct {
 	ContainerImages        map[string]string
 }
 
+type resolveImageFn func(string) (string, error)
+
 var (
-	image_resources = `
+	imageResources = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
 
-	image_long = templates.LongDesc(`
+	imageLong = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		` + image_resources)
+		` + imageResources)
 
-	image_example = templates.Examples(`
+	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -96,8 +98,8 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		Use: "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update image of a pod template"),
-		Long:    image_long,
-		Example: image_example,
+		Long:    imageLong,
+		Example: imageExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Validate())
@@ -124,7 +126,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.ChangeCause = f.Command(cmd, false)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = f.ResolveImage
+	o.ResolveImage = func(name string) (string, error) { return name, nil }
 	o.Cmd = cmd
 
 	if o.DryRun {
@@ -179,7 +181,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 }
 
 func (o *ImageOptions) Validate() error {
-	errors := []error{}
+	var errors []error
 	if o.All && len(o.Selector) > 0 {
 		errors = append(errors, fmt.Errorf("cannot set --all and --selector at the same time"))
 	}
@@ -195,7 +197,7 @@ func (o *ImageOptions) Validate() error {
 }
 
 func (o *ImageOptions) Run() error {
-	allErrs := []error{}
+	var allErrs []error
 
 	patches := CalculatePatches(o.Infos, cmdutil.InternalVersionJSONEncoder(), func(info *resource.Info) ([]byte, error) {
 		transformed := false

@@ -432,10 +432,6 @@ func (f *ring0Factory) Pauser(info *resource.Info) ([]byte, error) {
 	}
 }
 
-func (f *ring0Factory) ResolveImage(name string) (string, error) {
-	return name, nil
-}
-
 func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
 	switch obj := info.Object.(type) {
 	case *extensions.Deployment:

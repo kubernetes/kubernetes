@@ -140,11 +140,6 @@ type ClientAccessFactory interface {
 	// in case the object is already resumed.
 	Resumer(info *resource.Info) ([]byte, error)
 
-	// ResolveImage resolves the image names. For kubernetes this function is just
-	// passthrough but it allows to perform more sophisticated image name resolving for
-	// third-party vendors.
-	ResolveImage(imageName string) (string, error)
-
 	// Returns the default namespace to use in cases where no
 	// other namespace is specified and whether the namespace was
 	// overridden.
@@ -248,7 +243,7 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	if err != nil {
 		return nil, 0, err
 	}
-	pods := []*v1.Pod{}
+	var pods []*v1.Pod
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		externalPod := &v1.Pod{}
@@ -299,7 +294,7 @@ func makePortsString(ports []api.ServicePort, useNodePort bool) string {
 }
 
 func getPorts(spec api.PodSpec) []string {
-	result := []string{}
+	var result []string
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
 			result = append(result, strconv.Itoa(int(port.ContainerPort)))
@@ -320,7 +315,7 @@ func getProtocols(spec api.PodSpec) map[string]string {
 
 // Extracts the ports exposed by a service from the given service spec.
 func getServicePorts(spec api.ServiceSpec) []string {
-	result := []string{}
+	var result []string
 	for _, servicePort := range spec.Ports {
 		result = append(result, strconv.Itoa(int(servicePort.Port)))
 	}
