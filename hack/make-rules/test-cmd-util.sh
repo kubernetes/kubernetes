@@ -2843,7 +2843,7 @@ run_rc_tests() {
   # Pre-condition: default run without --name flag; should succeed by truncating the inherited name
   output_message=$(kubectl expose -f hack/testdata/pod-with-large-name.yaml --port=8081 2>&1 "${kube_flags[@]}")
   # Post-condition: inherited name from pod has been truncated
-  kube::test::if_has_string "${output_message}" '\"kubernetes-serve-hostname-testing-sixty-three-characters-in-len\" exposed'
+  kube::test::if_has_string "${output_message}" 'kubernetes-serve-hostname-testing-sixty-three-characters-in-len exposed'
   # Clean-up
   kubectl delete svc kubernetes-serve-hostname-testing-sixty-three-characters-in-len "${kube_flags[@]}"
 
@@ -2851,7 +2851,7 @@ run_rc_tests() {
   # Pre-condition: don't use --port flag
   output_message=$(kubectl expose -f test/fixtures/doc-yaml/admin/high-availability/etcd.yaml --selector=test=etcd 2>&1 "${kube_flags[@]}")
   # Post-condition: expose succeeded
-  kube::test::if_has_string "${output_message}" '\"etcd-server\" exposed'
+  kube::test::if_has_string "${output_message}" 'etcd-server\" exposed'
   # Post-condition: generated service has both ports from the exposed pod
   kube::test::get_object_assert 'service etcd-server' "{{$port_name}} {{$port_field}}" 'port-1 2380'
   kube::test::get_object_assert 'service etcd-server' "{{$second_port_name}} {{$second_port_field}}" 'port-2 2379'
@@ -4647,7 +4647,7 @@ __EOF__
   kube::test::if_has_string "${response}" 'must provide one or more resources'
   # test=label matches our node
   response=$(kubectl cordon --selector test=label)
-  kube::test::if_has_string "${response}" 'node "127.0.0.1" cordoned'
+  kube::test::if_has_string "${response}" 'node/127.0.0.1 cordoned'
   # invalid=label does not match any nodes
   response=$(kubectl cordon --selector invalid=label)
   kube::test::if_has_not_string "${response}" 'cordoned'

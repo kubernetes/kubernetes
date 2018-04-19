@@ -57,6 +57,9 @@ type EditOptions struct {
 	resource.FilenameOptions
 	RecordFlags *genericclioptions.RecordFlags
 
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+
 	Output             string
 	OutputPatch        bool
 	WindowsLineEndings bool
@@ -86,12 +89,14 @@ func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *E
 
 		EditMode: editMode,
 
-		Output:             "yaml",
+		PrintFlags: printers.NewPrintFlags("edited"),
+
 		WindowsLineEndings: goruntime.GOOS == "windows",
 
 		Recorder: genericclioptions.NoopRecorder{},
 
 		IOStreams: ioStreams,
+		Output:    "yaml",
 	}
 }
 
@@ -157,6 +162,15 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 			ContinueOnError().
 			Flatten().
 			Do()
+	}
+
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
 	}
 
 	o.CmdNamespace = cmdNamespace
@@ -423,14 +437,23 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 		}
 
 		if reflect.DeepEqual(originalJS, editedJS) {
-			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "skipped")
+			printer, err := o.ToPrinter("skipped")
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(info.AsVersioned(), o.Out)
 			return nil
 		} else {
 			err := o.annotationPatch(info)
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "edited")
+
+			printer, err := o.ToPrinter("edited")
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(info.AsVersioned(), o.Out)
 			return nil
 		}
 	})
@@ -549,7 +572,11 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		if reflect.DeepEqual(originalJS, editedJS) {
 			// no edit, so just skip it.
-			cmdutil.PrintSuccess(false, o.Out, info.Object, false, "skipped")
+			printer, err := o.ToPrinter("skipped")
+			if err != nil {
+				return err
+			}
+			printer.PrintObj(info.AsVersioned(), o.Out)
 			return nil
 		}
 
@@ -603,7 +630,11 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return nil
 		}
 		info.Refresh(patched, true)
-		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "edited")
+		printer, err := o.ToPrinter("edited")
+		if err != nil {
+			return err
+		}
+		printer.PrintObj(info.AsVersioned(), o.Out)
 		return nil
 	})
 	return err
@@ -614,7 +645,11 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err := resource.CreateAndRefresh(info); err != nil {
 			return err
 		}
-		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "created")
+		printer, err := o.ToPrinter("created")
+		if err != nil {
+			return err
+		}
+		printer.PrintObj(info.AsVersioned(), o.Out)
 		return nil
 	})
 	return err

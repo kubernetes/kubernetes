@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge": types.MergePatchType, "strategic": types.StrategicMergePatchType}
@@ -49,6 +50,8 @@ var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge"
 type PatchOptions struct {
 	resource.FilenameOptions
 	RecordFlags *genericclioptions.RecordFlags
+	PrintFlags  *printers.PrintFlags
+	ToPrinter   func(string) (printers.ResourcePrinterFunc, error)
 
 	Local  bool
 	DryRun bool
@@ -86,8 +89,8 @@ var (
 func NewPatchOptions() *PatchOptions {
 	return &PatchOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-
-		Recorder: genericclioptions.NoopRecorder{},
+		Recorder:    genericclioptions.NoopRecorder{},
+		PrintFlags:  printers.NewPrintFlags("patched"),
 	}
 }
 
@@ -110,11 +113,11 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().String("type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 
 	usage := "identifying the resource to update"
@@ -136,6 +139,19 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.DryRun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
+	}
 
 	return err
 }
@@ -222,10 +238,11 @@ func (o *PatchOptions) RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 				return err
 			}
 
-			if len(o.OutputFormat) > 0 && o.OutputFormat != "name" {
-				return cmdutil.PrintObject(cmd, info.Object, out)
+			printer, err := o.ToPrinter(patchOperation(didPatch))
+			if err != nil {
+				return err
 			}
-			cmdutil.PrintSuccess(o.OutputFormat == "name", out, info.Object, false, patchOperation(didPatch))
+			printer.PrintObj(info.AsVersioned(), out)
 
 			// if object was not successfully patched, exit with error code 1
 			if !didPatch {
@@ -264,12 +281,11 @@ func (o *PatchOptions) RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 			}
 		}
 
-		if len(o.OutputFormat) > 0 && o.OutputFormat != "name" {
-			return cmdutil.PrintObject(cmd, info.Object, out)
+		printer, err := o.ToPrinter(patchOperation(didPatch))
+		if err != nil {
+			return err
 		}
-
-		cmdutil.PrintSuccess(o.OutputFormat == "name", out, info.Object, o.DryRun, patchOperation(didPatch))
-		return nil
+		return printer.PrintObj(info.AsVersioned(), out)
 	})
 	if err != nil {
 		return err

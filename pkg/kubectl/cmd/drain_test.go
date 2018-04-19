@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -51,6 +52,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 const (
@@ -84,7 +86,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *corev1.Node
 		expected    *corev1.Node
-		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, genericclioptions.IOStreams) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{
@@ -197,7 +199,7 @@ func TestCordon(t *testing.T) {
 			tf.ClientConfigVal = defaultClientConfig()
 
 			buf := bytes.NewBuffer([]byte{})
-			cmd := test.cmd(tf, buf)
+			cmd := test.cmd(tf, genericclioptions.IOStreams{Out: buf, ErrOut: buf})
 
 			saw_fatal := false
 			func() {
@@ -708,7 +710,7 @@ func TestDrain(t *testing.T) {
 
 				buf := bytes.NewBuffer([]byte{})
 				errBuf := bytes.NewBuffer([]byte{})
-				cmd := NewCmdDrain(tf, buf, errBuf)
+				cmd := NewCmdDrain(tf, genericclioptions.IOStreams{Out: buf, ErrOut: errBuf})
 
 				saw_fatal := false
 				fatal_msg := ""
@@ -833,9 +835,18 @@ func TestDeletePods(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			o := DrainOptions{Factory: tf}
+			o := DrainOptions{
+				PrintFlags: printers.NewPrintFlags("drained"),
+			}
 			o.mapper, _ = tf.Object()
 			o.Out = os.Stdout
+
+			o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+				return func(obj runtime.Object, out io.Writer) error {
+					return nil
+				}, nil
+			}
+
 			_, pods := createPods(false)
 			pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn)
 

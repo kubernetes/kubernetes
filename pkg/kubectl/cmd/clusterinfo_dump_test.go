@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestSetupOutputWriterNoOp(t *testing.T) {
@@ -33,7 +34,7 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
-		cmd := NewCmdClusterInfoDump(f, os.Stdout)
+		cmd := NewCmdClusterInfoDump(f, genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr})
 		cmd.Flag("output-directory").Value.Set(test)
 		writer := setupOutputWriter(cmd, out, "/some/file/that/should/be/ignored")
 		if writer != out {
@@ -55,7 +56,7 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	cmd := NewCmdClusterInfoDump(f, os.Stdout)
+	cmd := NewCmdClusterInfoDump(f, genericclioptions.IOStreams{Out: os.Stdout, ErrOut: os.Stderr})
 	cmd.Flag("output-directory").Value.Set(dir)
 	writer := setupOutputWriter(cmd, out, file)
 	if writer == out {
