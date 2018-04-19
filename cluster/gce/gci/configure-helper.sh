@@ -1870,6 +1870,9 @@ function start-kube-controller-manager {
     params+=" --pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE"
     params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
   fi
+  if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
+    params+=" --controllers=${RUN_CONTROLLERS}"
+  fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
