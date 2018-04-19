@@ -138,6 +138,24 @@ func roundTripTypes(t *testing.T, scheme *runtime.Scheme, codecFactory runtimese
 	}
 }
 
+// RoundTripExternalTypes applies the round-trip test to all external round-trippable Kinds
+// in the scheme.  It will skip all the GroupVersionKinds in the nonRoundTripExternalTypes list .
+func RoundTripExternalTypes(t *testing.T, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool) {
+	kinds := scheme.AllKnownTypes()
+	for gvk := range kinds {
+		if gvk.Version == runtime.APIVersionInternal || globalNonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+
+		// FIXME: this is explicitly testing w/o protobuf which was failing if enabled
+		// the reason for that is that protobuf is not setting Kind and APIVersion fields
+		// during obj2 decode, the same then applies to DecodeInto obj3. My guess is we
+		// should be setting these two fields accordingly when protobuf is passed as codec
+		// to roundTrip method.
+		roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, true)
+	}
+}
+
 func RoundTripSpecificKindWithoutProtobuf(t *testing.T, gvk schema.GroupVersionKind, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool) {
 	roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, true)
 }
