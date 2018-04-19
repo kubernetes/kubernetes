@@ -19,6 +19,7 @@ package eviction
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -207,7 +208,7 @@ func startMemoryThresholdNotifier(thresholds []evictionapi.Threshold, observatio
 		usageThreshold := resource.NewQuantity(observed.capacity.Value(), resource.DecimalSI)
 		usageThreshold.Sub(*quantity)
 		description := fmt.Sprintf("<%s available", formatThresholdValue(threshold.Value))
-		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, usageThreshold.String(), description, handler)
+		memcgThresholdNotifier, err := NewMemCGThresholdNotifier(cgpath, attribute, strconv.FormatInt(usageThreshold.Value(), 10), description, handler)
 		if err != nil {
 			return err
 		}
