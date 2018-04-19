@@ -23,7 +23,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
@@ -103,8 +102,13 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration,
 	finalCfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
+	decoded, err := kubeadmapiext.LoadYAML(b)
+	if err != nil {
 		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
+	}
+
+	if err := kubeadmapiext.Migrate(decoded, cfg); err != nil {
+		return nil, fmt.Errorf("unable to migrate config from previous version: %v", err)
 	}
 	// Default and convert to the internal version
 	legacyscheme.Scheme.Default(cfg)

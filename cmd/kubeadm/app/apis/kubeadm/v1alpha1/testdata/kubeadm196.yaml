@@ -1,0 +1,62 @@
+api:
+  advertiseAddress: 172.31.93.180
+  bindPort: 6443
+authorizationModes:
+- Node
+- RBAC
+certificatesDir: /etc/kubernetes/pki
+cloudProvider: aws
+etcd:
+  caFile: ""
+  certFile: ""
+  dataDir: /var/lib/etcd
+  endpoints: null
+  image: ""
+  keyFile: ""
+imageRepository: gcr.io/google_containers
+kubeProxy:
+  config:
+    bindAddress: 0.0.0.0
+    clientConnection:
+      acceptContentTypes: ""
+      burst: 10
+      contentType: application/vnd.kubernetes.protobuf
+      kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
+      qps: 5
+    clusterCIDR: 192.168.0.0/16
+    configSyncPeriod: 15m0s
+    conntrack:
+      max: null
+      maxPerCore: 32768
+      min: 131072
+      tcpCloseWaitTimeout: 1h0m0s
+      tcpEstablishedTimeout: 24h0m0s
+    enableProfiling: false
+    featureGates: ""
+    healthzBindAddress: 0.0.0.0:10256
+    hostnameOverride: ""
+    iptables:
+      masqueradeAll: false
+      masqueradeBit: 14
+      minSyncPeriod: 0s
+      syncPeriod: 30s
+    ipvs:
+      minSyncPeriod: 0s
+      scheduler: ""
+      syncPeriod: 30s
+    metricsBindAddress: 127.0.0.1:10249
+    mode: ""
+    oomScoreAdj: -999
+    portRange: ""
+    resourceContainer: /kube-proxy
+    udpTimeoutMilliseconds: 250ms
+kubeletConfiguration: {}
+kubernetesVersion: v1.9.6
+networking:
+  dnsDomain: cluster.local
+  podSubnet: 192.168.0.0/16
+  serviceSubnet: 10.96.0.0/12
+nodeName: ip-172-31-93-180.ec2.internal
+token: 8d69af.cd3e1c58f6228dfc
+tokenTTL: 24h0m0s
+unifiedControlPlaneImage: ""
