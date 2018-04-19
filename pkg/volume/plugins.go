@@ -249,6 +249,10 @@ type VolumeHost interface {
 	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/
 	GetVolumeDevicePluginDir(pluginName string) string
 
+	// GetPodsDir returns the absolute path to a directory where all the pods
+	// information is stored
+	GetPodsDir() string
+
 	// GetPodVolumeDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
 	// pod.  If the specified pod does not exist, the result of this call

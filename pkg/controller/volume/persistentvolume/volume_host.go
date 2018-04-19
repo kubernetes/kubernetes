@@ -42,6 +42,10 @@ func (ctrl *PersistentVolumeController) GetVolumeDevicePluginDir(pluginName stri
 	return ""
 }
 
+func (ctrl *PersistentVolumeController) GetPodsDir() string {
+	return ""
+}
+
 func (ctrl *PersistentVolumeController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return ""
 }

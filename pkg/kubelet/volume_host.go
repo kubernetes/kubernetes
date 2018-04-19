@@ -93,6 +93,10 @@ func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string
 	return kvh.kubelet.getVolumeDevicePluginDir(pluginName)
 }
 
+func (kvh *kubeletVolumeHost) GetPodsDir() string {
+	return kvh.kubelet.getPodsDir()
+}
+
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	dir := kvh.kubelet.getPodVolumeDir(podUID, pluginName, volumeName)
 	if runtime.GOOS == "windows" {
