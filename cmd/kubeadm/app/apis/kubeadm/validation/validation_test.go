@@ -316,7 +316,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateAPIEndpoint(rt.s, nil)
+		actual := ValidateAPIEndpoint(&rt.s.API, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"%s test case failed:\n\texpected: %t\n\t  actual: %t",
@@ -705,7 +705,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		if errs := ValidateProxy(&successCase, nil); len(errs) != 0 {
+		if errs := ValidateProxy(successCase.KubeProxy.Config, nil); len(errs) != 0 {
 			t.Errorf("failed ValidateProxy: expect no errors but got %v", errs)
 		}
 	}
@@ -909,7 +909,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 
 	for i, errorCase := range errorCases {
-		if errs := ValidateProxy(&errorCase.masterConfig, nil); len(errs) == 0 {
+		if errs := ValidateProxy(errorCase.masterConfig.KubeProxy.Config, nil); len(errs) == 0 {
 			t.Errorf("%d failed ValidateProxy: expected error for %s, but got no error", i, errorCase.msg)
 		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
 			t.Errorf("%d failed ValidateProxy: unexpected error: %v, expected: %s", i, errs[0], errorCase.msg)
@@ -1040,7 +1040,7 @@ func TestValidateJoinDiscoveryTokenAPIServer(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateJoinDiscoveryTokenAPIServer(rt.s, nil)
+		actual := ValidateJoinDiscoveryTokenAPIServer(rt.s.DiscoveryTokenAPIServers, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"failed ValidateJoinDiscoveryTokenAPIServer:\n\texpected: %t\n\t  actual: %t",

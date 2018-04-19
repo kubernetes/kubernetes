@@ -198,7 +198,7 @@ func TestGetMasterEndpoint(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual, err := GetMasterEndpoint(rt.cfg)
+		actual, err := GetMasterEndpoint(&rt.cfg.API)
 		if err != nil && rt.expected {
 			t.Error(err)
 		}
@@ -308,7 +308,7 @@ func TestGetMasterHostPort(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual, err := GetMasterHostPort(rt.cfg)
+		actual, err := GetMasterHostPort(&rt.cfg.API)
 		if err != nil && rt.expected {
 			t.Error(err)
 		}

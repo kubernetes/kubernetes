@@ -146,7 +146,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts MasterConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
 			if err != nil {
 				t.Error(err)
 			}
