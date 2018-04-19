@@ -79,6 +79,10 @@ func ObjectGoPrintDiff(a, b interface{}) string {
 }
 
 func ObjectReflectDiff(a, b interface{}) string {
+	return ObjectReflectDiffN(a, b, 80)
+}
+
+func ObjectReflectDiffN(a, b interface{}, n int) string {
 	vA, vB := reflect.ValueOf(a), reflect.ValueOf(b)
 	if vA.Type() != vB.Type() {
 		return fmt.Sprintf("type A %T and type B %T do not match", a, b)
@@ -91,8 +95,8 @@ func ObjectReflectDiff(a, b interface{}) string {
 	for _, d := range diffs {
 		out = append(out,
 			fmt.Sprintf("%s:", d.path),
-			limit(fmt.Sprintf("  a: %#v", d.a), 80),
-			limit(fmt.Sprintf("  b: %#v", d.b), 80),
+			limit(fmt.Sprintf("  a: %#v", d.a), n),
+			limit(fmt.Sprintf("  b: %#v", d.b), n),
 		)
 	}
 	return strings.Join(out, "\n")
