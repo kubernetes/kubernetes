@@ -17,11 +17,14 @@ limitations under the License.
 package utils
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -34,7 +37,7 @@ type PodStore struct {
 	Reflector *cache.Reflector
 }
 
-func NewPodStore(c clientset.Interface, namespace string, label labels.Selector, field fields.Selector) *PodStore {
+func NewPodStore(c clientset.Interface, namespace string, label labels.Selector, field fields.Selector) (*PodStore, error) {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.LabelSelector = label.String()
@@ -52,7 +55,15 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 	stopCh := make(chan struct{})
 	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0)
 	go reflector.Run(stopCh)
-	return &PodStore{Store: store, stopCh: stopCh, Reflector: reflector}
+	if err := wait.PollImmediate(50*time.Millisecond, 2*time.Minute, func() (bool, error) {
+		if len(reflector.LastSyncResourceVersion()) != 0 {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		return nil, err
+	}
+	return &PodStore{Store: store, stopCh: stopCh, Reflector: reflector}, nil
 }
 
 func (s *PodStore) List() []*v1.Pod {
