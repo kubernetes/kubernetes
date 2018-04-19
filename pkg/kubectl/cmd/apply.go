@@ -49,21 +49,23 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 type ApplyOptions struct {
-	RecordFlags     *genericclioptions.RecordFlags
-	FilenameOptions resource.FilenameOptions
+	RecordFlags *genericclioptions.RecordFlags
+	Recorder    genericclioptions.Recorder
 
-	Recorder genericclioptions.Recorder
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
+
+	DeleteFlags   *DeleteFlags
+	DeleteOptions *DeleteOptions
 
 	Selector       string
-	Force          bool
+	DryRun         bool
 	Prune          bool
-	Cascade        bool
-	GracePeriod    int
 	PruneResources []pruneResource
-	Timeout        time.Duration
 	cmdBaseName    string
 	All            bool
 	Overwrite      bool
@@ -113,10 +115,10 @@ var (
 func NewApplyOptions(out, errout io.Writer) *ApplyOptions {
 	return &ApplyOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
+		DeleteFlags: NewDeleteFlags("that contains the configuration to apply"),
+		PrintFlags:  printers.NewPrintFlags("created"),
 
 		Overwrite:    true,
-		Cascade:      true,
-		GracePeriod:  -1,
 		OpenApiPatch: true,
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -140,32 +142,27 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 		Long:    applyLong,
 		Example: applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(validatePruneAll(o.Prune, o.All, o.Selector))
-			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run(f, cmd))
 		},
 	}
 
 	// bind flag structs
+	o.DeleteFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
-	usage := "that contains the configuration to apply"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
-	cmd.Flags().BoolVar(&o.Cascade, "cascade", o.Cascade, "Only relevant during a prune or a force apply. If true, cascade the deletion of the resources managed by pruned or deleted resources (e.g. Pods created by a ReplicationController).")
-	cmd.Flags().IntVar(&o.GracePeriod, "grace-period", o.GracePeriod, "Only relevant during a prune or a force apply. Period of time in seconds given to pruned or deleted resources to terminate gracefully. Ignored if negative.")
-	cmd.Flags().BoolVar(&o.Force, "force", o.Force, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenApiPatch, "openapi-patch", o.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	// apply subcommands
@@ -174,6 +171,34 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.AddCommand(NewCmdApplyEditLastApplied(f, out, errOut))
 
 	return cmd
+}
+
+func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	// allow for a success message operation to be specified at print time
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.DryRun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
+	}
+
+	var err error
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	o.DeleteOptions = o.DeleteFlags.ToOptions(o.Out, o.ErrOut)
+	return nil
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
@@ -224,18 +249,6 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	return pruneResources, nil
 }
 
-func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	var err error
-
-	o.RecordFlags.Complete(f.Command(cmd, false))
-	o.Recorder, err = o.RecordFlags.ToRecorder()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // TODO(juanvallejo): break dependency on factory and cmd
 func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
@@ -264,7 +277,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		FilenameParam(enforceNamespace, &o.DeleteOptions.FilenameOptions).
 		LabelSelectorParam(o.Selector).
 		IncludeUninitialized(includeUninitialized).
 		Flatten().
@@ -280,7 +293,6 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 	}
 
-	dryRun := cmdutil.GetDryRunFlag(cmd)
 	output := cmdutil.GetFlagString(cmd, "output")
 	shortOutput := output == "name"
 
@@ -326,7 +338,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
-			if !dryRun {
+			if !o.DryRun {
 				// Then create the resource and skip the three-way merge
 				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
 				if err != nil {
@@ -341,14 +353,15 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 
 			count++
-			if printObject {
-				return cmdutil.PrintObject(cmd, info.Object, o.Out)
+
+			printer, err := o.ToPrinter("created")
+			if err != nil {
+				return err
 			}
-			cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "created")
-			return nil
+			return printer.PrintObj(info.AsVersioned(), o.Out)
 		}
 
-		if !dryRun {
+		if !o.DryRun {
 			annotationMap, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
 			if err != nil {
 				return err
@@ -370,10 +383,10 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 				clientsetFunc: f.ClientSet,
 				overwrite:     o.Overwrite,
 				backOff:       clockwork.NewRealClock(),
-				force:         o.Force,
-				cascade:       o.Cascade,
-				timeout:       o.Timeout,
-				gracePeriod:   o.GracePeriod,
+				force:         o.DeleteOptions.ForceDeletion,
+				cascade:       o.DeleteOptions.Cascade,
+				timeout:       o.DeleteOptions.Timeout,
+				gracePeriod:   o.DeleteOptions.GracePeriod,
 				openapiSchema: openapiSchema,
 				scaleClient:   scaler,
 			}
@@ -393,16 +406,21 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 
 			if string(patchBytes) == "{}" && !printObject {
 				count++
-				cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, false, "unchanged")
-				return nil
+
+				printer, err := o.ToPrinter("unchanged")
+				if err != nil {
+					return err
+				}
+				return printer.PrintObj(info.AsVersioned(), o.Out)
 			}
 		}
 		count++
-		if printObject {
-			return cmdutil.PrintObject(cmd, info.Object, o.Out)
+
+		printer, err := o.ToPrinter("configured")
+		if err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(shortOutput, o.Out, info.Object, dryRun, "configured")
-		return nil
+		return printer.PrintObj(info.AsVersioned(), o.Out)
 	})
 
 	if err != nil {
@@ -424,9 +442,11 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		labelSelector: o.Selector,
 		visitedUids:   visitedUids,
 
-		cascade:     o.Cascade,
-		dryRun:      dryRun,
-		gracePeriod: o.GracePeriod,
+		cascade:     o.DeleteOptions.Cascade,
+		dryRun:      o.DryRun,
+		gracePeriod: o.DeleteOptions.GracePeriod,
+
+		toPrinter: o.ToPrinter,
 
 		out: o.Out,
 	}
@@ -438,13 +458,13 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	for n := range visitedNamespaces {
 		for _, m := range namespacedRESTMappings {
-			if err := p.prune(f, n, m, shortOutput, includeUninitialized); err != nil {
+			if err := p.prune(f, n, m, includeUninitialized); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
 	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(f, metav1.NamespaceNone, m, shortOutput, includeUninitialized); err != nil {
+		if err := p.prune(f, metav1.NamespaceNone, m, includeUninitialized); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
@@ -515,10 +535,12 @@ type pruner struct {
 	dryRun      bool
 	gracePeriod int
 
+	toPrinter func(string) (printers.ResourcePrinterFunc, error)
+
 	out io.Writer
 }
 
-func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, shortOutput, includeUninitialized bool) error {
+func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMapping, includeUninitialized bool) error {
 	c, err := p.clientFunc(mapping)
 	if err != nil {
 		return err
@@ -572,7 +594,12 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 				return err
 			}
 		}
-		cmdutil.PrintSuccess(shortOutput, p.out, obj, p.dryRun, "pruned")
+
+		printer, err := p.toPrinter("pruned")
+		if err != nil {
+			return err
+		}
+		printer.PrintObj(obj, p.out)
 	}
 	return nil
 }
