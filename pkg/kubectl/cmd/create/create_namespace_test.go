@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -51,8 +51,8 @@ func TestCreateNamespace(t *testing.T) {
 			}
 		}),
 	}
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateNamespace(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateNamespace(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{namespaceObject.Name})
 	expectedOutput := "namespace/" + namespaceObject.Name + "\n"

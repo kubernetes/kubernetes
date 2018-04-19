@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -52,8 +52,8 @@ func TestCreateService(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceClusterIP(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceClusterIP(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "8080:8000")
 	cmd.Run(cmd, []string{service.Name})
@@ -86,8 +86,8 @@ func TestCreateServiceNodePort(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceNodePort(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceNodePort(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("tcp", "30000:8000")
 	cmd.Run(cmd, []string{service.Name})
@@ -120,8 +120,8 @@ func TestCreateServiceExternalName(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceExternalName(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceExternalName(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("external-name", "name")
 	cmd.Run(cmd, []string{service.Name})

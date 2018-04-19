@@ -72,8 +72,7 @@ type EditOptions struct {
 	ApplyAnnotation bool
 	ChangeCause     string
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 
 	Recorder            genericclioptions.Recorder
 	f                   cmdutil.Factory
@@ -81,7 +80,7 @@ type EditOptions struct {
 	updatedResultGetter func(data []byte) *resource.Result
 }
 
-func NewEditOptions(editMode EditMode, out, errOut io.Writer) *EditOptions {
+func NewEditOptions(editMode EditMode, ioStreams genericclioptions.IOStreams) *EditOptions {
 	return &EditOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -92,8 +91,7 @@ func NewEditOptions(editMode EditMode, out, errOut io.Writer) *EditOptions {
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		Out:    out,
-		ErrOut: errOut,
+		IOStreams: ioStreams,
 	}
 }
 

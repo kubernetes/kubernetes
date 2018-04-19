@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -28,6 +27,7 @@ import (
 	fake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreateJobFromCronJob(t *testing.T) {
@@ -86,14 +86,13 @@ func TestCreateJobFromCronJob(t *testing.T) {
 
 	printFlags := NewPrintFlags("created")
 
-	buf := bytes.NewBuffer([]byte{})
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmdOptions := &CreateJobOptions{
 		PrintFlags: printFlags,
 		Name:       testJobName,
 		Namespace:  testNamespaceName,
 		Client:     clientset.BatchV1(),
-		Out:        buf,
-		Cmd:        NewCmdCreateJob(f, buf),
+		Cmd:        NewCmdCreateJob(f, ioStreams),
 		PrintObj: func(obj runtime.Object) error {
 			p, err := printFlags.ToPrinter()
 			if err != nil {
@@ -102,6 +101,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 
 			return p.PrintObj(obj, buf)
 		},
+		IOStreams: ioStreams,
 	}
 
 	err := cmdOptions.createJob(cronJob)

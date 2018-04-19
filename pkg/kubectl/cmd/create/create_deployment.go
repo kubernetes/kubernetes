@@ -17,13 +17,12 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -43,13 +42,9 @@ type DeploymentOpts struct {
 // NewCmdCreateDeployment is a macro command to create a new deployment.
 // This command is better known to users as `kubectl create deployment`.
 // Note that this command overlaps significantly with the `kubectl run` command.
-func NewCmdCreateDeployment(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DeploymentOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-			CmdErr:     cmdErr,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -131,12 +126,12 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	if len(generatorName) == 0 {
 		generatorName = cmdutil.DeploymentBasicAppsV1GeneratorName
-		generatorNameTemp, err := cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.CreateSubcommandOptions.CmdErr)
+		generatorNameTemp, err := cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.CreateSubcommandOptions.ErrOut)
 		if err != nil {
 			return err
 		}
 		if generatorNameTemp != generatorName {
-			cmdutil.Warning(o.CreateSubcommandOptions.CmdErr, generatorName, generatorNameTemp)
+			cmdutil.Warning(o.CreateSubcommandOptions.ErrOut, generatorName, generatorNameTemp)
 		} else {
 			generatorName = generatorNameTemp
 		}

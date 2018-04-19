@@ -19,7 +19,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/glog"
@@ -60,8 +59,7 @@ type AnnotateOptions struct {
 	removeAnnotations []string
 	Recorder          genericclioptions.Recorder
 
-	// Common share fields
-	out io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
@@ -99,17 +97,17 @@ var (
     kubectl annotate pods foo description-`))
 )
 
-func NewAnnotateOptions(out io.Writer) *AnnotateOptions {
+func NewAnnotateOptions(ioStreams genericclioptions.IOStreams) *AnnotateOptions {
 	return &AnnotateOptions{
-		out:         out,
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
-		Recorder: genericclioptions.NoopRecorder{},
+		Recorder:  genericclioptions.NoopRecorder{},
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	o := NewAnnotateOptions(out)
+func NewCmdAnnotate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewAnnotateOptions(ioStreams)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -283,9 +281,9 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		}
 
 		if len(o.outputFormat) > 0 {
-			return cmdutil.PrintObject(cmd, outputObj, o.out)
+			return cmdutil.PrintObject(cmd, outputObj, o.Out)
 		}
-		cmdutil.PrintSuccess(false, o.out, info.Object, o.dryrun, "annotated")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, o.dryrun, "annotated")
 		return nil
 	})
 }

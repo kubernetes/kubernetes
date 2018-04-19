@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreatePdb(t *testing.T) {
@@ -48,11 +49,11 @@ func TestCreatePdb(t *testing.T) {
 	}
 	tf.ClientConfigVal = &restclient.Config{}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
 
 	outputFormat := "name"
 
-	cmd := NewCmdCreatePodDisruptionBudget(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreatePodDisruptionBudget(tf, ioStreams)
 	cmd.Flags().Set("min-available", "1")
 	cmd.Flags().Set("selector", "app=rails")
 	cmd.Flags().Set("dry-run", "true")
@@ -64,8 +65,8 @@ func TestCreatePdb(t *testing.T) {
 	options := &PodDisruptionBudgetOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
 			PrintFlags: printFlags,
-			CmdOut:     buf,
 			Name:       pdbName,
+			IOStreams:  ioStreams,
 		},
 	}
 	err := options.Complete(cmd, []string{pdbName})

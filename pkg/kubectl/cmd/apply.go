@@ -73,8 +73,7 @@ type ApplyOptions struct {
 	OpenApiPatch   bool
 	PruneWhitelist []string
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 }
 
 const (
@@ -113,7 +112,7 @@ var (
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
-func NewApplyOptions(out, errout io.Writer) *ApplyOptions {
+func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 	return &ApplyOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: NewDeleteFlags("that contains the configuration to apply"),
@@ -124,13 +123,12 @@ func NewApplyOptions(out, errout io.Writer) *ApplyOptions {
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		Out:    out,
-		ErrOut: errout,
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := NewApplyOptions(out, errOut)
+func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewApplyOptions(ioStreams)
 
 	// Store baseName for use in printing warnings / messages involving the base command name.
 	// This is useful for downstream command that wrap this one.
@@ -167,9 +165,9 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	// apply subcommands
-	cmd.AddCommand(NewCmdApplyViewLastApplied(f, out, errOut))
-	cmd.AddCommand(NewCmdApplySetLastApplied(f, out, errOut))
-	cmd.AddCommand(NewCmdApplyEditLastApplied(f, out, errOut))
+	cmd.AddCommand(NewCmdApplyViewLastApplied(f, ioStreams))
+	cmd.AddCommand(NewCmdApplySetLastApplied(f, ioStreams))
+	cmd.AddCommand(NewCmdApplyEditLastApplied(f, ioStreams))
 
 	return cmd
 }

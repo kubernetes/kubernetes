@@ -77,6 +77,7 @@ go_test(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",

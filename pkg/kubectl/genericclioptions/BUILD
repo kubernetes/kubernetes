@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "io_options.go",
         "record_flags.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/genericclioptions",
