@@ -140,7 +140,7 @@ func TestValidateLogFlags(t *testing.T) {
 			name:     "container name combined with --all-containers",
 			flags:    map[string]string{"all-containers": "true"},
 			args:     []string{"my-pod", "my-container"},
-			expected: "--all-containers=true should not be specifiled with container",
+			expected: "--all-containers=true should not be specified with container",
 		},
 	}
 	for _, test := range tests {

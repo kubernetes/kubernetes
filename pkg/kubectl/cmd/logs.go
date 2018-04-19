@@ -228,7 +228,7 @@ func (o LogsOptions) Validate() error {
 		return errors.New("unexpected logs options object")
 	}
 	if o.AllContainers && len(logsOptions.Container) > 0 {
-		return fmt.Errorf("--all-containers=true should not be specifiled with container name %s", logsOptions.Container)
+		return fmt.Errorf("--all-containers=true should not be specified with container name %s", logsOptions.Container)
 	}
 	if errs := validation.ValidatePodLogOptions(logsOptions); len(errs) > 0 {
 		return errs.ToAggregate()
