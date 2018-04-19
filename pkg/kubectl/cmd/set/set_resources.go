@@ -75,9 +75,7 @@ type SetResourcesOptions struct {
 	ContainerSelector string
 	Output            string
 	All               bool
-	ChangeCause       string
 	Local             bool
-	Cmd               *cobra.Command
 
 	DryRun bool
 
@@ -157,9 +155,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ChangeCause = f.Command(cmd, false)
-	o.Cmd = cmd
-	o.DryRun = cmdutil.GetDryRunFlag(o.Cmd)
+	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")

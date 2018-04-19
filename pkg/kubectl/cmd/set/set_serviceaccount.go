@@ -65,12 +65,9 @@ type SetServiceAccountOptions struct {
 	out                    io.Writer
 	err                    io.Writer
 	dryRun                 bool
-	cmd                    *cobra.Command
 	shortOutput            bool
 	all                    bool
-	record                 bool
 	output                 string
-	changeCause            string
 	local                  bool
 	updatePodSpecForObject func(runtime.Object, func(*v1.PodSpec) error) (bool, error)
 	infos                  []*resource.Info
@@ -132,12 +129,9 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.record = cmdutil.GetRecordFlag(cmd)
-	o.changeCause = f.Command(cmd, false)
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = f.UpdatePodSpecForObject
-	o.cmd = cmd
 
 	if o.dryRun {
 		o.PrintFlags.Complete("%s (dry run)")
