@@ -967,10 +967,13 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			t.Errorf("failed creating pki assets: %v", err)
 		}
 
-		// delete ca.key if test.caKeyPresent is false
+		// delete ca.key and front-proxy-ca.key if test.caKeyPresent is false
 		if !test.caKeyPresent {
-			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, "ca.key")); err != nil {
-				t.Errorf("failed removing ca.key: %v", err)
+			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
+				t.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+			}
+			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
+				t.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
 			}
 		}
 
