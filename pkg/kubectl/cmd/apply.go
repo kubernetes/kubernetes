@@ -119,17 +119,19 @@ func NewApplyOptions(out, errout io.Writer) *ApplyOptions {
 		GracePeriod:  -1,
 		OpenApiPatch: true,
 
+		Recorder: genericclioptions.NoopRecorder{},
+
 		Out:    out,
 		ErrOut: errout,
 	}
 }
 
 func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := NewApplyOptions(out, errOut)
+	o := NewApplyOptions(out, errOut)
 
 	// Store baseName for use in printing warnings / messages involving the base command name.
 	// This is useful for downstream command that wrap this one.
-	options.cmdBaseName = baseName
+	o.cmdBaseName = baseName
 
 	cmd := &cobra.Command{
 		Use: "apply -f FILENAME",
@@ -139,29 +141,29 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 		Example: applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(options.Prune, options.All, options.Selector))
-			cmdutil.CheckErr(options.Complete(f, cmd))
-			cmdutil.CheckErr(options.Run(f, cmd))
+			cmdutil.CheckErr(validatePruneAll(o.Prune, o.All, o.Selector))
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Run(f, cmd))
 		},
 	}
 
 	// bind flag structs
-	options.RecordFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
 	usage := "that contains the configuration to apply"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", options.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
-	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
-	cmd.Flags().BoolVar(&options.Cascade, "cascade", options.Cascade, "Only relevant during a prune or a force apply. If true, cascade the deletion of the resources managed by pruned or deleted resources (e.g. Pods created by a ReplicationController).")
-	cmd.Flags().IntVar(&options.GracePeriod, "grace-period", options.GracePeriod, "Only relevant during a prune or a force apply. Period of time in seconds given to pruned or deleted resources to terminate gracefully. Ignored if negative.")
-	cmd.Flags().BoolVar(&options.Force, "force", options.Force, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
-	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
+	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
+	cmd.Flags().BoolVar(&o.Cascade, "cascade", o.Cascade, "Only relevant during a prune or a force apply. If true, cascade the deletion of the resources managed by pruned or deleted resources (e.g. Pods created by a ReplicationController).")
+	cmd.Flags().IntVar(&o.GracePeriod, "grace-period", o.GracePeriod, "Only relevant during a prune or a force apply. Period of time in seconds given to pruned or deleted resources to terminate gracefully. Ignored if negative.")
+	cmd.Flags().BoolVar(&o.Force, "force", o.Force, fmt.Sprintf("Delete and re-create the specified resource, when PATCH encounters conflict and has retried for %d times.", maxPatchRetry))
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "Only relevant during a force apply. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources in the namespace of the specified resource types.")
-	cmd.Flags().StringArrayVar(&options.PruneWhitelist, "prune-whitelist", options.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().BoolVar(&options.OpenApiPatch, "openapi-patch", options.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
+	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().BoolVar(&o.OpenApiPatch, "openapi-patch", o.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
@@ -223,9 +225,9 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 }
 
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.RecordFlags.Complete(f.Command(cmd, false))
-
 	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err

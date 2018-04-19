@@ -103,11 +103,13 @@ func NewAnnotateOptions(out io.Writer) *AnnotateOptions {
 	return &AnnotateOptions{
 		out:         out,
 		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
 	}
 }
 
 func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := NewAnnotateOptions(out)
+	o := NewAnnotateOptions(out)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -117,30 +119,30 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    annotateLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(f, cmd, args); err != nil {
+			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
-			if err := options.Validate(); err != nil {
+			if err := o.Validate(); err != nil {
 				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
 			}
-			cmdutil.CheckErr(options.RunAnnotate(f, cmd))
+			cmdutil.CheckErr(o.RunAnnotate(f, cmd))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
 	// bind flag structs
-	options.RecordFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
-	cmd.Flags().BoolVar(&options.local, "local", options.local, "If true, annotation will NOT contact api-server but run locally.")
-	cmd.Flags().StringVarP(&options.selector, "selector", "l", options.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
-	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
-	cmd.Flags().StringVar(&options.resourceVersion, "resource-version", options.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, annotation will NOT contact api-server but run locally.")
+	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types.")
+	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the annotation"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd
@@ -148,9 +150,9 @@ func NewCmdAnnotate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // Complete adapts from the command line args and factory to the data required.
 func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	o.RecordFlags.Complete(f.Command(cmd, false))
-
 	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err

@@ -90,6 +90,8 @@ func NewEditOptions(editMode EditMode, out, errOut io.Writer) *EditOptions {
 		Output:             "yaml",
 		WindowsLineEndings: goruntime.GOOS == "windows",
 
+		Recorder: genericclioptions.NoopRecorder{},
+
 		Out:    out,
 		ErrOut: errOut,
 	}
@@ -103,9 +105,9 @@ type editPrinterOptions struct {
 
 // Complete completes all the required options
 func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
-	o.RecordFlags.Complete(f.Command(cmd, false))
-
 	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err

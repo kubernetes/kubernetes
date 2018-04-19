@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/printers"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,16 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type SelectorOptions struct {
+type SetSelectorOptions struct {
 	fileOptions resource.FilenameOptions
 
-	PrintFlags *printers.PrintFlags
+	PrintFlags  *printers.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
 
 	local       bool
 	dryrun      bool
@@ -56,6 +59,7 @@ type SelectorOptions struct {
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	PrintObj printers.ResourcePrinterFunc
+	Recorder genericclioptions.Recorder
 
 	builder *resource.Builder
 	mapper  meta.RESTMapper
@@ -75,13 +79,20 @@ var (
         kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
-// NewCmdSelector is the "set selector" command.
-func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &SelectorOptions{
-		PrintFlags: printers.NewPrintFlags("selector updated"),
+func NewSelectorOptions(out io.Writer) *SetSelectorOptions {
+	return &SetSelectorOptions{
+		PrintFlags:  printers.NewPrintFlags("selector updated"),
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
 
 		out: out,
 	}
+}
+
+// NewCmdSelector is the "set selector" command.
+func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
+	o := NewSelectorOptions(out)
 
 	cmd := &cobra.Command{
 		Use: "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
@@ -90,31 +101,38 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example: selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.RunSelector())
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunSelector())
 		},
 	}
 
-	options.PrintFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
 	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().Bool("local", false, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "the resource to update the selectors"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.fileOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.fileOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
 }
 
 // Complete assigns the SelectorOptions from args.
-func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.all = cmdutil.GetFlagBool(cmd, "all")
-	o.record = cmdutil.GetRecordFlag(cmd)
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 
@@ -171,7 +189,7 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 }
 
 // Validate basic inputs
-func (o *SelectorOptions) Validate() error {
+func (o *SetSelectorOptions) Validate() error {
 	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.fileOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
@@ -182,7 +200,7 @@ func (o *SelectorOptions) Validate() error {
 }
 
 // RunSelector executes the command.
-func (o *SelectorOptions) RunSelector() error {
+func (o *SetSelectorOptions) RunSelector() error {
 	r := o.builder.Do()
 	err := r.Err()
 	if err != nil {
@@ -195,11 +213,16 @@ func (o *SelectorOptions) RunSelector() error {
 			versioned := info.AsVersioned()
 			patch.Info.Object = versioned
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
-
-			if selectErr == nil {
-				return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			if selectErr != nil {
+				return nil, selectErr
 			}
-			return nil, selectErr
+
+			// record this change (for rollout history)
+			if err := o.Recorder.Record(patch.Info.Object); err != nil {
+				glog.V(4).Infof("error recording current command: %v", err)
+			}
+
+			return runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 		})
 
 		if patch.Err != nil {
@@ -212,14 +235,6 @@ func (o *SelectorOptions) RunSelector() error {
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
 			return err
-		}
-
-		if o.record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(patched, o.changeCause); err == nil {
-				if patched, err = resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, false, patched); err != nil {
-					return fmt.Errorf("changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
-				}
-			}
 		}
 
 		info.Refresh(patched, true)

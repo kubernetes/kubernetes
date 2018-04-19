@@ -58,6 +58,7 @@ func NewAutoscaleOptions() *AutoscaleOptions {
 	return &AutoscaleOptions{
 		FilenameOptions: resource.FilenameOptions{},
 		RecordFlags:     genericclioptions.NewRecordFlags(),
+		Recorder:        genericclioptions.NoopRecorder{},
 	}
 }
 
@@ -99,9 +100,9 @@ func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.RecordFlags.Complete(f.Command(cmd, false))
-
 	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err

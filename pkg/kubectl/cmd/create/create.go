@@ -79,6 +79,8 @@ func NewCreateOptions(out, errOut io.Writer) *CreateOptions {
 		PrintFlags:  NewPrintFlags("created"),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
+		Recorder: genericclioptions.NoopRecorder{},
+
 		Out:    out,
 		ErrOut: errOut,
 	}
@@ -172,9 +174,9 @@ func (o *CreateOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 }
 
 func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.RecordFlags.Complete(f.Command(cmd, false))
-
 	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err

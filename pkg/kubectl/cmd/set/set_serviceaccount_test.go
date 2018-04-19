@@ -89,7 +89,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			cmd.Flags().Set("output", outputFormat)
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
-			saConfig := serviceAccountConfig{
+			saConfig := SetServiceAccountOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 					NamePrintFlags:     printers.NewNamePrintFlags(""),
@@ -133,7 +133,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
-	opts := serviceAccountConfig{
+	opts := SetServiceAccountOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 			NamePrintFlags:     printers.NewNamePrintFlags(""),
@@ -377,7 +377,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, out, out)
 			cmd.SetOutput(out)
 			cmd.Flags().Set("output", outputFormat)
-			saConfig := serviceAccountConfig{
+			saConfig := SetServiceAccountOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 					NamePrintFlags:     printers.NewNamePrintFlags(""),
@@ -424,7 +424,7 @@ func TestServiceAccountValidation(t *testing.T) {
 			cmd := NewCmdServiceAccount(tf, out, out)
 			cmd.SetOutput(out)
 
-			saConfig := &serviceAccountConfig{
+			saConfig := &SetServiceAccountOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 					NamePrintFlags:     printers.NewNamePrintFlags(""),
