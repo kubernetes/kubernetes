@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/pprof"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"os"
 
@@ -405,6 +407,10 @@ func BenchmarkAuthorization(b *testing.B) {
 	g := NewGraph()
 
 	opts := sampleDataOpts{
+		// To simulate high replication in a small number of namespaces:
+		// nodes:       5000,
+		// namespaces:  10,
+		// podsPerNode: 10,
 		nodes:                  500,
 		namespaces:             200,
 		podsPerNode:            200,
@@ -502,20 +508,93 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for _, tc := range tests {
-		if tc.features == nil {
-			authz.features = utilfeature.DefaultFeatureGate
-		} else {
-			authz.features = tc.features
-		}
-		b.Run(tc.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				decision, _, _ := authz.Authorize(tc.attrs)
-				if decision != tc.expect {
-					b.Errorf("expected %v, got %v", tc.expect, decision)
+	for _, testWriteContention := range []bool{false, true} {
+
+		shouldWrite := int32(1)
+		writes := int64(0)
+		_1ms := int64(0)
+		_10ms := int64(0)
+		_25ms := int64(0)
+		_50ms := int64(0)
+		_100ms := int64(0)
+		_250ms := int64(0)
+		_500ms := int64(0)
+		_1000ms := int64(0)
+		_1s := int64(0)
+
+		contentionPrefix := ""
+		if testWriteContention {
+			contentionPrefix = "contentious "
+			// Start a writer pushing graph modifications 100x a second
+			go func() {
+				for shouldWrite == 1 {
+					go func() {
+						start := time.Now()
+						authz.graph.AddPod(&api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "testwrite", Namespace: "ns0"},
+							Spec: api.PodSpec{
+								NodeName:           "node0",
+								ServiceAccountName: "default",
+								Volumes: []api.Volume{
+									{Name: "token", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "secret0-shared"}}},
+								},
+							},
+						})
+						diff := time.Now().Sub(start)
+						atomic.AddInt64(&writes, 1)
+						switch {
+						case diff < time.Millisecond:
+							atomic.AddInt64(&_1ms, 1)
+						case diff < 10*time.Millisecond:
+							atomic.AddInt64(&_10ms, 1)
+						case diff < 25*time.Millisecond:
+							atomic.AddInt64(&_25ms, 1)
+						case diff < 50*time.Millisecond:
+							atomic.AddInt64(&_50ms, 1)
+						case diff < 100*time.Millisecond:
+							atomic.AddInt64(&_100ms, 1)
+						case diff < 250*time.Millisecond:
+							atomic.AddInt64(&_250ms, 1)
+						case diff < 500*time.Millisecond:
+							atomic.AddInt64(&_500ms, 1)
+						case diff < 1000*time.Millisecond:
+							atomic.AddInt64(&_1000ms, 1)
+						default:
+							atomic.AddInt64(&_1s, 1)
+						}
+					}()
+					time.Sleep(10 * time.Millisecond)
 				}
+			}()
+		}
+
+		for _, tc := range tests {
+			if tc.features == nil {
+				authz.features = utilfeature.DefaultFeatureGate
+			} else {
+				authz.features = tc.features
 			}
-		})
+			b.Run(contentionPrefix+tc.name, func(b *testing.B) {
+				// Run authorization checks in parallel
+				b.SetParallelism(5000)
+				b.RunParallel(func(pb *testing.PB) {
+					for pb.Next() {
+						decision, _, _ := authz.Authorize(tc.attrs)
+						if decision != tc.expect {
+							b.Errorf("expected %v, got %v", tc.expect, decision)
+						}
+					}
+				})
+			})
+		}
+
+		atomic.StoreInt32(&shouldWrite, 0)
+		if testWriteContention {
+			b.Logf("graph modifications during contention test: %d", writes)
+			b.Logf("<1ms=%d, <10ms=%d, <25ms=%d, <50ms=%d, <100ms=%d, <250ms=%d, <500ms=%d, <1000ms=%d, >1000ms=%d", _1ms, _10ms, _25ms, _50ms, _100ms, _250ms, _500ms, _1000ms, _1s)
+		} else {
+			b.Logf("graph modifications during non-contention test: %d", writes)
+		}
 	}
 }
 
