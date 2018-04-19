@@ -25,6 +25,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -93,14 +95,16 @@ type RunObject struct {
 	Mapping   *meta.RESTMapping
 }
 
-type RunOpts struct {
+type RunOptions struct {
 	PrintFlags    *printers.PrintFlags
 	DeleteFlags   *DeleteFlags
 	DeleteOptions *DeleteOptions
+	RecordFlags   *genericclioptions.RecordFlags
 
 	DryRun bool
 
 	PrintObj func(runtime.Object) error
+	Recorder genericclioptions.Recorder
 
 	ArgsLenAtDash  int
 	Attach         bool
@@ -111,7 +115,6 @@ type RunOpts struct {
 	LeaveStdinOpen bool
 	Port           string
 	Quiet          bool
-	Record         bool
 	Schedule       string
 	TTY            bool
 
@@ -120,15 +123,22 @@ type RunOpts struct {
 	ErrOut io.Writer
 }
 
-func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
-	options := &RunOpts{
+func NewRunOptions(in io.Reader, out, errOut io.Writer) *RunOptions {
+	return &RunOptions{
 		PrintFlags:  printers.NewPrintFlags("created"),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
+		RecordFlags: genericclioptions.NewRecordFlags(),
 
-		In:     cmdIn,
-		Out:    cmdOut,
-		ErrOut: cmdErr,
+		Recorder: genericclioptions.NoopRecorder{},
+
+		In:     in,
+		Out:    out,
+		ErrOut: errOut,
 	}
+}
+
+func NewCmdRun(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *cobra.Command {
+	o := NewRunOptions(in, out, errOut)
 
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
@@ -137,17 +147,17 @@ func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *co
 		Long:    runLong,
 		Example: runExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd))
-			cmdutil.CheckErr(options.Run(f, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Run(f, cmd, args))
 		},
 	}
 
-	options.DeleteFlags.AddFlags(cmd)
-	options.PrintFlags.AddFlags(cmd)
+	o.DeleteFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
+	o.RecordFlags.AddFlags(cmd)
 
 	addRunFlags(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
 	return cmd
 }
@@ -181,7 +191,15 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("schedule", "", i18n.T("A schedule in the Cron format the job should be run with."))
 }
 
-func (o *RunOpts) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
 	o.ArgsLenAtDash = cmd.ArgsLenAtDash()
 	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 	o.Expose = cmdutil.GetFlagBool(cmd, "expose")
@@ -191,7 +209,6 @@ func (o *RunOpts) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.LeaveStdinOpen = cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 	o.Port = cmdutil.GetFlagString(cmd, "port")
 	o.Quiet = cmdutil.GetFlagBool(cmd, "quiet")
-	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.Schedule = cmdutil.GetFlagString(cmd, "schedule")
 	o.TTY = cmdutil.GetFlagBool(cmd, "tty")
 
@@ -223,7 +240,7 @@ func (o *RunOpts) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return nil
 }
 
-func (o *RunOpts) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || o.ArgsLenAtDash == 0 {
 		return cmdutil.UsageErrorf(cmd, "NAME is required for run")
@@ -432,7 +449,7 @@ func (o *RunOpts) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) erro
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func (o *RunOpts) removeCreatedObjects(f cmdutil.Factory, createdObjects []*RunObject) error {
+func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*RunObject) error {
 	for _, obj := range createdObjects {
 		namespace, err := obj.Mapping.MetadataAccessor.Namespace(obj.Object)
 		if err != nil {
@@ -571,7 +588,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 	return cmdutil.UsageErrorf(cmd, "invalid image pull policy: %s", pullPolicy)
 }
 
-func (o *RunOpts) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
+func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
 	generators := f.Generators("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
@@ -617,7 +634,7 @@ func (o *RunOpts) generateService(f cmdutil.Factory, cmd *cobra.Command, service
 	return runObject, nil
 }
 
-func (o *RunOpts) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
+func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
 	err := kubectl.ValidateParams(names, params)
 	if err != nil {
 		return nil, err
@@ -653,14 +670,8 @@ func (o *RunOpts) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, g
 		return nil, err
 	}
 
-	annotations, err := mapping.MetadataAccessor.Annotations(obj)
-	if err != nil {
-		return nil, err
-	}
-	if o.Record || len(annotations[kubectl.ChangeCauseAnnotation]) > 0 {
-		if err := cmdutil.RecordChangeCause(obj, f.Command(cmd, false)); err != nil {
-			return nil, err
-		}
+	if err := o.Recorder.Record(obj); err != nil {
+		glog.V(4).Infof("error recording current command: %v", err)
 	}
 
 	versioned := obj

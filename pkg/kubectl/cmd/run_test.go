@@ -39,6 +39,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
@@ -205,7 +206,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			}
 
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
-			opts := &RunOpts{
+			opts := &RunOptions{
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
@@ -219,6 +220,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, os.Stdout)
 				},
+				Recorder: genericclioptions.NoopRecorder{},
 
 				ArgsLenAtDash: test.argsLenAtDash,
 			}
@@ -375,15 +377,15 @@ func TestGenerateService(t *testing.T) {
 
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
 			buff := &bytes.Buffer{}
-			opts := &RunOpts{
+			opts := &RunOptions{
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
 				Out:    buff,
 				ErrOut: buff,
 
-				Port:   test.port,
-				Record: false,
+				Port:     test.port,
+				Recorder: genericclioptions.NoopRecorder{},
 
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, buff)

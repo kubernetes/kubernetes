@@ -38,7 +38,7 @@ type RecordFlags struct {
 // explicitly given by the user
 func (f *RecordFlags) ToRecorder() (Recorder, error) {
 	if f == nil {
-		return &NoopRecorder{}, nil
+		return NoopRecorder{}, nil
 	}
 
 	shouldRecord := false
@@ -49,7 +49,7 @@ func (f *RecordFlags) ToRecorder() (Recorder, error) {
 	// if flag was explicitly set to false by the user,
 	// do not record
 	if !shouldRecord {
-		return &NoopRecorder{}, nil
+		return NoopRecorder{}, nil
 	}
 
 	return &ChangeCauseRecorder{
@@ -98,7 +98,7 @@ type Recorder interface {
 type NoopRecorder struct{}
 
 // Record implements Recorder
-func (r *NoopRecorder) Record(obj runtime.Object) error {
+func (r NoopRecorder) Record(obj runtime.Object) error {
 	return nil
 }
 
