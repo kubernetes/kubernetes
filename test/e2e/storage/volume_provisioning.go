@@ -483,9 +483,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			testDynamicProvisioning(test, c, claim, class)
 		})
 
-		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout)
-		// when there is no regression.
-		It("should not provision a volume in an unmanaged GCE zone. [Slow]", func() {
+		It("should not provision a volume in an unmanaged GCE zone.", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"
 
@@ -538,7 +536,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionTimeout)
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
 		})
@@ -722,7 +720,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		It("should be disabled by changing the default annotation[Slow] [Serial] [Disruptive]", func() {
+		It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
@@ -744,7 +742,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
@@ -753,7 +751,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		It("should be disabled by removing the default annotation[Slow] [Serial] [Disruptive]", func() {
+		It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
@@ -775,7 +773,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionTimeout)
+			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			Expect(err).To(HaveOccurred())
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})

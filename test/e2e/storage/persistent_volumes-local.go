@@ -328,7 +328,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 	Context("Local volume that cannot be mounted [Slow]", func() {
 		// TODO:
-		// - make the pod create timeout shorter
 		// - check for these errors in unit tests intead
 		It("should fail due to non-existent path", func() {
 			ep := &eventPatterns{
@@ -368,7 +367,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = framework.WaitForPodNameRunningInNamespace(config.client, pod.Name, pod.Namespace)
+			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			Expect(err).To(HaveOccurred())
 			checkPodEvents(config, pod.Name, ep)
 
@@ -1113,7 +1112,7 @@ func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, 
 
 // createSecPod should be used when Pod requires non default SELinux labels
 func createSecPod(config *localTestConfig, volume *localTestVolume, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) (*v1.Pod, error) {
-	pod, err := framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", hostIPC, hostPID, seLinuxLabel, nil)
+	pod, err := framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", hostIPC, hostPID, seLinuxLabel, nil, framework.PodStartShortTimeout)
 	podNodeName, podNodeNameErr := podNodeName(config, pod)
 	Expect(podNodeNameErr).NotTo(HaveOccurred())
 	framework.Logf("Security Context POD %q created on Node %q", pod.Name, podNodeName)
@@ -1123,7 +1122,7 @@ func createSecPod(config *localTestConfig, volume *localTestVolume, hostIPC bool
 
 func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *int64) (*v1.Pod, error) {
 	By("Creating a pod")
-	return framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, fsGroup)
+	return framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, fsGroup, framework.PodStartShortTimeout)
 }
 
 func createAndMountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
