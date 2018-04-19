@@ -3973,11 +3973,6 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	// That said, if specified, we need to ensure they are valid.
 	allErrs = append(allErrs, ValidateNodeResources(node)...)
 
-	// external ID is required.
-	if len(node.Spec.ExternalID) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("spec", "externalID"), ""))
-	}
-
 	// Only allow Node.Spec.ConfigSource to be set if the DynamicKubeletConfig feature gate is enabled
 	if node.Spec.ConfigSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "configSource"), "configSource may only be set if the DynamicKubeletConfig feature gate is enabled)"))

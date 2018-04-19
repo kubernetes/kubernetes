@@ -56,10 +56,6 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: p.nodeNamePrefix,
 		},
-		Spec: v1.NodeSpec{
-			// TODO: investigate why this is needed.
-			ExternalID: "foo",
-		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),

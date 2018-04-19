@@ -3612,10 +3612,6 @@ type NodeSpec struct {
 	// PodCIDR represents the pod IP range assigned to the node.
 	// +optional
 	PodCIDR string `json:"podCIDR,omitempty" protobuf:"bytes,1,opt,name=podCIDR"`
-	// External ID of the node assigned by some machine database (e.g. a cloud provider).
-	// Deprecated.
-	// +optional
-	ExternalID string `json:"externalID,omitempty" protobuf:"bytes,2,opt,name=externalID"`
 	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	// +optional
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
@@ -3630,6 +3626,11 @@ type NodeSpec struct {
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
 	// +optional
 	ConfigSource *NodeConfigSource `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
+
+	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
+	// see: https://issues.k8s.io/61966
+	// +optional
+	DoNotUse_ExternalID string `json:"externalID,omitempty" protobuf:"bytes,2,opt,name=externalID"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -1033,20 +1033,6 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	}
 }
 
-func TestSetDefaultNodeExternalID(t *testing.T) {
-	name := "node0"
-	n := &v1.Node{}
-	n.Name = name
-	obj2 := roundTrip(t, runtime.Object(n))
-	n2 := obj2.(*v1.Node)
-	if n2.Spec.ExternalID != name {
-		t.Errorf("Expected default External ID: %s, got: %s", name, n2.Spec.ExternalID)
-	}
-	if n2.Spec.ProviderID != "" {
-		t.Errorf("Expected empty default Cloud Provider ID, got: %s", n2.Spec.ProviderID)
-	}
-}
-
 func TestSetDefaultNodeStatusAllocatable(t *testing.T) {
 	capacity := v1.ResourceList{
 		v1.ResourceCPU:    resource.MustParse("1000m"),

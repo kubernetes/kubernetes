@@ -867,9 +867,6 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
-		Spec: api.NodeSpec{
-			ExternalID: "ext",
-		},
 	}
 
 	tf := cmdtesting.NewTestFactory()

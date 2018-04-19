@@ -45,8 +45,7 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
 		Spec: v1.NodeSpec{
-			ExternalID: "node-name",
-			Taints:     oldTaints,
+			Taints: oldTaints,
 		},
 		Status: v1.NodeStatus{},
 	}

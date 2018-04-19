@@ -128,7 +128,7 @@ func TestEnsureNodeExistsByProviderIDOrNodeName(t *testing.T) {
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, tc.node)
+			exists, err := ensureNodeExistsByProviderIDOrInstanceID(instances, tc.node)
 			assert.NoError(t, err)
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
 				"expected cloud provider methods `%v` to be called but `%v` was called ",

@@ -1543,9 +1543,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
-						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
@@ -1620,9 +1617,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
-					Spec: v1.NodeSpec{
-						ExternalID: "node0",
-					},
 				},
 			},
 		},
@@ -1650,9 +1644,6 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
-						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
 						},
 					},
 				},
@@ -1755,9 +1746,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
-						},
 					},
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
@@ -1788,9 +1776,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
 								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
 							},
-						},
-						Spec: v1.NodeSpec{
-							ExternalID: "node0",
 						},
 					},
 				},
@@ -2207,9 +2192,6 @@ func TestNodeEventGeneration(t *testing.T) {
 					Name:              "node0",
 					UID:               "1234567890",
 					CreationTimestamp: metav1.Date(2015, 8, 10, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ExternalID: "node0",
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{

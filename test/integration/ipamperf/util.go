@@ -39,9 +39,6 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "sample-node-",
 		},
-		Spec: v1.NodeSpec{
-			ExternalID: "foo",
-		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),

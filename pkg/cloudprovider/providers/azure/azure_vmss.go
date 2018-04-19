@@ -161,7 +161,7 @@ func (ss *scaleSet) GetInstanceIDByNodeName(name string) (string, error) {
 // GetNodeNameByProviderID gets the node name by provider ID.
 func (ss *scaleSet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
 	// NodeName is not part of providerID for vmss instances.
-	scaleSetName, err := extractScaleSetNameByExternalID(providerID)
+	scaleSetName, err := extractScaleSetNameByProviderID(providerID)
 	if err != nil {
 		glog.V(4).Infof("Can not extract scale set name from providerID (%s), assuming it is mananaged by availability set: %v", providerID, err)
 		return ss.availabilitySet.GetNodeNameByProviderID(providerID)
@@ -295,9 +295,9 @@ func getScaleSetVMInstanceID(machineName string) (string, error) {
 	return fmt.Sprintf("%d", instanceID), nil
 }
 
-// extractScaleSetNameByExternalID extracts the scaleset name by node's externalID.
-func extractScaleSetNameByExternalID(externalID string) (string, error) {
-	matches := scaleSetNameRE.FindStringSubmatch(externalID)
+// extractScaleSetNameByProviderID extracts the scaleset name by node's ProviderID.
+func extractScaleSetNameByProviderID(providerID string) (string, error) {
+	matches := scaleSetNameRE.FindStringSubmatch(providerID)
 	if len(matches) != 2 {
 		return "", ErrorNotVmssInstance
 	}
@@ -612,7 +612,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 	// Construct instanceIDs from nodes.
 	instanceIDs := []string{}
 	for _, curNode := range nodes {
-		curScaleSetName, err := extractScaleSetNameByExternalID(curNode.Spec.ExternalID)
+		curScaleSetName, err := extractScaleSetNameByProviderID(curNode.Spec.ProviderID)
 		if err != nil {
 			glog.V(4).Infof("Node %q is not belonging to any scale sets, omitting it", curNode.Name)
 			continue
@@ -622,9 +622,9 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 			continue
 		}
 
-		instanceID, err := getLastSegment(curNode.Spec.ExternalID)
+		instanceID, err := getLastSegment(curNode.Spec.ProviderID)
 		if err != nil {
-			glog.Errorf("Failed to get last segment from %q: %v", curNode.Spec.ExternalID, err)
+			glog.Errorf("Failed to get last segment from %q: %v", curNode.Spec.ProviderID, err)
 			return err
 		}
 

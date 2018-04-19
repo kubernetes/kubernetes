@@ -1067,7 +1067,7 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 }
 
 func TestSingleItemImpliedRootScopedObject(t *testing.T) {
-	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.NodeSpec{ExternalID: "test"}}
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
 	r := streamTestObject(node)
 	infos, err := newDefaultBuilder().
 		NamespaceParam("test").DefaultNamespace().
