@@ -118,8 +118,6 @@ type ClientAccessFactory interface {
 	// LabelsForObject returns the labels associated with the provided object
 	LabelsForObject(object runtime.Object) (map[string]string, error)
 
-	// Returns internal flagset
-	FlagSet() *pflag.FlagSet
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
 	Command(cmd *cobra.Command, showSecrets bool) string
