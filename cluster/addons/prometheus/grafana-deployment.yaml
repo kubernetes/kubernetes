@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: kube-system
+  labels:
+    k8s-app: grafana
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    version: v5.0.4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: grafana
+      version: v5.0.4
+  template:
+    metadata:
+      labels:
+        k8s-app: grafana
+        version: v5.0.4
+    spec:
+      initContainers:
+        - name: download-dashboards
+          image: "appropriate/curl:latest"
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "/etc/grafana/download_dashboards.sh"]
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/grafana/download_dashboards.sh"
+              subPath: download_dashboards.sh
+            - name: storage
+              mountPath: "/var/lib/grafana"
+              subPath: 
+      containers:
+        - name: grafana
+          image: "grafana/grafana:5.0.4"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/grafana/grafana.ini"
+              subPath: grafana.ini
+            - name: dashboards
+              mountPath: "/var/lib/grafana/dashboards"
+            - name: config
+              mountPath: "/etc/grafana/provisioning/datasources/datasources.yaml"
+              subPath: datasources.yaml
+            - name: config
+              mountPath: "/etc/grafana/provisioning/dashboards/dashboardproviders.yaml"
+              subPath: dashboardproviders.yaml
+            - name: storage
+              mountPath: "/var/lib/grafana"
+              subPath: 
+          ports:
+            - name: service
+              containerPort: 80
+              protocol: TCP
+            - name: grafana
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana
+                  key: admin-password
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+              # initialDelaySeconds: 60
+              # timeoutSeconds: 30
+              # failureThreshold: 10
+              # periodSeconds: 10
+          # TODO resources
+          resources:
+            {}
+            
+      volumes:
+        - name: config
+          configMap:
+            name: grafana
+        - name: dashboards
+          configMap:
+            name: dashboards
+        - name: storage
+          emptyDir: {}
