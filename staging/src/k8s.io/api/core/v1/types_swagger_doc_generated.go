@@ -865,8 +865,8 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 }
 
 var map_LocalVolumeSource = map[string]string{
-	"":     "Local represents directly-attached storage with node affinity",
-	"path": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device",
+	"":     "Local represents directly-attached storage with node affinity (Beta feature)",
+	"path": "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled.",
 }
 
 func (LocalVolumeSource) SwaggerDoc() map[string]string {

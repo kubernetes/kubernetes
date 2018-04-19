@@ -1513,11 +1513,13 @@ type KeyToPath struct {
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
 }
 
-// Local represents directly-attached storage with node affinity
+// Local represents directly-attached storage with node affinity (Beta feature)
 type LocalVolumeSource struct {
-	// The full path to the volume on the node
-	// For alpha, this path must be a directory
-	// Once block as a source is supported, then this path can point to a block device
+	// The full path to the volume on the node.
+	// It can be either a directory or block device (disk, partition, ...).
+	// Directories can be represented only by PersistentVolume with VolumeMode=Filesystem.
+	// Block devices can be represented only by VolumeMode=Block, which also requires the
+	// BlockVolume alpha feature gate to be enabled.
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 }
 
