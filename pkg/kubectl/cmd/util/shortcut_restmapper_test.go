@@ -125,10 +125,9 @@ func TestReplaceAliases(t *testing.T) {
 		},
 	}
 
-	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
-
 	for _, test := range tests {
+		ds := &fakeDiscoveryClient{}
+		mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.srvRes, nil
 		}

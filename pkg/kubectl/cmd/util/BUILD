@@ -12,6 +12,7 @@ go_library(
         "helpers.go",
         "printing.go",
         "shortcut_restmapper.go",
+        "suggestion_restmapper.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
@@ -86,6 +87,7 @@ go_test(
         "factory_test.go",
         "helpers_test.go",
         "shortcut_restmapper_test.go",
+        "suggestion_restmapper_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

@@ -242,23 +242,45 @@ func TestCheckInvalidErr(t *testing.T) {
 func TestCheckNoResourceMatchError(t *testing.T) {
 	testCheckError(t, []checkErrTestCase{
 		{
-			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
+			&NoResourceWithSuggestionError{
+				NoResourceMatchError: &meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
+			},
 			`the server doesn't have a resource type "foo"`,
 			DefaultErrorExitCode,
 		},
 		{
-			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Version: "theversion", Resource: "foo"}},
+			&NoResourceWithSuggestionError{
+				NoResourceMatchError: &meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Version: "theversion", Resource: "foo"}},
+			},
 			`the server doesn't have a resource type "foo" in version "theversion"`,
 			DefaultErrorExitCode,
 		},
 		{
-			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
+			&NoResourceWithSuggestionError{
+				NoResourceMatchError: &meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
+			},
 			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
 			DefaultErrorExitCode,
 		},
 		{
-			&meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
+			&NoResourceWithSuggestionError{
+				NoResourceMatchError: &meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
+			},
 			`the server doesn't have a resource type "foo" in group "thegroup"`,
+			DefaultErrorExitCode,
+		},
+		{
+			&NoResourceWithSuggestionError{
+				NoResourceMatchError: &meta.NoResourceMatchError{PartialResource: schema.GroupVersionResource{Resource: "foo"}},
+				Suggestions:          []string{"fooa", "foob"},
+			},
+			`the server doesn't have a resource type "foo"
+
+Did you mean this?
+
+	fooa
+	foob
+`,
 			DefaultErrorExitCode,
 		},
 	})
@@ -318,5 +340,25 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestEditDistance(t *testing.T) {
+	for _, test := range []struct {
+		s1   string
+		s2   string
+		dist int
+	}{
+		{"", "", 0},
+		{"abcd", "", 4},
+		{"abcd", "abce", 1},
+		{"abcd", "abcde", 1},
+		{"eecd", "abcde", 3},
+		{"abcd", "zabc", 2},
+	} {
+		result := editDistance(test.s1, test.s2)
+		if result != test.dist {
+			t.Errorf("editDistance(%v, %v) expect to be %d; got %d", test.s1, test.s2, test.dist, result)
+		}
 	}
 }
