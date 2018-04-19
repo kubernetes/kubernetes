@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	// test sources
+	_ "k8s.io/kubernetes/test/e2e/api"
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/apps"
 	_ "k8s.io/kubernetes/test/e2e/auth"
