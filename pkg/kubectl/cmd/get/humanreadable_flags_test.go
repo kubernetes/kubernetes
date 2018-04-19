@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers_test
+package get
 
 import (
 	"bytes"
@@ -26,11 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
-	testObject := &api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	testObject := &api.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name: "foo",
+		Labels: map[string]string{
+			"l1": "value",
+		},
+	}}
 
 	testCases := []struct {
 		name       string
@@ -76,6 +80,11 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\npod/foo\\ +0/0\\ +0\\ +<unknown>\n",
 		},
 		{
+			name:           "label-columns prints specified label values in new column",
+			columnLabels:   []string{"l1"},
+			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +L1\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +value\n",
+		},
+		{
 			name:           "withNamespace displays an additional NAMESPACE column",
 			withNamespace:  true,
 			expectedOutput: "NAMESPACE\\ +NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\n\\ +foo\\ +0/0\\ +0\\ +<unknown>\n",
@@ -94,7 +103,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			printFlags := printers.HumanPrintFlags{
+			printFlags := HumanPrintFlags{
 				ShowKind:     &tc.showKind,
 				ShowLabels:   &tc.showLabels,
 				SortBy:       &tc.sortBy,
@@ -108,14 +117,14 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 				printFlags.Kind = schema.GroupKind{Kind: "pod"}
 			}
 
-			p, matched, err := printFlags.ToPrinter(tc.outputFormat)
+			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
-				if matched {
+				if !printers.IsNoCompatiblePrinterError(err) {
 					t.Fatalf("expected no printer matches for output format %q", tc.outputFormat)
 				}
 				return
 			}
-			if !matched {
+			if printers.IsNoCompatiblePrinterError(err) {
 				t.Fatalf("expected to match template printer for output format %q", tc.outputFormat)
 			}
 
@@ -128,10 +137,6 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-
-			// TODO(juanvallejo): remove this once we wire PrintFlags at the command level.
-			// handlers should be attached to the printer inside of the ToPrinter method.
-			printersinternal.AddHandlers(p.(*printers.HumanReadablePrinter))
 
 			out := bytes.NewBuffer([]byte{})
 			err = p.PrintObj(testObject, out)

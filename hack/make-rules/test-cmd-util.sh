@@ -227,7 +227,7 @@ function wait-for-pods-with-label()
 {
   local i
   for i in $(seq 1 10); do
-    kubeout=`kubectl get po -l $1 --template '{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}"`
+    kubeout=`kubectl get po -l $1 --output=go-template --template='{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}"`
     if [[ $kubeout = $2 ]]; then
         return
     fi

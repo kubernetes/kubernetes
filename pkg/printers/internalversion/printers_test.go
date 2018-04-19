@@ -99,26 +99,6 @@ func TestVersionedPrinter(t *testing.T) {
 	}
 }
 
-func TestPrintDefault(t *testing.T) {
-	printerTests := []struct {
-		Name   string
-		Format string
-	}{
-		{"test wide", "wide"},
-		{"test blank format", ""},
-	}
-
-	for _, test := range printerTests {
-		printer, err := printers.GetStandardPrinter(nil, legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.RegisteredGroupVersions()...), []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}, printers.PrintOptions{AllowMissingKeys: false})
-		if err != nil {
-			t.Errorf("in %s, unexpected error: %#v", test.Name, err)
-		}
-		if printer.IsGeneric() {
-			t.Errorf("in %s, printer should not be generic: %#v", test.Name, printer)
-		}
-	}
-}
-
 func TestPrintUnstructuredObject(t *testing.T) {
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
