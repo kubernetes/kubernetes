@@ -437,7 +437,7 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName, vmSetName string) (network.Int
 
 	// Check scale set name.
 	// Backends of Standard load balancer could belong to multiple VMSS, so we don't check vmSet for it.
-	if vmSetName != "" && !strings.EqualFold(ssName, vmSetName) && !ss.useStandardLoadBalancer() {
+	if !strings.EqualFold(ssName, vmSetName) && !ss.useStandardLoadBalancer() {
 		return network.Interface{}, errNotInVMSet
 	}
 
@@ -553,6 +553,11 @@ func (ss *scaleSet) getNodesScaleSets(nodes []*v1.Node) (map[string]sets.String,
 	standardNodes := []*v1.Node{}
 
 	for _, curNode := range nodes {
+		if ss.useStandardLoadBalancer() && ss.excludeMasterNodesFromStandardLB() && isMasterNode(curNode) {
+			glog.V(4).Infof("Excluding master node %q from load balancer backendpool", curNode.Name)
+			continue
+		}
+
 		curScaleSetName, err := extractScaleSetNameByProviderID(curNode.Spec.ProviderID)
 		if err != nil {
 			glog.V(4).Infof("Node %q is not belonging to any scale sets, assuming it is belong to availability sets", curNode.Name)
@@ -697,7 +702,9 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 
 		if instanceIDs.Len() == 0 {
 			// This may happen when scaling a vmss capacity to 0.
-			return fmt.Errorf("no nodes running are belonging to vmss %q", ssName)
+			glog.V(3).Infof("scale set %q has 0 nodes, adding it to load balancer anyway", ssName)
+			// InstanceIDs is required to update vmss, use * instead here since there are no nodes actually.
+			instanceIDs.Insert("*")
 		}
 
 		err := ss.ensureHostsInVMSetPool(serviceName, backendPoolID, ssName, instanceIDs.List(), isInternal)
