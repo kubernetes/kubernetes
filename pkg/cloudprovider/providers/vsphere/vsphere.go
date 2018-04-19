@@ -434,20 +434,36 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 		if err != nil {
 			glog.Warningf("Failed to extract addresses for NodeAddresses - %v", err)
 		} else {
+			// Add all external IPs
 			for _, addr := range localAddrs {
 				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 					if ipnet.IP.To4() != nil {
 						// Filter external IP by MAC address OUIs from vCenter and from ESX
-						var addressType v1.NodeAddressType
+						addressType := v1.NodeExternalIP
 						if strings.HasPrefix(i.HardwareAddr.String(), MacOuiVC) ||
 							strings.HasPrefix(i.HardwareAddr.String(), MacOuiEsx) {
 							v1helper.AddToNodeAddresses(&addrs,
 								v1.NodeAddress{
-									Type:    v1.NodeExternalIP,
+									Type:    addressType,
 									Address: ipnet.IP.String(),
 								},
+							)
+						}
+						glog.V(4).Infof("Find local IP address %v and set type to %v", ipnet.IP.String(), addressType)
+					}
+				}
+			}
+			for _, addr := range localAddrs {
+				// Add all internal IPs.
+				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+					if ipnet.IP.To4() != nil {
+						// Filter external IP by MAC address OUIs from vCenter and from ESX
+						addressType := v1.NodeInternalIP
+						if strings.HasPrefix(i.HardwareAddr.String(), MacOuiVC) ||
+							strings.HasPrefix(i.HardwareAddr.String(), MacOuiEsx) {
+							v1helper.AddToNodeAddresses(&addrs,
 								v1.NodeAddress{
-									Type:    v1.NodeInternalIP,
+									Type:    addressType,
 									Address: ipnet.IP.String(),
 								},
 							)
@@ -532,6 +548,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 		return nil, err
 	}
 	// retrieve VM's ip(s)
+	// Add all ExternalIP's first and then InternalIPs because of https://github.com/kubernetes/kubernetes/issues/62830
 	for _, v := range vmMoList[0].Guest.Net {
 		if vs.cfg.Network.PublicNetwork == v.Network {
 			for _, ip := range v.IpAddress {
@@ -540,7 +557,18 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 						v1.NodeAddress{
 							Type:    v1.NodeExternalIP,
 							Address: ip,
-						}, v1.NodeAddress{
+						},
+					)
+				}
+			}
+		}
+	}
+	for _, v := range vmMoList[0].Guest.Net {
+		if vs.cfg.Network.PublicNetwork == v.Network {
+			for _, ip := range v.IpAddress {
+				if net.ParseIP(ip).To4() != nil {
+					v1helper.AddToNodeAddresses(&addrs,
+						v1.NodeAddress{
 							Type:    v1.NodeInternalIP,
 							Address: ip,
 						},
