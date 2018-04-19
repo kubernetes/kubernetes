@@ -639,8 +639,10 @@ func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.mu.Lock()
 	proxier.endpointsSynced = true
+	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
 	proxier.mu.Unlock()
 
+	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
 }
 
