@@ -77,42 +77,6 @@ func TestEnsureInternalBackendServiceUpdates(t *testing.T) {
 	assert.Equal(t, bs.SessionAffinity, strings.ToUpper(string(v1.ServiceAffinityNone)))
 }
 
-func TestEnsureInternalBackendServiceGroups(t *testing.T) {
-	t.Parallel()
-
-	vals := DefaultTestClusterValues()
-	nodeNames := []string{"test-node-1"}
-
-	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
-
-	apiService := fakeLoadbalancerService(string(LBTypeInternal))
-	lbName := cloudprovider.GetLoadBalancerName(apiService)
-	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	igName := makeInstanceGroupName(vals.ClusterID)
-	igLinks, err := gce.ensureInternalInstanceGroups(igName, nodes)
-	require.NoError(t, err)
-
-	sharedBackend := shareBackendService(apiService)
-	bsName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
-	err = gce.ensureInternalBackendService(bsName, "description", apiService.Spec.SessionAffinity, cloud.SchemeInternal, "TCP", igLinks, "")
-	require.NoError(t, err)
-
-	// Update the BackendService with new Instances
-	newNodeNames := []string{"new-test-node-1", "new-test-node-2"}
-	err = gce.ensureInternalBackendServiceGroups(bsName, newNodeNames)
-	assert.NoError(t, err)
-
-	bs, err := gce.GetRegionBackendService(bsName, gce.region)
-	assert.NoError(t, err)
-
-	// Check that the instances are updated
-	newNodes, err := createAndInsertNodes(gce, newNodeNames, vals.ZoneName)
-	newIgLinks, err := gce.ensureInternalInstanceGroups(igName, newNodes)
-	backends := backendsFromGroupLinks(newIgLinks)
-	assert.Equal(t, bs.Backends, backends)
-}
-
 func TestEnsureInternalLoadBalancer(t *testing.T) {
 	t.Parallel()
 
@@ -303,29 +267,63 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
+	node1Name := []string{"test-node-1"}
 
 	apiService := fakeLoadbalancerService(string(LBTypeInternal))
-	_, err = createInternalLoadBalancer(gce, apiService, nil, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
-	assert.NoError(t, err)
-
-	// Remove the old Node and insert a new Node.
-	newNodeName := "test-node-2"
-	newNodes, err := createAndInsertNodes(gce, []string{newNodeName}, vals.ZoneName)
+	nodes, err := createAndInsertNodes(gce, node1Name, vals.ZoneName)
 	require.NoError(t, err)
 
-	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, apiService, newNodes)
+	_, err = gce.ensureInternalLoadBalancer(vals.ClusterName, vals.ClusterID, apiService, nil, nodes)
 	assert.NoError(t, err)
 
-	// Expect node 1 to be deleted and node 2 to still exist
+	// Replace the node in initial zone; add new node in a new zone.
+	node2Name, node3Name := "test-node-2", "test-node-3"
+	newNodesZoneA, err := createAndInsertNodes(gce, []string{node2Name}, vals.ZoneName)
+	require.NoError(t, err)
+	newNodesZoneB, err := createAndInsertNodes(gce, []string{node3Name}, vals.SecondaryZoneName)
+	require.NoError(t, err)
+
+	nodes = append(newNodesZoneA, newNodesZoneB...)
+	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, apiService, nodes)
+	assert.NoError(t, err)
+
+	lbName := cloudprovider.GetLoadBalancerName(apiService)
+	sharedBackend := shareBackendService(apiService)
+	backendServiceName := makeBackendServiceName(lbName, vals.ClusterID, sharedBackend, cloud.SchemeInternal, "TCP", apiService.Spec.SessionAffinity)
+	bs, err := gce.GetRegionBackendService(backendServiceName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(bs.Backends), "Want two backends referencing two instances groups")
+
+	for _, zone := range []string{vals.ZoneName, vals.SecondaryZoneName} {
+		var found bool
+		for _, be := range bs.Backends {
+			if strings.Contains(be.Group, zone) {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "Expected list of backends to have zone %q", zone)
+	}
+
+	// Expect initial zone to have test-node-2
 	igName := makeInstanceGroupName(vals.ClusterID)
 	instances, err := gce.ListInstancesInInstanceGroup(igName, vals.ZoneName, "ALL")
 	require.NoError(t, err)
-
 	assert.Equal(t, 1, len(instances))
 	assert.Contains(
 		t,
 		instances[0].Instance,
-		fmt.Sprintf("projects/%s/zones/%s/instances/%s", vals.ProjectID, vals.ZoneName, newNodeName),
+		fmt.Sprintf("projects/%s/zones/%s/instances/%s", vals.ProjectID, vals.ZoneName, node2Name),
+	)
+
+	// Expect initial zone to have test-node-3
+	instances, err = gce.ListInstancesInInstanceGroup(igName, vals.SecondaryZoneName, "ALL")
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(instances))
+	assert.Contains(
+		t,
+		instances[0].Instance,
+		fmt.Sprintf("projects/%s/zones/%s/instances/%s", vals.ProjectID, vals.SecondaryZoneName, node3Name),
 	)
 }
 
