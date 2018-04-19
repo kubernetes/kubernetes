@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -47,9 +48,12 @@ var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge"
 // referencing the cmd.Flags()
 type PatchOptions struct {
 	resource.FilenameOptions
+	RecordFlags *genericclioptions.RecordFlags
 
 	Local  bool
 	DryRun bool
+
+	Recorder genericclioptions.Recorder
 
 	OutputFormat string
 }
@@ -79,8 +83,16 @@ var (
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
 )
 
+func NewPatchOptions() *PatchOptions {
+	return &PatchOptions{
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+	}
+}
+
 func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &PatchOptions{}
+	o := NewPatchOptions()
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -90,32 +102,47 @@ func NewCmdPatch(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    patchLong,
 		Example: patchExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.OutputFormat = cmdutil.GetFlagString(cmd, "output")
-			options.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
-			err := RunPatch(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.RunPatch(f, out, cmd, args))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
+
+	o.RecordFlags.AddFlags(cmd)
+
 	cmd.Flags().StringP("patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().String("type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
 	cmdutil.AddPrinterFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 
 	usage := "identifying the resource to update"
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 
-	cmd.Flags().BoolVar(&options.Local, "local", options.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
+	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 
 	return cmd
 }
 
-func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *PatchOptions) error {
+func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+
+	return err
+}
+
+func (o *PatchOptions) RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	switch {
-	case options.Local && len(args) != 0:
+	case o.Local && len(args) != 0:
 		return fmt.Errorf("cannot specify --local and server resources")
 	}
 
@@ -148,7 +175,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -169,38 +196,36 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 
-		if !options.Local && !options.DryRun {
+		if !o.Local && !o.DryRun {
 			helper := resource.NewHelper(client, mapping)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
 			if err != nil {
 				return err
 			}
-			// Record the change as a second patch to avoid trying to merge with a user's patch data
-			if cmdutil.ShouldRecord(cmd, info) {
-				// Copy the resource info and update with the result of applying the user's patch
-				infoCopy := *info
-				infoCopy.Object = patchedObj
-				if patch, patchType, err := cmdutil.ChangeResourcePatch(&infoCopy, f.Command(cmd, true)); err == nil {
-					if recordedObj, err := helper.Patch(info.Namespace, info.Name, patchType, patch); err != nil {
-						glog.V(4).Infof("error recording reason: %v", err)
-					} else {
-						patchedObj = recordedObj
-					}
+
+			didPatch := !reflect.DeepEqual(info.Object, patchedObj)
+
+			// if the recorder makes a change, compute and create another patch
+			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
+				glog.V(4).Infof("error recording current command: %v", err)
+			} else if len(mergePatch) > 0 {
+				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+					glog.V(4).Infof("error recording reason: %v", err)
+				} else {
+					patchedObj = recordedObj
 				}
 			}
 			count++
-
-			didPatch := !reflect.DeepEqual(info.Object, patchedObj)
 
 			// After computing whether we changed data, refresh the resource info with the resulting object
 			if err := info.Refresh(patchedObj, true); err != nil {
 				return err
 			}
 
-			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
+			if len(o.OutputFormat) > 0 && o.OutputFormat != "name" {
 				return cmdutil.PrintObject(cmd, info.Object, out)
 			}
-			cmdutil.PrintSuccess(options.OutputFormat == "name", out, info.Object, false, patchOperation(didPatch))
+			cmdutil.PrintSuccess(o.OutputFormat == "name", out, info.Object, false, patchOperation(didPatch))
 
 			// if object was not successfully patched, exit with error code 1
 			if !didPatch {
@@ -239,11 +264,11 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			}
 		}
 
-		if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
+		if len(o.OutputFormat) > 0 && o.OutputFormat != "name" {
 			return cmdutil.PrintObject(cmd, info.Object, out)
 		}
 
-		cmdutil.PrintSuccess(options.OutputFormat == "name", out, info.Object, options.DryRun, patchOperation(didPatch))
+		cmdutil.PrintSuccess(o.OutputFormat == "name", out, info.Object, o.DryRun, patchOperation(didPatch))
 		return nil
 	})
 	if err != nil {

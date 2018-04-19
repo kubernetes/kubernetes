@@ -22,11 +22,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/types"
 	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -58,9 +61,24 @@ var (
 		kubectl scale --replicas=3 statefulset/web`))
 )
 
+type ScaleOptions struct {
+	FilenameOptions resource.FilenameOptions
+	RecordFlags     *genericclioptions.RecordFlags
+
+	Recorder genericclioptions.Recorder
+}
+
+func NewScaleOptions() *ScaleOptions {
+	return &ScaleOptions{
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+	}
+}
+
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
 func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	o := NewScaleOptions()
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -72,14 +90,17 @@ func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Long:    scaleLong,
 		Example: scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-			err := RunScale(f, out, errOut, cmd, args, shortOutput, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.RunScale(f, out, errOut, cmd, args, shortOutput))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
+
+	o.RecordFlags.AddFlags(cmd)
+
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().String("resource-version", "", i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
@@ -88,15 +109,26 @@ func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.MarkFlagRequired("replicas")
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddOutputFlagsForMutation(cmd)
-	cmdutil.AddRecordFlag(cmd)
 
 	usage := "identifying the resource to set a new size"
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	return cmd
 }
 
+func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
 // RunScale executes the scaling
-func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *resource.FilenameOptions) error {
+func (o *ScaleOptions) RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, shortOutput bool) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -114,7 +146,7 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		Unstructured().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(all, args...).
 		Flatten().
 		LabelSelectorParam(selector).
@@ -180,22 +212,20 @@ func RunScale(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 			}
 		}
 
-		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, patchType, err := cmdutil.ChangeResourcePatch(info, f.Command(cmd, true))
-			if err != nil {
-				return err
-			}
-			mapping := info.ResourceMapping()
+		// if the recorder makes a change, compute and create another patch
+		if mergePatch, err := o.Recorder.MakeRecordMergePatch(info.Object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
+		} else if len(mergePatch) > 0 {
 			client, err := f.UnstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			_, err = helper.Patch(info.Namespace, info.Name, patchType, patchBytes)
-			if err != nil {
-				return err
+			if _, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+				glog.V(4).Infof("error recording reason: %v", err)
 			}
 		}
+
 		counter++
 		cmdutil.PrintSuccess(shortOutput, out, info.Object, false, "scaled")
 		return nil

@@ -45,12 +45,10 @@ type SetSelectorOptions struct {
 	PrintFlags  *printers.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	local       bool
-	dryrun      bool
-	all         bool
-	record      bool
-	changeCause string
-	output      string
+	local  bool
+	dryrun bool
+	all    bool
+	output string
 
 	resources []string
 	selector  *metav1.LabelSelector
@@ -141,7 +139,6 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.changeCause = f.Command(cmd, false)
 	mapper, _ := f.Object()
 	o.mapper = mapper
 

@@ -9,9 +9,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/genericclioptions",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
     ],
 )
 

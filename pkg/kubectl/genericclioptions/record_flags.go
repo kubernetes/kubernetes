@@ -17,10 +17,12 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 // ChangeCauseAnnotation is the annotation indicating a guess at "why" something was changed
@@ -92,6 +94,7 @@ func NewRecordFlags() *RecordFlags {
 type Recorder interface {
 	// Record records why a runtime.Object was changed in an annotation.
 	Record(runtime.Object) error
+	MakeRecordMergePatch(runtime.Object) ([]byte, error)
 }
 
 // NoopRecorder does nothing.  It is a "do nothing" that can be returned so code doesn't switch on it.
@@ -100,6 +103,11 @@ type NoopRecorder struct{}
 // Record implements Recorder
 func (r NoopRecorder) Record(obj runtime.Object) error {
 	return nil
+}
+
+// MakeRecordMergePatch implements Recorder
+func (r NoopRecorder) MakeRecordMergePatch(obj runtime.Object) ([]byte, error) {
+	return nil, nil
 }
 
 // ChangeCauseRecorder annotates a "change-cause" to an input runtime object
@@ -121,4 +129,24 @@ func (r *ChangeCauseRecorder) Record(obj runtime.Object) error {
 	annotations[ChangeCauseAnnotation] = r.changeCause
 	accessor.SetAnnotations(annotations)
 	return nil
+}
+
+// MakeRecordMergePatch produces a merge patch for updating the recording annotation.
+func (r *ChangeCauseRecorder) MakeRecordMergePatch(obj runtime.Object) ([]byte, error) {
+	// copy so we don't mess with the original
+	objCopy := obj.DeepCopyObject()
+	if err := r.Record(objCopy); err != nil {
+		return nil, err
+	}
+
+	oldData, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	newData, err := json.Marshal(objCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonpatch.CreateMergePatch(oldData, newData)
 }

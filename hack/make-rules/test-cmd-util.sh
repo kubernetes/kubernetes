@@ -592,9 +592,10 @@ run_pod_tests() {
   # Post-condition: valid-pod's record annotation still contains command with --record=true
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*--record=true.*"
 
-  ### Record label change with unspecified flag and previous change already recorded
+  ### Record label change with specified flag and previous change already recorded
+  ### we are no longer tricked by data from another user into revealing more information about our client
   # Command
-  kubectl label pods valid-pod new-record-change=true "${kube_flags[@]}"
+  kubectl label pods valid-pod new-record-change=true --record=true "${kube_flags[@]}"
   # Post-condition: valid-pod's record annotation contains new change
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*new-record-change=true.*"
 

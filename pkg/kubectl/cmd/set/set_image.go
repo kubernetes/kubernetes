@@ -50,9 +50,7 @@ type SetImageOptions struct {
 	DryRun       bool
 	All          bool
 	Output       string
-	ChangeCause  string
 	Local        bool
-	Cmd          *cobra.Command
 	ResolveImage func(in string) (string, error)
 
 	PrintObj printers.ResourcePrinterFunc
@@ -138,11 +136,9 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
-	o.ChangeCause = f.Command(cmd, false)
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = f.ResolveImage
-	o.Cmd = cmd
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
