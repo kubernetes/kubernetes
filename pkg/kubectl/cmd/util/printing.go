@@ -251,7 +251,7 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 			* configmaps (aka 'cm')
 			* controllerrevisions
 			* cronjobs
-			* customresourcedefinition (aka 'crd')
+			* customresourcedefinitions (aka 'crd','crds')
 			* daemonsets (aka 'ds')
 			* deployments (aka 'deploy')
 			* endpoints (aka 'ep')
