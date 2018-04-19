@@ -52,7 +52,7 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 
 	role := obj.(*rbac.Role)
 	rules := role.Rules
-	if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
+	if err := rbacregistryvalidation.ConfirmNoEscalationInternal(ctx, s.ruleResolver, rules); err != nil {
 		return nil, errors.NewForbidden(groupResource, role.Name, err)
 	}
 	return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
@@ -72,7 +72,7 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 		}
 
 		rules := role.Rules
-		if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
+		if err := rbacregistryvalidation.ConfirmNoEscalationInternal(ctx, s.ruleResolver, rules); err != nil {
 			return nil, errors.NewForbidden(groupResource, role.Name, err)
 		}
 		return obj, nil

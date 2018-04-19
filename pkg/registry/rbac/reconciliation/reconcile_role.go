@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"reflect"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -51,10 +51,10 @@ type RuleOwner interface {
 	SetLabels(map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(map[string]string)
-	GetRules() []rbac.PolicyRule
-	SetRules([]rbac.PolicyRule)
-	GetAggregationRule() *rbac.AggregationRule
-	SetAggregationRule(*rbac.AggregationRule)
+	GetRules() []rbacv1.PolicyRule
+	SetRules([]rbacv1.PolicyRule)
+	GetAggregationRule() *rbacv1.AggregationRule
+	SetAggregationRule(*rbacv1.AggregationRule)
 	DeepCopyRuleOwner() RuleOwner
 }
 
@@ -75,9 +75,9 @@ type ReconcileClusterRoleResult struct {
 	Role RuleOwner
 
 	// MissingRules contains expected rules that were missing from the currently persisted role
-	MissingRules []rbac.PolicyRule
+	MissingRules []rbacv1.PolicyRule
 	// ExtraRules contains extra permissions the currently persisted role had
-	ExtraRules []rbac.PolicyRule
+	ExtraRules []rbacv1.PolicyRule
 
 	// MissingAggregationRuleSelectors contains expected selectors that were missing from the currently persisted role
 	MissingAggregationRuleSelectors []metav1.LabelSelector
@@ -112,7 +112,7 @@ func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, e
 	case errors.IsNotFound(err):
 		aggregationRule := o.Role.GetAggregationRule()
 		if aggregationRule == nil {
-			aggregationRule = &rbac.AggregationRule{}
+			aggregationRule = &rbacv1.AggregationRule{}
 		}
 		result = &ReconcileClusterRoleResult{
 			Role:                            o.Role,
@@ -178,7 +178,7 @@ func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, e
 func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions bool) (*ReconcileClusterRoleResult, error) {
 	result := &ReconcileClusterRoleResult{Operation: ReconcileNone}
 
-	result.Protected = (existing.GetAnnotations()[rbac.AutoUpdateAnnotationKey] == "false")
+	result.Protected = (existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false")
 
 	// Start with a copy of the existing object
 	result.Role = existing.DeepCopyRuleOwner()
@@ -223,7 +223,7 @@ func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions 
 		// add missing rules in the union case
 		aggregationRule := result.Role.GetAggregationRule()
 		if aggregationRule == nil {
-			aggregationRule = &rbac.AggregationRule{}
+			aggregationRule = &rbacv1.AggregationRule{}
 		}
 		aggregationRule.ClusterRoleSelectors = append(aggregationRule.ClusterRoleSelectors, result.MissingAggregationRuleSelectors...)
 		result.Role.SetAggregationRule(aggregationRule)
@@ -254,7 +254,7 @@ func merge(maps ...map[string]string) map[string]string {
 // aggregationRuleCovers determines whether or not the ownerSelectors cover the servantSelectors in terms of semantically
 // equal label selectors.
 // It returns whether or not the ownerSelectors cover and a list of the rules that the ownerSelectors do not cover.
-func aggregationRuleCovers(ownerRule, servantRule *rbac.AggregationRule) (bool, []metav1.LabelSelector) {
+func aggregationRuleCovers(ownerRule, servantRule *rbacv1.AggregationRule) (bool, []metav1.LabelSelector) {
 	switch {
 	case ownerRule == nil && servantRule == nil:
 		return true, []metav1.LabelSelector{}

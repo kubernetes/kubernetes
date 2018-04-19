@@ -20,6 +20,7 @@ package policybased
 import (
 	"context"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
@@ -66,7 +68,12 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 	}
 
-	rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
+	v1RoleRef := rbacv1.RoleRef{}
+	err := rbacv1helpers.Convert_rbac_RoleRef_To_v1_RoleRef(&roleBinding.RoleRef, &v1RoleRef, nil)
+	if err != nil {
+		return nil, err
+	}
+	rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +109,12 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 		}
 
 		// Otherwise, see if we already have all the permissions contained in the referenced role
-		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
+		v1RoleRef := rbacv1.RoleRef{}
+		err := rbacv1helpers.Convert_rbac_RoleRef_To_v1_RoleRef(&roleBinding.RoleRef, &v1RoleRef, nil)
+		if err != nil {
+			return nil, err
+		}
+		rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, namespace)
 		if err != nil {
 			return nil, err
 		}

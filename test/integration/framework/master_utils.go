@@ -199,6 +199,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		closeFn()
 		glog.Fatal(err)
 	}
+	var lastHealthContent []byte
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		result := privilegedClient.Get().AbsPath("/healthz").Do()
 		status := 0
@@ -206,10 +207,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		if status == 200 {
 			return true, nil
 		}
+		lastHealthContent, _ = result.Raw()
 		return false, nil
 	})
 	if err != nil {
 		closeFn()
+		glog.Errorf("last health content: %q", string(lastHealthContent))
 		glog.Fatal(err)
 	}
 

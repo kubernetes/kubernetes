@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
@@ -43,12 +43,12 @@ import (
 // semanticRoles is a few enumerated roles for which the relationships are well established
 // and we want to maintain symmetric roles
 type semanticRoles struct {
-	admin *rbac.ClusterRole
-	edit  *rbac.ClusterRole
-	view  *rbac.ClusterRole
+	admin *rbacv1.ClusterRole
+	edit  *rbacv1.ClusterRole
+	view  *rbacv1.ClusterRole
 }
 
-func getSemanticRoles(roles []rbac.ClusterRole) semanticRoles {
+func getSemanticRoles(roles []rbacv1.ClusterRole) semanticRoles {
 	ret := semanticRoles{}
 	for i := range roles {
 		role := roles[i]
@@ -81,10 +81,10 @@ func TestCovers(t *testing.T) {
 
 // additionalAdminPowers is the list of powers that we expect to be different than the editor role.
 // one resource per rule to make the "does not already contain" check easy
-var additionalAdminPowers = []rbac.PolicyRule{
-	rbac.NewRule("create").Groups("authorization.k8s.io").Resources("localsubjectaccessreviews").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.ReadWrite...).Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.ReadWrite...).Groups("rbac.authorization.k8s.io").Resources("roles").RuleOrDie(),
+var additionalAdminPowers = []rbacv1.PolicyRule{
+	rbacv1helpers.NewRule("create").Groups("authorization.k8s.io").Resources("localsubjectaccessreviews").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.ReadWrite...).Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.ReadWrite...).Groups("rbac.authorization.k8s.io").Resources("roles").RuleOrDie(),
 }
 
 func TestAdminEditRelationship(t *testing.T) {
@@ -92,7 +92,7 @@ func TestAdminEditRelationship(t *testing.T) {
 
 	// confirm that the edit role doesn't already have extra powers
 	for _, rule := range additionalAdminPowers {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.edit.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("edit has extra powers: %#v", rule)
 		}
 	}
@@ -109,19 +109,19 @@ func TestAdminEditRelationship(t *testing.T) {
 
 // viewEscalatingNamespaceResources is the list of rules that would allow privilege escalation attacks based on
 // ability to view (GET) them
-var viewEscalatingNamespaceResources = []rbac.PolicyRule{
-	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/attach").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/proxy").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/exec").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/portforward").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("secrets").RuleOrDie(),
-	rbac.NewRule(bootstrappolicy.Read...).Groups("").Resources("services/proxy").RuleOrDie(),
+var viewEscalatingNamespaceResources = []rbacv1.PolicyRule{
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/attach").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/proxy").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/exec").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("").Resources("pods/portforward").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("").Resources("secrets").RuleOrDie(),
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("").Resources("services/proxy").RuleOrDie(),
 }
 
 // ungettableResources is the list of rules that don't allow to view (GET) them
 // this is purposefully separate list to distinguish from escalating privs
-var ungettableResources = []rbac.PolicyRule{
-	rbac.NewRule(bootstrappolicy.Read...).Groups("apps", "extensions").Resources("deployments/rollback").RuleOrDie(),
+var ungettableResources = []rbacv1.PolicyRule{
+	rbacv1helpers.NewRule(bootstrappolicy.Read...).Groups("apps", "extensions").Resources("deployments/rollback").RuleOrDie(),
 }
 
 func TestEditViewRelationship(t *testing.T) {
@@ -143,7 +143,7 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't already have extra powers
 	for _, rule := range viewEscalatingNamespaceResources {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("view has extra powers: %#v", rule)
 		}
 	}
@@ -151,7 +151,7 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't have ungettable resources
 	for _, rule := range ungettableResources {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbac.PolicyRule{rule}); covers {
+		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("view has ungettable resource: %#v", rule)
 		}
 	}
