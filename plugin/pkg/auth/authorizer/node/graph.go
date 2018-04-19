@@ -173,28 +173,19 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 		return true
 	})
 	g.graph.VisitTo(vertex, func(neighbor graph.Node) bool {
-		// this upstream neighbor has only one edge (which must be to us), so remove them as well
 		if g.graph.Degree(neighbor) == 1 {
+			// this upstream neighbor has only one edge (which must be to us), so remove them as well
 			neighborsToRemove = append(neighborsToRemove, neighbor)
 		}
 		return true
 	})
 
 	// remove the vertex
-	g.graph.RemoveNode(vertex)
-	delete(g.vertices[vertexType][namespace], name)
-	if len(g.vertices[vertexType][namespace]) == 0 {
-		delete(g.vertices[vertexType], namespace)
-	}
+	g.removeVertex_locked(vertex)
 
 	// remove neighbors that are now edgeless
 	for _, neighbor := range neighborsToRemove {
-		g.graph.RemoveNode(neighbor)
-		n := neighbor.(*namedVertex)
-		delete(g.vertices[n.vertexType][n.namespace], n.name)
-		if len(g.vertices[n.vertexType][n.namespace]) == 0 {
-			delete(g.vertices[n.vertexType], n.namespace)
-		}
+		g.removeVertex_locked(neighbor.(*namedVertex))
 	}
 }
 
@@ -208,37 +199,36 @@ func (g *Graph) deleteEdges_locked(fromType, toType vertexType, toNamespace, toN
 		return
 	}
 
-	// get potential "from" verts that match fromType
-	namespaces, exists := g.vertices[fromType]
-	if !exists {
-		return
-	}
-
 	// delete all edges between vertices of fromType and toVert
-	removeVerts := []*namedVertex{}
-	for _, vertexMapping := range namespaces {
-		for _, fromVert := range vertexMapping {
-			if g.graph.HasEdgeBetween(fromVert, toVert) {
-				// remove the edge (no-op if edge doesn't exist)
-				g.graph.RemoveEdge(newDestinationEdge(fromVert, toVert, nil))
-				// remember to clean up the fromVert if we orphaned it
-				if g.graph.Degree(fromVert) == 0 {
-					removeVerts = append(removeVerts, fromVert)
-				}
-			}
+	neighborsToRemove := []*namedVertex{}
+	g.graph.VisitTo(toVert, func(from graph.Node) bool {
+		fromVert := from.(*namedVertex)
+		if fromVert.vertexType != fromType {
+			return true
 		}
-	}
+		// remove the edge
+		g.graph.RemoveEdge(simple.Edge{F: fromVert, T: toVert})
+		// track vertexes that changed edges
+		if g.graph.Degree(fromVert) == 0 {
+			neighborsToRemove = append(neighborsToRemove, fromVert)
+		}
+		return true
+	})
 
 	// clean up orphaned verts
-	for _, v := range removeVerts {
-		g.graph.RemoveNode(v)
-		delete(g.vertices[v.vertexType][v.namespace], v.name)
-		if len(g.vertices[v.vertexType][v.namespace]) == 0 {
-			delete(g.vertices[v.vertexType], v.namespace)
-		}
-		if len(g.vertices[v.vertexType]) == 0 {
-			delete(g.vertices, v.vertexType)
-		}
+	for _, v := range neighborsToRemove {
+		g.removeVertex_locked(v)
+	}
+}
+
+// must be called under write lock
+// removeVertex_locked removes the specified vertex from the graph and from the maintained indices.
+// It does nothing to indexes of neighbor vertices.
+func (g *Graph) removeVertex_locked(v *namedVertex) {
+	g.graph.RemoveNode(v)
+	delete(g.vertices[v.vertexType][v.namespace], v.name)
+	if len(g.vertices[v.vertexType][v.namespace]) == 0 {
+		delete(g.vertices[v.vertexType], v.namespace)
 	}
 }
 
@@ -265,22 +255,26 @@ func (g *Graph) AddPod(pod *api.Pod) {
 	//
 	// ref https://github.com/kubernetes/kubernetes/issues/58790
 	if len(pod.Spec.ServiceAccountName) > 0 {
-		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName), podVertex, nodeVertex))
+		serviceAccountVertex := g.getOrCreateVertex_locked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName)
+		g.graph.SetEdge(newDestinationEdge(serviceAccountVertex, podVertex, nodeVertex))
 	}
 
 	podutil.VisitPodSecretNames(pod, func(secret string) bool {
-		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret), podVertex, nodeVertex))
+		secretVertex := g.getOrCreateVertex_locked(secretVertexType, pod.Namespace, secret)
+		g.graph.SetEdge(newDestinationEdge(secretVertex, podVertex, nodeVertex))
 		return true
 	})
 
 	podutil.VisitPodConfigmapNames(pod, func(configmap string) bool {
-		g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(configMapVertexType, pod.Namespace, configmap), podVertex, nodeVertex))
+		configmapVertex := g.getOrCreateVertex_locked(configMapVertexType, pod.Namespace, configmap)
+		g.graph.SetEdge(newDestinationEdge(configmapVertex, podVertex, nodeVertex))
 		return true
 	})
 
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim != nil {
-			g.graph.SetEdge(newDestinationEdge(g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName), podVertex, nodeVertex))
+			pvcVertex := g.getOrCreateVertex_locked(pvcVertexType, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			g.graph.SetEdge(newDestinationEdge(pvcVertex, podVertex, nodeVertex))
 		}
 	}
 }
