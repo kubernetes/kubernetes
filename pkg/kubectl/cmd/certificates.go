@@ -26,6 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/staging/src/k8s.io/client-go/util/retry"
 
 	"github.com/spf13/cobra"
 )
@@ -184,16 +185,21 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 		if err != nil {
 			return err
 		}
-		csr := info.Object.(*certificates.CertificateSigningRequest)
-		csr, hasCondition, verb := modify(csr)
-		if !hasCondition || force {
-			csr, err = c.Certificates().
-				CertificateSigningRequests().
-				UpdateApproval(csr)
-			if err != nil {
+		var verb string
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if getErr := info.Get(); getErr != nil {
 				return err
 			}
-		}
+			csr := info.Object.(*certificates.CertificateSigningRequest)
+			csrToModify, hasCondition, modifyVerb := modify(csr.DeepCopy())
+			if !hasCondition || force {
+				if _, err = c.Certificates().CertificateSigningRequests().UpdateApproval(csrToModify); err != nil {
+					return err
+				}
+			}
+			verb = modifyVerb
+			return nil
+		})
 		found++
 		cmdutil.PrintSuccess(options.outputStyle == "name", out, info.Object, false, verb)
 		return nil
