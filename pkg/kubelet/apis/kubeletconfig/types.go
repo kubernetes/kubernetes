@@ -166,6 +166,9 @@ type KubeletConfiguration struct {
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
+	// Map of QoS resource reservation percentages (memory only for now).
+	// Requires the QOSReserved feature gate to be enabled.
+	QOSReserved map[string]string
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration
