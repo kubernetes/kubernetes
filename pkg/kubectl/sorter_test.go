@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -406,5 +407,69 @@ func TestSortingPrinter(t *testing.T) {
 		if !reflect.DeepEqual(test.obj, test.sort) {
 			t.Errorf("[%s]\nexpected:\n%v\nsaw:\n%v", test.name, test.sort, test.obj)
 		}
+	}
+}
+
+func TestRuntimeSortLess(t *testing.T) {
+	var testobj runtime.Object
+
+	testobj = &api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "b",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "c",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "a",
+				},
+			},
+		},
+	}
+
+	testobjs, err := meta.ExtractList(testobj)
+	if err != nil {
+		t.Fatalf("ExtractList testobj got unexpected error: %v", err)
+	}
+
+	testfield := "{.metadata.name}"
+	testruntimeSort := NewRuntimeSort(testfield, testobjs)
+	tests := []struct {
+		name         string
+		runtimeSort  *RuntimeSort
+		i            int
+		j            int
+		expectResult bool
+		expectErr    bool
+	}{
+		{
+			name:         "test less true",
+			runtimeSort:  testruntimeSort,
+			i:            0,
+			j:            1,
+			expectResult: true,
+		},
+		{
+			name:         "test less false",
+			runtimeSort:  testruntimeSort,
+			i:            1,
+			j:            2,
+			expectResult: false,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.runtimeSort.Less(test.i, test.j)
+			if result != test.expectResult {
+				t.Errorf("case[%d]:%s Expected result: %v, Got result: %v", i, test.name, test.expectResult, result)
+			}
+		})
 	}
 }
