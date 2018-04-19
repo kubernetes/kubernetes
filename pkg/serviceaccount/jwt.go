@@ -22,7 +22,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -139,8 +138,6 @@ type Validator interface {
 	// Validator requires to validate the JWT.
 	NewPrivateClaims() interface{}
 }
-
-var errMismatchedSigningMethod = errors.New("invalid signing method")
 
 func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
