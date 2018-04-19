@@ -208,7 +208,7 @@ func RunApply(flags *applyFlags) error {
 	glog.Infoln("")
 	glog.Infof("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
 	glog.Infoln("")
-	glog.Infoln("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets in turn.")
+	glog.Infoln("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
 
 	return nil
 }
