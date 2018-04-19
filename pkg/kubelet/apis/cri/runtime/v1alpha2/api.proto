@@ -252,7 +252,7 @@ message LinuxSandboxSecurityContext {
     // privileged containers are expected to be run.
     bool privileged = 6;
     // Seccomp profile for the sandbox, candidate values are:
-    // * docker/default: the default profile for the docker container runtime
+    // * runtime/default: the default profile for the container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
@@ -577,7 +577,7 @@ message LinuxContainerSecurityContext {
     //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9;
     // Seccomp profile for the container, candidate values are:
-    // * docker/default: the default profile for the docker container runtime
+    // * runtime/default: the default profile for the container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.

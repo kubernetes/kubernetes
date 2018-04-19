@@ -316,7 +316,7 @@ func restrictedPod(f *framework.Framework, name string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      "docker/default",
+				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
 				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
 			},
 		},
@@ -374,8 +374,8 @@ func restrictedPSPInPolicy(name string) *policy.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  "docker/default",
-				seccomp.DefaultProfileAnnotationKey:   "docker/default",
+				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
 				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
@@ -429,8 +429,8 @@ func restrictedPSP(name string) *extensionsv1beta1.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  "docker/default",
-				seccomp.DefaultProfileAnnotationKey:   "docker/default",
+				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
 				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
