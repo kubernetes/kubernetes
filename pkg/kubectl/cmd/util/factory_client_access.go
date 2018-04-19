@@ -35,6 +35,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"sync"
+
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -62,13 +64,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/transport"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type ring0Factory struct {
 	flags            *pflag.FlagSet
 	clientConfig     clientcmd.ClientConfig
 	discoveryFactory DiscoveryClientFactory
-	clientCache      *ClientCache
+
+	requireMatchedServerVersion bool
+	checkServerVersion          sync.Once
+	matchesServerVersionErr     error
 }
 
 func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientAccessFactory {
@@ -87,13 +93,10 @@ func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientA
 func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clientcmd.ClientConfig, discoveryFactory DiscoveryClientFactory) ClientAccessFactory {
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
-	clientCache := NewClientCache(clientConfig, discoveryFactory)
-
 	f := &ring0Factory{
 		flags:            flags,
 		clientConfig:     clientConfig,
 		discoveryFactory: discoveryFactory,
-		clientCache:      clientCache,
 	}
 
 	return f
@@ -202,22 +205,54 @@ func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, er
 }
 
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	return f.clientCache.KubernetesClientSetForVersion(nil)
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(clientConfig)
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
-	return f.clientCache.ClientSetForVersion(nil)
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return internalclientset.NewForConfig(clientConfig)
+}
+
+func (f *ring0Factory) checkMatchingServerVersion() error {
+	f.checkServerVersion.Do(func() {
+		if !f.requireMatchedServerVersion {
+			return
+		}
+		discoveryClient, err := f.DiscoveryClient()
+		if err != nil {
+			f.matchesServerVersionErr = err
+			return
+		}
+		f.matchesServerVersionErr = discovery.MatchesServerVersion(version.Get(), discoveryClient)
+	})
+
+	return f.matchesServerVersionErr
 }
 
 func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
+	if err := f.checkMatchingServerVersion(); err != nil {
+		return nil, err
+	}
+	clientConfig, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	setKubernetesDefaults(clientConfig)
+	return clientConfig, nil
 }
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientConfig.ClientConfig()
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
-	clientConfig, err := f.clientCache.ClientConfigForVersion(nil)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +430,7 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
-	flags.BoolVar(&f.clientCache.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+	flags.BoolVar(&f.requireMatchedServerVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 
 	f.discoveryFactory.BindFlags(flags)
 
@@ -710,4 +745,20 @@ func InternalVersionDecoder() runtime.Decoder {
 func InternalVersionJSONEncoder() runtime.Encoder {
 	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 	return unstructured.JSONFallbackEncoder{Encoder: encoder}
+}
+
+// setKubernetesDefaults sets default values on the provided client config for accessing the
+// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
+// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
+func setKubernetesDefaults(config *restclient.Config) error {
+	// TODO remove this hack.  This is allowing the GetOptions to be serialized.
+	config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
+
+	if config.APIPath == "" {
+		config.APIPath = "/api"
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = legacyscheme.Codecs
+	}
+	return restclient.SetKubernetesDefaults(config)
 }
