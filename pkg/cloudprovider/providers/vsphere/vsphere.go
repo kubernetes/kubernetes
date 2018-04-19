@@ -600,7 +600,8 @@ func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
 		return false, err
 	}
 	for _, node := range nodes {
-		if node.VMUUID == GetUUIDFromProviderID(providerID) {
+		// ProviderID is UUID for nodes v1.9.3+
+		if node.VMUUID == GetUUIDFromProviderID(providerID) || node.NodeName == providerID {
 			nodeName = node.NodeName
 			break
 		}
