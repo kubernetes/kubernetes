@@ -137,6 +137,9 @@ type Config struct {
 
 	// VolumeBinder handles PVC/PV binding for the pod.
 	VolumeBinder *volumebinder.VolumeBinder
+
+	// Disable pod preemption or not.
+	DisablePreemption bool
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
@@ -207,8 +210,9 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 // If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
 // It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
-	if !util.PodPriorityEnabled() {
-		glog.V(3).Infof("Pod priority feature is not enabled. No preemption is performed.")
+	if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
+		glog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
+			" No preemption is performed.")
 		return "", nil
 	}
 	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)

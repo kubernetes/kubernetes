@@ -133,6 +133,9 @@ type configFactory struct {
 
 	// always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
+
+	// Disable pod preemption or not.
+	disablePreemption bool
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -152,6 +155,7 @@ func NewConfigFactory(
 	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int32,
 	enableEquivalenceClassCache bool,
+	disablePreemption bool,
 ) scheduler.Configurator {
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
@@ -179,6 +183,7 @@ func NewConfigFactory(
 		schedulerName:                  schedulerName,
 		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		enableEquivalenceClassCache:    enableEquivalenceClassCache,
+		disablePreemption:              disablePreemption,
 	}
 
 	c.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -1064,7 +1069,20 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		glog.Info("Created equivalence class cache")
 	}
 
-	algo := core.NewGenericScheduler(c.schedulerCache, c.equivalencePodCache, c.podQueue, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, c.volumeBinder, c.pVCLister, c.alwaysCheckAllPredicates)
+	algo := core.NewGenericScheduler(
+		c.schedulerCache,
+		c.equivalencePodCache,
+		c.podQueue,
+		predicateFuncs,
+		predicateMetaProducer,
+		priorityConfigs,
+		priorityMetaProducer,
+		extenders,
+		c.volumeBinder,
+		c.pVCLister,
+		c.alwaysCheckAllPredicates,
+		c.disablePreemption,
+	)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{

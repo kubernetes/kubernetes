@@ -409,7 +409,18 @@ func TestGenericScheduler(t *testing.T) {
 		pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
 
 		scheduler := NewGenericScheduler(
-			cache, nil, NewSchedulingQueue(), test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyPriorityMetadataProducer, []algorithm.SchedulerExtender{}, nil, pvcLister, test.alwaysCheckAllPredicates)
+			cache,
+			nil,
+			NewSchedulingQueue(),
+			test.predicates,
+			algorithm.EmptyPredicateMetadataProducer,
+			test.prioritizers,
+			algorithm.EmptyPriorityMetadataProducer,
+			[]algorithm.SchedulerExtender{},
+			nil,
+			pvcLister,
+			test.alwaysCheckAllPredicates,
+			false)
 		machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
 		if !reflect.DeepEqual(err, test.wErr) {
@@ -1323,7 +1334,18 @@ func TestPreempt(t *testing.T) {
 			extenders = append(extenders, extender)
 		}
 		scheduler := NewGenericScheduler(
-			cache, nil, NewSchedulingQueue(), map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyPriorityMetadataProducer, extenders, nil, schedulertesting.FakePersistentVolumeClaimLister{}, false)
+			cache,
+			nil,
+			NewSchedulingQueue(),
+			map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
+			algorithm.EmptyPredicateMetadataProducer,
+			[]algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
+			algorithm.EmptyPriorityMetadataProducer,
+			extenders,
+			nil,
+			schedulertesting.FakePersistentVolumeClaimLister{},
+			false,
+			false)
 		// Call Preempt and check the expected results.
 		node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 		if err != nil {

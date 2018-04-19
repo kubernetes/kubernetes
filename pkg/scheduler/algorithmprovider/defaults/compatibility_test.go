@@ -579,6 +579,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Storage().V1().StorageClasses(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
+			false,
 		).CreateFromConfig(policy); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
