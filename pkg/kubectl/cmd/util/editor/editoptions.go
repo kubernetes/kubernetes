@@ -71,7 +71,6 @@ type EditOptions struct {
 	CmdNamespace    string
 	ApplyAnnotation bool
 	ChangeCause     string
-	Include3rdParty bool
 
 	Out    io.Writer
 	ErrOut io.Writer

@@ -89,7 +89,6 @@ func NewCmdScale(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	usage := "identifying the resource to set a new size"
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)

@@ -132,7 +132,6 @@ func NewCmdLabel(f cmdutil.Factory, out, errout io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd

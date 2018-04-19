@@ -117,7 +117,6 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
 
@@ -300,7 +299,6 @@ func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFla
 	editOptions.Output = cmdutil.GetFlagString(cmd, "output")
 	editOptions.ApplyAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	editOptions.RecordFlags = recordFlags
-	editOptions.Include3rdParty = cmdutil.GetFlagBool(cmd, "include-extended-apis")
 
 	err := editOptions.Complete(f, []string{}, cmd)
 	if err != nil {

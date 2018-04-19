@@ -54,7 +54,6 @@ func NewCmdClusterInfo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	cmd.AddCommand(NewCmdClusterInfoDump(f, out))
 	return cmd
 }
