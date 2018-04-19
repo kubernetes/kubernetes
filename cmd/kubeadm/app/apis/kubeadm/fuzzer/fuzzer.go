@@ -118,9 +118,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				},
 			}
 			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
-				Path:      "foo",
-				LogDir:    "/foo",
-				LogMaxAge: utilpointer.Int32Ptr(0),
+				Path:                  "foo",
+				LogDir:                "/foo",
+				LogMaxAge:             utilpointer.Int32Ptr(0),
+				WebhookConfigPath:     "foo",
+				WebhookInitialBackoff: "30s",
 			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {

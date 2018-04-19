@@ -93,6 +93,8 @@ func autoConvert_v1alpha1_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfigu
 	out.Path = in.Path
 	out.LogDir = in.LogDir
 	out.LogMaxAge = (*int32)(unsafe.Pointer(in.LogMaxAge))
+	out.WebhookConfigPath = in.WebhookConfigPath
+	out.WebhookInitialBackoff = in.WebhookInitialBackoff
 	return nil
 }
 
@@ -105,6 +107,8 @@ func autoConvert_kubeadm_AuditPolicyConfiguration_To_v1alpha1_AuditPolicyConfigu
 	out.Path = in.Path
 	out.LogDir = in.LogDir
 	out.LogMaxAge = (*int32)(unsafe.Pointer(in.LogMaxAge))
+	out.WebhookConfigPath = in.WebhookConfigPath
+	out.WebhookInitialBackoff = in.WebhookInitialBackoff
 	return nil
 }
 
