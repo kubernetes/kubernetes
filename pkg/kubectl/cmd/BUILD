@@ -93,6 +93,7 @@ go_library(
         "//pkg/util/interrupt:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",
+        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/github.com/daviddengcn/go-colortext:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
