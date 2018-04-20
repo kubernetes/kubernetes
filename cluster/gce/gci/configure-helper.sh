@@ -2149,7 +2149,12 @@ function update-prometheus-to-sd-parameters {
 
 # Updates parameters in yaml file for event-exporter configuration
 function update-event-exporter {
-    sed -i -e "s@{{ *event_exporter_zone *}}@${ZONE:-}@g" "$1"
+  if [[ "${MULTIMASTER:-}" == "true" ]]; then
+    local -r location=${REGION:-}
+  else
+    local -r location=${ZONE:-}
+  fi
+  sed -i -e "s@{{ *event_exporter_location *}}@${location}@g" "$1"
 }
 
 function update-dashboard-controller {
