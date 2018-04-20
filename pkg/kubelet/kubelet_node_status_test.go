@@ -642,8 +642,8 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	assert.Error(t, kubelet.updateNodeStatus())
 
 	// should have attempted multiple times
-	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts != nodeStatusUpdateRetry {
-		t.Errorf("Expected %d attempts, got %d", nodeStatusUpdateRetry, actualAttempts)
+	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts < nodeStatusUpdateRetry {
+		t.Errorf("Expected at least %d attempts, got %d", nodeStatusUpdateRetry, actualAttempts)
 	}
 }
 
