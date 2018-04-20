@@ -21,7 +21,3 @@ package volume
 func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 	return nil
 }
-
-func IsSameFSGroup(dir string, fsGroup int64) (bool, int, error) {
-	return true, int(fsGroup), nil
-}

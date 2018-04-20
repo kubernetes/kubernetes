@@ -274,7 +274,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if !notMnt {
 		return nil
 	}
-	refs, err := mount.GetMountRefsByDev(m.mounter, m.globalPath)
+	refs, err := m.mounter.GetMountRefs(m.globalPath)
 	if fsGroup != nil {
 		if err != nil {
 			glog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
@@ -285,11 +285,11 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		refs = m.filterPodMounts(refs)
 		if len(refs) > 0 {
 			fsGroupNew := int64(*fsGroup)
-			fsGroupSame, fsGroupOld, err := volume.IsSameFSGroup(m.globalPath, fsGroupNew)
+			fsGroupOld, err := m.mounter.GetFSGroup(m.globalPath)
 			if err != nil {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}
-			if !fsGroupSame {
+			if fsGroupNew != fsGroupOld {
 				m.plugin.recorder.Eventf(m.pod, v1.EventTypeWarning, events.WarnAlreadyMountedVolume, "The requested fsGroup is %d, but the volume %s has GID %d. The volume may not be shareable.", fsGroupNew, m.volName, fsGroupOld)
 			}
 		}
