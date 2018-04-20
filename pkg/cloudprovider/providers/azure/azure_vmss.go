@@ -627,13 +627,15 @@ func (ss *scaleSet) ensureHostsInVMSetPool(serviceName string, backendPoolID str
 			// the same network interface couldn't be added to more than one load balancer of
 			// the same type. Omit those nodes (e.g. masters) so Azure ARM won't complain
 			// about this.
-			backendPool := *newBackendPools[0].ID
-			matches := backendPoolIDRE.FindStringSubmatch(backendPool)
-			if len(matches) == 2 {
-				lbName := matches[1]
-				if strings.HasSuffix(lbName, InternalLoadBalancerNameSuffix) == isInternal {
-					glog.V(4).Infof("vmss %q has already been added to LB %q, omit adding it to a new one", vmSetName, lbName)
-					return nil
+			for _, pool := range newBackendPools {
+				backendPool := *pool.ID
+				matches := backendPoolIDRE.FindStringSubmatch(backendPool)
+				if len(matches) == 2 {
+					lbName := matches[1]
+					if strings.HasSuffix(lbName, InternalLoadBalancerNameSuffix) == isInternal {
+						glog.V(4).Infof("vmss %q has already been added to LB %q, omit adding it to a new one", vmSetName, lbName)
+						return nil
+					}
 				}
 			}
 		}
@@ -696,7 +698,7 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 
 	for ssName, instanceIDs := range scalesets {
 		// Only add nodes belonging to specified vmSet to basic LB backends.
-		if !ss.useStandardLoadBalancer() && ssName != vmSetName {
+		if !ss.useStandardLoadBalancer() && !strings.EqualFold(ssName, vmSetName) {
 			continue
 		}
 
@@ -859,7 +861,7 @@ func (ss *scaleSet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAd
 
 	for ssName := range scalesets {
 		// Only remove nodes belonging to specified vmSet to basic LB backends.
-		if !ss.useStandardLoadBalancer() && ssName != vmSetName {
+		if !ss.useStandardLoadBalancer() && !strings.EqualFold(ssName, vmSetName) {
 			continue
 		}
 
