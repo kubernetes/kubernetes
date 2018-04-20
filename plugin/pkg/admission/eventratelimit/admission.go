@@ -19,6 +19,8 @@ package eventratelimit
 import (
 	"io"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/util/flowcontrol"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -85,13 +87,17 @@ func (a *Plugin) Validate(attr admission.Attributes) (err error) {
 		return nil
 	}
 
-	var rejectionError error
+	var errors []error
 	// give each limit enforcer a chance to reject the event
 	for _, enforcer := range a.limitEnforcers {
 		if err := enforcer.accept(attr); err != nil {
-			rejectionError = err
+			errors = append(errors, err)
 		}
 	}
 
-	return rejectionError
+	if aggregatedErr := utilerrors.NewAggregate(errors); aggregatedErr != nil {
+		return apierrors.NewTooManyRequestsError(aggregatedErr.Error())
+	}
+
+	return nil
 }
