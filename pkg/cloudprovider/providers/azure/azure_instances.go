@@ -167,6 +167,10 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 		}
 		ssName, instanceID, err := extractVmssVMName(metadataName)
 		if err != nil {
+			if err == ErrorNotVmssInstance {
+				// Compose machineID for standard Node.
+				return az.getStandardMachineID(nodeName), nil
+			}
 			return "", err
 		}
 		// Compose instanceID based on ssName and instanceID for vmss instance.
