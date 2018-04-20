@@ -507,6 +507,13 @@ func BuildGenericConfig(
 			versionedInformers.Core().V1().Services().Lister(),
 		)
 	}
+	// resolve kubernetes.default.svc locally
+	localHost, err := url.Parse(genericConfig.LoopbackClientConfig.Host)
+	if err != nil {
+		lastErr = err
+		return
+	}
+	serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 
 	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
 	if err != nil {
