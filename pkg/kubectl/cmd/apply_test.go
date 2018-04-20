@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/cobra"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	corev1 "k8s.io/api/core/v1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,6 +90,7 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
+	filenameCM                = "../../../test/fixtures/pkg/kubectl/cmd/apply/cm.yaml"
 	filenameRC                = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
 	filenameRCArgs            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-args.yaml"
 	filenameRCLastAppliedArgs = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied-args.yaml"
@@ -104,6 +106,21 @@ const (
 	filenameWidgetClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
 	filenameWidgetServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
 )
+
+func readConfigMapList(t *testing.T, filename string) []byte {
+	data := readBytesFromFile(t, filename)
+	cmList := corev1.ConfigMapList{}
+	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &cmList); err != nil {
+		t.Fatal(err)
+	}
+
+	cmListBytes, err := runtime.Encode(testapi.Default.Codec(), &cmList)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return cmListBytes
+}
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
 	file, err := os.Open(filename)
@@ -253,6 +270,48 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 	}
 
 	return finish
+}
+
+func TestRunApplyPrintsValidObjectList(t *testing.T) {
+	initTestErrorHandler(t)
+	cmBytes := readConfigMapList(t, filenameCM)
+	pathCM := "/namespaces/test/configmaps"
+
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case strings.HasPrefix(p, pathCM) && m != "GET":
+				pod := ioutil.NopCloser(bytes.NewReader(cmBytes))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: pod}, nil
+			case strings.HasPrefix(p, pathCM) && m != "PATCH":
+				pod := ioutil.NopCloser(bytes.NewReader(cmBytes))
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: pod}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+	cmd.Flags().Set("filename", filenameCM)
+	cmd.Flags().Set("output", "json")
+	cmd.Flags().Set("dry-run", "true")
+	cmd.Run(cmd, []string{})
+
+	// ensure that returned list can be unmarshaled back into a configmap list
+	cmList := corev1.List{}
+	if err := runtime.DecodeInto(testapi.Default.Codec(), buf.Bytes(), &cmList); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestRunApplyViewLastApplied(t *testing.T) {
