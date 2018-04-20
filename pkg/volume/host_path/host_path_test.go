@@ -17,6 +17,7 @@ limitations under the License.
 package host_path
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -386,6 +387,14 @@ func (fftc *fakeFileTypeChecker) CleanSubPaths(_, _ string) error {
 
 func (fftc *fakeFileTypeChecker) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
+}
+
+func (fftc *fakeFileTypeChecker) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (fftc *fakeFileTypeChecker) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
 }
 
 func setUp() error {

@@ -91,6 +91,14 @@ func (mounter *fakeMounter) SafeMakeDir(_, _ string, _ os.FileMode) error {
 	return nil
 }
 
+func (mounter *fakeMounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mounter *fakeMounter) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
+}
+
 func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	name := path.Base(file)
 	if strings.HasPrefix(name, "mount") {

@@ -19,6 +19,7 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -162,4 +163,12 @@ func (fm *fakeMounter) CleanSubPaths(podDir string, volumeName string) error {
 
 func (fm *fakeMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return nil
+}
+
+func (fm *fakeMounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (fm *fakeMounter) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
 }

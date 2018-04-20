@@ -508,7 +508,7 @@ func (plugin *rbdPlugin) newUnmapperInternal(volName string, podUID types.UID, m
 }
 
 func (plugin *rbdPlugin) getDeviceNameFromOldMountPath(mounter mount.Interface, mountPath string) (string, error) {
-	refs, err := mount.GetMountRefsByDev(mounter, mountPath)
+	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return "", err
 	}

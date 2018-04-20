@@ -151,3 +151,11 @@ func (m *execMounter) CleanSubPaths(podDir string, volumeName string) error {
 func (m *execMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return m.wrappedMounter.SafeMakeDir(pathname, base, perm)
 }
+
+func (m *execMounter) GetMountRefs(pathname string) ([]string, error) {
+	return m.wrappedMounter.GetMountRefs(pathname)
+}
+
+func (m *execMounter) GetFSGroup(pathname string) (int64, error) {
+	return m.wrappedMounter.GetFSGroup(pathname)
+}

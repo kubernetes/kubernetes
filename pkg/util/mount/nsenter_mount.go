@@ -327,3 +327,19 @@ func (mounter *NsenterMounter) PrepareSafeSubpath(subPath Subpath) (newHostPath 
 func (mounter *NsenterMounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return doSafeMakeDir(pathname, base, perm)
 }
+
+func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
+	hostpath, err := mounter.ne.EvalSymlinks(pathname)
+	if err != nil {
+		return nil, err
+	}
+	return getMountRefsByDev(mounter, hostpath)
+}
+
+func (mounter *NsenterMounter) GetFSGroup(pathname string) (int64, error) {
+	kubeletpath, err := mounter.ne.KubeletPath(pathname)
+	if err != nil {
+		return 0, err
+	}
+	return getFSGroup(kubeletpath)
+}
