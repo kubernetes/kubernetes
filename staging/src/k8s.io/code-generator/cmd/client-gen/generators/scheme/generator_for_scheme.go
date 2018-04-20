@@ -62,7 +62,7 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 	for _, group := range g.Groups {
 		for _, version := range group.Versions {
 			packagePath := g.InputPackages[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}]
-			groupAlias := strings.ToLower(g.GroupGoNames[clientgentypes.GroupVersion{group.Group, version.Version}])
+			groupAlias := strings.ToLower(g.GroupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
 			if g.CreateRegistry {
 				// import the install package for internal clientsets instead of the type package with register.go
 				if version.Version != "" {
