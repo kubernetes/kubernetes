@@ -212,6 +212,11 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return false, fmt.Errorf("node %q cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
+	// Fast check to see if we know of a destination edge
+	if r.graph.destinationEdgeIndex[startingVertex.ID()].has(nodeVertex.ID()) {
+		return true, nil
+	}
+
 	found := false
 	traversal := &traverse.VisitingDepthFirst{
 		EdgeFilter: func(edge graph.Edge) bool {
