@@ -161,6 +161,10 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("listKind"), names.ListKind, "may have mixed case, but should otherwise match: "+strings.Join(errs, ",")))
 	}
 
+	if strings.HasSuffix(names.Kind, "List") {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), names.Kind, "may not end with List as kind name"))
+	}
+
 	for i, shortName := range names.ShortNames {
 		if errs := validationutil.IsDNS1035Label(shortName); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("shortNames").Index(i), shortName, strings.Join(errs, ",")))

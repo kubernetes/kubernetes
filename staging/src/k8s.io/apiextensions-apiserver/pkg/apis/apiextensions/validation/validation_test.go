@@ -164,6 +164,44 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 		},
 		{
+			name: "bad names 03 with List as Kind name",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kindList",
+						ListKind: "kindListList",
+					},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "scope"),
+				invalid("spec", "names", "kind"),
+			},
+		},
+		{
+			name: "lowercase list in the Kind",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Scope:   apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kindlist",
+						ListKind: "kindlistList",
+					},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
 			name: "additionalProperties and properties forbidden",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
