@@ -68,9 +68,9 @@ import (
 )
 
 type ring0Factory struct {
-	flags            *pflag.FlagSet
-	clientConfig     clientcmd.ClientConfig
-	discoveryFactory DiscoveryClientFactory
+	flags             *pflag.FlagSet
+	clientConfig      clientcmd.ClientConfig
+	discoveryCacheDir string
 
 	requireMatchedServerVersion bool
 	checkServerVersion          sync.Once
@@ -85,60 +85,14 @@ func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientA
 		clientConfig = DefaultClientConfig(flags)
 	}
 
-	return NewClientAccessFactoryFromDiscovery(flags, clientConfig, &discoveryFactory{clientConfig: clientConfig})
-}
-
-// NewClientAccessFactoryFromDiscovery allows an external caller to substitute a different discoveryFactory
-// Which allows for the client cache to be built in ring0, but still rely on a custom discovery client
-func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clientcmd.ClientConfig, discoveryFactory DiscoveryClientFactory) ClientAccessFactory {
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
 	f := &ring0Factory{
-		flags:            flags,
-		clientConfig:     clientConfig,
-		discoveryFactory: discoveryFactory,
+		flags:        flags,
+		clientConfig: clientConfig,
 	}
 
 	return f
-}
-
-type discoveryFactory struct {
-	clientConfig clientcmd.ClientConfig
-	cacheDir     string
-}
-
-func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	cfg, err := f.clientConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
-	cfg.Burst = 100
-
-	if f.cacheDir != "" {
-		wt := cfg.WrapTransport
-		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			if wt != nil {
-				rt = wt(rt)
-			}
-			return transport.NewCacheRoundTripper(f.cacheDir, rt)
-		}
-	}
-
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
-	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
-}
-
-func (f *discoveryFactory) BindFlags(flags *pflag.FlagSet) {
-	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
-	flags.StringVar(&f.cacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
@@ -201,7 +155,32 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 }
 
 func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return f.discoveryFactory.DiscoveryClient()
+	cfg, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// The more groups you have, the more discovery requests you need to make.
+	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
+	// double it just so we don't end up here again for a while.  This config is only used for discovery.
+	cfg.Burst = 100
+
+	if f.discoveryCacheDir != "" {
+		wt := cfg.WrapTransport
+		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			if wt != nil {
+				rt = wt(rt)
+			}
+			return transport.NewCacheRoundTripper(f.discoveryCacheDir, rt)
+		}
+	}
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
+	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -387,10 +366,6 @@ func (f *ring0Factory) LabelsForObject(object runtime.Object) (map[string]string
 	return meta.NewAccessor().Labels(object)
 }
 
-func (f *ring0Factory) FlagSet() *pflag.FlagSet {
-	return f.flags
-}
-
 // Set showSecrets false to filter out stuff like secrets.
 func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {
@@ -432,7 +407,8 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.requireMatchedServerVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 
-	f.discoveryFactory.BindFlags(flags)
+	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+	flags.StringVar(&f.discoveryCacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
