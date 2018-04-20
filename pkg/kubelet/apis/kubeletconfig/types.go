@@ -253,6 +253,8 @@ type KubeletConfiguration struct {
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
 	ContainerLogMaxFiles int32
+	// Auto rotate the kubelet client certificates the certificate expiration approaches.
+	RotateCertificates bool
 
 	/* following flags are meant for Node Allocatable */
 

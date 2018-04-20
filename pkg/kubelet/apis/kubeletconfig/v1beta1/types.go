@@ -410,6 +410,8 @@ type KubeletConfiguration struct {
 	// Default: 5
 	// +optional
 	ContainerLogMaxFiles *int32 `json:"containerLogMaxFiles,omitempty"`
+	// Auto rotate the kubelet client certificates the certificate expiration approaches.
+	RotateCertificates bool `json:"rotateCertificates,omitempty"`
 
 	/* following flags are meant for Node Allocatable */
 

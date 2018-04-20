@@ -203,6 +203,7 @@ var (
 		"ReadOnlyPort",
 		"RegistryBurst",
 		"RegistryPullQPS",
+		"RotateCertificates",
 		"RuntimeRequestTimeout.Duration",
 		"SerializeImagePulls",
 		"StreamingConnectionIdleTimeout.Duration",
