@@ -20,10 +20,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
+
+var validNonResourceVerbs = sets.NewString("*", "get", "post", "put", "delete", "patch", "head", "options")
 
 // Minimal validation of names for roles and bindings. Identical to the validation for Openshift. See:
 // * https://github.com/kubernetes/kubernetes/blob/60db50/pkg/api/validation/name.go
@@ -104,6 +107,11 @@ func validatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.
 		}
 		if len(rule.APIGroups) > 0 || len(rule.Resources) > 0 || len(rule.ResourceNames) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceURLs"), rule.NonResourceURLs, "rules cannot apply to both regular resources and non-resource URLs"))
+		}
+		verbs := sets.NewString(rule.Verbs...)
+		illegalVerbs := verbs.Difference(validNonResourceVerbs)
+		if len(illegalVerbs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("verbs"), rule.Verbs, "invalid verb for nonResourceURL"))
 		}
 		return allErrs
 	}
