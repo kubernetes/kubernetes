@@ -71,6 +71,8 @@ type ClusterOverrideFlags struct {
 	APIVersion            FlagInfo
 	CertificateAuthority  FlagInfo
 	InsecureSkipTLSVerify FlagInfo
+	ProxyNetworkType      FlagInfo
+	ProxyAddress          FlagInfo
 }
 
 // FlagInfo contains information about how to register a flag.  This struct is useful if you want to provide a way for an extender to
@@ -146,6 +148,8 @@ const (
 	FlagNamespace        = "namespace"
 	FlagAPIServer        = "server"
 	FlagInsecure         = "insecure-skip-tls-verify"
+	FlagProxyNetworkType = "proxy-network-type"
+	FlagProxyAddress     = "proxy-address"
 	FlagCertFile         = "client-certificate"
 	FlagKeyFile          = "client-key"
 	FlagCAFile           = "certificate-authority"
@@ -189,6 +193,8 @@ func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
 		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert file for the certificate authority"},
 		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
+		ProxyNetworkType:      FlagInfo{prefix + FlagProxyNetworkType, "", "", "A type of network to proxy outgoing requests over. Examples are tcp and udp. See https://golang.org/pkg/net/#Dial for all options. If this flag is provided, proxy-address must also be provided"},
+		ProxyAddress:          FlagInfo{prefix + FlagProxyAddress, "", "", "An address to proxy outbound requests over. For example, localhost:3000. See https://golang.org/pkg/net/#Dial for other options. If this flag is provided, proxy-network-type must also be provided"},
 	}
 }
 
@@ -226,6 +232,8 @@ func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, f
 	flagNames.APIServer.BindStringFlag(flags, &clusterInfo.Server)
 	flagNames.CertificateAuthority.BindStringFlag(flags, &clusterInfo.CertificateAuthority)
 	flagNames.InsecureSkipTLSVerify.BindBoolFlag(flags, &clusterInfo.InsecureSkipTLSVerify)
+	flagNames.ProxyAddress.BindStringFlag(flags, &clusterInfo.ProxyAddress)
+	flagNames.ProxyNetworkType.BindStringFlag(flags, &clusterInfo.ProxyNetworkType)
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables

@@ -373,6 +373,61 @@ func TestCreateMissingContext(t *testing.T) {
 	}
 }
 
+func TestCreateWithProxy(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterDefaults: clientcmdapi.Cluster{
+			ProxyNetworkType: "tcp",
+			ProxyAddress:     "localhost:8080",
+		},
+	}, nil)
+
+	cfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// unfortunately it is hard to test that the dial is hitting the right proxy
+	if cfg.Dial == nil {
+		t.Fatalf("Expected dial function to be non-nil since a proxy is provided")
+	}
+}
+
+func TestCreateWithProxyWithMissingNetworkType(t *testing.T) {
+	const expectedErrorContains = "Either both or neither of proxy-address and proxy-network-type must be provided"
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterDefaults: clientcmdapi.Cluster{
+			ProxyNetworkType: "tcp",
+		},
+	}, nil)
+
+	_, err := clientBuilder.ClientConfig()
+	if err == nil {
+		t.Fatalf("Expected error: %v", expectedErrorContains)
+	}
+	if !strings.Contains(err.Error(), expectedErrorContains) {
+		t.Fatalf("Expected error: %v, but got %v", expectedErrorContains, err)
+	}
+}
+
+func TestCreateWithProxyWithMissingAddress(t *testing.T) {
+	const expectedErrorContains = "Either both or neither of proxy-address and proxy-network-type must be provided"
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterDefaults: clientcmdapi.Cluster{
+			ProxyAddress: "localhost:8080",
+		},
+	}, nil)
+
+	_, err := clientBuilder.ClientConfig()
+	if err == nil {
+		t.Fatalf("Expected error: %v", expectedErrorContains)
+	}
+	if !strings.Contains(err.Error(), expectedErrorContains) {
+		t.Fatalf("Expected error: %v, but got %v", expectedErrorContains, err)
+	}
+}
+
 func TestInClusterClientConfigPrecedence(t *testing.T) {
 	tt := []struct {
 		overrides *ConfigOverrides
@@ -438,6 +493,14 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			},
 		},
 		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
+					ProxyNetworkType: "tcp",
+					ProxyAddress:     "localhost:8080",
+				},
+			},
+		},
+		{
 			overrides: &ConfigOverrides{},
 		},
 	}
@@ -446,6 +509,7 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		expectedServer := "https://host-from-cluster.com"
 		expectedToken := "token-from-cluster"
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
+		expectedDialToBeNil := true
 
 		icc := &inClusterClientConfig{
 			inClusterConfigProvider: func() (*restclient.Config, error) {
@@ -474,6 +538,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if overridenCAFile := tc.overrides.ClusterInfo.CertificateAuthority; len(overridenCAFile) > 0 {
 			expectedCAFile = overridenCAFile
 		}
+		if overridenProxyAddress := tc.overrides.ClusterInfo.ProxyAddress; len(overridenProxyAddress) > 0 {
+			expectedDialToBeNil = false
+		}
 
 		if clientConfig.Host != expectedServer {
 			t.Errorf("Expected server %v, got %v", expectedServer, clientConfig.Host)
@@ -483,6 +550,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)
+		}
+		if (clientConfig.Dial == nil) != expectedDialToBeNil {
+			t.Errorf("Expected dial to be nil: %v, got %v", expectedDialToBeNil, clientConfig.Dial == nil)
 		}
 	}
 }

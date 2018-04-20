@@ -51,6 +51,11 @@ func Example_ofOptionsConfig() {
 		Server:                "https://bravo.org:8080",
 		InsecureSkipTLSVerify: false,
 	}
+	defaultConfig.Clusters["charlie"] = &Cluster{
+		Server:           "https://charlie.org:8080",
+		ProxyNetworkType: "unix",
+		ProxyAddress:     "/tmp/sock",
+	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
 		ClientCertificate: "path/to/my/client-cert-filename",
 		ClientKey:         "path/to/my/client-key-filename",
@@ -99,6 +104,11 @@ func Example_ofOptionsConfig() {
 	//   bravo:
 	//     LocationOfOrigin: ""
 	//     server: https://bravo.org:8080
+	//   charlie:
+	//     LocationOfOrigin: ""
+	//     proxy-address: /tmp/sock
+	//     proxy-network-type: unix
+	//     server: https://charlie.org:8080
 	// contexts:
 	//   alfa-as-black-mage:
 	//     LocationOfOrigin: ""
