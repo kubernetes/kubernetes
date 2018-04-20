@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ var _ = SIGDescribe("api-namespaces-create", func() {
 		   Testname: api-namespaces-create-name-valid
 		   Description: Check that creating a namespace with valid name parameter succeeds.
 		*/
-		framework.ConformanceIt("creating a namespace with only (valid) name parameter should succed", func() {
+		framework.ConformanceIt("creating a namespace with only (valid) name parameter should succeed", func() {
 			namespaceName :=
 				strings.Join([]string{"testbasename", string(uuid.NewUUID())}, "")
 
