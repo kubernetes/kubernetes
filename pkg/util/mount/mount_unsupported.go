@@ -126,3 +126,11 @@ func (mounter *Mounter) CleanSubPaths(podDir string, volumeName string) error {
 func (mounter *Mounter) SafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	return unsupportedErr
 }
+
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+	return -1, errors.New("not implemented")
+}
