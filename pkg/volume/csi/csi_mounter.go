@@ -219,6 +219,34 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	// apply volume ownership
+	if !c.readOnly && fsGroup != nil {
+		err := volume.SetVolumeOwnership(c, fsGroup)
+		if err != nil {
+			// attempt to rollback mount.
+			glog.Error(log("mounter.SetupAt failed to set fsgroup volume ownership for [%s]: %v", c.volumeID, err))
+			glog.V(4).Info(log("mounter.SetupAt attempting to unpublish volume %s due to previous error", c.volumeID))
+			if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
+				glog.Error(log(
+					"mounter.SetupAt failed to unpublish volume [%s]: %v (caused by previous NodePublish error: %v)",
+					c.volumeID, unpubErr, err,
+				))
+				return fmt.Errorf("%v (caused by %v)", unpubErr, err)
+			}
+
+			if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
+				glog.Error(log(
+					"mounter.SetupAt failed to clean mount dir [%s]: %v (caused by previous NodePublish error: %v)",
+					dir, unmountErr, err,
+				))
+				return fmt.Errorf("%v (caused by %v)", unmountErr, err)
+			}
+
+			return err
+		}
+		glog.V(4).Info(log("mounter.SetupAt sets fsGroup to [%d] for %s", *fsGroup, c.volumeID))
+	}
+
 	glog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
 	return nil
 }
