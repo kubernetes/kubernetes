@@ -52,20 +52,22 @@ const (
 )
 
 type TestClusterValues struct {
-	ProjectID   string
-	Region      string
-	ZoneName    string
-	ClusterID   string
-	ClusterName string
+	ProjectID         string
+	Region            string
+	ZoneName          string
+	SecondaryZoneName string
+	ClusterID         string
+	ClusterName       string
 }
 
 func DefaultTestClusterValues() TestClusterValues {
 	return TestClusterValues{
-		ProjectID:   "test-project",
-		Region:      "us-central1",
-		ZoneName:    "us-central1-b",
-		ClusterID:   "test-cluster-id",
-		ClusterName: "Test Cluster Name",
+		ProjectID:         "test-project",
+		Region:            "us-central1",
+		ZoneName:          "us-central1-b",
+		SecondaryZoneName: "us-central1-c",
+		ClusterID:         "test-cluster-id",
+		ClusterName:       "Test Cluster Name",
 	}
 }
 
