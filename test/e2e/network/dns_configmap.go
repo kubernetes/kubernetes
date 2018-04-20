@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -32,6 +33,13 @@ type dnsFederationsConfigMapTest struct {
 	fedMap  map[string]string
 	isValid bool
 }
+
+var (
+	googleDnsHostname = "google-public-dns-a.google.com"
+	// The ConfigMap update mechanism takes longer than the standard
+	// wait.ForeverTestTimeout.
+	moreForeverTestTimeout = 2 * 60 * time.Second
+)
 
 var _ = SIGDescribe("DNS configMap federations", func() {
 
@@ -156,10 +164,6 @@ func (t *dnsNameserverTest) run() {
 		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
 	}})
 
-	// The ConfigMap update mechanism takes longer than the standard
-	// wait.ForeverTestTimeout.
-	moreForeverTestTimeout := 2 * 60 * time.Second
-
 	t.checkDNSRecordFrom(
 		"abc.acme.local",
 		func(actual []string) bool { return len(actual) == 1 && actual[0] == "1.1.1.1" },
@@ -199,11 +203,16 @@ func (t *dnsPtrFwdTest) run() {
 	t.createDNSServerWithPtrRecord()
 	defer t.deleteDNSServerPod()
 
+	// Should still be able to lookup public nameserver without explicit upstream nameserver set.
+	t.checkDNSRecordFrom(
+		"8.8.8.8.in-addr.arpa",
+		func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDnsHostname+"." },
+		"dnsmasq",
+		moreForeverTestTimeout)
+
 	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
 	}})
-
-	moreForeverTestTimeout := 2 * 60 * time.Second
 
 	t.checkDNSRecordFrom(
 		"123.2.0.192.in-addr.arpa",
@@ -211,12 +220,69 @@ func (t *dnsPtrFwdTest) run() {
 		"dnsmasq",
 		moreForeverTestTimeout)
 
-	t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
+	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{}})
 	t.checkDNSRecordFrom(
 		"123.2.0.192.in-addr.arpa",
 		func(actual []string) bool { return len(actual) == 0 },
 		"dnsmasq",
 		moreForeverTestTimeout)
+}
+
+type dnsExternalNameTest struct {
+	dnsTestCommon
+}
+
+func (t *dnsExternalNameTest) run() {
+	t.init()
+
+	t.createUtilPod()
+	defer t.deleteUtilPod()
+
+	fooHostname := "foo.example.com"
+	t.createDNSServer(map[string]string{
+		fooHostname: "192.0.2.123",
+	})
+	defer t.deleteDNSServerPod()
+
+	f := t.f
+	serviceName := "dns-externalname-upstream-test"
+	externalNameService := framework.CreateServiceSpec(serviceName, googleDnsHostname, false, nil)
+	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService); err != nil {
+		Fail(fmt.Sprintf("Failed when creating service: %v", err))
+	}
+	serviceNameLocal := "dns-externalname-upstream-local"
+	externalNameServiceLocal := framework.CreateServiceSpec(serviceNameLocal, fooHostname, false, nil)
+	if _, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameServiceLocal); err != nil {
+		Fail(fmt.Sprintf("Failed when creating service: %v", err))
+	}
+	defer func() {
+		By("deleting the test externalName service")
+		defer GinkgoRecover()
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
+		f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameServiceLocal.Name, nil)
+	}()
+
+	t.checkDNSRecordFrom(
+		fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name),
+		func(actual []string) bool {
+			return len(actual) >= 1 && actual[0] == googleDnsHostname+"."
+		},
+		"dnsmasq",
+		moreForeverTestTimeout)
+
+	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
+		"upstreamNameservers": fmt.Sprintf(`["%v"]`, t.dnsServerPod.Status.PodIP),
+	}})
+
+	t.checkDNSRecordFrom(
+		fmt.Sprintf("%s.%s.svc.cluster.local", serviceNameLocal, f.Namespace.Name),
+		func(actual []string) bool {
+			return len(actual) == 2 && actual[0] == fooHostname+"." && actual[1] == "192.0.2.123"
+		},
+		"dnsmasq",
+		moreForeverTestTimeout)
+
+	t.setConfigMap(&v1.ConfigMap{Data: map[string]string{}})
 }
 
 var _ = SIGDescribe("DNS configMap nameserver", func() {
@@ -236,6 +302,15 @@ var _ = SIGDescribe("DNS configMap nameserver", func() {
 		It("should forward PTR records lookup to upstream nameserver [Slow][Serial]", func() {
 			fwdTest.c = fwdTest.f.ClientSet
 			fwdTest.run()
+		})
+	})
+
+	Context("Forward external name lookup", func() {
+		externalNameTest := &dnsExternalNameTest{dnsTestCommon: newDnsTestCommon()}
+
+		It("should forward externalname lookup to upstream nameserver [Slow][Serial]", func() {
+			externalNameTest.c = externalNameTest.f.ClientSet
+			externalNameTest.run()
 		})
 	})
 })
