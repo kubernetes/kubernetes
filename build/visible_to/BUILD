@@ -200,6 +200,7 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/create",
         "//pkg/kubectl/cmd/resource",
+        "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/explain",
     ],

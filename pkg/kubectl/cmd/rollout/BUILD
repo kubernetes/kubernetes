@@ -1,6 +1,7 @@
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -47,5 +48,21 @@ filegroup(
     tags = ["automanaged"],
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_rollout_CONSUMERS",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["rollout_pause_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/kubectl/cmd/testing:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/rest/fake:go_default_library",
     ],
 )
