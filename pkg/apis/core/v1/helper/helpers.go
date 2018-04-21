@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -244,6 +245,71 @@ func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (label
 		selector = selector.Add(*r)
 	}
 	return selector, nil
+}
+
+// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// fields.Selector.
+func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
+	if len(nsm) == 0 {
+		return fields.Nothing(), nil
+	}
+
+	selectors := []fields.Selector{}
+	for _, expr := range nsm {
+		switch expr.Operator {
+		case v1.NodeSelectorOpIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
+
+		case v1.NodeSelectorOpNotIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
+
+		default:
+			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
+		}
+	}
+
+	return fields.AndSelectors(selectors...), nil
+}
+
+// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
+// nil or empty term matches no objects.
+func MatchNodeSelectorTerms(
+	nodeSelectorTerms []v1.NodeSelectorTerm,
+	nodeLabels labels.Set,
+	nodeFields fields.Set,
+) bool {
+	for _, req := range nodeSelectorTerms {
+		// nil or empty term selects no objects
+		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
+			continue
+		}
+
+		if len(req.MatchExpressions) != 0 {
+			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
+			if err != nil || !labelSelector.Matches(nodeLabels) {
+				continue
+			}
+		}
+
+		if len(req.MatchFields) != 0 {
+			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
+			if err != nil || !fieldSelector.Matches(nodeFields) {
+				continue
+			}
+		}
+
+		return true
+	}
+
+	return false
 }
 
 // AddOrUpdateTolerationInPodSpec tries to add a toleration to the toleration list in PodSpec.

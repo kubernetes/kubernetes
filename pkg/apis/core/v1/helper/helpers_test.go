@@ -25,6 +25,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -560,5 +561,234 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
 			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
 		}
+	}
+}
+
+func TestMatchNodeSelectorTerms(t *testing.T) {
+	type args struct {
+		nodeSelectorTerms []v1.NodeSelectorTerm
+		nodeLabels        labels.Set
+		nodeFields        fields.Set
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "nil terms",
+			args: args{
+				nodeSelectorTerms: nil,
+				nodeLabels:        nil,
+				nodeFields:        nil,
+			},
+			want: false,
+		},
+		{
+			name: "node label matches matchExpressions terms",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+					},
+				},
+				nodeLabels: map[string]string{"label_1": "label_1_val"},
+				nodeFields: nil,
+			},
+			want: true,
+		},
+		{
+			name: "node field matches matchFields terms",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: nil,
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "invalid node field requirement",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1, host_2"},
+						}},
+					},
+				},
+				nodeLabels: nil,
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "fieldSelectorTerm with node labels",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: map[string]string{
+					"metadata.name": "host_1",
+				},
+				nodeFields: nil,
+			},
+			want: false,
+		},
+		{
+			name: "labelSelectorTerm with node fields",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: nil,
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "labelSelectorTerm and fieldSelectorTerm was set, but only node fields",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: nil,
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "labelSelectorTerm and fieldSelectorTerm was set, both node fields and labels (both matched)",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: map[string]string{
+					"label_1": "label_1_val",
+				},
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "labelSelectorTerm and fieldSelectorTerm was set, both node fields and labels (one mismatched)",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: map[string]string{
+					"label_1": "label_1_val-failed",
+				},
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "multi-selector was set, both node fields and labels (one mismatched)",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+					},
+					{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: map[string]string{
+					"label_1": "label_1_val-failed",
+				},
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MatchNodeSelectorTerms(tt.args.nodeSelectorTerms, tt.args.nodeLabels, tt.args.nodeFields); got != tt.want {
+				t.Errorf("MatchNodeSelectorTermsORed() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
