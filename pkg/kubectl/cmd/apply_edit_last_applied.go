@@ -17,14 +17,13 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var (
@@ -57,8 +56,8 @@ var (
 		kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
-func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := editor.NewEditOptions(editor.ApplyEditMode, out, errOut)
+func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	validArgs := cmdutil.ValidArgList(f)
 

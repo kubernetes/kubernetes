@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -68,8 +68,8 @@ var (
 		kubectl edit deployment/mydeployment -o yaml --save-config`))
 )
 
-func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := editor.NewEditOptions(editor.NormalEditMode, out, errOut)
+func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := editor.NewEditOptions(editor.NormalEditMode, ioStreams)
 	o.ValidateOptions = cmdutil.ValidateOptions{EnableValidation: true}
 
 	validArgs := cmdutil.ValidArgList(f)

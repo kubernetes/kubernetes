@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1"}
@@ -112,8 +113,7 @@ func TestCreateRoleBinding(t *testing.T) {
 		},
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateRoleBinding(tf, buf)
+	cmd := NewCmdCreateRoleBinding(tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("role", "fake-role")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")

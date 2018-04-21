@@ -50,11 +50,11 @@ type CreateOptions struct {
 	Selector         string
 	EditBeforeCreate bool
 	Raw              string
-	Out              io.Writer
-	ErrOut           io.Writer
 
 	Recorder genericclioptions.Recorder
 	PrintObj func(obj kruntime.Object) error
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -74,20 +74,19 @@ var (
 		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
-func NewCreateOptions(out, errOut io.Writer) *CreateOptions {
+func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
 		PrintFlags:  NewPrintFlags("created"),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		Out:    out,
-		ErrOut: errOut,
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := NewCreateOptions(out, errOut)
+func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use: "create -f FILENAME",
@@ -97,7 +96,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
+				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
 				defaultRunFunc(cmd, args)
 				return
 			}
@@ -125,20 +124,20 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	o.PrintFlags.AddFlags(cmd)
 
 	// create subcommands
-	cmd.AddCommand(NewCmdCreateNamespace(f, out))
-	cmd.AddCommand(NewCmdCreateQuota(f, out))
-	cmd.AddCommand(NewCmdCreateSecret(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
-	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
-	cmd.AddCommand(NewCmdCreateService(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateDeployment(f, out, errOut))
-	cmd.AddCommand(NewCmdCreateClusterRole(f, out))
-	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, out))
-	cmd.AddCommand(NewCmdCreateRole(f, out))
-	cmd.AddCommand(NewCmdCreateRoleBinding(f, out))
-	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, out))
-	cmd.AddCommand(NewCmdCreatePriorityClass(f, out))
-	cmd.AddCommand(NewCmdCreateJob(f, out))
+	cmd.AddCommand(NewCmdCreateNamespace(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateQuota(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateSecret(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateConfigMap(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateServiceAccount(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateService(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateDeployment(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateClusterRole(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateClusterRoleBinding(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateRole(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateRoleBinding(f, ioStreams))
+	cmd.AddCommand(NewCmdCreatePodDisruptionBudget(f, ioStreams))
+	cmd.AddCommand(NewCmdCreatePriorityClass(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateJob(f, ioStreams))
 	return cmd
 }
 
@@ -207,7 +206,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	if o.EditBeforeCreate {
-		return RunEditOnCreate(f, o.RecordFlags, o.Out, o.ErrOut, cmd, &o.FilenameOptions)
+		return RunEditOnCreate(f, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
@@ -292,8 +291,8 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 	return nil
 }
 
-func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFlags, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
-	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, out, errOut)
+func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions) error {
+	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
 	editOptions.FilenameOptions = *options
 	editOptions.ValidateOptions = cmdutil.ValidateOptions{
 		EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
@@ -341,8 +340,14 @@ type CreateSubcommandOptions struct {
 
 	PrintObj func(obj kruntime.Object) error
 
-	CmdOut io.Writer
-	CmdErr io.Writer
+	genericclioptions.IOStreams
+}
+
+func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
+	return &CreateSubcommandOptions{
+		PrintFlags: NewPrintFlags("created"),
+		IOStreams:  ioStreams,
+	}
 }
 
 func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, generator kubectl.StructuredGenerator) error {
@@ -365,7 +370,7 @@ func (o *CreateSubcommandOptions) Complete(cmd *cobra.Command, args []string, ge
 	}
 
 	o.PrintObj = func(obj kruntime.Object) error {
-		return printer.PrintObj(obj, o.CmdOut)
+		return printer.PrintObj(obj, o.Out)
 	}
 
 	return nil

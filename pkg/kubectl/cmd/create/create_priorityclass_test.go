@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreatePriorityClass(t *testing.T) {
@@ -47,11 +48,11 @@ func TestCreatePriorityClass(t *testing.T) {
 		}),
 	}
 	tf.ClientConfigVal = &restclient.Config{}
-	buf := bytes.NewBuffer([]byte{})
 
 	outputFormat := "name"
 
-	cmd := NewCmdCreatePriorityClass(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreatePriorityClass(tf, ioStreams)
 	cmd.Flags().Set("value", "1000")
 	cmd.Flags().Set("global-default", "true")
 	cmd.Flags().Set("description", "my priority")
@@ -64,8 +65,8 @@ func TestCreatePriorityClass(t *testing.T) {
 	options := &PriorityClassOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
 			PrintFlags: printFlags,
-			CmdOut:     buf,
 			Name:       pcName,
+			IOStreams:  ioStreams,
 		},
 	}
 	err := options.Complete(cmd, []string{pcName})

@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreateClusterRoleBinding(t *testing.T) {
@@ -111,8 +112,8 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	}
 
 	expectedOutput := "clusterrolebinding.rbac.authorization.k8s.io/" + expectBinding.Name + "\n"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateClusterRoleBinding(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateClusterRoleBinding(tf, ioStreams)
 	cmd.Flags().Set("clusterrole", "fake-clusterrole")
 	cmd.Flags().Set("user", "fake-user")
 	cmd.Flags().Set("group", "fake-group")

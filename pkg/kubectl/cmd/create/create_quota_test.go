@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -75,8 +75,8 @@ func TestCreateQuota(t *testing.T) {
 		},
 	}
 	for name, test := range tests {
-		buf := bytes.NewBuffer([]byte{})
-		cmd := NewCmdCreateQuota(tf, buf)
+		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+		cmd := NewCmdCreateQuota(tf, ioStreams)
 		cmd.Flags().Parse(test.flags)
 		cmd.Flags().Set("output", "name")
 		cmd.Run(cmd, []string{resourceQuotaObject.Name})

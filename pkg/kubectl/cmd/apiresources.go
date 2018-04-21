@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -53,12 +54,12 @@ var (
 // ApiResourcesOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ApiResourcesOptions struct {
-	out io.Writer
-
 	Output     string
 	APIGroup   string
 	Namespaced bool
 	NoHeaders  bool
+
+	genericclioptions.IOStreams
 }
 
 // groupResource contains the APIGroup and APIResource
@@ -67,10 +68,14 @@ type groupResource struct {
 	APIResource metav1.APIResource
 }
 
-func NewCmdApiResources(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ApiResourcesOptions{
-		out: out,
+func NewAPIResourceOptions(ioStreams genericclioptions.IOStreams) *ApiResourcesOptions {
+	return &ApiResourcesOptions{
+		IOStreams: ioStreams,
 	}
+}
+
+func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewAPIResourceOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:     "api-resources",
@@ -78,15 +83,15 @@ func NewCmdApiResources(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    "Print the supported API resources on the server",
 		Example: apiresources_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd))
-			cmdutil.CheckErr(options.Validate(cmd))
-			cmdutil.CheckErr(options.RunApiResources(cmd, f))
+			cmdutil.CheckErr(o.Complete(cmd))
+			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.RunApiResources(cmd, f))
 		},
 	}
 	cmdutil.AddOutputFlags(cmd)
 	cmdutil.AddNoHeadersFlags(cmd)
-	cmd.Flags().StringVar(&options.APIGroup, "api-group", "", "The API group to use when talking to the server.")
-	cmd.Flags().BoolVar(&options.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
+	cmd.Flags().StringVar(&o.APIGroup, "api-group", "", "The API group to use when talking to the server.")
+	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", true, "Namespaced indicates if a resource is namespaced or not.")
 	return cmd
 }
 
@@ -110,7 +115,7 @@ func (o *ApiResourcesOptions) Validate(cmd *cobra.Command) error {
 }
 
 func (o *ApiResourcesOptions) RunApiResources(cmd *cobra.Command, f cmdutil.Factory) error {
-	w := printers.GetNewTabWriter(o.out)
+	w := printers.GetNewTabWriter(o.Out)
 	defer w.Flush()
 
 	discoveryclient, err := f.DiscoveryClient()

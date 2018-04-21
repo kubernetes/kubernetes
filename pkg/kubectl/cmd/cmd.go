@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 const (
@@ -246,11 +247,13 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
+	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
+
 	groups := templates.CommandGroups{
 		{
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
-				create.NewCmdCreate(f, out, err),
+				create.NewCmdCreate(f, ioStreams),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
 				set.NewCmdSet(f, in, out, err),
@@ -262,7 +265,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				resource.NewCmdGet(f, out, err),
 				NewCmdExplain(f, out, err),
-				NewCmdEdit(f, out, err),
+				NewCmdEdit(f, ioStreams),
 				NewCmdDelete(f, out, err),
 			},
 		},
@@ -303,7 +306,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				NewCmdApply("kubectl", f, out, err),
+				NewCmdApply("kubectl", f, ioStreams),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out, err),
 				NewCmdConvert(f, out),
@@ -313,7 +316,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Settings Commands:",
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, out, err),
-				NewCmdAnnotate(f, out),
+				NewCmdAnnotate(f, ioStreams),
 				NewCmdCompletion(out, ""),
 			},
 		},
@@ -347,7 +350,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(NewCmdApiResources(f, out))
+	cmds.AddCommand(NewCmdApiResources(f, ioStreams))
 	cmds.AddCommand(NewCmdOptions(out))
 
 	return cmds

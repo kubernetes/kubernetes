@@ -51,6 +51,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -70,13 +71,10 @@ var (
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	c := NewCmdApply("kubectl", f, buf, errBuf)
+	c := NewCmdApply("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
 	if validateApplyArgs(c, []string{"rc"}) == nil {
 		t.Fatalf("unexpected non-error")
 	}
@@ -298,10 +296,9 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameCM)
 	cmd.Flags().Set("output", "json")
 	cmd.Flags().Set("dry-run", "true")
@@ -426,7 +423,6 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
-			buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				if str != test.expectedErr {
@@ -434,7 +430,8 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 				}
 			})
 
-			cmd := NewCmdApplyViewLastApplied(tf, buf, errBuf)
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApplyViewLastApplied(tf, ioStreams)
 			if test.filePath != "" {
 				cmd.Flags().Set("filename", test.filePath)
 			}
@@ -479,10 +476,9 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -527,10 +523,9 @@ func TestApplyObject(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, []string{})
@@ -592,10 +587,9 @@ func TestApplyObjectOutput(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "yaml")
 			cmd.Run(cmd, []string{})
@@ -654,10 +648,9 @@ func TestApplyRetry(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, []string{})
@@ -704,10 +697,9 @@ func TestApplyNonExistObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -759,10 +751,8 @@ func TestApplyEmptyPatch(t *testing.T) {
 	tf.Namespace = "test"
 
 	// 1. apply non exist object
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -776,10 +766,8 @@ func TestApplyEmptyPatch(t *testing.T) {
 	}
 
 	// 2. test apply already exist object, will not send empty patch request
-	buf = bytes.NewBuffer([]byte{})
-	errBuf = bytes.NewBuffer([]byte{})
-
-	cmd = NewCmdApply("kubectl", tf, buf, errBuf)
+	ioStreams, _, buf, _ = genericclioptions.NewTestIOStreams()
+	cmd = NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameRC)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{})
@@ -835,10 +823,9 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			if asList {
 				cmd.Flags().Set("filename", filenameRCSVC)
 			} else {
@@ -936,10 +923,9 @@ func TestApplyNULLPreservation(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameDeployObjClientside)
 			cmd.Flags().Set("output", "name")
 
@@ -1003,10 +989,9 @@ func TestUnstructuredApply(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameWidgetClientside)
 			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, []string{})
@@ -1097,10 +1082,9 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 			}
 			tf.OpenAPISchemaFunc = fn
 			tf.Namespace = "test"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameWidgetClientside)
 			cmd.Flags().Set("output", "name")
 			cmd.Run(cmd, []string{})
@@ -1203,7 +1187,6 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
-			buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
 				if str != test.expectedErr {
@@ -1211,7 +1194,8 @@ func TestRunApplySetLastApplied(t *testing.T) {
 				}
 			})
 
-			cmd := NewCmdApplySetLastApplied(tf, buf, errBuf)
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApplySetLastApplied(tf, ioStreams)
 			cmd.Flags().Set("filename", test.filePath)
 			cmd.Flags().Set("output", test.output)
 			cmd.Run(cmd, []string{})
@@ -1382,10 +1366,8 @@ func TestForceApply(t *testing.T) {
 			tf.ClientConfigVal = &restclient.Config{}
 			tf.Namespace = "test"
 
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
-
-			cmd := NewCmdApply("kubectl", tf, buf, errBuf)
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("output", "name")
 			cmd.Flags().Set("force", "true")

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
@@ -229,18 +230,17 @@ func TestEdit(t *testing.T) {
 			}
 			tf.ClientConfigVal = defaultClientConfig()
 			tf.CommandVal = "edit test cmd invocation"
-			buf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 
 			var cmd *cobra.Command
 			switch testcase.Mode {
 			case "edit":
-				cmd = NewCmdEdit(tf, buf, errBuf)
+				cmd = NewCmdEdit(tf, ioStreams)
 			case "create":
-				cmd = create.NewCmdCreate(tf, buf, errBuf)
+				cmd = create.NewCmdCreate(tf, ioStreams)
 				cmd.Flags().Set("edit", "true")
 			case "edit-last-applied":
-				cmd = NewCmdApplyEditLastApplied(tf, buf, errBuf)
+				cmd = NewCmdApplyEditLastApplied(tf, ioStreams)
 			default:
 				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
 			}

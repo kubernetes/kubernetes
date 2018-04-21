@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -55,8 +56,7 @@ type SetLastAppliedOptions struct {
 	PatchBufferList  []PatchBuffer
 	Factory          cmdutil.Factory
 
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 }
 
 type PatchBuffer struct {
@@ -82,15 +82,14 @@ var (
 		`))
 )
 
-func NewSetLastAppliedOptions(out, errout io.Writer) *SetLastAppliedOptions {
+func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastAppliedOptions {
 	return &SetLastAppliedOptions{
-		Out:    out,
-		ErrOut: errout,
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdApplySetLastApplied(f cmdutil.Factory, out, errout io.Writer) *cobra.Command {
-	options := NewSetLastAppliedOptions(out, errout)
+func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := NewSetLastAppliedOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use: "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,

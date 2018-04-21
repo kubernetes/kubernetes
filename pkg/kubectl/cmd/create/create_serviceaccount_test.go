@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -52,8 +52,8 @@ func TestCreateServiceAccount(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateServiceAccount(tf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceAccount(tf, ioStreams)
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{serviceAccountObject.Name})
 	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
