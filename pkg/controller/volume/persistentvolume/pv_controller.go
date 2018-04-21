@@ -285,6 +285,16 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 		return false, nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+		// When feature DynamicProvisioningScheduling enabled,
+		// Scheduler signal to the PV controller to start dynamic
+		// provisioning by setting the "annSelectedNode" annotation
+		// in the PVC
+		if _, ok := claim.Annotations[annSelectedNode]; ok {
+			return false, nil
+		}
+	}
+
 	className := v1helper.GetPersistentVolumeClaimClass(claim)
 	if className == "" {
 		return false, nil
@@ -298,8 +308,6 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 	if class.VolumeBindingMode == nil {
 		return false, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", className)
 	}
-
-	// TODO: add check to handle dynamic provisioning later
 
 	return *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer, nil
 }
@@ -328,7 +336,6 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			// OBSERVATION: pvc is "Pending", will retry
 			switch {
 			case delayBinding:
-				// TODO: Skip dynamic provisioning for now
 				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.WaitForFirstConsumer, "waiting for first consumer to be created before binding")
 			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
@@ -1428,9 +1435,16 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	}
 
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
+	// TODO: modify the Provision() interface to pass in the allowed topology information
+	// of the provisioned volume.
 	volume, err = provisioner.Provision()
 	opComplete(&err)
 	if err != nil {
+		// Other places of failure has nothing to do with DynamicProvisioningScheduling,
+		// so just let controller retry in the next sync. We'll only call func
+		// rescheduleProvisioning here when the underlying provisioning actually failed.
+		ctrl.rescheduleProvisioning(claim)
+
 		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
 		glog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
@@ -1518,6 +1532,29 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 		glog.V(2).Infof("volume %q provisioned for claim %q", volume.Name, claimToClaimKey(claim))
 		msg := fmt.Sprintf("Successfully provisioned volume %s using %s", volume.Name, plugin.GetPluginName())
 		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ProvisioningSucceeded, msg)
+	}
+}
+
+// rescheduleProvisioning signal back to the scheduler to retry dynamic provisioning
+// by removing the annSelectedNode annotation
+func (ctrl *PersistentVolumeController) rescheduleProvisioning(claim *v1.PersistentVolumeClaim) {
+	if _, ok := claim.Annotations[annSelectedNode]; !ok {
+		// Provisioning not triggered by the scheduler, skip
+		return
+	}
+
+	// The claim from method args can be pointing to watcher cache. We must not
+	// modify these, therefore create a copy.
+	newClaim := claim.DeepCopy()
+	delete(newClaim.Annotations, annSelectedNode)
+	// Try to update the PVC object
+	if _, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(newClaim.Namespace).Update(newClaim); err != nil {
+		glog.V(4).Infof("Failed to delete annotation 'annSelectedNode' for PersistentVolumeClaim %q: %v", claimToClaimKey(newClaim), err)
+		return
+	}
+	if _, err := ctrl.storeClaimUpdate(newClaim); err != nil {
+		// We will get an "claim updated" event soon, this is not a big error
+		glog.V(4).Infof("Updating PersistentVolumeClaim %q: cannot update internal cache: %v", claimToClaimKey(newClaim), err)
 	}
 }
 
