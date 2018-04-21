@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"reflect"
@@ -122,9 +121,6 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	trace.Step("Object encoded")
 	if err != nil {
 		return err
-	}
-	if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
-		return errors.New("resourceVersion may not be set on objects to be created")
 	}
 	if err := h.versioner.PrepareObjectForStorage(obj); err != nil {
 		return fmt.Errorf("PrepareObjectForStorage returned an error: %v", err)
@@ -532,7 +528,7 @@ func (h *etcdHelper) GuaranteedUpdate(
 
 		// Since update object may have a resourceVersion set, we need to clear it here.
 		if err := h.versioner.PrepareObjectForStorage(ret); err != nil {
-			return errors.New("resourceVersion cannot be set on objects store in etcd")
+			return fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 		}
 
 		newBodyData, err := runtime.Encode(h.codec, ret)
