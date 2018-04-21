@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	namespacesRootUrl  string = "/api/v1/namespaces/"
+	namespacesRootURL  string = "/api/v1/namespaces/"
 	originalGeneration int64  = 0
 )
 
@@ -119,7 +119,7 @@ var _ = SIGDescribe("api-namespaces-create", func() {
 				Expect(namespace.ObjectMeta.Name).To(Equal(namespaceName)) // this should match our given namespaceName
 			}
 			v.verifySelfLink = func(namespace *v1.Namespace) {
-				expectedSelfLink := strings.Join([]string{namespacesRootUrl, namespaceName}, "")
+				expectedSelfLink := strings.Join([]string{namespacesRootURL, namespaceName}, "")
 				Expect(namespace.ObjectMeta.SelfLink).To(Equal(expectedSelfLink))
 			}
 			v.verifyAll(namespace)
@@ -176,7 +176,7 @@ var _ = SIGDescribe("api-namespaces-create", func() {
 				Expect(strings.HasPrefix(namespace.ObjectMeta.Name, generateName)).To(BeTrue())
 			}
 			v.verifySelfLink = func(namespace *v1.Namespace) {
-				expectedSelfLinkBase := strings.Join([]string{namespacesRootUrl, generateName}, "")
+				expectedSelfLinkBase := strings.Join([]string{namespacesRootURL, generateName}, "")
 				Expect(strings.HasPrefix(namespace.ObjectMeta.SelfLink, expectedSelfLinkBase)).To(BeTrue())
 			}
 			v.verifyAll(namespace)
@@ -217,7 +217,7 @@ var _ = SIGDescribe("api-namespaces-create", func() {
 				Expect(strings.HasPrefix(namespace.ObjectMeta.Name, generateName)).To(BeTrue())
 			}
 			v.verifySelfLink = func(namespace *v1.Namespace) {
-				expectedSelfLinkBase := strings.Join([]string{namespacesRootUrl, generateName}, "")
+				expectedSelfLinkBase := strings.Join([]string{namespacesRootURL, generateName}, "")
 				Expect(strings.HasPrefix(namespace.ObjectMeta.SelfLink, expectedSelfLinkBase)).To(BeTrue())
 			}
 			v.verifyLabels = func(namespace *v1.Namespace) {
@@ -229,11 +229,10 @@ var _ = SIGDescribe("api-namespaces-create", func() {
 })
 
 // VerifyFunc is a type meant to hold functions that operate on namespaces
-
 type VerifyFunc func(namespace *v1.Namespace)
 
-// NamespaceVerifier is an object meant to hold functions that operate on namespaces that will be later called to verify expectations.
-
+// NamespaceVerifier is an object meant to hold functions that operate on namespaces that will be
+//later called to verify expectations.
 type NamespaceVerifier struct {
 	verifyKind       VerifyFunc
 	verifyAPIVersion VerifyFunc
@@ -322,7 +321,7 @@ func newDefaultVerifier() NamespaceVerifier {
 			//Expect(namespace.ObjectMeta.DeletionTimestamp).To(Equal(defaultDeletionTimestamp))
 		},
 		verifyDeletionGracePeriodSeconds: func(namespace *v1.Namespace) {
-			var defaultDeletionGracePeriodSeconds *int64 = nil
+			var defaultDeletionGracePeriodSeconds *int64
 			Expect(namespace.ObjectMeta.DeletionGracePeriodSeconds).To(Equal(defaultDeletionGracePeriodSeconds))
 		},
 

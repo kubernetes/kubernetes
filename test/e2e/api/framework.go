@@ -18,6 +18,7 @@ package api
 
 import "github.com/onsi/ginkgo"
 
+// Creating a description for api testing
 func SIGDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[sig-api] "+text, body)
 }
