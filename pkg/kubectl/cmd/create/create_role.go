@@ -204,6 +204,11 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		}
 		resource.Resource = parts[0]
 
+		if resource.Resource == "*" && len(parts) == 1 && len(sections) == 1 {
+			o.Resources = []ResourceOptions{*resource}
+			break
+		}
+
 		o.Resources = append(o.Resources, *resource)
 	}
 
@@ -278,6 +283,9 @@ func (o *CreateRoleOptions) validateResource() error {
 	for _, r := range o.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
+		}
+		if r.Resource == "*" {
+			return nil
 		}
 
 		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}
