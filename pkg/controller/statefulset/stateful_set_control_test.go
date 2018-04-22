@@ -81,6 +81,7 @@ func TestStatefulSetControl(t *testing.T) {
 		obj func() *apps.StatefulSet
 	}{
 		{CreatesPods, simpleSetFn},
+		{SetsStatusFields, simpleSetFn},
 		{ScalesUp, simpleSetFn},
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
@@ -127,6 +128,27 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	}
 	if set.Status.Replicas != 3 {
 		t.Error("Failed to scale statefulset to 3 replicas")
+	}
+}
+
+func SetsStatusFields(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	client := fake.NewSimpleClientset(set)
+	spc, _, ssc, stop := setupController(client)
+	defer close(stop)
+
+	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	var err error
+	set, err = spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting updated StatefulSet: %v", err)
+	}
+	if set.Status.ReadyReplicas != 3 {
+		t.Error("Failed to set ReadyReplicas correctly")
+	}
+	if set.Status.UpdatedReplicas != 3 {
+		t.Error("Failed to set UpdatedReplicas correctly")
 	}
 }
 
