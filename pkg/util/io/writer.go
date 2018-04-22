@@ -55,7 +55,10 @@ type NsenterWriter struct{}
 // WriteFile calls 'nsenter cat - > <the file>' and 'nsenter chmod' to create a
 // file on the host.
 func (writer *NsenterWriter) WriteFile(filename string, data []byte, perm os.FileMode) error {
-	ne := nsenter.NewNsenter()
+	ne, err := nsenter.NewNsenter()
+	if err != nil {
+		return err
+	}
 	echoArgs := []string{"-c", fmt.Sprintf("cat > %s", filename)}
 	glog.V(5).Infof("nsenter: write data to file %s by nsenter", filename)
 	command := ne.Exec("sh", echoArgs)
