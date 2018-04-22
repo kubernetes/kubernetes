@@ -297,7 +297,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if isCreated(pods[i]) && !isTerminating(pods[i]) {
 			if getPodRevision(pods[i]) == currentRevision.Name {
 				status.CurrentReplicas++
-			} else if getPodRevision(pods[i]) == updateRevision.Name {
+			}
+			if getPodRevision(pods[i]) == updateRevision.Name {
 				status.UpdatedReplicas++
 			}
 		}
