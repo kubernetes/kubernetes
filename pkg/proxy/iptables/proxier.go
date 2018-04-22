@@ -748,12 +748,8 @@ func (proxier *Proxier) syncProxyRules() {
 	args := make([]string, 64)
 
 	// Build rules for each service.
-	for svcName, svc := range proxier.serviceMap {
-		svcInfo, ok := svc.(*serviceInfo)
-		if !ok {
-			glog.Errorf("Failed to cast serviceInfo %q", svcName.String())
-			continue
-		}
+	svcInfoMap := serviceInfoMap(proxier.serviceMap)
+	for svcName, svcInfo := range svcInfoMap {
 		isIPv6 := utilnet.IsIPv6(svcInfo.ClusterIP)
 		protocol := strings.ToLower(string(svcInfo.Protocol))
 		svcNameString := svcInfo.serviceNameString
@@ -1094,6 +1090,13 @@ func (proxier *Proxier) syncProxyRules() {
 				"-A", string(endpointChain),
 				"-m", "comment", "--comment", svcNameString,
 			)
+			// Handle endpoints that are a clusterIP
+			isInClusterService, targetServiceChainName := isEndpointAService(endpoints[i], svcInfoMap, proxier.endpointsMap)
+			if isInClusterService {
+				args = append(args, "-p", protocol, "-j", string(targetServiceChainName))
+				writeLine(proxier.natRules, args...)
+				continue
+			}
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
 				"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
@@ -1371,4 +1374,33 @@ func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	}
 	glog.V(2).Infof("Opened local port %s", lp.String())
 	return socket, nil
+}
+
+func serviceInfoMap(serviceMap proxy.ServiceMap) map[proxy.ServicePortName]*serviceInfo {
+	serviceInfoMap := map[proxy.ServicePortName]*serviceInfo{}
+	for svcName, svc := range serviceMap {
+		svcInfo, ok := svc.(*serviceInfo)
+		if !ok {
+			glog.Errorf("Failed to cast serviceInfo %q", svcName.String())
+			continue
+		}
+		serviceInfoMap[svcName] = svcInfo
+	}
+	return serviceInfoMap
+}
+
+func isEndpointAService(endpoint *endpointsInfo, svcInfoMap map[proxy.ServicePortName]*serviceInfo, endpointsMap proxy.EndpointsMap) (bool, utiliptables.Chain) {
+	port, err := endpoint.Port()
+	if err != nil {
+		return false, utiliptables.Chain("")
+	}
+	myProto := strings.ToUpper(endpoint.protocol)
+	for svcName, svcInfo := range svcInfoMap {
+		if svcInfo.ClusterIP.String() == endpoint.IP() && svcInfo.Port == port && string(svcInfo.Protocol) == myProto {
+			if len(endpointsMap[svcName]) > 0 {
+				return true, svcInfo.servicePortChainName
+			}
+		}
+	}
+	return false, utiliptables.Chain("")
 }

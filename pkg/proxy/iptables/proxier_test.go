@@ -2268,4 +2268,77 @@ func Test_updateEndpointsMap(t *testing.T) {
 	}
 }
 
+func TestBuildServiceMapServiceWithClusterIPTarget(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+
+	svcTargetIP := "172.16.55.4"
+	svcTargetPort := 1234
+	svcTargetPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "some-service"),
+		Port:           "p1234",
+	}
+	svcSourcePortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "endpoint-is-some-service"),
+		Port:           "p1234",
+	}
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "some-service", func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = svcTargetIP
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     "p1234",
+				Port:     int32(svcTargetPort),
+				Protocol: api.ProtocolTCP,
+			}}
+		}),
+		makeTestService("ns1", "endpoint-is-some-service", func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = "172.16.55.5"
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     "p1234",
+				Port:     int32(svcTargetPort),
+				Protocol: api.ProtocolTCP,
+			}}
+		}),
+	)
+
+	makeEndpointsMap(fp,
+		makeTestEndpoints("ns1", "some-service", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: "10.2.10.2",
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p1234",
+					Port: int32(svcTargetPort),
+				}},
+			}}
+		}),
+		makeTestEndpoints("ns1", "endpoint-is-some-service", func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: svcTargetIP,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: "p1234",
+					Port: int32(svcTargetPort),
+				}},
+			}}
+		}),
+	)
+	fp.syncProxyRules()
+
+	proto := strings.ToLower(string(api.ProtocolTCP))
+	epStr := fmt.Sprintf("%s:%d", svcTargetIP, svcTargetPort)
+	targetSvcChain := string(servicePortChainName(svcTargetPortName.String(), proto))
+	sourceEpChain := string(servicePortEndpointChainName(svcSourcePortName.String(), proto, epStr))
+
+	kubeSourceSvcEndpointRules := ipt.GetRules(string(sourceEpChain))
+	if !hasJump(kubeSourceSvcEndpointRules, targetSvcChain, "", 0) {
+		t.Errorf("Failed to find jump to svc chain %s from endpoint chain %s", targetSvcChain, sourceEpChain)
+	}
+}
+
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.
