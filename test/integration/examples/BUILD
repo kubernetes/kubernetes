@@ -21,6 +21,7 @@ go_test(
         "//pkg/master:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
