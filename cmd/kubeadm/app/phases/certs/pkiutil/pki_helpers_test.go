@@ -436,48 +436,69 @@ func TestPathForPublicKey(t *testing.T) {
 }
 
 func TestGetAPIServerAltNames(t *testing.T) {
-	hostname := "valid-hostname"
-	advertiseIP := "1.2.3.4"
-	controlPlaneEndpoint := "api.k8s.io"
-	cfg := &kubeadmapi.MasterConfiguration{
-		API:               kubeadmapi.API{AdvertiseAddress: advertiseIP, ControlPlaneEndpoint: controlPlaneEndpoint},
-		Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-		NodeName:          hostname,
-		APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
+
+	var tests = []struct {
+		name                string
+		cfg                 *kubeadmapi.MasterConfiguration
+		expectedDNSNames    []string
+		expectedIPAddresses []string
+	}{
+		{
+			name: "ControlPlaneEndpoint DNS",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:6443"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				NodeName:          "valid-hostname",
+				APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
+			},
+			expectedDNSNames:    []string{"valid-hostname", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", "api.k8s.io"},
+			expectedIPAddresses: []string{"10.96.0.1", "1.2.3.4", "10.1.245.94", "10.1.245.95"},
+		},
+		{
+			name: "ControlPlaneEndpoint IP",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "4.5.6.7:6443"},
+				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				NodeName:          "valid-hostname",
+				APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
+			},
+			expectedDNSNames:    []string{"valid-hostname", "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local"},
+			expectedIPAddresses: []string{"10.96.0.1", "1.2.3.4", "10.1.245.94", "10.1.245.95", "4.5.6.7"},
+		},
 	}
 
-	altNames, err := GetAPIServerAltNames(cfg)
-	if err != nil {
-		t.Fatalf("failed calling GetAPIServerAltNames: %v", err)
-	}
+	for _, rt := range tests {
+		altNames, err := GetAPIServerAltNames(rt.cfg)
+		if err != nil {
+			t.Fatalf("failed calling GetAPIServerAltNames: %s: %v", rt.name, err)
+		}
 
-	expectedDNSNames := []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.cluster.local", controlPlaneEndpoint}
-	for _, DNSName := range expectedDNSNames {
-		found := false
-		for _, val := range altNames.DNSNames {
-			if val == DNSName {
-				found = true
-				break
+		for _, DNSName := range rt.expectedDNSNames {
+			found := false
+			for _, val := range altNames.DNSNames {
+				if val == DNSName {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
 			}
 		}
 
-		if !found {
-			t.Errorf("altNames does not contain DNSName %s", DNSName)
-		}
-	}
-
-	expectedIPAddresses := []string{"10.96.0.1", advertiseIP, "10.1.245.94", "10.1.245.95"}
-	for _, IPAddress := range expectedIPAddresses {
-		found := false
-		for _, val := range altNames.IPs {
-			if val.Equal(net.ParseIP(IPAddress)) {
-				found = true
-				break
+		for _, IPAddress := range rt.expectedIPAddresses {
+			found := false
+			for _, val := range altNames.IPs {
+				if val.Equal(net.ParseIP(IPAddress)) {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain IPAddress %s", IPAddress)
+			if !found {
+				t.Errorf("%s: altNames does not contain IPAddress %s but %v", rt.name, IPAddress, altNames.IPs)
+			}
 		}
 	}
 }

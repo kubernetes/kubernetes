@@ -275,7 +275,73 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "Valid IPv4 address and default port",
+			name: "Valid DNS ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "cp.k8s.io:8081",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv4 ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1.2.3.4:8081",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv6 ControlPlaneEndpoint (with port), ControlPlaneEndpoint and port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "[2001:db7::1]:8081",
+					AdvertiseAddress:     "2001:db7::2",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid DNS ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "cp.k8s.io",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv4 ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1.2.3.4",
+					AdvertiseAddress:     "4.5.6.7",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv6 ControlPlaneEndpoint (without port), ControlPlaneEndpoint and port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "2001:db7::1",
+					AdvertiseAddress:     "2001:db7::2",
+					BindPort:             6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv4 AdvertiseAddress and default port",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.3.4",
@@ -285,7 +351,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Valid IPv6 address and port",
+			name: "Valid IPv6 AdvertiseAddress and port",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "2001:db7::1",
@@ -295,7 +361,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Invalid IPv4 address",
+			name: "Invalid IPv4 AdvertiseAddress",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "1.2.34",
@@ -305,11 +371,57 @@ func TestValidateAPIEndpoint(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "Invalid IPv6 address",
+			name: "Invalid IPv6 AdvertiseAddress",
 			s: &kubeadm.MasterConfiguration{
 				API: kubeadm.API{
 					AdvertiseAddress: "2001:db7:1",
 					BindPort:         3446,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid BindPort",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         0,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid DNS ControlPlaneEndpoint",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "bad!!.k8s.io",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid ipv4 ControlPlaneEndpoint",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1..3.4",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid ipv6 ControlPlaneEndpoint",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid ControlPlaneEndpoint port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					ControlPlaneEndpoint: "1.2.3.4:0",
 				},
 			},
 			expected: false,
