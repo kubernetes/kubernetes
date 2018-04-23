@@ -128,7 +128,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Computing predicates")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders, g.predicateMetaProducer, g.equivalenceCache, g.schedulingQueue, g.alwaysCheckAllPredicates)
+	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pod, nodes)
 	if err != nil {
 		return "", err
 	}
@@ -325,21 +325,11 @@ func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName s
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func findNodesThatFit(
-	pod *v1.Pod,
-	nodeNameToInfo map[string]*schedulercache.NodeInfo,
-	nodes []*v1.Node,
-	predicateFuncs map[string]algorithm.FitPredicate,
-	extenders []algorithm.SchedulerExtender,
-	metadataProducer algorithm.PredicateMetadataProducer,
-	ecache *EquivalenceCache,
-	schedulingQueue SchedulingQueue,
-	alwaysCheckAllPredicates bool,
-) ([]*v1.Node, FailedPredicateMap, error) {
+func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 
-	if len(predicateFuncs) == 0 {
+	if len(g.predicates) == 0 {
 		filtered = nodes
 	} else {
 		// Create filtered list with enough space to avoid growing it
@@ -350,12 +340,12 @@ func findNodesThatFit(
 		var filteredLen int32
 
 		// We can use the same metadata producer for all nodes.
-		meta := metadataProducer(pod, nodeNameToInfo)
+		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
 
 		var equivCacheInfo *equivalenceClassInfo
-		if ecache != nil {
+		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
-			equivCacheInfo = ecache.getEquivalenceClassInfo(pod)
+			equivCacheInfo = g.equivalenceCache.getEquivalenceClassInfo(pod)
 		}
 
 		checkNode := func(i int) {
@@ -363,11 +353,12 @@ func findNodesThatFit(
 			fits, failedPredicates, err := podFitsOnNode(
 				pod,
 				meta,
-				nodeNameToInfo[nodeName],
-				predicateFuncs,
-				ecache,
-				schedulingQueue,
-				alwaysCheckAllPredicates,
+				g.cachedNodeInfoMap[nodeName],
+				g.predicates,
+				g.cache,
+				g.equivalenceCache,
+				g.schedulingQueue,
+				g.alwaysCheckAllPredicates,
 				equivCacheInfo,
 			)
 			if err != nil {
@@ -391,12 +382,12 @@ func findNodesThatFit(
 		}
 	}
 
-	if len(filtered) > 0 && len(extenders) != 0 {
-		for _, extender := range extenders {
+	if len(filtered) > 0 && len(g.extenders) != 0 {
+		for _, extender := range g.extenders {
 			if !extender.IsInterested(pod) {
 				continue
 			}
-			filteredList, failedMap, err := extender.Filter(pod, filtered, nodeNameToInfo)
+			filteredList, failedMap, err := extender.Filter(pod, filtered, g.cachedNodeInfoMap)
 			if err != nil {
 				if extender.IsIgnorable() {
 					glog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
@@ -467,6 +458,7 @@ func podFitsOnNode(
 	meta algorithm.PredicateMetadata,
 	info *schedulercache.NodeInfo,
 	predicateFuncs map[string]algorithm.FitPredicate,
+	cache schedulercache.Cache,
 	ecache *EquivalenceCache,
 	queue SchedulingQueue,
 	alwaysCheckAllPredicates bool,
@@ -548,10 +540,13 @@ func podFitsOnNode(
 							} else {
 								predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
 							}
-							result := predicateResults[predicateKey]
-							ecache.UpdateCachedPredicateItem(
-								pod.GetName(), info.Node().GetName(),
-								predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
+							// Skip update if NodeInfo is stale.
+							if cache != nil && cache.IsUpToDate(info) {
+								result := predicateResults[predicateKey]
+								ecache.UpdateCachedPredicateItem(
+									pod.GetName(), info.Node().GetName(),
+									predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
+							}
 						}
 					}
 				}()
@@ -976,7 +971,7 @@ func selectVictimsOnNode(
 	// that we should check is if the "pod" is failing to schedule due to pod affinity
 	// failure.
 	// TODO(bsalamat): Consider checking affinity to lower priority pods if feasible with reasonable performance.
-	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false, nil); !fits {
+	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, nil, queue, false, nil); !fits {
 		if err != nil {
 			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -990,7 +985,7 @@ func selectVictimsOnNode(
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
-		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false, nil)
+		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, nil, queue, false, nil)
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
