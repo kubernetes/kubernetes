@@ -115,33 +115,32 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, featureGate
 			fmt.Fprintln(w, "")
 		}
 
-		fmt.Fprintf(w, "Upgrade to the latest %s:\n", upgrade.Description)
-		fmt.Fprintln(w, "")
-		fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
-		fmt.Fprintf(tabw, "API Server\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		fmt.Fprintf(tabw, "Controller Manager\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		fmt.Fprintf(tabw, "Scheduler\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		fmt.Fprintf(tabw, "Kube Proxy\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
-		if features.Enabled(featureGates, features.CoreDNS) {
-			fmt.Fprintf(tabw, "CoreDNS\t%s\t%s\n", upgrade.Before.DNSVersion, upgrade.After.DNSVersion)
-		} else {
-			fmt.Fprintf(tabw, "Kube DNS\t%s\t%s\n", upgrade.Before.DNSVersion, upgrade.After.DNSVersion)
-		}
-		fmt.Fprintf(tabw, "Etcd\t%s\t%s\n", upgrade.Before.EtcdVersion, upgrade.After.EtcdVersion)
-
-		// The tabwriter should be flushed at this stage as we have now put in all the required content for this time. This is required for the tabs' size to be correct.
-		tabw.Flush()
-		fmt.Fprintln(w, "")
-		fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
-		fmt.Fprintln(w, "")
-		fmt.Fprintf(w, "\tkubeadm upgrade apply %s\n", upgrade.After.KubeVersion)
-		fmt.Fprintln(w, "")
-
 		if upgrade.Before.KubeadmVersion != upgrade.After.KubeadmVersion {
-			fmt.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s.\n", upgrade.After.KubeadmVersion)
+			fmt.Fprintf(w, "Note: In order to show accurate upgrade versions, please use kubeadm version %s.\n", upgrade.After.KubeadmVersion)
+		} else {
+			fmt.Fprintf(w, "Upgrade to the latest %s:\n", upgrade.Description)
 			fmt.Fprintln(w, "")
-		}
+			fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+			fmt.Fprintf(tabw, "API Server\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
+			fmt.Fprintf(tabw, "Controller Manager\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
+			fmt.Fprintf(tabw, "Scheduler\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
+			fmt.Fprintf(tabw, "Kube Proxy\t%s\t%s\n", upgrade.Before.KubeVersion, upgrade.After.KubeVersion)
 
+			if features.Enabled(featureGates, features.CoreDNS) {
+				fmt.Fprintf(tabw, "CoreDNS\t%s\t%s\n", upgrade.Before.DNSVersion, upgrade.After.DNSVersion)
+			} else {
+				fmt.Fprintf(tabw, "Kube DNS\t%s\t%s\n", upgrade.Before.DNSVersion, upgrade.After.DNSVersion)
+			}
+			fmt.Fprintf(tabw, "Etcd\t%s\t%s\n", upgrade.Before.EtcdVersion, upgrade.After.EtcdVersion)
+
+			// The tabwriter should be flushed at this stage as we have now put in all the required content for this time. This is required for the tabs' size to be correct.
+			tabw.Flush()
+			fmt.Fprintln(w, "")
+			fmt.Fprintln(w, "You can now apply the upgrade by executing the following command:")
+			fmt.Fprintln(w, "")
+			fmt.Fprintf(w, "\tkubeadm upgrade apply %s\n", upgrade.After.KubeVersion)
+		}
+		fmt.Fprintln(w, "")
 		fmt.Fprintln(w, "_____________________________________________________________________")
 		fmt.Fprintln(w, "")
 	}
