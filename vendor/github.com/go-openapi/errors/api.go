@@ -113,13 +113,14 @@ func MethodNotAllowed(requested string, allow []string) Error {
 
 // ServeError the error handler interface implemenation
 func ServeError(rw http.ResponseWriter, r *http.Request, err error) {
+	rw.Header().Set("Content-Type", "application/json")
 	switch e := err.(type) {
 	case *CompositeError:
 		er := flattenComposite(e)
 		ServeError(rw, r, er.Errors[0])
 	case *MethodNotAllowedError:
 		rw.Header().Add("Allow", strings.Join(err.(*MethodNotAllowedError).Allowed, ","))
-		rw.WriteHeader(int(e.Code()))
+		rw.WriteHeader(asHTTPCode(int(e.Code())))
 		if r == nil || r.Method != "HEAD" {
 			rw.Write(errorAsJSON(e))
 		}
@@ -129,7 +130,7 @@ func ServeError(rw http.ResponseWriter, r *http.Request, err error) {
 			rw.Write(errorAsJSON(New(http.StatusInternalServerError, "Unknown error")))
 			return
 		}
-		rw.WriteHeader(int(e.Code()))
+		rw.WriteHeader(asHTTPCode(int(e.Code())))
 		if r == nil || r.Method != "HEAD" {
 			rw.Write(errorAsJSON(e))
 		}
@@ -139,5 +140,11 @@ func ServeError(rw http.ResponseWriter, r *http.Request, err error) {
 			rw.Write(errorAsJSON(New(http.StatusInternalServerError, err.Error())))
 		}
 	}
+}
 
+func asHTTPCode(input int) int {
+	if input >= 600 {
+		return 422
+	}
+	return input
 }

@@ -1286,27 +1286,27 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/analysis",
-			"Rev": "b44dc874b601d9e4e2f6e19140e794ba24bead3b"
+			"Rev": "f59a71f0ece6f9dfb438be7f45148f006cbad88e"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/errors",
-			"Rev": "d24ebc2075bad502fac3a8ae27aa6dd58e1952dc"
+			"Rev": "7bcb96a367bac6b76e6e42fa84155bb5581dcff8"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
-			"Rev": "46af16f9f7b149af66e5d1bd010e3574dc06de98"
+			"Rev": "3a0015ad55fa9873f41605d3e8f28cd279c32ab2"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/jsonreference",
-			"Rev": "13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272"
+			"Rev": "3fb327e6747da3043567ee86abd02bb6376b6be2"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/loads",
-			"Rev": "a80dea3052f00e5f032e860dd7355cd0cc67e24d"
+			"Rev": "2a2b323bab96e6b1fdee110e57d959322446e9c9"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/runtime",
-			"Rev": "11e322eeecc1032d5a0a96c566ed53f2b5c26e22"
+			"Rev": "08d6c2820cc8b72df6b9eb4fe62d243a9cca55fa"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/spec",
@@ -1314,15 +1314,21 @@
 		},
 		{
 			"ImportPath": "github.com/go-openapi/strfmt",
-			"Rev": "d65c7fdb29eca313476e529628176fe17e58c488"
+			"Rev": "481808443b00a14745fada967cb5eeff0f9b1df2"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/swag",
-			"Rev": "f3f9494671f93fcff853e3c6e9e948b3eb71e590"
+			"Rev": "811b1089cde9dad18d4d0c2d09fbdbf28dbd27a5"
 		},
 		{
 			"ImportPath": "github.com/go-openapi/validate",
-			"Rev": "d509235108fcf6ab4913d2dcb3a2260c0db2108e"
+			"Comment": "mark-6-g659e09d",
+			"Rev": "659e09d234fdd860a2556c5a53fcfff6f787e24b"
+		},
+		{
+			"ImportPath": "github.com/go-openapi/validate/post",
+			"Comment": "mark-6-g659e09d",
+			"Rev": "659e09d234fdd860a2556c5a53fcfff6f787e24b"
 		},
 		{
 			"ImportPath": "github.com/godbus/dbus",
@@ -2005,7 +2011,6 @@
 		},
 		{
 			"ImportPath": "github.com/inconshreveable/mousetrap",
-			"Comment": "v1.0",
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
@@ -2825,7 +2830,6 @@
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",
-			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
 		},
 		{
@@ -3240,6 +3244,16 @@
 			"ImportPath": "gopkg.in/inf.v0",
 			"Comment": "v0.9.0",
 			"Rev": "3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2/bson",
+			"Comment": "r2016.08.01-5-g3f83fa5",
+			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
+		},
+		{
+			"ImportPath": "gopkg.in/mgo.v2/internal/json",
+			"Comment": "r2016.08.01-5-g3f83fa5",
+			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",

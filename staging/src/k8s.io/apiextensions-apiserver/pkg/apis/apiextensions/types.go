@@ -34,6 +34,9 @@ type CustomResourceDefinitionSpec struct {
 	Validation *CustomResourceValidation
 	// Subresources describes the subresources for CustomResources
 	Subresources *CustomResourceSubresources
+	// Prune enables pruning of unspecified fields. This required validation to be enabled.
+	// Note: this will default to true in version v1.
+	Prune bool
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition

@@ -9,6 +9,8 @@ go_library(
         "loading.go",
         "net.go",
         "path.go",
+        "post_go18.go",
+        "pre_go18.go",
         "util.go",
         "yaml.go",
     ],

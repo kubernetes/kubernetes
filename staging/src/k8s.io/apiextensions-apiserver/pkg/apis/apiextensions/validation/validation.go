@@ -117,6 +117,11 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("subresources"), "disabled by feature-gate CustomResourceSubresources"))
 	}
 
+	validationEnabled := spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil
+	if spec.Prune && !validationEnabled {
+		allErrs = append(allErrs, field.Required(fldPath.Child("validation").Child("openAPIV3Schema"), "must be set if spec.prune is true"))
+	}
+
 	return allErrs
 }
 
@@ -328,8 +333,8 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		return allErrs
 	}
 
-	if schema.Default != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "default is not supported"))
+	if schema.Default != nil && !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "disabled by feature-gate"))
 	}
 
 	if schema.ID != "" {

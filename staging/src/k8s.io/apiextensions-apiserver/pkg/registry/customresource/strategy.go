@@ -18,6 +18,7 @@ package customresource
 
 import (
 	"github.com/go-openapi/validate"
+	postvalidationalgorithms "github.com/go-openapi/validate/post"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -82,6 +83,16 @@ func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, 
 
 	accessor, _ := meta.Accessor(obj)
 	accessor.SetGeneration(1)
+
+	// This applies defaults from the CRD schema.
+	// Validation errors, if any, are ignored. We do another validation pass here
+	// because we want defaulting to occur before the actual validation.
+	customResource := obj.(*unstructured.Unstructured)
+	customResourceValidator := a.validator.schemaValidator
+	result := customResourceValidator.Validate(customResource.UnstructuredContent())
+	if result.AsError() == nil {
+		postvalidationalgorithms.ApplyDefaults(result)
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -122,6 +133,16 @@ func (a customResourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
 		newAccessor, _ := meta.Accessor(newCustomResourceObject)
 		newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
+	}
+
+	// This applies defaults from the CRD schema.
+	// Validation errors, if any, are ignored. We do another validation pass here
+	// because we want defaulting to occur before the actual validation.
+	customResource := obj.(*unstructured.Unstructured)
+	customResourceValidator := a.validator.schemaValidator
+	result := customResourceValidator.Validate(customResource.UnstructuredContent())
+	if result.AsError() == nil {
+		postvalidationalgorithms.ApplyDefaults(result)
 	}
 }
 

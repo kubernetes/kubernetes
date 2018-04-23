@@ -9,6 +9,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "basic_test.go",
+        "defaulting_test.go",
         "finalization_test.go",
         "registration_test.go",
         "subresources_test.go",
