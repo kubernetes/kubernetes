@@ -62,16 +62,19 @@ func TestSortedSliceFromStringIntMap(t *testing.T) {
 func TestPrintAvailableUpgrades(t *testing.T) {
 	featureGates := make(map[string]bool)
 	var tests = []struct {
+		name          string
 		upgrades      []upgrade.Upgrade
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
 		{
+			name:     "no update needed",
 			upgrades: []upgrade.Upgrade{},
 			expectedBytes: []byte(`Awesome, you're up-to-date! Enjoy!
 `),
 		},
 		{
+			name: "outdated kubeadm and kubelet",
 			upgrades: []upgrade.Upgrade{
 				{
 					Description: "version in the v1.8 series",
@@ -96,27 +99,14 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.8.1   v1.8.3
 
-Upgrade to the latest version in the v1.8 series:
-
-COMPONENT            CURRENT   AVAILABLE
-API Server           v1.8.1    v1.8.3
-Controller Manager   v1.8.1    v1.8.3
-Scheduler            v1.8.1    v1.8.3
-Kube Proxy           v1.8.1    v1.8.3
-Kube DNS             1.14.5    1.14.5
-Etcd                 3.0.17    3.0.17
-
-You can now apply the upgrade by executing the following command:
-
-	kubeadm upgrade apply v1.8.3
-
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.3.
+Note: In order to show accurate upgrade versions, please use kubeadm version v1.8.3.
 
 _____________________________________________________________________
 
 `),
 		},
 		{
+			name: "outdated kubelet newest kubeadm",
 			upgrades: []upgrade.Upgrade{
 				{
 					Description: "stable version",
@@ -160,6 +150,7 @@ _____________________________________________________________________
 `),
 		},
 		{
+			name: "multiple stable paths",
 			upgrades: []upgrade.Upgrade{
 				{
 					Description: "version in the v1.8 series",
@@ -168,13 +159,13 @@ _____________________________________________________________________
 						KubeletVersions: map[string]uint16{
 							"v1.8.3": 1,
 						},
-						KubeadmVersion: "v1.8.3",
+						KubeadmVersion: "v1.8.5",
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.5",
-						KubeadmVersion: "v1.8.3",
+						KubeadmVersion: "v1.8.5",
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
@@ -222,27 +213,14 @@ Components that must be upgraded manually after you have upgraded the control pl
 COMPONENT   CURRENT      AVAILABLE
 Kubelet     1 x v1.8.3   v1.9.0
 
-Upgrade to the latest stable version:
-
-COMPONENT            CURRENT   AVAILABLE
-API Server           v1.8.3    v1.9.0
-Controller Manager   v1.8.3    v1.9.0
-Scheduler            v1.8.3    v1.9.0
-Kube Proxy           v1.8.3    v1.9.0
-Kube DNS             1.14.5    1.14.9
-Etcd                 3.0.17    3.1.12
-
-You can now apply the upgrade by executing the following command:
-
-	kubeadm upgrade apply v1.9.0
-
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0.
+Note: In order to show accurate upgrade versions, please use kubeadm version v1.9.0.
 
 _____________________________________________________________________
 
 `),
 		},
 		{
+			name: "experimental upgrade",
 			upgrades: []upgrade.Upgrade{
 				{
 					Description: "experimental version",
@@ -251,7 +229,7 @@ _____________________________________________________________________
 						KubeletVersions: map[string]uint16{
 							"v1.8.5": 1,
 						},
-						KubeadmVersion: "v1.8.5",
+						KubeadmVersion: "v1.9.0-beta.1",
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
@@ -281,13 +259,12 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.9.0-beta.1
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0-beta.1.
-
 _____________________________________________________________________
 
 `),
 		},
 		{
+			name: "release candidate upgrade",
 			upgrades: []upgrade.Upgrade{
 				{
 					Description: "release candidate version",
@@ -296,7 +273,7 @@ _____________________________________________________________________
 						KubeletVersions: map[string]uint16{
 							"v1.8.5": 1,
 						},
-						KubeadmVersion: "v1.8.5",
+						KubeadmVersion: "v1.9.0-rc.1",
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
@@ -326,13 +303,12 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.9.0-rc.1
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.0-rc.1.
-
 _____________________________________________________________________
 
 `),
 		},
 		{
+			name: "mixed kubelet versions",
 			upgrades: []upgrade.Upgrade{
 				{
 					Description: "version in the v1.9 series",
@@ -342,7 +318,7 @@ _____________________________________________________________________
 							"v1.9.2": 1,
 							"v1.9.3": 2,
 						},
-						KubeadmVersion: "v1.9.2",
+						KubeadmVersion: "v1.9.3",
 						DNSVersion:     "1.14.5",
 						EtcdVersion:    "3.0.17",
 					},
@@ -373,23 +349,23 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.9.3
 
-Note: Before you can perform this upgrade, you have to update kubeadm to v1.9.3.
-
 _____________________________________________________________________
 
 `),
 		},
 	}
 	for _, rt := range tests {
-		rt.buf = bytes.NewBufferString("")
-		printAvailableUpgrades(rt.upgrades, rt.buf, featureGates)
-		actualBytes := rt.buf.Bytes()
-		if !bytes.Equal(actualBytes, rt.expectedBytes) {
-			t.Errorf(
-				"failed PrintAvailableUpgrades:\n\texpected: %q\n\t  actual: %q",
-				string(rt.expectedBytes),
-				string(actualBytes),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			rt.buf = bytes.NewBufferString("")
+			printAvailableUpgrades(rt.upgrades, rt.buf, featureGates)
+			actualBytes := rt.buf.Bytes()
+			if !bytes.Equal(actualBytes, rt.expectedBytes) {
+				t.Errorf(
+					"failed PrintAvailableUpgrades:\n\texpected: %q\n\t  actual: %q",
+					string(rt.expectedBytes),
+					string(actualBytes),
+				)
+			}
+		})
 	}
 }

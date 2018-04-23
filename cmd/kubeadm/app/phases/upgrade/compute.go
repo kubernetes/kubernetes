@@ -146,20 +146,13 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			// If the cluster version is lower than the newest patch version, we should inform about the possible upgrade
 			if patchUpgradePossible(clusterVersion, patchVersion) {
 
-				// The kubeadm version has to be upgraded to the latest patch version
-				newKubeadmVer := patchVersionStr
-				if kubeadmVersion.AtLeast(patchVersion) {
-					// In this case, the kubeadm CLI version is new enough. Don't display an update suggestion for kubeadm by making .NewKubeadmVersion equal .CurrentKubeadmVersion
-					newKubeadmVer = kubeadmVersionStr
-				}
-
 				upgrades = append(upgrades, Upgrade{
 					Description: description,
 					Before:      beforeState,
 					After: ClusterState{
 						KubeVersion:    patchVersionStr,
 						DNSVersion:     dns.GetDNSVersion(patchVersion, ActiveDNSAddon(featureGates)),
-						KubeadmVersion: newKubeadmVer,
+						KubeadmVersion: patchVersionStr,
 						EtcdVersion:    getSuggestedEtcdVersion(patchVersionStr),
 						// KubeletVersions is unset here as it is not used anywhere in .After
 					},
