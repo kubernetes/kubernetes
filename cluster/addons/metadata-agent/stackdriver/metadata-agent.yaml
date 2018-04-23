@@ -47,7 +47,7 @@ spec:
           exec:
             command:
               - /bin/bash
-              - c
+              - -c
               - |
                 if [[ -f /var/run/metadata-agent/health/unhealthy ]]; then
                   exit 1;
@@ -110,7 +110,7 @@ spec:
           exec:
             command:
               - /bin/bash
-              - c
+              - -c
               - |
                 if [[ -f /var/run/metadata-agent/health/unhealthy ]]; then
                   exit 1;
