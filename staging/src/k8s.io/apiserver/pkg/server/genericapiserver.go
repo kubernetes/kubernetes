@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -157,10 +156,6 @@ type DelegationTarget interface {
 	// UnprotectedHandler returns a handler that is NOT protected by a normal chain
 	UnprotectedHandler() http.Handler
 
-	// RequestContextMapper returns the existing RequestContextMapper.  Because we cannot rewire all existing
-	// uses of this function, this will be used in any delegating API server
-	RequestContextMapper() apirequest.RequestContextMapper
-
 	// PostStartHooks returns the post-start hooks that need to be combined
 	PostStartHooks() map[string]postStartHookEntry
 
@@ -199,13 +194,10 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 }
 
 type emptyDelegate struct {
-	requestContextMapper apirequest.RequestContextMapper
 }
 
 func NewEmptyDelegate() DelegationTarget {
-	return emptyDelegate{
-		requestContextMapper: apirequest.NewRequestContextMapper(),
-	}
+	return emptyDelegate{}
 }
 
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
@@ -223,15 +215,8 @@ func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
 func (s emptyDelegate) ListedPaths() []string {
 	return []string{}
 }
-func (s emptyDelegate) RequestContextMapper() apirequest.RequestContextMapper {
-	return s.requestContextMapper
-}
 func (s emptyDelegate) NextDelegate() DelegationTarget {
 	return nil
-}
-
-func (s *GenericAPIServer) RequestContextMapper() apirequest.RequestContextMapper {
-	return s.delegationTarget.RequestContextMapper()
 }
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
@@ -364,7 +349,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	}
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
-	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions, s.delegationTarget.RequestContextMapper()).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix, apiVersions).WebService())
 
 	return nil
 }
@@ -409,7 +394,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	}
 
 	s.DiscoveryGroupManager.AddGroup(apiGroup)
-	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup, s.delegationTarget.RequestContextMapper()).WebService())
+	s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
 
 	return nil
 }
@@ -441,7 +426,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Mapper:          apiGroupInfo.GroupMeta.RESTMapper,
 
 		Admit:                        s.admissionControl,
-		Context:                      s.RequestContextMapper(),
 		MinRequestTimeout:            s.minRequestTimeout,
 		EnableAPIResponseCompression: s.enableAPIResponseCompression,
 	}

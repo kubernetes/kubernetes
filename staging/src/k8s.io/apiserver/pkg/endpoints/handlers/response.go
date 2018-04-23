@@ -169,7 +169,7 @@ func transformResponseObject(ctx request.Context, scope RequestScope, req *http.
 		}
 	}
 
-	responsewriters.WriteObject(ctx, statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+	responsewriters.WriteObject(statusCode, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed

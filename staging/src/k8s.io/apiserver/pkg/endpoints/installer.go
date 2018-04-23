@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 )
@@ -188,10 +187,6 @@ func (a *APIInstaller) restMapping(resource string) (*meta.RESTMapping, error) {
 
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, error) {
 	admit := a.group.Admit
-	context := a.group.Context
-	if context == nil {
-		return nil, fmt.Errorf("%v missing Context", a.group.GroupVersion)
-	}
 
 	optionsExternalVersion := a.group.GroupVersion
 	if a.group.OptionsExternalVersion != nil {
@@ -342,14 +337,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
-	var ctxFn handlers.ContextFunc
-	ctxFn = func(req *http.Request) request.Context {
-		if ctx, ok := context.Get(req); ok {
-			return request.WithUserAgent(ctx, req.Header.Get("User-Agent"))
-		}
-		return request.WithUserAgent(request.NewContext(), req.Header.Get("User-Agent"))
-	}
-
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
@@ -389,7 +376,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			GetContext:         ctxFn,
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      true,
 			SelfLinkPathPrefix: gpath.Join(a.prefix, resource) + "/",
@@ -438,7 +424,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			GetContext:         ctxFn,
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      false,
 			SelfLinkPathPrefix: gpath.Join(a.prefix, scope.ParamName()) + "/",
@@ -497,7 +482,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	kubeVerbs := map[string]struct{}{}
 	reqScope := handlers.RequestScope{
-		ContextFunc:     ctxFn,
 		Serializer:      a.group.Serializer,
 		ParameterCodec:  a.group.ParameterCodec,
 		Creater:         a.group.Creater,
@@ -581,7 +565,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 
 			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
+				handler = genericfilters.RestfulWithCompression(handler)
 			}
 			doc := "read the specified " + kind
 			if hasSubresource {
@@ -613,7 +597,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			if a.enableAPIResponseCompression {
-				handler = genericfilters.RestfulWithCompression(handler, a.group.Context)
+				handler = genericfilters.RestfulWithCompression(handler)
 			}
 			route := ws.GET(action.Path).To(handler).
 				Doc(doc).

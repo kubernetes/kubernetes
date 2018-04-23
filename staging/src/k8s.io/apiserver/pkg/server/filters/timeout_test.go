@@ -63,8 +63,8 @@ func TestTimeout(t *testing.T) {
 			_, err := w.Write([]byte(resp))
 			writeErrors <- err
 		}),
-		func(*http.Request) (<-chan time.Time, func(), *apierrors.StatusError) {
-			return timeout, record.Record, timeoutErr
+		func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+			return req, timeout, record.Record, timeoutErr
 		}))
 	defer ts.Close()
 

@@ -136,17 +136,6 @@ func UIDFrom(ctx Context) (types.UID, bool) {
 	return uid, ok
 }
 
-// WithUserAgent returns a copy of parent in which the user value is set
-func WithUserAgent(parent Context, userAgent string) Context {
-	return WithValue(parent, userAgentKey, userAgent)
-}
-
-// UserAgentFrom returns the value of the userAgent key on the ctx
-func UserAgentFrom(ctx Context) (string, bool) {
-	userAgent, ok := ctx.Value(userAgentKey).(string)
-	return userAgent, ok
-}
-
 // WithAuditEvent returns set audit event struct.
 func WithAuditEvent(parent Context, ev *audit.Event) Context {
 	return WithValue(parent, auditKey, ev)

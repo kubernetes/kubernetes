@@ -331,7 +331,7 @@ func TestCustomHandlerChain(t *testing.T) {
 
 	var protected, called bool
 
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			protected = true
 			apiHandler.ServeHTTP(w, req)
@@ -507,10 +507,9 @@ func TestGracefulShutdown(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config, contextMapper apirequest.RequestContextMapper) http.Handler {
-		handler := genericfilters.WithWaitGroup(apiHandler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
-		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, contextMapper)
-		handler = apirequest.WithRequestContext(handler, contextMapper)
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
+		handler := genericfilters.WithWaitGroup(apiHandler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 		return handler
 	}
 

@@ -54,7 +54,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 			scope.err(err, w, req)
 			return
 		}
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		result, err := getter(ctx, name, req, trace)
@@ -137,7 +137,7 @@ func getRequestOptions(req *http.Request, scope RequestScope, into runtime.Objec
 			newQuery[k] = v
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		requestInfo, _ := request.RequestInfoFrom(ctx)
 		startingIndex := 2
 		if isSubresource {
@@ -181,7 +181,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			hasName = false
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		opts := metainternalversion.ListOptions{}

@@ -34,14 +34,12 @@ import (
 
 // BuildHandlerChain builds a handler chain with a base handler and CompletedConfig.
 func BuildHandlerChain(apiHandler http.Handler, c *CompletedConfig) http.Handler {
-	requestContextMapper := apirequest.NewRequestContextMapper()
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(requestContextMapper, legacyscheme.Codecs, false)
+	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
-	handler := genericapifilters.WithAuthorization(apiHandler, requestContextMapper, c.Authorization.Authorizer, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, requestContextMapper, c.Authentication.Authenticator, failedHandler)
-	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver, requestContextMapper)
-	handler = apirequest.WithRequestContext(handler, requestContextMapper)
+	handler := genericapifilters.WithAuthorization(apiHandler, c.Authorization.Authorizer, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler)
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
