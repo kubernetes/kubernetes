@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -82,7 +81,7 @@ const (
 // called 'ready' in the given directory and returns
 // true if that file exists.
 func IsReady(dir string) bool {
-	readyFile := path.Join(dir, readyFileName)
+	readyFile := filepath.Join(dir, readyFileName)
 	s, err := os.Stat(readyFile)
 	if err != nil {
 		return false
@@ -105,7 +104,7 @@ func SetReady(dir string) {
 		return
 	}
 
-	readyFile := path.Join(dir, readyFileName)
+	readyFile := filepath.Join(dir, readyFileName)
 	file, err := os.Create(readyFile)
 	if err != nil {
 		glog.Errorf("Can't touch %s: %v", readyFile, err)

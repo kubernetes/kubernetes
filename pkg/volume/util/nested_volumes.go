@@ -18,12 +18,12 @@ package util
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"k8s.io/api/core/v1"
 )
 
 // getNestedMountpoints returns a list of mountpoint directories that should be created
@@ -90,7 +90,7 @@ func MakeNestedMountpoints(name, baseDir string, pod v1.Pod) error {
 		return err
 	}
 	for _, dir := range dirs {
-		err := os.MkdirAll(path.Join(baseDir, dir), 0755)
+		err := os.MkdirAll(filepath.Join(baseDir, dir), 0755)
 		if err != nil {
 			return fmt.Errorf("Unable to create nested volume mountpoints: %v", err)
 		}
