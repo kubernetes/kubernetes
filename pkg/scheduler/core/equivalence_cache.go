@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 
 	"github.com/golang/glog"
@@ -68,6 +69,36 @@ func NewEquivalenceCache() *EquivalenceCache {
 	return &EquivalenceCache{
 		algorithmCache: make(map[string]AlgorithmCache),
 	}
+}
+
+// RunPredicate will return a cached predicate result. In case of a cache miss, the predicate will
+// be run and its results cached for the next call.
+//
+// NOTE: RunPredicate will not update the equivalence cache if the given NodeInfo is stale.
+func (ec *EquivalenceCache) RunPredicate(
+	pred algorithm.FitPredicate,
+	predicateKey string,
+	pod *v1.Pod,
+	meta algorithm.PredicateMetadata,
+	nodeInfo *schedulercache.NodeInfo,
+	equivClassInfo *equivalenceClassInfo,
+	cache schedulercache.Cache,
+) (bool, []algorithm.PredicateFailureReason, error) {
+	ec.Lock()
+	defer ec.Unlock()
+	fit, reasons, invalid := ec.PredicateWithECache(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash, false)
+	if !invalid {
+		return fit, reasons, nil
+	}
+	fit, reasons, err := pred(pod, meta, nodeInfo)
+	if err != nil {
+		return fit, reasons, err
+	}
+	// Skip update if NodeInfo is stale.
+	if cache != nil && cache.IsUpToDate(nodeInfo) {
+		ec.UpdateCachedPredicateItem(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, fit, reasons, equivClassInfo.hash, false)
+	}
+	return fit, reasons, nil
 }
 
 // UpdateCachedPredicateItem updates pod predicate for equivalence class
