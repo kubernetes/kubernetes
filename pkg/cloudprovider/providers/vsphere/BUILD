@@ -20,6 +20,7 @@ go_library(
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib/diskmanagers:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/mo:go_default_library",
