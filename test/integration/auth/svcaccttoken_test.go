@@ -342,6 +342,88 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 		doTokenReview(t, cs, treq, false)
 	})
+
+	t.Run("a token should be invalid after recreating same name pod", func(t *testing.T) {
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &one,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Pod",
+					APIVersion: "v1",
+					Name:       pod.Name,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+		originalPod, originalDelPod := createDeletePod(t, cs, pod)
+		defer originalDelPod()
+
+		treq.Spec.BoundObjectRef.UID = originalPod.UID
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `"test-pod"`, "kubernetes.io", "pod", "name")
+		checkPayload(t, treq.Status.Token, "null", "kubernetes.io", "secret")
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+
+		doTokenReview(t, cs, treq, false)
+		originalDelPod()
+		doTokenReview(t, cs, treq, true)
+
+		_, recreateDelPod := createDeletePod(t, cs, pod)
+		defer recreateDelPod()
+
+		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("a token should be invalid after recreating same name secret", func(t *testing.T) {
+		treq := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         []string{"api"},
+				ExpirationSeconds: &one,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					Kind:       "Secret",
+					APIVersion: "v1",
+					Name:       secret.Name,
+					UID:        secret.UID,
+				},
+			},
+		}
+
+		sa, del := createDeleteSvcAcct(t, cs, sa)
+		defer del()
+
+		originalSecret, originalDelSecret := createDeleteSecret(t, cs, secret)
+		defer originalDelSecret()
+
+		treq.Spec.BoundObjectRef.UID = originalSecret.UID
+		if treq, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(sa.Name, treq); err != nil {
+			t.Fatalf("err: %v", err)
+		}
+
+		checkPayload(t, treq.Status.Token, `"system:serviceaccount:myns:test-svcacct"`, "sub")
+		checkPayload(t, treq.Status.Token, `["api"]`, "aud")
+		checkPayload(t, treq.Status.Token, `null`, "kubernetes.io", "pod")
+		checkPayload(t, treq.Status.Token, `"test-secret"`, "kubernetes.io", "secret", "name")
+		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
+		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
+
+		doTokenReview(t, cs, treq, false)
+		originalDelSecret()
+		doTokenReview(t, cs, treq, true)
+
+		_, recreateDelSecret := createDeleteSecret(t, cs, secret)
+		defer recreateDelSecret()
+
+		doTokenReview(t, cs, treq, true)
+	})
 }
 
 func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
