@@ -438,13 +438,15 @@ func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]inte
 }
 
 // DeepCopyJSON deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
-// types produced by json.Unmarshal().
+// types produced by json.Unmarshal() and also int64 and uint64.
+// bool, int64, uint64, float64, string, []interface{}, map[string]interface{}, json.Number and nil
 func DeepCopyJSON(x map[string]interface{}) map[string]interface{} {
 	return DeepCopyJSONValue(x).(map[string]interface{})
 }
 
 // DeepCopyJSONValue deep copies the passed value, assuming it is a valid JSON representation i.e. only contains
-// types produced by json.Unmarshal().
+// types produced by json.Unmarshal() and also int64 and uint64.
+// bool, int64, uint64, float64, string, []interface{}, map[string]interface{}, json.Number and nil
 func DeepCopyJSONValue(x interface{}) interface{} {
 	switch x := x.(type) {
 	case map[string]interface{}:
@@ -467,7 +469,7 @@ func DeepCopyJSONValue(x interface{}) interface{} {
 			clone[i] = DeepCopyJSONValue(v)
 		}
 		return clone
-	case string, int64, bool, float64, nil, encodingjson.Number:
+	case string, int64, uint64, bool, float64, nil, encodingjson.Number:
 		return x
 	default:
 		panic(fmt.Errorf("cannot deep copy %T", x))

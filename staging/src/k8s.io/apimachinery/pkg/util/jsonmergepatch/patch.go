@@ -120,7 +120,7 @@ func keepOrDeleteNullInObj(m map[string]interface{}, keepNull bool) (map[string]
 				if err != nil {
 					return nil, err
 				}
-			case []interface{}, string, float64, bool, int, int64, nil:
+			case []interface{}, string, float64, bool, int64, uint64, nil:
 				// Lists are always replaced in Json, no need to check each entry in the list.
 				if !keepNull {
 					filteredMap[key] = val
