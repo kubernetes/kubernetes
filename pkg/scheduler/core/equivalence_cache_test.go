@@ -734,7 +734,7 @@ func TestEquivalenceCacheInvalidationRace(t *testing.T) {
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, pvcLister, true, false)
+		nil, nil, pvcLister, true)
 
 	// First scheduling attempt should fail.
 	nodeLister := schedulertesting.FakeNodeLister(makeNodeList([]string{"machine1"}))

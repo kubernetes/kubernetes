@@ -119,4 +119,7 @@ type Cache interface {
 
 	// FilteredList returns all cached pods that pass the filter.
 	FilteredList(filter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
+
+	// IsUpToDate returns true if the given NodeInfo matches the current data in the cache.
+	IsUpToDate(n *NodeInfo) bool
 }
