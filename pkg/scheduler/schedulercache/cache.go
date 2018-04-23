@@ -460,6 +460,13 @@ func (cache *schedulerCache) ListPDBs(selector labels.Selector) ([]*policy.PodDi
 	return pdbs, nil
 }
 
+func (cache *schedulerCache) IsUpToDate(n *NodeInfo) bool {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	node, ok := cache.nodes[n.Node().Name]
+	return ok && n.generation == node.generation
+}
+
 func (cache *schedulerCache) run() {
 	go wait.Until(cache.cleanupExpiredAssumedPods, cache.period, cache.stop)
 }
