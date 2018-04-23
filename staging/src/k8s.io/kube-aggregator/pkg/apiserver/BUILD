@@ -55,6 +55,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
@@ -70,6 +71,7 @@ go_library(
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:go_default_library",
+        "//vendor/k8s.io/kube-aggregator/pkg/apiserver/metrics:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apiserver/scheme:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/informers/internalversion:go_default_library",
@@ -93,6 +95,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/kube-aggregator/pkg/apiserver/metrics:all-srcs",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver/scheme:all-srcs",
     ],
     tags = ["automanaged"],

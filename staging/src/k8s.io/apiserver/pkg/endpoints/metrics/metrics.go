@@ -190,7 +190,7 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 		_, hj := response.ResponseWriter.(http.Hijacker)
 		var rw http.ResponseWriter
 		if cn && fl && hj {
-			rw = &fancyResponseWriterDelegator{delegate}
+			rw = &FancyResponseWriterDelegator{delegate}
 		} else {
 			rw = delegate
 		}
@@ -213,7 +213,7 @@ func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler ht
 		_, fl := w.(http.Flusher)
 		_, hj := w.(http.Hijacker)
 		if cn && fl && hj {
-			w = &fancyResponseWriterDelegator{delegate}
+			w = &FancyResponseWriterDelegator{delegate}
 		} else {
 			w = delegate
 		}
@@ -221,6 +221,37 @@ func InstrumentHandlerFunc(verb, resource, subresource, scope string, handler ht
 		handler(w, req)
 
 		MonitorRequest(req, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
+	}
+}
+
+// InstrumentHandlerFunc works like Prometheus' InstrumentHandlerFunc but adds some Kubernetes endpoint specific information.
+func InstrumentHandlerFromContext(contextMapper request.RequestContextMapper, handler http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		now := time.Now()
+
+		var requestInfo *request.RequestInfo
+		ctx, ok := contextMapper.Get(req)
+		if ok {
+			requestInfo, ok = request.RequestInfoFrom(ctx)
+		}
+		if requestInfo == nil {
+			requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
+		}
+
+		delegate := &ResponseWriterDelegator{ResponseWriter: w}
+
+		_, cn := w.(http.CloseNotifier)
+		_, fl := w.(http.Flusher)
+		_, hj := w.(http.Hijacker)
+		if cn && fl && hj {
+			w = &FancyResponseWriterDelegator{delegate}
+		} else {
+			w = delegate
+		}
+
+		handler.ServeHTTP(w, req)
+
+		MonitorRequest(req, requestInfo.Verb, requestInfo.Resource, requestInfo.Subresource, CleanScope(requestInfo), delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
 	}
 }
 
@@ -298,19 +329,19 @@ func (r *ResponseWriterDelegator) ContentLength() int {
 	return int(r.written)
 }
 
-type fancyResponseWriterDelegator struct {
+type FancyResponseWriterDelegator struct {
 	*ResponseWriterDelegator
 }
 
-func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
+func (f *FancyResponseWriterDelegator) CloseNotify() <-chan bool {
 	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 
-func (f *fancyResponseWriterDelegator) Flush() {
+func (f *FancyResponseWriterDelegator) Flush() {
 	f.ResponseWriter.(http.Flusher).Flush()
 }
 
-func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (f *FancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
