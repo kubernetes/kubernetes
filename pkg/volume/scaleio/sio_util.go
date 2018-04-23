@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -188,7 +188,7 @@ func loadConfig(configName string) (map[string]string, error) {
 func saveConfig(configName string, data map[string]string) error {
 	glog.V(4).Info(log("saving config file %s", configName))
 
-	dir := path.Dir(configName)
+	dir := filepath.Dir(configName)
 	if _, err := os.Stat(dir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
