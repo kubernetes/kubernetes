@@ -28,7 +28,6 @@ go_test(
         "//test/e2e/scheduling:go_default_library",
         "//test/e2e/servicecatalog:go_default_library",
         "//test/e2e/storage:go_default_library",
-        "//test/e2e/ui:go_default_library",
     ],
 )
 
@@ -115,7 +114,6 @@ filegroup(
         "//test/e2e/servicecatalog:all-srcs",
         "//test/e2e/storage:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
-        "//test/e2e/ui:all-srcs",
         "//test/e2e/upgrades:all-srcs",
     ],
     tags = ["automanaged"],
