@@ -428,7 +428,7 @@ func NewSchedulerServer(config *componentconfig.KubeSchedulerConfiguration, mast
 		SchedulerName:                  config.SchedulerName,
 		Client:                         client,
 		InformerFactory:                informers.NewSharedInformerFactory(client, 0),
-		PodInformer:                    factory.NewPodInformer(client, 0, config.SchedulerName),
+		PodInformer:                    factory.NewPodInformer(client, 0),
 		AlgorithmSource:                config.AlgorithmSource,
 		HardPodAffinitySymmetricWeight: config.HardPodAffinitySymmetricWeight,
 		EventClient:                    eventClient,

@@ -212,10 +212,10 @@ func NewConfigFactory(
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return unassignedNonTerminatedPod(t)
+					return unassignedNonTerminatedPod(t) && responsibleForPod(t, schedulerName)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return unassignedNonTerminatedPod(pod)
+						return unassignedNonTerminatedPod(pod) && responsibleForPod(pod, schedulerName)
 					}
 					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
 					return false
@@ -1173,6 +1173,11 @@ func assignedNonTerminatedPod(pod *v1.Pod) bool {
 	return true
 }
 
+// responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
+func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
+	return schedulerName == pod.Spec.SchedulerName
+}
+
 // assignedPodLister filters the pods returned from a PodLister to
 // only include those that have a node name set.
 type assignedPodLister struct {
@@ -1245,10 +1250,9 @@ func (i *podInformer) Lister() corelisters.PodLister {
 }
 
 // NewPodInformer creates a shared index informer that returns only non-terminal pods.
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration, schedulerName string) coreinformers.PodInformer {
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
 	selector := fields.ParseSelectorOrDie(
-		"spec.schedulerName=" + schedulerName +
-			",status.phase!=" + string(v1.PodSucceeded) +
+		"status.phase!=" + string(v1.PodSucceeded) +
 			",status.phase!=" + string(v1.PodFailed))
 	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
 	return &podInformer{
