@@ -29,7 +29,7 @@ import (
 )
 
 func startJobController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}]; !ok {
 		return false, nil
 	}
 	go job.NewJobController(
@@ -41,7 +41,7 @@ func startJobController(ctx ControllerContext) (bool, error) {
 }
 
 func startCronJobController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}]; !ok {
 		return false, nil
 	}
 	cjc, err := cronjob.NewCronJobController(

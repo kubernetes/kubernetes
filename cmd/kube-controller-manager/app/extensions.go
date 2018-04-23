@@ -28,7 +28,7 @@ import (
 )
 
 func startDeploymentController(ctx ControllerContext) (bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}]; !ok {
 		return false, nil
 	}
 	dc, err := deployment.NewDeploymentController(

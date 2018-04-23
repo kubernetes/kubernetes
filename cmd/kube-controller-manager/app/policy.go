@@ -32,7 +32,7 @@ func startDisruptionController(ctx ControllerContext) (bool, error) {
 	var version = "v1beta1"
 	var resource = "poddisruptionbudgets"
 
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
+	if _, ok := ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}]; !ok {
 		glog.Infof(
 			"Refusing to start disruption because resource %q in group %q is not available.",
 			resource, group+"/"+version)
