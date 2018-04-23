@@ -952,7 +952,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 		}
 		defer os.RemoveAll(targetDir)
 
-		dataDirPath := path.Join(targetDir, dataDirName)
+		dataDirPath := filepath.Join(targetDir, dataDirName)
 		err = os.MkdirAll(dataDirPath, 0755)
 		if err != nil {
 			t.Fatalf("%v: unexpected error creating data path: %v", tc.name, err)
@@ -969,7 +969,7 @@ func TestCreateUserVisibleFiles(t *testing.T) {
 		}
 
 		for subpath, expectedDest := range tc.expected {
-			visiblePath := path.Join(targetDir, subpath)
+			visiblePath := filepath.Join(targetDir, subpath)
 			destination, err := os.Readlink(visiblePath)
 			if err != nil && os.IsNotExist(err) {
 				t.Fatalf("%v: visible symlink does not exist: %v", tc.name, visiblePath)
