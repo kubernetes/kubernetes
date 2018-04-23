@@ -22,7 +22,7 @@ source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 # address for the master. (In the case of upgrade/repair, we re-use
 # the same IP.)
 #
-# It requires a whole slew of assumed variables, partially due to to
+# It requires a whole slew of assumed variables, partially due to
 # the call to write-master-env. Listing them would be rather
 # futile. Instead, we list the required calls to ensure any additional
 #
