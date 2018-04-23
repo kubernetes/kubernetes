@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
@@ -223,6 +225,11 @@ type ControllerContext struct {
 	// ComponentConfig provides access to init options for a given controller
 	ComponentConfig componentconfig.KubeControllerManagerConfiguration
 
+	// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
+	// initialization of the RESTMapper until the first mapping is
+	// requested.
+	RESTMapper *discovery.DeferredDiscoveryRESTMapper
+
 	// AvailableResources is a map listing currently available resources
 	AvailableResources map[schema.GroupVersionResource]bool
 
@@ -389,6 +396,14 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		return ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
 	}
 
+	// Use a discovery client capable of being refreshed.
+	discoveryClient := rootClientBuilder.ClientOrDie("controller-discovery")
+	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient.Discovery())
+	restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedClient)
+	go wait.Until(func() {
+		restMapper.Reset()
+	}, 30*time.Second, stop)
+
 	availableResources, err := GetAvailableResources(rootClientBuilder)
 	if err != nil {
 		return ControllerContext{}, err
@@ -404,6 +419,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		ClientBuilder:      clientBuilder,
 		InformerFactory:    sharedInformers,
 		ComponentConfig:    s.Generic.ComponentConfig,
+		RESTMapper:         restMapper,
 		AvailableResources: availableResources,
 		Cloud:              cloud,
 		LoopMode:           loopMode,

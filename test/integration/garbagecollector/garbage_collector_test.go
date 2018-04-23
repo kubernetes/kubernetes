@@ -254,6 +254,12 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	}
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {
+		go wait.Until(func() {
+			// Resetting the REST mapper will also invalidate the underlying discovery
+			// client. This is a leaky abstraction and assumes behavior about the REST
+			// mapper, but we'll deal with it for now.
+			restMapper.Reset()
+		}, syncPeriod, stopCh)
 		go gc.Run(workers, stopCh)
 		go gc.Sync(clientSet.Discovery(), syncPeriod, stopCh)
 	}
