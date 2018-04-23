@@ -308,7 +308,7 @@ kube::util::gv-to-swagger-name() {
 # Assumed vars:
 # SWAGGER_API_PATH: Base path for swaggerapi on apiserver. Ex:
 # http://localhost:8080/swaggerapi.
-# SWAGGER_ROOT_DIR: Root dir where we want to to save the fetched spec.
+# SWAGGER_ROOT_DIR: Root dir where we want to save the fetched spec.
 # VERSIONS: Array of group versions to include in swagger spec.
 kube::util::fetch-swagger-spec() {
   for ver in ${VERSIONS}; do
