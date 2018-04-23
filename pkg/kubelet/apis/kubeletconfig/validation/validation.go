@@ -118,5 +118,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for HairpinMode (--hairpin-mode). Valid options are %q, %q or %q",
 			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
 	}
+
+	if err := validateKubeletOSConfiguration(kc); err != nil {
+		allErrors = append(allErrors, err)
+	}
 	return utilerrors.NewAggregate(allErrors)
 }
