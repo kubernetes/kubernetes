@@ -132,7 +132,7 @@ _____________________________________________________________________
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0",
 						KubeadmVersion: "v1.9.0",
-						DNSVersion:     "1.14.9",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -148,7 +148,7 @@ API Server           v1.8.3    v1.9.0
 Controller Manager   v1.8.3    v1.9.0
 Scheduler            v1.8.3    v1.9.0
 Kube Proxy           v1.8.3    v1.9.0
-Kube DNS             1.14.5    1.14.9
+Kube DNS             1.14.5    1.14.10
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -193,7 +193,7 @@ _____________________________________________________________________
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0",
 						KubeadmVersion: "v1.9.0",
-						DNSVersion:     "1.14.9",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -229,7 +229,7 @@ API Server           v1.8.3    v1.9.0
 Controller Manager   v1.8.3    v1.9.0
 Scheduler            v1.8.3    v1.9.0
 Kube Proxy           v1.8.3    v1.9.0
-Kube DNS             1.14.5    1.14.9
+Kube DNS             1.14.5    1.14.10
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -258,7 +258,7 @@ _____________________________________________________________________
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0-beta.1",
 						KubeadmVersion: "v1.9.0-beta.1",
-						DNSVersion:     "1.14.9",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -274,7 +274,7 @@ API Server           v1.8.5    v1.9.0-beta.1
 Controller Manager   v1.8.5    v1.9.0-beta.1
 Scheduler            v1.8.5    v1.9.0-beta.1
 Kube Proxy           v1.8.5    v1.9.0-beta.1
-Kube DNS             1.14.5    1.14.9
+Kube DNS             1.14.5    1.14.10
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
@@ -303,7 +303,7 @@ _____________________________________________________________________
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.9.0-rc.1",
 						KubeadmVersion: "v1.9.0-rc.1",
-						DNSVersion:     "1.14.9",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.12",
 					},
 				},
@@ -319,7 +319,7 @@ API Server           v1.8.5    v1.9.0-rc.1
 Controller Manager   v1.8.5    v1.9.0-rc.1
 Scheduler            v1.8.5    v1.9.0-rc.1
 Kube Proxy           v1.8.5    v1.9.0-rc.1
-Kube DNS             1.14.5    1.14.9
+Kube DNS             1.14.5    1.14.10
 Etcd                 3.0.17    3.1.12
 
 You can now apply the upgrade by executing the following command:
