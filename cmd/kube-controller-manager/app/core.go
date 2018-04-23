@@ -31,7 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -300,12 +299,12 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
 
-	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
-
 	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
 	if err != nil {
 		return true, err
 	}
+
+	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
 	namespaceController := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
@@ -348,11 +347,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	}
 
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
-
-	// Use a discovery client capable of being refreshed.
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	restMapper.Reset()
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
 	config.ContentConfig = dynamic.ContentConfig()
@@ -360,8 +355,8 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	// resource types. Otherwise we'll be storing full Unstructured data in our
 	// caches for custom resources. Consider porting it to work with
 	// metav1beta1.PartialObjectMetadata.
-	metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
-	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+	metaOnlyClientPool := dynamic.NewClientPool(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc)
+	clientPool := dynamic.NewClientPool(config, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc)
 
 	// Get an initial set of deletable resources to prime the garbage collector.
 	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
@@ -372,7 +367,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
 		metaOnlyClientPool,
 		clientPool,
-		restMapper,
+		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,
 		ctx.InformerFactory,
