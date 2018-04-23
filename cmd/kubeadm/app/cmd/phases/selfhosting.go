@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeletclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
@@ -101,8 +102,11 @@ func getSelfhostingSubCommand() *cobra.Command {
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
+			kubeletClient, err := kubeletclient.CreateClient()
+			kubeadmutil.CheckErr(err)
+
 			// Converts the Static Pod-hosted control plane into a self-hosted one
-			waiter := apiclient.NewKubeWaiter(client, 2*time.Minute, os.Stdout)
+			waiter := apiclient.NewKubeWaiter(client, kubeletClient, 2*time.Minute, os.Stdout)
 			err = selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter, false)
 			kubeadmutil.CheckErr(err)
 		},

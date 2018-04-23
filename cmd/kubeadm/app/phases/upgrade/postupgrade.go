@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -48,7 +47,7 @@ var expiry = 180 * 24 * time.Hour
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the markmaster phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
+func PerformPostUpgradeTasks(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -74,7 +73,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	}
 
 	// Upgrade to a self-hosted control plane if possible
-	if err := upgradeToSelfHosting(client, cfg, newK8sVer, dryRun); err != nil {
+	if err := upgradeToSelfHosting(client, waiter, cfg, newK8sVer, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -140,11 +139,8 @@ func removeOldKubeDNSDeploymentIfCoreDNSIsUsed(cfg *kubeadmapi.MasterConfigurati
 	return nil
 }
 
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
+func upgradeToSelfHosting(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.MasterConfiguration, newK8sVer *version.Version, dryRun bool) error {
 	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) && newK8sVer.AtLeast(v190alpha3) {
-
-		waiter := getWaiter(dryRun, client)
-
 		// kubeadm will now convert the static Pod-hosted control plane into a self-hosted one
 		fmt.Println("[self-hosted] Creating self-hosted control plane.")
 		if err := selfhosting.CreateSelfHostedControlPlane(kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubernetesDir, cfg, client, waiter, dryRun); err != nil {
@@ -152,15 +148,6 @@ func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.MasterConf
 		}
 	}
 	return nil
-}
-
-// getWaiter gets the right waiter implementation for the right occasion
-// TODO: Consolidate this with what's in init.go?
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
-	if dryRun {
-		return dryrunutil.NewWaiter()
-	}
-	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
 }
 
 // backupAPIServerCertAndKey backups the old cert and key of kube-apiserver to a specified directory.
