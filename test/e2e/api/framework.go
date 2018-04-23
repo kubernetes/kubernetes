@@ -18,7 +18,7 @@ package api
 
 import "github.com/onsi/ginkgo"
 
-// Creating a description for api testing
+// SIGDescribe is a method for labeling api-rest-like operations on kubernates api
 func SIGDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[sig-api] "+text, body)
 }
