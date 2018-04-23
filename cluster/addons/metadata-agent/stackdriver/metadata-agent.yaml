@@ -43,7 +43,7 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       containers:
-      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:{{ metadata_agent_version }}
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.19-1
         imagePullPolicy: IfNotPresent
         name: metadata-agent
         livenessProbe:
@@ -106,7 +106,7 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       containers:
-      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:{{ metadata_agent_version }}
+      - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.19-1
         imagePullPolicy: IfNotPresent
         name: metadata-agent
         livenessProbe:
