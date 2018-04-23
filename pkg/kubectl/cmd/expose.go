@@ -289,7 +289,7 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, out io.Writer, cmd *
 			cmdutil.PrintSuccess(false, out, info.Object, true, "exposed")
 			return nil
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 

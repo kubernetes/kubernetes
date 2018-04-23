@@ -224,8 +224,7 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 		if err := groupMeta.AddVersionInterfaces(
 			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
 			&meta.VersionInterfaces{
-				ObjectConvertor:  scheme,
-				MetadataAccessor: accessor,
+				ObjectConvertor: scheme,
 			},
 		); err != nil {
 			return err

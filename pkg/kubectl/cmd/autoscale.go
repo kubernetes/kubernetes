@@ -187,7 +187,7 @@ func (o *AutoscaleOptions) RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *c
 			return cmdutil.PrintObject(cmd, object, out)
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), hpa.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 

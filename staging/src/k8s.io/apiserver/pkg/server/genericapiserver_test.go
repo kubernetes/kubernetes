@@ -155,8 +155,7 @@ func TestInstallAPIGroups(t *testing.T) {
 
 		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 			return &meta.VersionInterfaces{
-				ObjectConvertor:  scheme,
-				MetadataAccessor: meta.NewAccessor(),
+				ObjectConvertor: scheme,
 			}, nil
 		}
 

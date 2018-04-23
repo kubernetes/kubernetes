@@ -119,7 +119,7 @@ func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory,
 			return err
 		}
 
-		configString, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		configString, err := kubectl.GetOriginalConfiguration(info.Object)
 		if err != nil {
 			return err
 		}

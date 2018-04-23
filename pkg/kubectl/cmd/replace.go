@@ -219,7 +219,7 @@ func (o *ReplaceOptions) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
@@ -315,7 +315,7 @@ func (o *ReplaceOptions) forceReplace() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 

@@ -28,8 +28,7 @@ func InterfacesForUnstructuredConversion(parent VersionInterfacesFunc) VersionIn
 	return func(version schema.GroupVersion) (*VersionInterfaces, error) {
 		if i, err := parent(version); err == nil {
 			return &VersionInterfaces{
-				ObjectConvertor:  i.ObjectConvertor,
-				MetadataAccessor: NewAccessor(),
+				ObjectConvertor: i.ObjectConvertor,
 			}, nil
 		}
 		return InterfacesForUnstructured(version)
@@ -41,7 +40,6 @@ func InterfacesForUnstructuredConversion(parent VersionInterfacesFunc) VersionIn
 // other conversions.
 func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{
-		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
-		MetadataAccessor: NewAccessor(),
+		ObjectConvertor: &unstructured.UnstructuredObjectConverter{},
 	}, nil
 }

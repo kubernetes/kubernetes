@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -110,7 +111,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	if err != nil {
 		return err
 	}
-	rv, err := mapping.MetadataAccessor.ResourceVersion(obj)
+	rv, err := meta.NewAccessor().ResourceVersion(obj)
 	if err != nil {
 		return err
 	}

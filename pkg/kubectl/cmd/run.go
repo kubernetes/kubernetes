@@ -451,12 +451,12 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*RunObject) error {
 	for _, obj := range createdObjects {
-		namespace, err := obj.Mapping.MetadataAccessor.Namespace(obj.Object)
+		namespace, err := metadataAccessor.Namespace(obj.Object)
 		if err != nil {
 			return err
 		}
 		var name string
-		name, err = obj.Mapping.MetadataAccessor.Name(obj.Object)
+		name, err = metadataAccessor.Name(obj.Object)
 		if err != nil {
 			return err
 		}
@@ -687,7 +687,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 			return nil, err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return nil, err
 		}
 
