@@ -17,10 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"reflect"
 	"testing"
+
+	"github.com/coreos/etcd/clientv3"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 type fakeVersionGetter struct {
@@ -113,7 +114,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.8.3",
 						KubeadmVersion: "v1.8.3",
-						DNSVersion:     "1.14.5",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.0.17",
 					},
 				},
@@ -145,7 +146,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.0",
 						KubeadmVersion: "v1.9.0",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -195,7 +196,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.1",
 						KubeadmVersion: "v1.9.1",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -242,7 +243,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.0-alpha.2",
 						KubeadmVersion: "v1.9.0-alpha.2",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -269,13 +270,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 							"v1.8.5": 1,
 						},
 						KubeadmVersion: "v1.8.5",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.0.14",
 					},
 					After: ClusterState{
 						KubeVersion:    "v1.9.0-alpha.2",
 						KubeadmVersion: "v1.9.0-alpha.2",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -309,7 +310,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.0-beta.1",
 						KubeadmVersion: "v1.9.0-beta.1",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -343,7 +344,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.0-rc.1",
 						KubeadmVersion: "v1.9.0-rc.1",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -377,7 +378,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.6-rc.1",
 						KubeadmVersion: "v1.9.6-rc.1",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -411,7 +412,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.0-rc.1",
 						KubeadmVersion: "v1.9.0-rc.1",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
@@ -429,7 +430,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.10.0-alpha.2",
 						KubeadmVersion: "v1.10.0-alpha.2",
-						DNSVersion:     "1.14.7",
+						DNSVersion:     "1.14.10",
 						EtcdVersion:    "3.1.11",
 					},
 				},
