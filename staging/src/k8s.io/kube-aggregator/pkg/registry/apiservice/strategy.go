@@ -97,10 +97,9 @@ func (apiServerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, o
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Spec = oldAPIService.Spec
-	newAPIService.Labels = oldAPIService.Labels
-	newAPIService.Annotations = oldAPIService.Annotations
-	newAPIService.Finalizers = oldAPIService.Finalizers
-	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
+
+	// Status updates should update only status, not ObjectMeta.
+	generic.ResetObjectMetaForStatus(newAPIService, oldAPIService)
 }
 
 func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
