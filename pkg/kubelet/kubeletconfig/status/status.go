@@ -32,29 +32,28 @@ import (
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
-// TODO(mtaufen): s/current/assigned, as this is more accurate e.g. if you are using lkg, you aren't currently using "current" :)
 const (
-	// CurLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, flags, and/or local files
-	CurLocalMessage = "using current: local"
-	// LkgLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, flags, and/or local files
+	// AssignedLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, files, and flags
+	AssignedLocalMessage = "using assigned: local"
+	// LkgLocalMessage indicates that the Kubelet is using its local config, which consists of defaults, files, and flags
 	LkgLocalMessage = "using last-known-good: local"
 
-	// CurRemoteMessageFmt indicates the Kubelet is using its current config, which is from an API source
-	CurRemoteMessageFmt = "using current: %s"
+	// AssignedRemoteMessageFmt indicates the Kubelet is using its assigned config, which is from an API source
+	AssignedRemoteMessageFmt = "using assigned: %s"
 	// LkgRemoteMessageFmt indicates the Kubelet is using its last-known-good config, which is from an API source
 	LkgRemoteMessageFmt = "using last-known-good: %s"
 
-	// CurLocalOkayReason indicates that the Kubelet is using its local config
-	CurLocalOkayReason = "when the config source is nil, the Kubelet uses its local config"
-	// CurRemoteOkayReason indicates that the config referenced by Node.ConfigSource is currently passing all checks
-	CurRemoteOkayReason = "passing all checks"
+	// AssignedLocalOkReason indicates that the Kubelet is using its local config
+	AssignedLocalOkReason = "when the config source is nil, the Kubelet uses its local config"
+	// AssignedRemoteOkReason indicates that the config referenced by Node.ConfigSource is currently passing all checks
+	AssignedRemoteOkReason = "passing all checks"
 
-	// CurFailLoadReasonFmt indicates that the Kubelet failed to load the current config checkpoint for an API source
-	CurFailLoadReasonFmt = "failed to load current: %s"
-	// CurFailParseReasonFmt indicates that the Kubelet failed to parse the current config checkpoint for an API source
-	CurFailParseReasonFmt = "failed to parse current: %s"
-	// CurFailValidateReasonFmt indicates that the Kubelet failed to validate the current config checkpoint for an API source
-	CurFailValidateReasonFmt = "failed to validate current: %s"
+	// AssignedFailLoadReasonFmt indicates that the Kubelet failed to load the assigned config's local checkpoint
+	AssignedFailLoadReasonFmt = "failed to load assigned: %s"
+	// AssignedFailParseReasonFmt indicates that the Kubelet failed to parse the assigned config after loading the local checkpoint
+	AssignedFailParseReasonFmt = "failed to parse assigned: %s"
+	// AssignedFailValidateReasonFmt indicates that the Kubelet failed to validate the assigned config after loading and parsing the local checkpoint
+	AssignedFailValidateReasonFmt = "failed to validate assigned: %s"
 
 	// LkgFail*ReasonFmt reasons are currently used to print errors in the Kubelet log, but do not appear in Node.Status.Conditions
 
@@ -84,10 +83,10 @@ const (
 	FailSyncReasonCheckpointExistenceFmt = "failed to determine whether object %s with UID %s was already checkpointed"
 	// FailSyncReasonSaveCheckpointFmt is used when we can't save a checkpoint, e.g. due to filesystem issues
 	FailSyncReasonSaveCheckpointFmt = "failed to save config checkpoint for object %s with UID %s"
-	// FailSyncReasonSetCurrentDefault is used when we can't set the current config checkpoint to the local default, e.g. due to filesystem issues
-	FailSyncReasonSetCurrentLocal = "failed to set current config checkpoint to local config"
-	// FailSyncReasonSetCurrentUIDFmt is used when we can't set the current config checkpoint to a checkpointed object, e.g. due to filesystem issues
-	FailSyncReasonSetCurrentUIDFmt = "failed to set current config checkpoint to object %s with UID %s"
+	// FailSyncReasonAssignLocal is used when we can't set the assigned config checkpoint to the local default, e.g. due to filesystem issues
+	FailSyncReasonAssignLocal = "failed to set assigned config to local config"
+	// FailSyncReasonAssignRemoteFmt is used when we can't set the assigned config checkpoint to a checkpointed object, e.g. due to filesystem issues
+	FailSyncReasonAssignRemoteFmt = "failed to set assigned config to object %s with UID %s"
 
 	// EmptyMessage is a placeholder in the case that we accidentally set the condition's message to the empty string.
 	// Doing so can result in a partial patch, and thus a confusing status; this makes it clear that the message was not provided.
