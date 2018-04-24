@@ -36,79 +36,37 @@ const (
 	originalGeneration int64  = 0
 )
 
-var _ = SIGDescribe("api-namespaces-list", func() {
-	f := framework.NewDefaultFramework("api-namespaces-list")
+var _ = SIGDescribe("api-namespaces", func() {
+	f := framework.NewDefaultFramework("api-namespaces")
 
 	Context("starting from an any environment (might be empty or not)", func() {
 		// explicitly not asking for a namespace not being created for the test
 		f.SkipNamespaceCreation = true
-
-		/*
-		   Testname: api-namespaces-list-default
-		   Description: Check that the namespaces returned match the expected well known default namespaces.
-		*/
-		framework.ConformanceIt("list with empty options should show built-in by default namespaces", func() {
-
-			defaultNamespaces := make(map[string]bool)
-			defaultNamespaces["default"] = false
-			defaultNamespaces["kube-system"] = false
-			defaultNamespaces["kube-public"] = false
-
-			By("Retrieving namespaces")
-			options := metav1.ListOptions{}
-			namespaces, err := f.ClientSet.CoreV1().Namespaces().List(options)
-			Expect(err).NotTo(HaveOccurred())
-
-			// checking default namespaces are present in the result
-			for _, namespace := range namespaces.Items {
-				_, present := defaultNamespaces[namespace.ObjectMeta.Name]
-				if present {
-					delete(defaultNamespaces, namespace.ObjectMeta.Name)
-				}
-			}
-			// if all were present, map should end up empty
-			Expect(len(defaultNamespaces)).To(Equal(0))
-		})
-	})
-
-})
-
-var _ = SIGDescribe("api-namespaces-create", func() {
-	f := framework.NewDefaultFramework("api-namespaces-create")
-
-	Context("starting from an any environment (might be empty or not)", func() {
-		// explicitly not asking for a namespace not being created for the test
-		f.SkipNamespaceCreation = true
-
-		/*
-		   Testname: api-namespaces-create-empty
-		   Description: Check that creating a namespace with empty parameters fails.
-		*/
-		framework.ConformanceIt("creating a namespace with empty parameters should fail", func() {
-			namespaceCreationData := &v1.Namespace{}
-			_, err := f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
-			Expect(err).To(HaveOccurred())
-		})
 
 		/*
 		   Testname: api-namespaces-create-name-valid
 		   Description: Check that creating a namespace with valid name parameter succeeds.
 		*/
-		framework.ConformanceIt("creating a namespace with only (valid) name parameter should succeed", func() {
+		framework.ConformanceIt("scenario: get: not-found > post > list : present > get by name: found-and-matches >  delete >  get: not-found", func() {
 			namespaceName :=
 				strings.Join([]string{"testbasename", string(uuid.NewUUID())}, "")
 
-			By(fmt.Sprintf(" creating namespaceName:[%v]\n", namespaceName))
+			// namespace should be not found
+			getOptions := metav1.GetOptions{}
+			namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
+			Expect(err).To(HaveOccurred())
 
+			// creating namespace
+			By(fmt.Sprintf(" creating namespaceName:[%v]\n", namespaceName))
 			namespaceCreationData := &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespaceName,
 				},
 			}
-
-			namespace, err := f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
+			namespace, err = f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
 			Expect(err).NotTo(HaveOccurred())
 
+			// scheduling for deletion once the tests ends
 			defer func() {
 				err := f.ClientSet.CoreV1().Namespaces().Delete(namespace.ObjectMeta.Name, nil)
 				Expect(err).NotTo(HaveOccurred())
@@ -124,107 +82,30 @@ var _ = SIGDescribe("api-namespaces-create", func() {
 			}
 			v.verifyAll(namespace)
 
-		})
-
-		/*
-		   Testname: api-namespaces-create-generatename-invalid
-		   Description: Check that creating a namespace with invalid generatename parameter fails.
-		*/
-		framework.ConformanceIt("creating a namespace with invalid generateName (containing uppercase) should fail", func() {
-			generateName :=
-				strings.Join([]string{"thisHasUppercaseCharacters", string(uuid.NewUUID())}, "")
-
-			namespaceCreationData := &v1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: generateName,
-					Name:         "",
-				},
-			}
-
-			_, err := f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
-			Expect(err).To(HaveOccurred())
-		})
-
-		/*
-		   Testname: api-namespaces-create-generatename-valid
-		   Description: Check that creating a namespace with valid generatename parameter succeeds.
-		*/
-		framework.ConformanceIt("creating a namespace with valid generateName (all lowercase)", func() {
-			generateName :=
-				strings.Join([]string{"lowercasecharacters", string(uuid.NewUUID())}, "")
-
-			namespaceCreationData := &v1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: generateName,
-					Name:         "",
-				},
-			}
-
-			namespace, err := f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
+			// listing should return the just created namespace
+			listOptions := metav1.ListOptions{}
+			var namespaces *v1.NamespaceList = nil
+			namespaces, err = f.ClientSet.CoreV1().Namespaces().List(listOptions)
 			Expect(err).NotTo(HaveOccurred())
 
-			defer func() {
-				err := f.ClientSet.CoreV1().Namespaces().Delete(namespace.ObjectMeta.Name, nil)
-				Expect(err).NotTo(HaveOccurred())
-			}()
+			// checking the namespace is present in the result
+			found := false
+			for _, namespaceItem := range namespaces.Items {
+				found = (namespaceItem.ObjectMeta.Name == namespaceName)
+				if found {
+					break
+				}
+			}
+			Expect(found).To(BeTrue())
 
-			v := newDefaultVerifier()
-			v.verifyGenerateName = func(namespace *v1.Namespace) {
-				Expect(namespace.ObjectMeta.GenerateName).To(Equal(generateName))
-			}
-			v.verifyName = func(namespace *v1.Namespace) {
-				Expect(strings.HasPrefix(namespace.ObjectMeta.Name, generateName)).To(BeTrue())
-			}
-			v.verifySelfLink = func(namespace *v1.Namespace) {
-				expectedSelfLinkBase := strings.Join([]string{namespacesRootURL, generateName}, "")
-				Expect(strings.HasPrefix(namespace.ObjectMeta.SelfLink, expectedSelfLinkBase)).To(BeTrue())
-			}
+			// looking for that specific namespace again
+			namespace, err = f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
+			Expect(err).NotTo(HaveOccurred())
+
+			// verify same creation parameters
 			v.verifyAll(namespace)
 		})
 
-		/*
-		   Testname: api-namespaces-create-generatename-valid-labels
-		   Description: Check that creating a namespace with valid generatename and labels parameters succeeds.
-		*/
-		framework.ConformanceIt("creating a namespace with valid generateName (all lowercase) and labels set", func() {
-			generateName :=
-				strings.Join([]string{"lowercasecharacters", string(uuid.NewUUID())}, "")
-
-			labels := map[string]string{}
-			labels["e2e-run"] = string(uuid.NewUUID())
-
-			namespaceCreationData := &v1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: generateName,
-					Name:         "",
-					Labels:       labels,
-				},
-			}
-
-			namespace, err := f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
-			Expect(err).NotTo(HaveOccurred())
-
-			defer func() {
-				err := f.ClientSet.CoreV1().Namespaces().Delete(namespace.ObjectMeta.Name, nil)
-				Expect(err).NotTo(HaveOccurred())
-			}()
-
-			v := newDefaultVerifier()
-			v.verifyGenerateName = func(namespace *v1.Namespace) {
-				Expect(namespace.ObjectMeta.GenerateName).To(Equal(generateName))
-			}
-			v.verifyName = func(namespace *v1.Namespace) {
-				Expect(strings.HasPrefix(namespace.ObjectMeta.Name, generateName)).To(BeTrue())
-			}
-			v.verifySelfLink = func(namespace *v1.Namespace) {
-				expectedSelfLinkBase := strings.Join([]string{namespacesRootURL, generateName}, "")
-				Expect(strings.HasPrefix(namespace.ObjectMeta.SelfLink, expectedSelfLinkBase)).To(BeTrue())
-			}
-			v.verifyLabels = func(namespace *v1.Namespace) {
-				Expect(namespace.ObjectMeta.Labels).To(Equal(labels))
-			}
-			v.verifyAll(namespace)
-		})
 	})
 })
 
