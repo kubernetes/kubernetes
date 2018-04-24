@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/plugin/pkg/audit/fake"
 )
 
 var (
@@ -83,7 +83,7 @@ func TestBufferedBackendCollectEvents(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
-			backend := NewBackend(&fakeBackend{}, config).(*bufferedBackend)
+			backend := NewBackend(&fake.Backend{}, config).(*bufferedBackend)
 
 			backend.ProcessEvents(newEvents(tc.numEvents)...)
 			batch := backend.collectEvents(tc.timer, tc.stopCh)
@@ -96,7 +96,7 @@ func TestBufferedBackendCollectEvents(t *testing.T) {
 func TestBufferedBackendProcessEventsAfterStop(t *testing.T) {
 	t.Parallel()
 
-	backend := NewBackend(&fakeBackend{}, NewDefaultBatchConfig()).(*bufferedBackend)
+	backend := NewBackend(&fake.Backend{}, NewDefaultBatchConfig()).(*bufferedBackend)
 
 	backend.Run(closedStopCh)
 	backend.Shutdown()
@@ -111,7 +111,7 @@ func TestBufferedBackendProcessEventsBufferFull(t *testing.T) {
 
 	config := NewDefaultBatchConfig()
 	config.BufferSize = 1
-	backend := NewBackend(&fakeBackend{}, config).(*bufferedBackend)
+	backend := NewBackend(&fake.Backend{}, config).(*bufferedBackend)
 
 	backend.ProcessEvents(newEvents(2)...)
 
@@ -123,8 +123,8 @@ func TestBufferedBackendShutdownWaitsForDelegatedCalls(t *testing.T) {
 
 	delegatedCallStartCh := make(chan struct{})
 	delegatedCallEndCh := make(chan struct{})
-	delegateBackend := &fakeBackend{
-		onRequest: func(_ []*auditinternal.Event) {
+	delegateBackend := &fake.Backend{
+		OnRequest: func(_ []*auditinternal.Event) {
 			close(delegatedCallStartCh)
 			<-delegatedCallEndCh
 		},
@@ -158,24 +158,4 @@ func TestBufferedBackendShutdownWaitsForDelegatedCalls(t *testing.T) {
 	// Wait for Shutdown to exit after delegated call has exited.
 	close(delegatedCallEndCh)
 	<-shutdownEndCh
-}
-
-type fakeBackend struct {
-	onRequest func(events []*auditinternal.Event)
-}
-
-var _ audit.Backend = &fakeBackend{}
-
-func (b *fakeBackend) Run(stopCh <-chan struct{}) error {
-	return nil
-}
-
-func (b *fakeBackend) Shutdown() {
-	return
-}
-
-func (b *fakeBackend) ProcessEvents(ev ...*auditinternal.Event) {
-	if b.onRequest != nil {
-		b.onRequest(ev)
-	}
 }
