@@ -58,8 +58,10 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	// find 'bind' option
+	opts := []string{}
+
 	for _, option := range options {
+		// find 'bind' option
 		if option == "bind" {
 			// This is a bind-mount. In order to mimic linux behaviour, we must
 			// use the original device of the bind-mount as the real source.
@@ -78,7 +80,11 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 					break
 				}
 			}
-			break
+		}
+		// find 'ro' option
+		if option == "ro" {
+			// reuse MountPoint.Opts field to mark mount as readonly
+			opts = append(opts, "ro")
 		}
 	}
 
@@ -88,7 +94,7 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 		absTarget = target
 	}
 
-	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype})
+	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: opts})
 	glog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
 	return nil
