@@ -24,7 +24,7 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
-const defaultPerm = 0666
+const defaultPerm = 0755
 
 // FileExists returns true if a regular file exists at `path`, false if `path` does not exist, otherwise an error
 func FileExists(fs utilfs.Filesystem, path string) (bool, error) {
@@ -118,7 +118,7 @@ func DirExists(fs utilfs.Filesystem, path string) (bool, error) {
 		if info.IsDir() {
 			return true, nil
 		}
-		return false, fmt.Errorf("expected dir at %q, but mode is is %q", path, info.Mode().String())
+		return false, fmt.Errorf("expected dir at %q, but mode is %q", path, info.Mode().String())
 	} else if os.IsNotExist(err) {
 		return false, nil
 	} else {
