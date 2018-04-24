@@ -19,7 +19,7 @@ package git_repo
 import (
 	"fmt"
 	"io/ioutil"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -216,10 +216,10 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	switch {
 	case b.target == ".":
 		// if target dir is '.', use the current dir
-		subdir = path.Join(dir)
+		subdir = filepath.Join(dir)
 	case len(files) == 1:
 		// if target is not '.', use the generated folder
-		subdir = path.Join(dir, files[0].Name())
+		subdir = filepath.Join(dir, files[0].Name())
 	default:
 		// if target is not '.', but generated many files, it's wrong
 		return fmt.Errorf("unexpected directory contents: %v", files)
@@ -239,7 +239,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func (b *gitRepoVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(gitRepoPluginName)), b.volName)
+	return filepath.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(gitRepoPluginName)), b.volName)
 }
 
 func (b *gitRepoVolumeMounter) execCommand(command string, args []string, dir string) ([]byte, error) {
