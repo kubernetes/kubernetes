@@ -1047,16 +1047,16 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
-	priorityMetaProducer, err := c.GetPriorityMetadataProducer()
-	if err != nil {
-		return nil, err
-	}
-
 	predicateMetaProducer, err := c.GetPredicateMetadataProducer()
 	if err != nil {
 		return nil, err
 	}
 
+	priorityMetaProducer, err := c.GetPriorityMetadataProducer()
+	if err != nil {
+		return nil, err
+	}
+	
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
 		pluginArgs, err := c.getPluginArgs()
