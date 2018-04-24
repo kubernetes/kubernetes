@@ -19,7 +19,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//hack/boilerplate:all-srcs",
-        "//hack/cmd/teststale:all-srcs",
         "//hack/e2e-internal:all-srcs",
         "//hack/lib:all-srcs",
         "//hack/make-rules:all-srcs",
