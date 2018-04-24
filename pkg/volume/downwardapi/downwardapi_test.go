@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -313,7 +313,7 @@ type stepName struct {
 func (step stepName) getName() string { return step.name }
 
 func doVerifyLinesInFile(t *testing.T, volumePath, filename string, expected string) {
-	data, err := ioutil.ReadFile(path.Join(volumePath, filename))
+	data, err := ioutil.ReadFile(filepath.Join(volumePath, filename))
 	if err != nil {
 		t.Errorf(err.Error())
 		return
@@ -349,7 +349,7 @@ type verifyMode struct {
 }
 
 func (step verifyMode) run(test *downwardAPITest) {
-	fileInfo, err := os.Stat(path.Join(test.volumePath, step.name))
+	fileInfo, err := os.Stat(filepath.Join(test.volumePath, step.name))
 	if err != nil {
 		test.t.Errorf(err.Error())
 		return
@@ -373,7 +373,7 @@ func (step reSetUp) run(test *downwardAPITest) {
 		test.pod.ObjectMeta.Labels = step.newLabels
 	}
 
-	currentTarget, err := os.Readlink(path.Join(test.volumePath, downwardAPIDir))
+	currentTarget, err := os.Readlink(filepath.Join(test.volumePath, downwardAPIDir))
 	if err != nil {
 		test.t.Errorf("labels file should be a link... %s\n", err.Error())
 	}
@@ -384,7 +384,7 @@ func (step reSetUp) run(test *downwardAPITest) {
 	}
 
 	// get the link of the link
-	currentTarget2, err := os.Readlink(path.Join(test.volumePath, downwardAPIDir))
+	currentTarget2, err := os.Readlink(filepath.Join(test.volumePath, downwardAPIDir))
 	if err != nil {
 		test.t.Errorf(".current should be a link... %s\n", err.Error())
 	}
