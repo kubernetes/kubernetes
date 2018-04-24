@@ -17,6 +17,7 @@ limitations under the License.
 package resttest
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -99,7 +100,7 @@ func (t *Tester) TestNamespace() string {
 
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
-func (t *Tester) TestContext() genericapirequest.Context {
+func (t *Tester) TestContext() context.Context {
 	if t.clusterScope {
 		return genericapirequest.NewContext()
 	}
@@ -128,11 +129,11 @@ func (t *Tester) setObjectMeta(obj runtime.Object, name string) {
 
 type AssignFunc func([]runtime.Object) []runtime.Object
 type EmitFunc func(runtime.Object, string) error
-type GetFunc func(genericapirequest.Context, runtime.Object) (runtime.Object, error)
+type GetFunc func(context.Context, runtime.Object) (runtime.Object, error)
 type InitWatchFunc func()
 type InjectErrFunc func(err error)
 type IsErrorFunc func(err error) bool
-type CreateFunc func(genericapirequest.Context, runtime.Object) error
+type CreateFunc func(context.Context, runtime.Object) error
 type SetRVFunc func(uint64)
 type UpdateFunc func(runtime.Object) runtime.Object
 
@@ -219,7 +220,7 @@ func (t *Tester) TestWatch(
 // =============================================================================
 // Creation tests.
 
-func (t *Tester) delete(ctx genericapirequest.Context, obj runtime.Object) error {
+func (t *Tester) delete(ctx context.Context, obj runtime.Object) error {
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -576,7 +577,7 @@ func (t *Tester) testUpdateRetrievesOldObject(obj runtime.Object, createFn Creat
 	// Make sure a custom transform is called, and sees the expected updatedObject and oldObject
 	// This tests the mechanism used to pass the old and new object to admission
 	calledUpdatedObject := 0
-	noopTransform := func(_ genericapirequest.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
+	noopTransform := func(_ context.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
 		if !reflect.DeepEqual(storedFoo, oldObject) {
 			t.Errorf("Expected\n\t%#v\ngot\n\t%#v", storedFoo, oldObject)
 		}
@@ -618,7 +619,7 @@ func (t *Tester) testUpdatePropagatesUpdatedObjectError(obj runtime.Object, crea
 
 	// Make sure our transform is called, and sees the expected updatedObject and oldObject
 	propagateErr := fmt.Errorf("custom updated object error for %v", foo)
-	noopTransform := func(_ genericapirequest.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
+	noopTransform := func(_ context.Context, updatedObject runtime.Object, oldObject runtime.Object) (runtime.Object, error) {
 		return nil, propagateErr
 	}
 

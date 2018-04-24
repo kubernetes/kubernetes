@@ -17,6 +17,7 @@ limitations under the License.
 package responsewriters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Avoid emitting errors that look like valid HTML. Quotes are okay.
@@ -41,7 +41,7 @@ func BadGatewayError(w http.ResponseWriter, req *http.Request) {
 }
 
 // Forbidden renders a simple forbidden error
-func Forbidden(ctx request.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
+func Forbidden(ctx context.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
 	msg := sanitizer.Replace(forbiddenMessage(attributes))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 

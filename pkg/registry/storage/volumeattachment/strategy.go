@@ -17,9 +17,10 @@ limitations under the License.
 package volumeattachment
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -41,10 +42,10 @@ func (volumeAttachmentStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (volumeAttachmentStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
-func (volumeAttachmentStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	volumeAttachment := obj.(*storage.VolumeAttachment)
 	return validation.ValidateVolumeAttachment(volumeAttachment)
 }
@@ -58,10 +59,10 @@ func (volumeAttachmentStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (volumeAttachmentStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (volumeAttachmentStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newVolumeAttachmentObj := obj.(*storage.VolumeAttachment)
 	oldVolumeAttachmentObj := old.(*storage.VolumeAttachment)
 	errorList := validation.ValidateVolumeAttachment(newVolumeAttachmentObj)

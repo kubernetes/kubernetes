@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -63,7 +63,7 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (nodeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	node := obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
 
@@ -73,7 +73,7 @@ func (nodeStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (nodeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
@@ -85,7 +85,7 @@ func (nodeStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old run
 }
 
 // Validate validates a new node.
-func (nodeStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateNode(node)
 }
@@ -95,7 +95,7 @@ func (nodeStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (nodeStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateNode(obj.(*api.Node))
 	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
 }
@@ -104,7 +104,7 @@ func (nodeStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (ns nodeStrategy) Export(ctx genericapirequest.Context, obj runtime.Object, exact bool) error {
+func (ns nodeStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
 	n, ok := obj.(*api.Node)
 	if !ok {
 		// unexpected programmer error
@@ -126,18 +126,18 @@ type nodeStatusStrategy struct {
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
 
-func (nodeStatusStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (nodeStatusStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	_ = obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set on create.
 }
 
-func (nodeStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
 	oldNode := old.(*api.Node)
 	newNode.Spec = oldNode.Spec
 }
 
-func (nodeStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
 }
 
@@ -147,7 +147,7 @@ func (nodeStatusStrategy) Canonicalize(obj runtime.Object) {
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
 type ResourceGetter interface {
-	Get(genericapirequest.Context, string, *metav1.GetOptions) (runtime.Object, error)
+	Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
 // NodeToSelectableFields returns a field set that represents the object.
@@ -185,7 +185,7 @@ func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.
-func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper, ctx genericapirequest.Context, id string) (*url.URL, http.RoundTripper, error) {
+func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
 	schemeReq, name, portReq, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))

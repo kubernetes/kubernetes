@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	authenticationapiv1 "k8s.io/api/authentication/v1"
@@ -46,7 +47,7 @@ type TokenREST struct {
 
 var _ = rest.NamedCreater(&TokenREST{})
 
-func (r *TokenREST) Create(ctx genericapirequest.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := createValidation(obj); err != nil {
 		return nil, err
 	}
@@ -120,11 +121,11 @@ func (r *TokenREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 }
 
 type getter interface {
-	Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
 }
 
 // newContext return a copy of ctx in which new RequestInfo is set
-func newContext(ctx genericapirequest.Context, resource, name string, gvk schema.GroupVersionKind) genericapirequest.Context {
+func newContext(ctx context.Context, resource, name string, gvk schema.GroupVersionKind) context.Context {
 	oldInfo, found := genericapirequest.RequestInfoFrom(ctx)
 	if !found {
 		return ctx

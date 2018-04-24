@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -263,7 +264,7 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
 // on all child objects returned. Returns the number of items in the list.
-func setListSelfLink(obj runtime.Object, ctx request.Context, req *http.Request, namer ScopeNamer) (int, error) {
+func setListSelfLink(obj runtime.Object, ctx context.Context, req *http.Request, namer ScopeNamer) (int, error) {
 	if !meta.IsListType(obj) {
 		return 0, nil
 	}

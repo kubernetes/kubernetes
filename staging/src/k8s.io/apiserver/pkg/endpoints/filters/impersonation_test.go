@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -308,7 +309,7 @@ func TestImpersonationFilter(t *testing.T) {
 		},
 	}
 
-	var ctx request.Context
+	var ctx context.Context
 	var actualUser user.Info
 	var lock sync.Mutex
 

@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -151,7 +152,7 @@ type mutateObjectUpdateFunc func(obj, old runtime.Object) error
 
 // patchResource divides PatchResource for easier unit testing
 func patchResource(
-	ctx request.Context,
+	ctx context.Context,
 	updateMutation mutateObjectUpdateFunc,
 	createValidation rest.ValidateObjectFunc,
 	updateValidation rest.ValidateObjectUpdateFunc,
@@ -184,7 +185,7 @@ func patchResource(
 
 	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object as input.
-	applyPatch := func(_ request.Context, _, currentObject runtime.Object) (runtime.Object, error) {
+	applyPatch := func(_ context.Context, _, currentObject runtime.Object) (runtime.Object, error) {
 		// Make sure we actually have a persisted currentObject
 		trace.Step("About to apply patch")
 		if hasUID, err := hasUID(currentObject); err != nil {
@@ -373,7 +374,7 @@ func patchResource(
 
 	// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object and the patched object as input.
-	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
+	applyAdmission := func(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
 		trace.Step("About to check admission control")
 		return patchedObject, updateMutation(patchedObject, currentObject)
 	}

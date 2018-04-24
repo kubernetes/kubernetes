@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -46,11 +46,11 @@ type RESTUpdateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
-	PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object)
+	PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
-	ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList
+	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
@@ -83,7 +83,7 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
-func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, obj, old runtime.Object) error {
+func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -130,7 +130,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 }
 
 // TransformFunc is a function to transform and return newObj
-type TransformFunc func(ctx genericapirequest.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error)
+type TransformFunc func(ctx context.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error)
 
 // defaultUpdatedObjectInfo implements UpdatedObjectInfo
 type defaultUpdatedObjectInfo struct {
@@ -167,7 +167,7 @@ func (i *defaultUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
 // It returns a copy of the held obj, passed through any configured transformers.
-func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (runtime.Object, error) {
+func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
 	var err error
 	// Start with the configured object
 	newObj := i.obj
@@ -214,7 +214,7 @@ func (i *wrappedUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
 // It delegates to the wrapped objInfo and passes the result through any configured transformers.
-func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (runtime.Object, error) {
+func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
 	newObj, err := i.objInfo.UpdatedObject(ctx, oldObj)
 	if err != nil {
 		return newObj, err

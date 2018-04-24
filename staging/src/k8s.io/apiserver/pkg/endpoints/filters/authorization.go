@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -76,7 +77,7 @@ func WithAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 	})
 }
 
-func GetAuthorizerAttributes(ctx request.Context) (authorizer.Attributes, error) {
+func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error) {
 	attribs := authorizer.AttributesRecord{}
 
 	user, ok := request.UserFrom(ctx)
