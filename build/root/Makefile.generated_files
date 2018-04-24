@@ -35,12 +35,13 @@ SHELL := /bin/bash
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
+generated_files: gen_deepcopy gen_defaulter gen_conversion lint_api gen_openapi
 
 .PHONY: verify_generated_files
 verify_generated_files: verify_gen_deepcopy    \
                         verify_gen_defaulter   \
-                        verify_gen_conversion
+                        verify_gen_conversion  \
+                        lint_api
 
 # Code-generation logic.
 #
@@ -484,6 +485,108 @@ sinclude $(META_DIR)/$(DEFAULTER_GEN).mk
 # and make is happy.
 $(DEFAULTER_GEN):
 	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/defaulter-gen
+	touch $@
+
+#
+# Api linter
+#
+# Linter that validates API conventions on packages that want OpenAPI functions generated.
+#
+# openapi-gen rules:
+#     Any package that wants OpenAPI functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:openapi-gen=true
+
+# The tool used to lint apis.
+API_LINT := $(BIN_DIR)/api-linter
+
+# Find all the directories that request open-api generation (same as
+# openapi-gen).
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:openapi-gen tags)
+endif
+OPENAPI_DIRS := $(shell                                             \
+    grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
+        | xargs -n1 dirname                                         \
+        | LC_ALL=C sort -u                                          \
+)
+
+API_LINTER_VALIDATE := api_linter_validate
+
+# This rule is the user-friendly entrypoint for api linter.
+.PHONY: lint_api
+lint_api: $(API_LINTER_VALIDATE) $(API_LINT)
+
+# For each dir in OPENAPI_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+#
+# We depend on the $(GOFILES_META).stamp to detect when the set of input files
+# has changed.  This allows us to detect deleted input files.
+$(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
+    $(API_LINTER_VALIDATE): $(META_DIR)/$(dir)/$(GOFILES_META).stamp        \
+                                 $(gofiles__$(dir))                        \
+))
+
+# How to re-lint api code. This emits a single file for all results.
+$(API_LINTER_VALIDATE): $(API_LINT)
+	function run_lint_api() {                                                                     \
+	    ./hack/run-in-gopath.sh $(API_LINT)                                                       \
+	        --v $(KUBE_VERBOSE)                                                                   \
+	        --logtostderr                                                                         \
+		--whitelist-file ./vendor/k8s.io/code-generator/cmd/api-linter/linters/whitelist.csv  \
+	        -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')            \
+	        "$$@";                                                                                \
+	};                                                                                            \
+	run_lint_api
+
+# This calculates the dependencies for the linter tool, so we only rebuild
+# it when needed. It is PHONY so that it always runs, but it only updates the
+# file if the contents have actually changed. We 'sinclude' this later.
+.PHONY: $(META_DIR)/$(API_LINT).mk
+$(META_DIR)/$(API_LINT).mk:
+	mkdir -p $(@D);                                                       \
+	(echo -n "$(API_LINT): ";                                             \
+	 ./hack/run-in-gopath.sh go list                                      \
+	     -f '{{.ImportPath}}{{"\n"}}{{range .Deps}}{{.}}{{"\n"}}{{end}}'  \
+	     ./vendor/k8s.io/code-generator/cmd/api-linter                    \
+	     | grep --color=never "^$(PRJ_SRC_PATH)/"                         \
+	     | xargs ./hack/run-in-gopath.sh go list                          \
+	         -f '{{$$d := .Dir}}{{$$d}}{{"\n"}}{{range .GoFiles}}{{$$d}}/{{.}}{{"\n"}}{{end}}'  \
+	     | paste -sd' ' -                                                 \
+	     | sed 's/ / \\=,/g'                                              \
+	     | tr '=,' '\n\t'                                                 \
+	     | sed "s|$$(pwd -P)/||";                                         \
+	) > $@.tmp;                                                           \
+	if ! cmp -s $@.tmp $@; then                                           \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                              \
+	        echo "DBG: $(API_LINT).mk changed";                           \
+	    fi;                                                               \
+	    cat $@.tmp > $@;                                                  \
+	    rm -f $@.tmp;                                                     \
+	fi
+
+# Include dependency info for the linter tool. This will cause the rule of
+# the same name to be considered and if it is updated, make will restart.
+sinclude $(META_DIR)/$(API_LINT).mk
+
+# How to build the linter tool. The deps for this are defined in
+# the $(API_LINT).mk, above.
+#
+# A word on the need to touch:
+# This rule might trigger if, for example, a non-Go file was added or deleted
+# from a directory on which this depends. This target needs to be reconsidered,
+# but Go realizes it doesn't actually have to be rebuilt.  In that case, make
+# will forever see the dependency as newer than the binary, and try to rebuild
+# it over and over.  So we touch it, and make is happy.
+$(API_LINT):
+	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/api-linter
 	touch $@
 
 #
