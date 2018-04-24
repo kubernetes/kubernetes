@@ -273,9 +273,9 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, out, err),
-				NewCmdRollingUpdate(f, out),
-				NewCmdScale(f, out, err),
+				rollout.NewCmdRollout(f, ioStreams),
+				NewCmdRollingUpdate(f, ioStreams),
+				NewCmdScale(f, ioStreams),
 				NewCmdAutoscale(f, ioStreams),
 			},
 		},
@@ -288,7 +288,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdCordon(f, ioStreams),
 				NewCmdUncordon(f, ioStreams),
 				NewCmdDrain(f, ioStreams),
-				NewCmdTaint(f, out),
+				NewCmdTaint(f, ioStreams),
 			},
 		},
 		{
