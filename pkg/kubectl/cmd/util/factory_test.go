@@ -44,7 +44,7 @@ import (
 )
 
 func TestPortsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -75,7 +75,7 @@ func TestPortsForObject(t *testing.T) {
 }
 
 func TestProtocolsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
@@ -113,7 +113,7 @@ func TestProtocolsForObject(t *testing.T) {
 }
 
 func TestLabelsForObject(t *testing.T) {
-	f := NewFactory(nil)
+	f := NewFactory(NewTestConfigFlags())
 
 	tests := []struct {
 		name     string
@@ -164,7 +164,7 @@ func TestLabelsForObject(t *testing.T) {
 }
 
 func TestCanBeExposed(t *testing.T) {
-	factory := NewFactory(nil)
+	factory := NewFactory(NewTestConfigFlags())
 	tests := []struct {
 		kind      schema.GroupKind
 		expectErr bool

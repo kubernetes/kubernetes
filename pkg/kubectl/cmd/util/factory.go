@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/tools/clientcmd"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -125,10 +124,9 @@ type ClientAccessFactory interface {
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
 	Command(cmd *cobra.Command, showSecrets bool) string
+
 	// BindFlags adds any flags that are common to all kubectl sub commands.
 	BindFlags(flags *pflag.FlagSet)
-	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
-	BindExternalFlags(flags *pflag.FlagSet)
 
 	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
 	SuggestedPodTemplateResources() []schema.GroupResource
@@ -227,10 +225,9 @@ type factory struct {
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
-// if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
-// if optionalClientConfig is not nil, then this factory will make use of it.
-func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
-	clientAccessFactory := NewClientAccessFactory(optionalClientConfig)
+// Receives a clientGetter capable of providing a discovery client and a REST client configuration.
+func NewFactory(clientGetter RESTClientGetter) Factory {
+	clientAccessFactory := NewClientAccessFactory(clientGetter)
 	objectMappingFactory := NewObjectMappingFactory(clientAccessFactory)
 	builderFactory := NewBuilderFactory(clientAccessFactory, objectMappingFactory)
 
