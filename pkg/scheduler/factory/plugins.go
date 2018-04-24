@@ -70,7 +70,6 @@ type PriorityFunctionFactory2 func(PluginFactoryArgs) (algorithm.PriorityMapFunc
 
 // PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
-	Function          PriorityFunctionFactory
 	MapReduceFunction PriorityFunctionFactory2
 	Weight            int
 }
@@ -260,23 +259,10 @@ func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerF
 	predicateMetadataProducer = factory
 }
 
-// RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
-// with which the function was registered.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
-	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
-			return function
-		},
-		Weight: weight,
-	})
-}
-
 // RegisterPriorityFunction2 registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 // FIXME: Rename to PriorityFunctionFactory.
-func RegisterPriorityFunction2(
+func RegisterPriorityFunction(
 	name string,
 	mapFunction algorithm.PriorityMapFunction,
 	reduceFunction algorithm.PriorityReduceFunction,
@@ -333,7 +319,6 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
-			Function:          existingPcf.Function,
 			MapReduceFunction: existingPcf.MapReduceFunction,
 			Weight:            policy.Weight,
 		}
@@ -438,21 +423,15 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 		if !ok {
 			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
-		if factory.Function != nil {
-			configs = append(configs, algorithm.PriorityConfig{
-				Name:     name,
-				Function: factory.Function(args),
-				Weight:   factory.Weight,
-			})
-		} else {
-			mapFunction, reduceFunction := factory.MapReduceFunction(args)
-			configs = append(configs, algorithm.PriorityConfig{
+
+		mapFunction, reduceFunction := factory.MapReduceFunction(args)
+		configs = append(configs, algorithm.PriorityConfig{
 				Name:   name,
 				Map:    mapFunction,
 				Reduce: reduceFunction,
 				Weight: factory.Weight,
-			})
-		}
+		})
+
 	}
 	if err := validateSelectedConfigs(configs); err != nil {
 		return nil, err
