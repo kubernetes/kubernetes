@@ -18,7 +18,7 @@ package flexvolume
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -65,7 +65,7 @@ type PluginFactory interface {
 type pluginFactory struct{}
 
 func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
-	execPath := path.Join(pluginDir, name)
+	execPath := filepath.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapePluginName(name)
 
@@ -102,7 +102,7 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")
 	execName := parts[len(parts)-1]
-	execPath := path.Join(plugin.execPath, execName)
+	execPath := filepath.Join(plugin.execPath, execName)
 	if runtime.GOOS == "windows" {
 		execPath = util.GetWindowsPath(execPath)
 	}
@@ -274,6 +274,6 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 		return "", fmt.Errorf("GetVolumeName failed from getDeviceMountPath: %s", err)
 	}
 
-	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
-	return path.Join(mountsDir, volumeName), nil
+	mountsDir := filepath.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
+	return filepath.Join(mountsDir, volumeName), nil
 }
