@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["round_tripper.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/transport",
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/transport",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gregjones/httpcache:go_default_library",

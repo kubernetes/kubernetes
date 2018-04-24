@@ -19,9 +19,12 @@ package apiserver
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -31,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
@@ -146,7 +150,29 @@ func TestServerSidePrint(t *testing.T) {
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
-	factory := util.NewFactory(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+	configFlags := util.NewTestConfigFlags().
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+
+	restConfig, err := configFlags.ToRESTConfig()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	defer func() {
+		os.Remove(cacheDir)
+	}()
+
+	configFlags.WithDiscoveryClient(util.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)))
+
+	factory := util.NewFactory(configFlags)
 	mapper, err := factory.RESTMapper()
 	if err != nil {
 		t.Errorf("unexpected error getting mapper: %v", err)

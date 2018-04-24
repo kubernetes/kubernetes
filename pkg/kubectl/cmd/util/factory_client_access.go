@@ -20,22 +20,18 @@ package util
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
+	"sync"
 
 	"k8s.io/api/core/v1"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"sync"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -50,13 +46,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -64,124 +58,37 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubectl/util/transport"
 	"k8s.io/kubernetes/pkg/version"
 )
 
+type RESTClientGetter interface {
+	ToRESTConfig() (*restclient.Config, error)
+	ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+	ToRawKubeConfigLoader() clientcmd.ClientConfig
+}
+
 type ring0Factory struct {
-	flags             *pflag.FlagSet
-	clientConfig      clientcmd.ClientConfig
-	discoveryCacheDir string
+	clientGetter RESTClientGetter
 
 	requireMatchedServerVersion bool
 	checkServerVersion          sync.Once
 	matchesServerVersionErr     error
 }
 
-func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientAccessFactory {
-	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-
-	clientConfig := optionalClientConfig
-	if optionalClientConfig == nil {
-		clientConfig = DefaultClientConfig(flags)
+func NewClientAccessFactory(clientGetter RESTClientGetter) ClientAccessFactory {
+	if clientGetter == nil {
+		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
 
-	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
-
 	f := &ring0Factory{
-		flags:        flags,
-		clientConfig: clientConfig,
+		clientGetter: clientGetter,
 	}
 
 	return f
 }
 
-// DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
-//   1.  Use the kubeconfig builder.  The number of merges and overrides here gets a little crazy.  Stay with me.
-//       1.  Merge the kubeconfig itself.  This is done with the following hierarchy rules:
-//           1.  CommandLineLocation - this parsed from the command line, so it must be late bound.  If you specify this,
-//               then no other kubeconfig files are merged.  This file must exist.
-//           2.  If $KUBECONFIG is set, then it is treated as a list of files that should be merged.
-//	     3.  HomeDirectoryLocation
-//           Empty filenames are ignored.  Files with non-deserializable content produced errors.
-//           The first file to set a particular value or map key wins and the value or map key is never changed.
-//           This means that the first file to set CurrentContext will have its context preserved.  It also means
-//           that if two files specify a "red-user", only values from the first file's red-user are used.  Even
-//           non-conflicting entries from the second file's "red-user" are discarded.
-//       2.  Determine the context to use based on the first hit in this chain
-//           1.  command line argument - again, parsed from the command line, so it must be late bound
-//           2.  CurrentContext from the merged kubeconfig file
-//           3.  Empty is allowed at this stage
-//       3.  Determine the cluster info and auth info to use.  At this point, we may or may not have a context.  They
-//           are built based on the first hit in this chain.  (run it twice, once for auth, once for cluster)
-//           1.  command line argument
-//           2.  If context is present, then use the context value
-//           3.  Empty is allowed
-//       4.  Determine the actual cluster info to use.  At this point, we may or may not have a cluster info.  Build
-//           each piece of the cluster info based on the chain:
-//           1.  command line argument
-//           2.  If cluster info is present and a value for the attribute is present, use it.
-//           3.  If you don't have a server location, bail.
-//       5.  Auth info is build using the same rules as cluster info, EXCEPT that you can only have one authentication
-//           technique per auth info.  The following conditions result in an error:
-//           1.  If there are two conflicting techniques specified from the command line, fail.
-//           2.  If the command line does not specify one, and the auth info has conflicting techniques, fail.
-//           3.  If the command line specifies one and the auth info specifies another, honor the command line technique.
-//   2.  Use default values and potentially prompt for auth information
-//
-//   However, if it appears that we're running in a kubernetes cluster
-//   container environment, then run with the auth info kubernetes mounted for
-//   us. Specifically:
-//     The env vars KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT are
-//     set, and the file /var/run/secrets/kubernetes.io/serviceaccount/token
-//     exists and is not a directory.
-func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	// use the standard defaults for this client command
-	// DEPRECATED: remove and replace with something more accurate
-	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
-
-	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-
-	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmd.ClusterDefaults}
-
-	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
-	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
-	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
-
-	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
-	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
-
-	return clientConfig
-}
-
 func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	cfg, err := f.clientConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
-	cfg.Burst = 100
-
-	if f.discoveryCacheDir != "" {
-		wt := cfg.WrapTransport
-		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			if wt != nil {
-				rt = wt(rt)
-			}
-			return transport.NewCacheRoundTripper(f.discoveryCacheDir, rt)
-		}
-	}
-
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
-	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
+	return f.clientGetter.ToDiscoveryClient()
 }
 
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
@@ -227,7 +134,7 @@ func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
 	if err := f.checkMatchingServerVersion(); err != nil {
 		return nil, err
 	}
-	clientConfig, err := f.clientConfig.ClientConfig()
+	clientConfig, err := f.clientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +142,7 @@ func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
 	return clientConfig, nil
 }
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
-	return f.clientConfig.ClientConfig()
+	return f.clientGetter.ToRESTConfig()
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
@@ -413,26 +320,11 @@ func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 }
 
 func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
-	// Merge factory's flags
-	flags.AddFlagSet(f.flags)
-
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.requireMatchedServerVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
-
-	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
-	flags.StringVar(&f.discoveryCacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
-
-	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
-}
-
-func (f *ring0Factory) BindExternalFlags(flags *pflag.FlagSet) {
-	// any flags defined by external projects (not part of pflags)
-	flags.AddGoFlagSet(flag.CommandLine)
 }
 
 func (f *ring0Factory) SuggestedPodTemplateResources() []schema.GroupResource {
@@ -476,7 +368,7 @@ func (f *ring0Factory) Resumer(info *resource.Info) ([]byte, error) {
 }
 
 func (f *ring0Factory) DefaultNamespace() (string, bool, error) {
-	return f.clientConfig.Namespace()
+	return f.clientGetter.ToRawKubeConfigLoader().Namespace()
 }
 
 const (

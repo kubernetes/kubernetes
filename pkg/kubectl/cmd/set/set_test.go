@@ -26,7 +26,7 @@ import (
 )
 
 func TestLocalAndDryRunFlags(t *testing.T) {
-	f := clientcmdutil.NewFactory(nil)
+	f := clientcmdutil.NewFactory(clientcmdutil.NewTestConfigFlags())
 	setCmd := NewCmdSet(f, genericclioptions.NewTestIOStreamsDiscard())
 	ensureLocalAndDryRunFlagsOnChildren(t, setCmd, "")
 }

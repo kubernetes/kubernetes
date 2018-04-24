@@ -17,12 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apiserver/pkg/util/flag"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
@@ -255,11 +256,11 @@ var (
 )
 
 func NewDefaultKubectlCommand() *cobra.Command {
-	return NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	return NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -273,8 +274,13 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
+	kubeConfigFlags := cmdutil.NewConfigFlags()
+	kubeConfigFlags.AddFlags(cmds.PersistentFlags())
+
+	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+
+	f := cmdutil.NewFactory(kubeConfigFlags)
 	f.BindFlags(cmds.PersistentFlags())
-	f.BindExternalFlags(cmds.PersistentFlags())
 
 	// Sending in 'nil' for the getLanguageFn() results in using
 	// the LANG environment variable.
@@ -284,7 +290,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	i18n.LoadTranslations("kubectl", nil)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
+	cmds.SetGlobalNormalizationFunc(utilflag.WarnWordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
