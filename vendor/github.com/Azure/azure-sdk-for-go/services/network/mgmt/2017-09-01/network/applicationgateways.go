@@ -42,8 +42,8 @@ func NewApplicationGatewaysClientWithBaseURI(baseURI string, subscriptionID stri
 
 // BackendHealth gets the backend health of the specified application gateway in a resource group.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
-// expand is expands BackendAddressPool and BackendHttpSettings referenced in backend health.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway. expand is expands BackendAddressPool and BackendHttpSettings referenced in backend health.
 func (client ApplicationGatewaysClient) BackendHealth(ctx context.Context, resourceGroupName string, applicationGatewayName string, expand string) (result ApplicationGatewaysBackendHealthFuture, err error) {
 	req, err := client.BackendHealthPreparer(ctx, resourceGroupName, applicationGatewayName, expand)
 	if err != nil {
@@ -114,8 +114,8 @@ func (client ApplicationGatewaysClient) BackendHealthResponder(resp *http.Respon
 
 // CreateOrUpdate creates or updates the specified application gateway.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
-// parameters is parameters supplied to the create or update application gateway operation.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway. parameters is parameters supplied to the create or update application gateway operation.
 func (client ApplicationGatewaysClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, applicationGatewayName string, parameters ApplicationGateway) (result ApplicationGatewaysCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -126,7 +126,7 @@ func (client ApplicationGatewaysClient) CreateOrUpdate(ctx context.Context, reso
 						{Target: "parameters.ApplicationGatewayPropertiesFormat.WebApplicationFirewallConfiguration.RuleSetVersion", Name: validation.Null, Rule: true, Chain: nil},
 					}},
 				}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "network.ApplicationGatewaysClient", "CreateOrUpdate")
+		return result, validation.NewError("network.ApplicationGatewaysClient", "CreateOrUpdate", err.Error())
 	}
 
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, applicationGatewayName, parameters)
@@ -197,7 +197,8 @@ func (client ApplicationGatewaysClient) CreateOrUpdateResponder(resp *http.Respo
 
 // Delete deletes the specified application gateway.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway.
 func (client ApplicationGatewaysClient) Delete(ctx context.Context, resourceGroupName string, applicationGatewayName string) (result ApplicationGatewaysDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, applicationGatewayName)
 	if err != nil {
@@ -264,7 +265,8 @@ func (client ApplicationGatewaysClient) DeleteResponder(resp *http.Response) (re
 
 // Get gets the specified application gateway.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway.
 func (client ApplicationGatewaysClient) Get(ctx context.Context, resourceGroupName string, applicationGatewayName string) (result ApplicationGateway, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, applicationGatewayName)
 	if err != nil {
@@ -792,7 +794,8 @@ func (client ApplicationGatewaysClient) ListAvailableWafRuleSetsResponder(resp *
 
 // Start starts the specified application gateway.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway.
 func (client ApplicationGatewaysClient) Start(ctx context.Context, resourceGroupName string, applicationGatewayName string) (result ApplicationGatewaysStartFuture, err error) {
 	req, err := client.StartPreparer(ctx, resourceGroupName, applicationGatewayName)
 	if err != nil {
@@ -859,7 +862,8 @@ func (client ApplicationGatewaysClient) StartResponder(resp *http.Response) (res
 
 // Stop stops the specified application gateway in a resource group.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway.
 func (client ApplicationGatewaysClient) Stop(ctx context.Context, resourceGroupName string, applicationGatewayName string) (result ApplicationGatewaysStopFuture, err error) {
 	req, err := client.StopPreparer(ctx, resourceGroupName, applicationGatewayName)
 	if err != nil {
@@ -926,8 +930,8 @@ func (client ApplicationGatewaysClient) StopResponder(resp *http.Response) (resu
 
 // UpdateTags updates the specified application gateway tags.
 //
-// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application gateway.
-// parameters is parameters supplied to update application gateway tags.
+// resourceGroupName is the name of the resource group. applicationGatewayName is the name of the application
+// gateway. parameters is parameters supplied to update application gateway tags.
 func (client ApplicationGatewaysClient) UpdateTags(ctx context.Context, resourceGroupName string, applicationGatewayName string, parameters TagsObject) (result ApplicationGatewaysUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, applicationGatewayName, parameters)
 	if err != nil {

@@ -41,8 +41,8 @@ func NewLoadBalancersClientWithBaseURI(baseURI string, subscriptionID string) Lo
 
 // CreateOrUpdate creates or updates a load balancer.
 //
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer. parameters
-// is parameters supplied to the create or update load balancer operation.
+// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// parameters is parameters supplied to the create or update load balancer operation.
 func (client LoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters LoadBalancer) (result LoadBalancersCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, loadBalancerName, parameters)
 	if err != nil {
@@ -179,8 +179,8 @@ func (client LoadBalancersClient) DeleteResponder(resp *http.Response) (result a
 
 // Get gets the specified load balancer.
 //
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer. expand is
-// expands referenced resources.
+// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer. expand
+// is expands referenced resources.
 func (client LoadBalancersClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result LoadBalancer, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, expand)
 	if err != nil {
@@ -432,8 +432,8 @@ func (client LoadBalancersClient) ListAllComplete(ctx context.Context) (result L
 
 // UpdateTags updates a load balancer tags.
 //
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer. parameters
-// is parameters supplied to update load balancer tags.
+// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// parameters is parameters supplied to update load balancer tags.
 func (client LoadBalancersClient) UpdateTags(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters TagsObject) (result LoadBalancersUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, loadBalancerName, parameters)
 	if err != nil {
