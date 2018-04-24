@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -364,29 +363,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
 		verifyResult(cs, 0, 1, ns)
-	})
-
-	It("validates that a pod with an invalid NodeAffinity is rejected", func() {
-		By("Trying to launch a pod with an invalid Affinity data.")
-		podName := "without-label"
-		_, err := cs.CoreV1().Pods(ns).Create(initPausePod(f, pausePodConfig{
-			Name: podName,
-			Affinity: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{},
-							},
-						},
-					},
-				},
-			},
-		}))
-
-		if err == nil || !errors.IsInvalid(err) {
-			framework.Failf("Expect error of invalid, got : %v", err)
-		}
 	})
 
 	/*
