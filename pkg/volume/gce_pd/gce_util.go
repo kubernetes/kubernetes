@@ -18,7 +18,6 @@ package gce_pd
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -299,8 +298,8 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 // Returns list of all /dev/disk/by-id/* paths for given PD.
 func getDiskByIdPaths(pdName string, partition string) []string {
 	devicePaths := []string{
-		path.Join(diskByIdPath, diskGooglePrefix+pdName),
-		path.Join(diskByIdPath, diskScsiGooglePrefix+pdName),
+		filepath.Join(diskByIdPath, diskGooglePrefix+pdName),
+		filepath.Join(diskByIdPath, diskScsiGooglePrefix+pdName),
 	}
 
 	if partition != "" {
