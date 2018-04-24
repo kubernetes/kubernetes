@@ -38,7 +38,7 @@ var Registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 
 func init() {
 	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	Install(GroupFactoryRegistry, Registry, Scheme)
+	Install(Registry, Scheme)
 }
 
 // Install registers the API group and adds types to a scheme
