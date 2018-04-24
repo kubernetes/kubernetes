@@ -41,3 +41,20 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	encoder := codecs.EncoderForVersion(info.Serializer, gv)
 	return runtime.Encode(encoder, obj)
 }
+
+// UnmarshalFromYaml unmarshals yaml into an object.
+func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, error) {
+	return UnmarshalFromYamlForCodecs(buffer, gv, clientsetscheme.Codecs)
+}
+
+// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the specified codec
+func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
+	mediaType := "application/yaml"
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return nil, fmt.Errorf("unsupported media type %q", mediaType)
+	}
+
+	decoder := codecs.DecoderToVersion(info.Serializer, gv)
+	return runtime.Decode(decoder, buffer)
+}

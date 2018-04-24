@@ -13,7 +13,6 @@ go_library(
         "copy.go",
         "endpoint.go",
         "error.go",
-        "etcd.go",
         "marshal.go",
         "template.go",
         "version.go",
@@ -22,7 +21,6 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
-        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
@@ -64,6 +62,7 @@ filegroup(
         "//cmd/kubeadm/app/util/audit:all-srcs",
         "//cmd/kubeadm/app/util/config:all-srcs",
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
+        "//cmd/kubeadm/app/util/etcd:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
         "//cmd/kubeadm/app/util/pubkeypin:all-srcs",
         "//cmd/kubeadm/app/util/staticpod:all-srcs",
