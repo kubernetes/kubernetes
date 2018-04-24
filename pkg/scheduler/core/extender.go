@@ -116,7 +116,7 @@ func (h *HTTPExtender) IsIgnorable() bool {
 // SupportsPreemption returns if a extender support preemption.
 // A extender should have preempt verb defined and enabled its own node cache.
 func (h *HTTPExtender) SupportsPreemption() bool {
-	return len(h.preemptVerb) > 0
+	return h.preemptVerb == "preempt"
 }
 
 // ProcessPreemption returns filtered candidate nodes and victims after running preemption logic in extender.
