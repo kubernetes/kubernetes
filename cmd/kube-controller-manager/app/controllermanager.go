@@ -326,9 +326,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["ttl"] = startTTLController
 	controllers["bootstrapsigner"] = startBootstrapSignerController
 	controllers["tokencleaner"] = startTokenCleanerController
+	controllers["nodeipam"] = startNodeIpamController
 	if loopMode == IncludeCloudLoops {
 		controllers["service"] = startServiceController
-		controllers["nodeipam"] = startNodeIpamController
 		controllers["route"] = startRouteController
 		// TODO: volume controller into the IncludeCloudLoops only set.
 		// TODO: Separate cluster in cloud check from node lifecycle controller.
