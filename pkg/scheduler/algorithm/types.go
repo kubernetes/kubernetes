@@ -45,7 +45,7 @@ type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*sche
 
 // PriorityMetadataProducer is a function that computes metadata for a given pod. This
 // is now used for only for priority functions. For predicates please use PredicateMetadataProducer.
-type PriorityMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{}
+type PriorityMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) interface{}
 
 // PriorityFunction is a function that computes scores for all nodes.
 // DEPRECATED
@@ -69,7 +69,7 @@ func EmptyPredicateMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*sche
 }
 
 // EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.
-func EmptyPriorityMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+func EmptyPriorityMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) interface{} {
 	return nil
 }
 
