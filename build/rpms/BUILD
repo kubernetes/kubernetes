@@ -10,6 +10,7 @@ pkg_rpm(
         "//cmd/kubectl",
     ],
     spec_file = "kubectl.spec",
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 )
 
@@ -22,6 +23,7 @@ pkg_rpm(
         "//cmd/kubelet",
     ],
     spec_file = "kubelet.spec",
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 )
 
@@ -35,6 +37,7 @@ pkg_rpm(
         "//cmd/kubeadm",
     ],
     spec_file = "kubeadm.spec",
+    tags = ["manual"],
     version_file = "//build:os_package_version",
 )
 
@@ -46,6 +49,7 @@ pkg_rpm(
         "@kubernetes_cni//file",
     ],
     spec_file = "kubernetes-cni.spec",
+    tags = ["manual"],
     version_file = "//build:cni_package_version",
 )
 
