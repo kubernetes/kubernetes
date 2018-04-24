@@ -153,8 +153,9 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 	accessor := meta.NewAccessor()
 
 	groupMeta := &apimachinery.GroupMeta{
-		GroupVersions: externalVersions,
-		SelfLinker:    runtime.SelfLinker(accessor),
+		GroupVersions:   externalVersions,
+		SelfLinker:      runtime.SelfLinker(accessor),
+		RootScopedKinds: gmf.GroupArgs.RootScopedKinds,
 	}
 	for _, v := range externalVersions {
 		gvf := gmf.VersionArgs[v.Version]

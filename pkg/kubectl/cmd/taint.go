@@ -233,7 +233,7 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+		obj, err := info.ObjectConverter.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return err
 		}

@@ -220,7 +220,12 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 		switch t := infos[0].AsVersioned().(type) {
 		case *v1.ReplicationController:
 			replicasDefaulted = t.Spec.Replicas == nil
-			newRc, _ = infos[0].AsInternal().(*api.ReplicationController)
+
+			// previous code ignored the error.  Seem like it's very unlikely to fail, so ok for now.
+			uncastObj, err := legacyscheme.Scheme.ConvertToVersion(t, api.SchemeGroupVersion)
+			if err == nil {
+				newRc, _ = uncastObj.(*api.ReplicationController)
+			}
 		}
 		if newRc == nil {
 			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -311,10 +312,11 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:  o.Typer,
-			RESTMapper:   o.Mapper,
-			ClientMapper: resource.ClientMapperFunc(o.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+			ObjectTyper:     o.Typer,
+			ObjectConverter: legacyscheme.Scheme,
+			RESTMapper:      o.Mapper,
+			ClientMapper:    resource.ClientMapperFunc(o.ClientForMapping),
+			Decoder:         cmdutil.InternalVersionDecoder(),
 		}
 		info, err = resourceMapper.InfoForObject(object, nil)
 		if err != nil {

@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -297,7 +298,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand before
 	// trying to print, since the printers are keyed by type. This is extremely expensive.
 	if h.encoder != nil && h.decoder != nil {
-		obj, _ = decodeUnknownObject(obj, h.encoder, h.decoder)
+		obj, _ = decodeUnknownObject(obj, h.decoder)
 	}
 
 	// print with a registered handler
@@ -817,14 +818,18 @@ func AppendAllLabels(showLabels bool, itemLabels map[string]string) string {
 }
 
 // check if the object is unstructured. If so, attempt to convert it to a type we can understand.
-func decodeUnknownObject(obj runtime.Object, encoder runtime.Encoder, decoder runtime.Decoder) (runtime.Object, error) {
+func decodeUnknownObject(obj runtime.Object, decoder runtime.Decoder) (runtime.Object, error) {
 	var err error
-	switch obj.(type) {
-	case runtime.Unstructured, *runtime.Unknown:
-		if objBytes, err := runtime.Encode(encoder, obj); err == nil {
+	switch t := obj.(type) {
+	case runtime.Unstructured:
+		if objBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj); err == nil {
 			if decodedObj, err := runtime.Decode(decoder, objBytes); err == nil {
 				obj = decodedObj
 			}
+		}
+	case *runtime.Unknown:
+		if decodedObj, err := runtime.Decode(decoder, t.Raw); err == nil {
+			obj = decodedObj
 		}
 	}
 

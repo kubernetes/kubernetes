@@ -28,30 +28,15 @@ import (
 
 // Implements RESTScope interface
 type restScope struct {
-	name             RESTScopeName
-	paramName        string
-	argumentName     string
-	paramDescription string
+	name RESTScopeName
 }
 
 func (r *restScope) Name() RESTScopeName {
 	return r.name
 }
-func (r *restScope) ParamName() string {
-	return r.paramName
-}
-func (r *restScope) ArgumentName() string {
-	return r.argumentName
-}
-func (r *restScope) ParamDescription() string {
-	return r.paramDescription
-}
 
 var RESTScopeNamespace = &restScope{
-	name:             RESTScopeNameNamespace,
-	paramName:        "namespaces",
-	argumentName:     "namespace",
-	paramDescription: "object name and auth scope, such as for teams and projects",
+	name: RESTScopeNameNamespace,
 }
 
 var RESTScopeRoot = &restScope{
@@ -526,17 +511,10 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 			return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", gvk.GroupVersion(), gvk.Kind)
 		}
 
-		interfaces, err := m.interfacesFunc(gvk.GroupVersion())
-		if err != nil {
-			return nil, fmt.Errorf("the provided version %q has no relevant versions: %v", gvk.GroupVersion().String(), err)
-		}
-
 		mappings = append(mappings, &RESTMapping{
 			Resource:         res.Resource,
 			GroupVersionKind: gvk,
 			Scope:            scope,
-
-			ObjectConvertor: interfaces.ObjectConvertor,
 		})
 	}
 

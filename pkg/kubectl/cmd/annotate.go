@@ -248,7 +248,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		var outputObj runtime.Object
 		var obj runtime.Object
 
-		obj, err = info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+		obj, err = info.ObjectConverter.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return err
 		}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -404,9 +405,10 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 			return err
 		}
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			ObjectTyper:     typer,
+			ObjectConverter: legacyscheme.Scheme,
+			RESTMapper:      mapper,
+			ClientMapper:    resource.ClientMapperFunc(f.ClientForMapping),
 		}
 		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {

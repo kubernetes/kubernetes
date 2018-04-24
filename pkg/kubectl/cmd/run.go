@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -673,10 +674,11 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	versioned := obj
 	if !o.DryRun {
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:  typer,
-			RESTMapper:   mapper,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+			ObjectTyper:     typer,
+			ObjectConverter: legacyscheme.Scheme,
+			RESTMapper:      mapper,
+			ClientMapper:    resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:         cmdutil.InternalVersionDecoder(),
 		}
 		info, err := resourceMapper.InfoForObject(obj, nil)
 		if err != nil {

@@ -24,6 +24,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/get",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
@@ -66,7 +67,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
@@ -77,8 +77,8 @@ go_test(
         "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/printers:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",

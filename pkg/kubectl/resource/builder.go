@@ -760,7 +760,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
+		visitors = append(visitors, NewSelector(client, mapping, b.mapper.ObjectConverter, selectorNamespace, labelSelector, fieldSelector, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)
@@ -835,11 +835,12 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:    client,
-			Mapping:   mapping,
-			Namespace: selectorNamespace,
-			Name:      tuple.Name,
-			Export:    b.export,
+			Client:          client,
+			Mapping:         mapping,
+			ObjectConverter: b.mapper.ObjectConverter,
+			Namespace:       selectorNamespace,
+			Name:            tuple.Name,
+			Export:          b.export,
 		}
 		items = append(items, info)
 	}
@@ -900,11 +901,12 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:    client,
-			Mapping:   mapping,
-			Namespace: selectorNamespace,
-			Name:      name,
-			Export:    b.export,
+			Client:          client,
+			Mapping:         mapping,
+			ObjectConverter: b.mapper.ObjectConverter,
+			Namespace:       selectorNamespace,
+			Name:            name,
+			Export:          b.export,
 		}
 		visitors = append(visitors, info)
 	}

@@ -270,10 +270,11 @@ func newDefaultBuilder() *Builder {
 func newDefaultBuilderWith(client ClientMapper) *Builder {
 	return NewBuilder(
 		&Mapper{
-			RESTMapper:   restmapper,
-			ObjectTyper:  scheme.Scheme,
-			ClientMapper: client,
-			Decoder:      corev1Codec,
+			RESTMapper:      restmapper,
+			ObjectTyper:     scheme.Scheme,
+			ObjectConverter: scheme.Scheme,
+			ClientMapper:    client,
+			Decoder:         corev1Codec,
 		},
 		nil,
 		categories.LegacyCategoryExpander,

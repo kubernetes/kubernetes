@@ -718,7 +718,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 
 	for _, nodeInfo := range o.nodeInfos {
 		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-			obj, err := nodeInfo.Mapping.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+			obj, err := nodeInfo.ObjectConverter.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 				continue

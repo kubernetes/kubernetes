@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -428,7 +429,14 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			lastMapping = mapping
 		}
 
-		printer.PrintObj(info.AsInternal(), w)
+		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
+		if err != nil {
+			// if there's an error, try to print what you have (mirrors old behavior).
+			glog.V(1).Info(err)
+			printer.PrintObj(info.Object, w)
+		} else {
+			printer.PrintObj(internalObj, w)
+		}
 	}
 	w.Flush()
 	if nonEmptyObjCount == 0 && !o.IgnoreNotFound {
@@ -542,7 +550,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			if !o.IsGeneric {
 				// printing always takes the internal version, but the watch event uses externals
 				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(objToPrint, mapping, internalGV)
+				objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
 			}
 			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
@@ -570,7 +578,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 			// printing always takes the internal version, but the watch event uses externals
 			// TODO fix printing to use server-side or be version agnostic
 			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-			if err := printer.PrintObj(attemptToConvertToInternal(e.Object, mapping, internalGV), o.Out); err != nil {
+			if err := printer.PrintObj(attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV), o.Out); err != nil {
 				return false, err
 			}
 			return false, nil

@@ -28,7 +28,6 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -133,18 +132,18 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 }
 
 // getResourceKind returns the external group version kind registered for the given storage
-// object. If the storage object is a subresource and has an override supplied for it, it returns
+// object and whether or not the kind is cluster scoped. If the storage object is a subresource and has an override supplied for it, it returns
 // the group version kind supplied in the override.
-func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schema.GroupVersionKind, error) {
+func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schema.GroupVersionKind, bool, error) {
 	// Let the storage tell us exactly what GVK it has
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
-		return gvkProvider.GroupVersionKind(a.group.GroupVersion), nil
+		return gvkProvider.GroupVersionKind(a.group.GroupVersion), gvkProvider.ClusterScoped(), nil
 	}
 
 	object := storage.New()
 	fqKinds, _, err := a.group.Typer.ObjectKinds(object)
 	if err != nil {
-		return schema.GroupVersionKind{}, err
+		return schema.GroupVersionKind{}, false, err
 	}
 
 	// a given go type can have multiple potential fully qualified kinds.  Find the one that corresponds with the group
@@ -157,32 +156,11 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (schem
 		}
 	}
 	if fqKindToRegister.Empty() {
-		return schema.GroupVersionKind{}, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
+		return schema.GroupVersionKind{}, false, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
-	return fqKindToRegister, nil
-}
 
-// restMapping returns rest mapper for the resource.
-// Example REST paths that this mapper maps.
-// 1. Resource only, no subresource:
-//      Resource Type:    batch/v1.Job (input args: resource = "jobs")
-//      REST path:        /apis/batch/v1/namespaces/{namespace}/job/{name}
-// 2. Subresource and its parent belong to different API groups and/or versions:
-//      Resource Type:    extensions/v1beta1.ReplicaSet (input args: resource = "replicasets")
-//      Subresource Type: autoscaling/v1.Scale
-//      REST path:        /apis/extensions/v1beta1/namespaces/{namespace}/replicaset/{name}/scale
-func (a *APIInstaller) restMapping(resource string) (*meta.RESTMapping, error) {
-	// subresources must have parent resources, and follow the namespacing rules of their parent.
-	// So get the storage of the resource (which is the parent resource in case of subresources)
-	storage, ok := a.group.Storage[resource]
-	if !ok {
-		return nil, fmt.Errorf("unable to locate the storage object for resource: %s", resource)
-	}
-	fqKindToRegister, err := a.getResourceKind(resource, storage)
-	if err != nil {
-		return nil, fmt.Errorf("unable to locate fully qualified kind for mapper resource %s: %v", resource, err)
-	}
-	return a.group.Mapper.RESTMapping(fqKindToRegister.GroupKind(), fqKindToRegister.Version)
+	// group is guaranteed to match based on the check above
+	return fqKindToRegister, a.group.RootScopedKinds.Has(fqKindToRegister.Kind), nil
 }
 
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, error) {
@@ -198,12 +176,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, err
 	}
 
-	mapping, err := a.restMapping(resource)
-	if err != nil {
-		return nil, err
-	}
-
-	fqKindToRegister, err := a.getResourceKind(path, storage)
+	fqKindToRegister, clusterScoped, err := a.getResourceKind(path, storage)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +311,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
-	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
@@ -357,8 +329,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var apiResource metav1.APIResource
 	// Get the list of actions for the given scope.
-	switch scope.Name() {
-	case meta.RESTScopeNameRoot:
+	switch {
+	case clusterScoped:
 		// Handle non-namespace scoped resources like nodes.
 		resourcePath := resource
 		resourceParams := params
@@ -402,10 +374,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
 		break
-	case meta.RESTScopeNameNamespace:
+	default:
+		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		namespaceParam := ws.PathParameter(scope.ArgumentName(), scope.ParamDescription()).DataType("string")
-		namespacedPath := scope.ParamName() + "/{" + scope.ArgumentName() + "}/" + resource
+		namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
+		namespacedPath := namespaceParamName + "/{" + "namespace" + "}/" + resource
 		namespaceParams := []*restful.Parameter{namespaceParam}
 
 		resourcePath := namespacedPath
@@ -426,7 +399,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		namer := handlers.ContextBasedNaming{
 			SelfLinker:         a.group.Linker,
 			ClusterScoped:      false,
-			SelfLinkPathPrefix: gpath.Join(a.prefix, scope.ParamName()) + "/",
+			SelfLinkPathPrefix: gpath.Join(a.prefix, namespaceParamName) + "/",
 			SelfLinkPathSuffix: itemPathSuffix,
 		}
 
@@ -455,8 +428,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer, true}, allowWatchList)
 		}
 		break
-	default:
-		return nil, fmt.Errorf("unsupported restscope: %s", scope.Name())
 	}
 
 	// Create Routes for the actions.
@@ -539,7 +510,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		// If there is a subresource, kind should be the parent's kind.
 		if hasSubresource {
-			fqParentKind, err := a.getResourceKind(resource, a.group.Storage[resource])
+			parentStorage, ok := a.group.Storage[resource]
+			if !ok {
+				return nil, fmt.Errorf("missing parent storage: %q", resource)
+			}
+			fqParentKind, _, err := a.getResourceKind(resource, parentStorage)
 			if err != nil {
 				return nil, err
 			}
@@ -654,7 +629,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				string(types.MergePatchType),
 				string(types.StrategicMergePatchType),
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulPatchResource(patcher, reqScope, admit, mapping.ObjectConvertor, supportedTypes))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulPatchResource(patcher, reqScope, admit, a.group.Convertor, supportedTypes))
 			route := ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -230,10 +231,11 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:  o.Typer,
-			RESTMapper:   o.Mapper,
-			ClientMapper: resource.ClientMapperFunc(o.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+			ObjectTyper:     o.Typer,
+			ObjectConverter: legacyscheme.Scheme,
+			RESTMapper:      o.Mapper,
+			ClientMapper:    resource.ClientMapperFunc(o.ClientForMapping),
+			Decoder:         cmdutil.InternalVersionDecoder(),
 		}
 		hpa, err := resourceMapper.InfoForObject(object, nil)
 		if err != nil {

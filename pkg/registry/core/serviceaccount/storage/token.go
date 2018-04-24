@@ -46,6 +46,7 @@ type TokenREST struct {
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
+var _ = rest.GroupVersionKindProvider(&TokenREST{})
 
 func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := createValidation(obj); err != nil {
@@ -118,6 +119,10 @@ func (r *TokenREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 		Version: authenticationapiv1.SchemeGroupVersion.Version,
 		Kind:    "TokenRequest",
 	}
+}
+
+func (*TokenREST) ClusterScoped() bool {
+	return false
 }
 
 type getter interface {

@@ -27,24 +27,22 @@ import (
 	"strings"
 	"testing"
 
+	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1"
 
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -104,11 +102,11 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		Items: []api.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 	}
@@ -126,6 +124,8 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			},
 		},
 	}
+
+	one := int32(1)
 	rc := &api.ReplicationControllerList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "17",
@@ -134,7 +134,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+					Replicas: &one,
 				},
 			},
 		},
@@ -193,25 +193,6 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	mapper, _ := tf.Object()
-	m, err := mapper.RESTMapping(schema.GroupKind{Group: "apitest", Kind: "Type"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	convertedObj, err := m.ConvertToVersion(&unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind":       "Type",
-			"apiVersion": "apitest/unlikelyversion",
-			"name":       "foo",
-		},
-	}, schema.GroupVersion{Group: "apitest", Version: "unlikelyversion"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(convertedObj, obj) {
-		t.Fatalf("unexpected conversion of unstructured object to structured: %s", diff.ObjectReflectDiff(convertedObj, obj))
-	}
-
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
@@ -246,7 +227,9 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 func TestGetSchemaObject(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	codec := testapi.Default.Codec()
+	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
+	t.Logf("%v", string(runtime.EncodeOrDie(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})))
+
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
@@ -401,15 +384,15 @@ func TestGetSortedObjects(t *testing.T) {
 		Items: []api.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 	}
@@ -701,7 +684,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
                 "containers": null,
                 "dnsPolicy": "ClusterFirst",
                 "restartPolicy": "Always",
-                "schedulerName": "default-scheduler",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
             },
@@ -720,7 +702,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
                 "containers": null,
                 "dnsPolicy": "ClusterFirst",
                 "restartPolicy": "Always",
-                "schedulerName": "default-scheduler",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
             },
@@ -752,7 +733,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 }
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("did not match: %v", diff.StringDiff(e, a))
 	}
 }
 
@@ -896,7 +877,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				Namespace:       "test",
 				ResourceVersion: "9",
 			},
-			Spec: apitesting.DeepEqualSafePodSpec(),
+			Spec: apitesting.V1DeepEqualSafePodSpec(),
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -904,7 +885,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				Namespace:       "test",
 				ResourceVersion: "10",
 			},
-			Spec: apitesting.DeepEqualSafePodSpec(),
+			Spec: apitesting.V1DeepEqualSafePodSpec(),
 		},
 	}
 	events := []watch.Event{
@@ -917,7 +898,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "9",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 		{
@@ -928,7 +909,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "10",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 		// resource events
@@ -940,7 +921,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "11",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 		{
@@ -951,7 +932,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 					Namespace:       "test",
 					ResourceVersion: "12",
 				},
-				Spec: apitesting.DeepEqualSafePodSpec(),
+				Spec: apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 	}

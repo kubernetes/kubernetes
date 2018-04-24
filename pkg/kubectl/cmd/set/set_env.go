@@ -272,7 +272,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		for _, info := range infos {
-			versionedObject, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+			versionedObject, err := info.ObjectConverter.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				return err
 			}

@@ -192,7 +192,7 @@ func TestServerSidePrint(t *testing.T) {
 			continue
 		}
 		intGV := gvk.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-		intObj, err := mapping.ConvertToVersion(obj, intGV)
+		intObj, err := legacyscheme.Scheme.ConvertToVersion(obj, intGV)
 		if err != nil {
 			t.Errorf("unexpected error converting %s to internal: %v", gvk, err)
 			continue

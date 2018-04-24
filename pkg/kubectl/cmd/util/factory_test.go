@@ -474,10 +474,11 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
 	b := resource.NewBuilder(
 		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  legacyscheme.Scheme,
-			ClientMapper: fakeClient(),
-			Decoder:      testapi.Default.Codec(),
+			RESTMapper:      mapper,
+			ObjectTyper:     legacyscheme.Scheme,
+			ObjectConverter: legacyscheme.Scheme,
+			ClientMapper:    fakeClient(),
+			Decoder:         testapi.Default.Codec(),
 		},
 		nil,
 		categories.LegacyCategoryExpander,

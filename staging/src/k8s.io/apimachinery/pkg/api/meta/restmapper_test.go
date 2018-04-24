@@ -577,10 +577,6 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 			t.Errorf("%d: unexpected resource: %#v", i, mapping)
 		}
 
-		if mapping.ObjectConvertor == nil {
-			t.Errorf("%d: missing codec: %#v", i, mapping)
-		}
-
 		groupVersion := testCase.ExpectedGroupVersion
 		if groupVersion == nil {
 			groupVersion = &testCase.APIGroupVersions[0]
@@ -727,9 +723,6 @@ func TestRESTMapperRESTMappings(t *testing.T) {
 			if mapping.Resource != exp.Resource {
 				t.Errorf("%d - %d: unexpected resource: %#v", i, j, mapping)
 			}
-			if mapping.ObjectConvertor == nil {
-				t.Errorf("%d - %d: missing codec: %#v", i, j, mapping)
-			}
 			if mapping.GroupVersionKind != exp.GroupVersionKind {
 				t.Errorf("%d - %d: unexpected GroupVersionKind: %#v", i, j, mapping)
 			}
@@ -744,7 +737,7 @@ func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 
 	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, unmatchedVersionInterfaces)
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace)
-	_, err := mapper.RESTMapping(internalObjectGK, expectedGroupVersion1.Version)
+	_, err := mapper.RESTMapping(internalObjectGK, "test3")
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
