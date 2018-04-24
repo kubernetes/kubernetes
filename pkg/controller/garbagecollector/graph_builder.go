@@ -135,7 +135,7 @@ func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource)
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
+			return client.
 				Resource(&apiResource, metav1.NamespaceAll).
 				List(options)
 		},
@@ -145,7 +145,7 @@ func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource)
 			// namespaces if it's namespace scoped, so leave
 			// APIResource.Namespaced as false is all right.
 			apiResource := metav1.APIResource{Name: resource.Resource}
-			return client.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback).
+			return client.
 				Resource(&apiResource, metav1.NamespaceAll).
 				Watch(options)
 		},

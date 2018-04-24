@@ -197,7 +197,7 @@ func genericDescriber(clientAccessFactory ClientAccessFactory, mapping *meta.RES
 	clientConfigCopy.GroupVersion = &gv
 
 	// used to fetch the resource
-	dynamicClient, err := dynamic.NewClient(&clientConfigCopy)
+	dynamicClient, err := dynamic.NewClient(&clientConfigCopy, gv)
 	if err != nil {
 		return nil, err
 	}

@@ -30,25 +30,28 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "bad_debt.go",
         "client.go",
         "client_pool.go",
         "dynamic_util.go",
+        "scheme.go",
+        "simple.go",
     ],
     importpath = "k8s.io/client-go/dynamic",
     deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion/queryparams:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/versioning:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 
