@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -55,12 +55,12 @@ func TestMounterGetPath(t *testing.T) {
 		{
 			name:           "simple specName",
 			specVolumeName: "spec-0",
-			path:           path.Join(tmpDir, fmt.Sprintf("pods/%s/volumes/kubernetes.io~csi/%s/%s", testPodUID, "spec-0", "/mount")),
+			path:           filepath.Join(tmpDir, fmt.Sprintf("pods/%s/volumes/kubernetes.io~csi/%s/%s", testPodUID, "spec-0", "/mount")),
 		},
 		{
 			name:           "specName with dots",
 			specVolumeName: "test.spec.1",
-			path:           path.Join(tmpDir, fmt.Sprintf("pods/%s/volumes/kubernetes.io~csi/%s/%s", testPodUID, "test.spec.1", "/mount")),
+			path:           filepath.Join(tmpDir, fmt.Sprintf("pods/%s/volumes/kubernetes.io~csi/%s/%s", testPodUID, "test.spec.1", "/mount")),
 		},
 	}
 	for _, tc := range testCases {
@@ -218,7 +218,7 @@ func TestSaveVolumeData(t *testing.T) {
 	for i, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
 		specVolID := fmt.Sprintf("spec-volid-%d", i)
-		mountDir := path.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
+		mountDir := filepath.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
 		if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
 			t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 		}
@@ -230,7 +230,7 @@ func TestSaveVolumeData(t *testing.T) {
 		}
 		// did file get created
 		dataDir := getTargetPath(testPodUID, specVolID, plug.host)
-		file := path.Join(dataDir, volDataFileName)
+		file := filepath.Join(dataDir, volDataFileName)
 		if _, err := os.Stat(file); err != nil {
 			t.Errorf("failed to create data dir: %v", err)
 		}
