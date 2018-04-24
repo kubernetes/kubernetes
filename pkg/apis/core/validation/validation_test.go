@@ -6048,6 +6048,13 @@ func TestValidatePod(t *testing.T) {
 											Values:   []string{"value1", "value2"},
 										},
 									},
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"host1"},
+										},
+									},
 								},
 							},
 						},
@@ -6506,6 +6513,83 @@ func TestValidatePod(t *testing.T) {
 									MatchExpressions: []core.NodeSelectorRequirement{
 										{
 											Key: "key1",
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, more values for field selector": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"host1", "host2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, invalid operator": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].operator",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpExists,
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, invalid key": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].key",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.namespace",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"ns1"},
 										},
 									},
 								},

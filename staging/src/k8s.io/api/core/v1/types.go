@@ -2322,10 +2322,15 @@ type NodeSelector struct {
 	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 
-// A null or empty node selector term matches no objects.
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
 type NodeSelectorTerm struct {
-	//Required. A list of node selector requirements. The requirements are ANDed.
-	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions" protobuf:"bytes,1,rep,name=matchExpressions"`
+	// A list of node selector requirements by node's labels.
+	// +optional
+	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
+	// A list of node selector requirements by node's fields.
+	// +optional
+	MatchFields []NodeSelectorRequirement `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
 }
 
 // A node selector requirement is a selector that contains values, a key, and an operator

@@ -2107,10 +2107,13 @@ type NodeSelector struct {
 	NodeSelectorTerms []NodeSelectorTerm
 }
 
-// A null or empty node selector term matches no objects.
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
 type NodeSelectorTerm struct {
-	//Required. A list of node selector requirements. The requirements are ANDed.
+	// A list of node selector requirements by node's labels.
 	MatchExpressions []NodeSelectorRequirement
+	// A list of node selector requirements by node's fields.
+	MatchFields []NodeSelectorRequirement
 }
 
 // A node selector requirement is a selector that contains values, a key, and an operator

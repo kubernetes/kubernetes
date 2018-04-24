@@ -1877,10 +1877,16 @@ message NodeSelectorRequirement {
   repeated string values = 3;
 }
 
-// A null or empty node selector term matches no objects.
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
 message NodeSelectorTerm {
-  // Required. A list of node selector requirements. The requirements are ANDed.
+  // A list of node selector requirements by node's labels.
+  // +optional
   repeated NodeSelectorRequirement matchExpressions = 1;
+
+  // A list of node selector requirements by node's fields.
+  // +optional
+  repeated NodeSelectorRequirement matchFields = 2;
 }
 
 // NodeSpec describes the attributes that a node is created with.
