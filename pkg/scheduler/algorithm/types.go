@@ -25,6 +25,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 )
 
+// NodeFieldSelectorKeys is a map that: the key are node field selector keys; the values are
+// the functions to get the value of the node field.
+var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
+	NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
+}
+
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
 type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
