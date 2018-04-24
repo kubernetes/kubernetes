@@ -53,7 +53,7 @@ var _ = SIGDescribe("api-namespaces", func() {
 		     2) post it
 		     3) check that the newly created namespace is brought when get by name is invoked.
 		     4) check that the newly created namespace appears on the list.
-		     5) delete the namespace, waiting until 
+		     5) delete the namespace, waiting until finished.
 		     6) check that the newly created namespace is NOT brought when get by name is invoked.
 		     7) check that the newly created namespace does NOT appear on the list.
 		*/
