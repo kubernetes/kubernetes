@@ -1,21 +1,23 @@
+load("//build:workspace_mirror.bzl", "mirror")
+
 http_archive(
     name = "io_bazel_rules_go",
     sha256 = "4b2c61795ac2eefcb28f3eb8e1cb2d8fb3c2eafa0f6712473bc5f93728f38758",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.10.2/rules_go-0.10.2.tar.gz"],
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.10.2/rules_go-0.10.2.tar.gz"),
 )
 
 http_archive(
     name = "io_kubernetes_build",
     sha256 = "007774f06536059f3f782d1a092bddc625d88c17f20bbe731cea844a52485b11",
     strip_prefix = "repo-infra-97099dccc8807e9159dc28f374a8f0602cab07e1",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/97099dccc8807e9159dc28f374a8f0602cab07e1.tar.gz"],
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/97099dccc8807e9159dc28f374a8f0602cab07e1.tar.gz"),
 )
 
 http_archive(
     name = "bazel_skylib",
     sha256 = "bbccf674aa441c266df9894182d80de104cabd19be98be002f6d478aaa31574d",
     strip_prefix = "bazel-skylib-2169ae1c374aab4a09aa90e65efe1a3aad4e279b",
-    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"],
+    urls = mirror("https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"),
 )
 
 ETCD_VERSION = "3.2.18"
@@ -25,14 +27,14 @@ new_http_archive(
     build_file = "third_party/etcd.BUILD",
     sha256 = "b729db0732448064271ea6fdcb901773c4fe917763ca07776f22d0e5e0bd4097",
     strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
-    urls = ["https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)],
+    urls = mirror("https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)),
 )
 
 http_archive(
     name = "io_bazel_rules_docker",
     sha256 = "c440717ee9b1b2f4a1e9bf5622539feb5aef9db83fc1fa1517818f13c041b0be",
     strip_prefix = "rules_docker-8bbe2a8abd382641e65ff7127a3700a8530f02ce",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/8bbe2a8abd382641e65ff7127a3700a8530f02ce.tar.gz"],
+    urls = mirror("https://github.com/bazelbuild/rules_docker/archive/8bbe2a8abd382641e65ff7127a3700a8530f02ce.tar.gz"),
 )
 
 load("@bazel_skylib//:lib.bzl", "versions")
@@ -53,7 +55,7 @@ docker_repositories()
 http_file(
     name = "kubernetes_cni",
     sha256 = "f04339a21b8edf76d415e7f17b620e63b8f37a76b2f706671587ab6464411f2d",
-    url = "https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz",
+    urls = mirror("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz"),
 )
 
 docker_pull(
@@ -79,3 +81,6 @@ docker_pull(
     repository = "library/busybox",
     tag = "latest",  # ignored, but kept here for documentation
 )
+
+load("//build:workspace_mirror.bzl", "export_urls")
+export_urls("workspace_urls")
