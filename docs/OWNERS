@@ -1,9 +1,13 @@
-reviewers:
-  - brendandburns
-  - smarterclayton
-  - thockin
-approvers:
-  - brendandburns
-  - smarterclayton
-  - thockin
-  - pwittrock
+".*":
+	reviewers:
+	  - brendandburns
+	  - smarterclayton
+	  - thockin
+	approvers:
+	  - brendandburns
+	  - smarterclayton
+	  - thockin
+	  - pwittrock
+"^(getting-started-guides|admin|user-guide|devel|design|proposals)":
+	labels:
+	- kind/old-docs
