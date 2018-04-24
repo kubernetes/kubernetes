@@ -775,6 +775,11 @@ EOF
 ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
 EOF
   fi
+  if [ -n "${MAX_PODS:-}" ]; then
+    cat >>$file <<EOF
+MAX_PODS: $(yaml-quote ${MAX_PODS})
+EOF
+  fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
     cat >>$file <<EOF
