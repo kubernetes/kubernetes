@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 
 	"k8s.io/apimachinery/pkg/types"
 	kwait "k8s.io/apimachinery/pkg/util/wait"

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest"
 
@@ -174,7 +174,9 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		// case we do get instance view every time to fulfill the azure_zones requirement without hitting
 		// throttling.
 		// Consider adding separate parameter for controlling 'InstanceView' once node update issue #56276 is fixed
-		vm, err := az.VirtualMachinesClient.Get(az.ResourceGroup, key, compute.InstanceView)
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+		vm, err := az.VirtualMachinesClient.Get(ctx, az.ResourceGroup, key, compute.InstanceView)
 		exists, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
