@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -36,6 +37,7 @@ import (
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
+	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -43,8 +45,12 @@ import (
 	networkingapiv1 "k8s.io/api/networking/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storageapiv1 "k8s.io/api/storage/v1"
+	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -456,28 +462,37 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
 	ret.EnableVersions(
+		admissionregistrationv1beta1.SchemeGroupVersion,
 		apiv1.SchemeGroupVersion,
-		extensionsapiv1beta1.SchemeGroupVersion,
-		batchapiv1.SchemeGroupVersion,
-		batchapiv1beta1.SchemeGroupVersion,
-		authenticationv1.SchemeGroupVersion,
-		authenticationv1beta1.SchemeGroupVersion,
-		autoscalingapiv1.SchemeGroupVersion,
-		autoscalingapiv2beta1.SchemeGroupVersion,
 		appsv1beta1.SchemeGroupVersion,
 		appsv1beta2.SchemeGroupVersion,
 		appsv1.SchemeGroupVersion,
+		authenticationv1.SchemeGroupVersion,
+		authenticationv1beta1.SchemeGroupVersion,
+		authorizationapiv1.SchemeGroupVersion,
+		authorizationapiv1beta1.SchemeGroupVersion,
+		autoscalingapiv1.SchemeGroupVersion,
+		autoscalingapiv2beta1.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion,
+		batchapiv1beta1.SchemeGroupVersion,
+		certificatesapiv1beta1.SchemeGroupVersion,
+		eventsv1beta1.SchemeGroupVersion,
+		extensionsapiv1beta1.SchemeGroupVersion,
+		networkingapiv1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
-		certificatesapiv1beta1.SchemeGroupVersion,
-		authorizationapiv1.SchemeGroupVersion,
-		authorizationapiv1beta1.SchemeGroupVersion,
-		networkingapiv1.SchemeGroupVersion,
-		eventsv1beta1.SchemeGroupVersion,
-		admissionregistrationv1beta1.SchemeGroupVersion,
+	)
+	// disable alpha versions explicitly so we have a full list of what's possible to serve
+	ret.DisableVersions(
+		admissionregistrationv1alpha1.SchemeGroupVersion,
+		batchapiv2alpha1.SchemeGroupVersion,
+		rbacv1alpha1.SchemeGroupVersion,
+		schedulingv1alpha1.SchemeGroupVersion,
+		settingsv1alpha1.SchemeGroupVersion,
+		storageapiv1alpha1.SchemeGroupVersion,
 	)
 
 	return ret

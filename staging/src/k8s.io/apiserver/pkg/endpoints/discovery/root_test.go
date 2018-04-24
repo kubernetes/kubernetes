@@ -26,7 +26,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,10 +37,9 @@ import (
 )
 
 var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	registry             = registered.NewOrDie("")
-	scheme               = runtime.NewScheme()
-	codecs               = serializer.NewCodecFactory(scheme)
+	registry = registered.NewOrDie("")
+	scheme   = runtime.NewScheme()
+	codecs   = serializer.NewCodecFactory(scheme)
 )
 
 func init() {

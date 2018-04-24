@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,14 +35,13 @@ import (
 )
 
 var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	registry             = registered.NewOrDie("")
-	Scheme               = runtime.NewScheme()
-	Codecs               = serializer.NewCodecFactory(Scheme)
+	registry = registered.NewOrDie("")
+	Scheme   = runtime.NewScheme()
+	Codecs   = serializer.NewCodecFactory(Scheme)
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, registry, Scheme)
+	install.Install(registry, Scheme)
 
 	// we need to add the options to empty v1
 	// TODO fix the server code to avoid this
