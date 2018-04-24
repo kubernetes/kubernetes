@@ -260,7 +260,7 @@ type KubeletConfiguration struct {
 	// Requires the QOSReserved feature gate to be enabled.
 	// Default: nil
 	// +optional
-	QOSReserved map[string]string `json:"QOSReserved,omitempty"`
+	QOSReserved map[string]string `json:"qosReserved,omitempty"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	// Default: "2m"
