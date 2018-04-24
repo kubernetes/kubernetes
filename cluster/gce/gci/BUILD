@@ -10,7 +10,7 @@ go_test(
     ],
     data = [
         ":scripts-test-data",
-        "//cluster/gce/manifests:manifests-test-data",
+        "//cluster/gce/manifests",
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
