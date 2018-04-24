@@ -412,7 +412,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		BeforeEach(func() {
 			setupStorageClass(config, &immediateMode)
 			setupLocalVolumeProvisioner(config)
-			volumePath = path.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
+			volumePath = filepath.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
 			setupLocalVolumeProvisionerMountPoint(config, volumePath, config.node0)
 		})
 
@@ -492,7 +492,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			createProvisionerDaemonset(config)
 
 			By("Creating a volume in discovery directory")
-			dynamicVolumePath := path.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
+			dynamicVolumePath := filepath.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
 			setupLocalVolumeProvisionerMountPoint(config, dynamicVolumePath, config.node0)
 
 			By("Waiting for the PersistentVolume to be created")
@@ -561,7 +561,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				By(fmt.Sprintf("Setting up local volumes on node %q", node.Name))
 				paths := []string{}
 				for j := 0; j < volsPerNode; j++ {
-					volumePath := path.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
+					volumePath := filepath.Join(config.discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
 					setupLocalVolumeProvisionerMountPoint(config, volumePath, &config.nodes[i])
 					paths = append(paths, volumePath)
 				}

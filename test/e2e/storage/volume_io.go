@@ -30,7 +30,7 @@ package storage
 import (
 	"fmt"
 	"math"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -186,8 +186,8 @@ func deleteFile(pod *v1.Pod, fpath string) {
 // Note: `fsizes` values are enforced to each be at least `minFileSize` and a multiple of `minFileSize`
 //   bytes.
 func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framework.VolumeTestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
-	dir := path.Join("/opt", config.Prefix, config.Namespace)
-	dd_input := path.Join(dir, "dd_if")
+	dir := filepath.Join("/opt", config.Prefix, config.Namespace)
+	dd_input := filepath.Join(dir, "dd_if")
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value
 	loopCnt := minFileSize / int64(len(writeBlk))
 	// initContainer cmd to create and fill dd's input file. The initContainer is used to create
@@ -229,7 +229,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 		if math.Mod(float64(fsize), float64(minFileSize)) != 0 {
 			fsize = fsize/minFileSize + minFileSize
 		}
-		fpath := path.Join(dir, fmt.Sprintf("%s-%d", file, fsize))
+		fpath := filepath.Join(dir, fmt.Sprintf("%s-%d", file, fsize))
 		if err = writeToFile(clientPod, fpath, dd_input, fsize); err != nil {
 			return err
 		}
