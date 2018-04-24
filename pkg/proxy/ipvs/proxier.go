@@ -127,8 +127,10 @@ type Proxier struct {
 	syncRunner      *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 
 	// These are effectively const and do not need the mutex to be held.
-	syncPeriod     time.Duration
-	minSyncPeriod  time.Duration
+	syncPeriod    time.Duration
+	minSyncPeriod time.Duration
+	// Values are CIDR's to exclude when cleaning up IPVS rules.
+	excludeCIDRs   []string
 	iptables       utiliptables.Interface
 	ipvs           utilipvs.Interface
 	ipset          utilipset.Interface
@@ -258,6 +260,7 @@ func NewProxier(ipt utiliptables.Interface,
 	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
+	excludeCIDRs []string,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -1542,16 +1545,28 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	return nil
 }
 
-func (proxier *Proxier) cleanLegacyService(atciveServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer) {
+func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer) {
 	unbindIPAddr := sets.NewString()
-	for cS := range currentServices {
-		if !atciveServices[cS] {
-			svc := currentServices[cS]
-			err := proxier.ipvs.DeleteVirtualServer(svc)
-			if err != nil {
-				glog.Errorf("Failed to delete service, error: %v", err)
+	for cs := range currentServices {
+		svc := currentServices[cs]
+		if _, ok := activeServices[cs]; !ok {
+			// This service was not processed in the latest sync loop so before deleting it,
+			// make sure it does not fall within an excluded CIDR range.
+			okayToDelete := true
+			for _, excludedCIDR := range proxier.excludeCIDRs {
+				// Any validation of this CIDR already should have occurred.
+				_, n, _ := net.ParseCIDR(excludedCIDR)
+				if n.Contains(svc.Address) {
+					okayToDelete = false
+					break
+				}
 			}
-			unbindIPAddr.Insert(svc.Address.String())
+			if okayToDelete {
+				if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
+					glog.Errorf("Failed to delete service, error: %v", err)
+				}
+				unbindIPAddr.Insert(svc.Address.String())
+			}
 		}
 	}
 

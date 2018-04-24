@@ -116,6 +116,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 	}
 
 	allErrs = append(allErrs, validateIPVSSchedulerMethod(kubeproxyconfig.IPVSSchedulerMethod(config.Scheduler), fldPath.Child("Scheduler"))...)
+	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
 	return allErrs
 }
@@ -251,5 +252,16 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 		}
 	}
 
+	return allErrs
+}
+
+func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i := range excludeCIDRs {
+		if _, _, err := net.ParseCIDR(excludeCIDRs[i]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
+		}
+	}
 	return allErrs
 }
