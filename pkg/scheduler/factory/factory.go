@@ -1062,12 +1062,12 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
-	priorityMetaProducer, err := c.GetPriorityMetadataProducer()
+	predicateMetaProducer, err := c.GetPredicateMetadataProducer()
 	if err != nil {
 		return nil, err
 	}
 
-	predicateMetaProducer, err := c.GetPredicateMetadataProducer()
+	priorityMetaProducer, err := c.GetPriorityMetadataProducer()
 	if err != nil {
 		return nil, err
 	}

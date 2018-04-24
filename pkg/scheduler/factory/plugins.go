@@ -58,20 +58,13 @@ type PredicateMetadataProducerFactory func(PluginFactoryArgs) algorithm.Predicat
 // FitPredicateFactory produces a FitPredicate from the given args.
 type FitPredicateFactory func(PluginFactoryArgs) algorithm.FitPredicate
 
-// PriorityFunctionFactory produces a PriorityConfig from the given args.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-type PriorityFunctionFactory func(PluginFactoryArgs) algorithm.PriorityFunction
-
-// PriorityFunctionFactory2 produces map & reduce priority functions
+// PriorityFunctionFactory produces map & reduce priority functions
 // from a given args.
-// FIXME: Rename to PriorityFunctionFactory.
-type PriorityFunctionFactory2 func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction)
+type PriorityFunctionFactory func(PluginFactoryArgs) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction)
 
 // PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
-	Function          PriorityFunctionFactory
-	MapReduceFunction PriorityFunctionFactory2
+	MapReduceFunction PriorityFunctionFactory
 	Weight            int
 }
 
@@ -256,21 +249,7 @@ func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerF
 
 // RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
-	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
-			return function
-		},
-		Weight: weight,
-	})
-}
-
-// RegisterPriorityFunction2 registers a priority function with the algorithm registry. Returns the name,
-// with which the function was registered.
-// FIXME: Rename to PriorityFunctionFactory.
-func RegisterPriorityFunction2(
+func RegisterPriorityFunction(
 	name string,
 	mapFunction algorithm.PriorityMapFunction,
 	reduceFunction algorithm.PriorityReduceFunction,
@@ -336,7 +315,6 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
-			Function:          existingPcf.Function,
 			MapReduceFunction: existingPcf.MapReduceFunction,
 			Weight:            policy.Weight,
 		}
@@ -449,21 +427,15 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 		if !ok {
 			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
-		if factory.Function != nil {
-			configs = append(configs, algorithm.PriorityConfig{
-				Name:     name,
-				Function: factory.Function(args),
-				Weight:   factory.Weight,
-			})
-		} else {
-			mapFunction, reduceFunction := factory.MapReduceFunction(args)
-			configs = append(configs, algorithm.PriorityConfig{
-				Name:   name,
-				Map:    mapFunction,
-				Reduce: reduceFunction,
-				Weight: factory.Weight,
-			})
-		}
+
+		mapFunction, reduceFunction := factory.MapReduceFunction(args)
+		configs = append(configs, algorithm.PriorityConfig{
+			Name:   name,
+			Map:    mapFunction,
+			Reduce: reduceFunction,
+			Weight: factory.Weight,
+		})
+
 	}
 	if err := validateSelectedConfigs(configs); err != nil {
 		return nil, err

@@ -34,7 +34,7 @@ func TestEmptyPriorityMetadataProducer(t *testing.T) {
 		"1": schedulercache.NewNodeInfo(),
 	}
 	// Test EmptyPriorityMetadataProducer
-	metadata := EmptyPriorityMetadataProducer(fakePod, nodeNameToInfo)
+	metadata := EmptyPriorityMetadataProducer(fakePod, nodeNameToInfo, nil)
 	if metadata != nil {
 		t.Errorf("failed to produce empty metadata: got %v, expected nil", metadata)
 	}
