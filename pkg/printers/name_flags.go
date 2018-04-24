@@ -63,7 +63,7 @@ func (f *NamePrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, error)
 	case "":
 		return namePrinter, nil
 	default:
-		return nil, NoCompatiblePrinterError{f}
+		return nil, NoCompatiblePrinterError{Options: f, OutputFormat: &outputFormat}
 	}
 }
 

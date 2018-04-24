@@ -23,11 +23,17 @@ import (
 )
 
 type NoCompatiblePrinterError struct {
-	Options interface{}
+	OutputFormat *string
+	Options      interface{}
 }
 
 func (e NoCompatiblePrinterError) Error() string {
-	return fmt.Sprintf("unable to match a printer suitable for the options specified: %#v", e.Options)
+	output := ""
+	if e.OutputFormat != nil {
+		output = *e.OutputFormat
+	}
+
+	return fmt.Sprintf("unable to match a printer suitable for the output format %q and the options specified: %#v", output, e.Options)
 }
 
 func IsNoCompatiblePrinterError(err error) bool {
@@ -67,7 +73,7 @@ func (f *PrintFlags) ToPrinter() (ResourcePrinter, error) {
 		return p, err
 	}
 
-	return nil, NoCompatiblePrinterError{f}
+	return nil, NoCompatiblePrinterError{Options: f, OutputFormat: f.OutputFormat}
 }
 
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {

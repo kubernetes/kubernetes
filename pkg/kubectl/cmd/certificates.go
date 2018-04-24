@@ -60,8 +60,8 @@ type CertificateOptions struct {
 	csrNames    []string
 	outputStyle string
 
-	clientSetFunc func() (internalclientset.Interface, error)
-	builderFunc   func() *resource.Builder
+	clientSet internalclientset.Interface
+	builder   *resource.Builder
 
 	genericclioptions.IOStreams
 }
@@ -79,8 +79,11 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return printer.PrintObj(obj, out)
 	}
 
-	o.builderFunc = f.NewBuilder
-	o.clientSetFunc = f.ClientSet
+	o.builder = f.NewBuilder()
+	o.clientSet, err = f.ClientSet()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -127,7 +130,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 }
 
 func (o *CertificateOptions) RunCertificateApprove(force bool) error {
-	return o.modifyCertificateCondition(o.builderFunc, o.clientSetFunc, force, func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool) {
+	return o.modifyCertificateCondition(o.builder, o.clientSet, force, func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool) {
 		var alreadyApproved bool
 		for _, c := range csr.Status.Conditions {
 			if c.Type == certificates.CertificateApproved {
@@ -177,7 +180,7 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 }
 
 func (o *CertificateOptions) RunCertificateDeny(force bool) error {
-	return o.modifyCertificateCondition(o.builderFunc, o.clientSetFunc, force, func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool) {
+	return o.modifyCertificateCondition(o.builder, o.clientSet, force, func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool) {
 		var alreadyDenied bool
 		for _, c := range csr.Status.Conditions {
 			if c.Type == certificates.CertificateDenied {
@@ -197,13 +200,9 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 	})
 }
 
-func (options *CertificateOptions) modifyCertificateCondition(builderFunc func() *resource.Builder, clientSetFunc func() (internalclientset.Interface, error), force bool, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool)) error {
+func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet internalclientset.Interface, force bool, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool)) error {
 	var found int
-	c, err := clientSetFunc()
-	if err != nil {
-		return err
-	}
-	r := builderFunc().
+	r := builder.
 		Internal().
 		ContinueOnError().
 		FilenameParam(false, &options.FilenameOptions).
@@ -212,14 +211,14 @@ func (options *CertificateOptions) modifyCertificateCondition(builderFunc func()
 		Flatten().
 		Latest().
 		Do()
-	err = r.Visit(func(info *resource.Info, err error) error {
+	err := r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
 		csr := info.Object.(*certificates.CertificateSigningRequest)
 		csr, hasCondition := modify(csr)
 		if !hasCondition || force {
-			csr, err = c.Certificates().
+			csr, err = clientSet.Certificates().
 				CertificateSigningRequests().
 				UpdateApproval(csr)
 			if err != nil {

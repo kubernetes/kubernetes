@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -198,8 +197,8 @@ func TestCordon(t *testing.T) {
 			}
 			tf.ClientConfigVal = defaultClientConfig()
 
-			buf := bytes.NewBuffer([]byte{})
-			cmd := test.cmd(tf, genericclioptions.IOStreams{Out: buf, ErrOut: buf})
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			cmd := test.cmd(tf, ioStreams)
 
 			saw_fatal := false
 			func() {
@@ -708,9 +707,8 @@ func TestDrain(t *testing.T) {
 				}
 				tf.ClientConfigVal = defaultClientConfig()
 
-				buf := bytes.NewBuffer([]byte{})
-				errBuf := bytes.NewBuffer([]byte{})
-				cmd := NewCmdDrain(tf, genericclioptions.IOStreams{Out: buf, ErrOut: errBuf})
+				ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
+				cmd := NewCmdDrain(tf, ioStreams)
 
 				saw_fatal := false
 				fatal_msg := ""

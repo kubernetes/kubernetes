@@ -525,10 +525,9 @@ func TestCopyToPod(t *testing.T) {
 	}
 
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 
-	cmd := NewCmdCp(tf, genericclioptions.IOStreams{Out: buf, ErrOut: errBuf})
+	cmd := NewCmdCp(tf, ioStreams)
 
 	srcFile, err := ioutil.TempDir("", "test")
 	if err != nil {
@@ -556,7 +555,7 @@ func TestCopyToPod(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		opts := NewCopyOptions(genericclioptions.IOStreams{Out: buf, ErrOut: errBuf})
+		opts := NewCopyOptions(ioStreams)
 		src := fileSpec{
 			File: srcFile,
 		}
