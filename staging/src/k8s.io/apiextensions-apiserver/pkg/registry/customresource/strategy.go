@@ -17,6 +17,8 @@ limitations under the License.
 package customresource
 
 import (
+	"fmt"
+
 	"github.com/go-openapi/validate"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -70,6 +72,10 @@ func (a customResourceStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a CustomResource before creation.
 func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+	// coerce types and drop unknown fields in metadata
+	// if there are errors, we don't do anything and fail in ValidateCreate and ValidateUpdate
+	coerceMetadata(obj)
+
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
 		customResourceObject := obj.(*unstructured.Unstructured)
 		customResource := customResourceObject.UnstructuredContent()
@@ -86,6 +92,11 @@ func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, 
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (a customResourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	// coerce types and drop unknown fields in metadata
+	// if there are errors, we don't do anything and fail in ValidateCreate and ValidateUpdate
+	coerceMetadata(obj)
+	coerceMetadata(old)
+
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
 		return
 	}
@@ -181,4 +192,43 @@ func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label label
 		Field:    field,
 		GetAttrs: a.GetAttrs,
 	}
+}
+
+// getCoercedMetadata returns the result of round tripping the "metadata" value through metav1.ObjectMeta
+// to coerce types and drop unknown fields, matching native behavior
+func getCoercedMetadata(obj runtime.Object) (*metav1.ObjectMeta, map[string]interface{}, error) {
+	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected type %T", obj)
+	}
+	unstructuredMetadata, ok := customResourceObject.Object["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected metadata type %T", customResourceObject.Object["metadata"])
+	}
+
+	structuredMetadata := &metav1.ObjectMeta{}
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredMetadata, structuredMetadata)
+	if err != nil {
+		return nil, nil, err
+	}
+	coercedUnstructuredMetadata, err := runtime.DefaultUnstructuredConverter.ToUnstructured(structuredMetadata)
+
+	return structuredMetadata, coercedUnstructuredMetadata, err
+}
+
+func coerceMetadata(obj runtime.Object) error {
+	_, coercedMetadata, err := getCoercedMetadata(obj)
+	if err != nil {
+		return err
+	}
+	customResourceObject, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return fmt.Errorf("unexpected type %T", obj)
+	}
+	_, ok = customResourceObject.Object["metadata"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unexpected metadata type %T", customResourceObject.Object["metadata"])
+	}
+	customResourceObject.Object["metadata"] = coercedMetadata
+	return nil
 }
