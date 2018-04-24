@@ -22,8 +22,8 @@ export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 
-if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
-	echo "${KUBE_ROOT}/examples not detected.  This script should be run from a location where the source dirs are available."
+if [[ ! -d "${KUBE_ROOT}/pkg" ]]; then
+	echo "${KUBE_ROOT}/pkg not detected.  This script should be run from a location where the source dirs are available."
 	exit 1
 fi
 
@@ -43,7 +43,6 @@ pushd "${KUBE_ROOT}" >/dev/null
 BINDATA_OUTPUT="test/e2e/generated/bindata.go"
 go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md \
-	"examples/..." \
 	"test/e2e/testing-manifests/..." \
 	"test/images/..." \
 	"test/fixtures/..."

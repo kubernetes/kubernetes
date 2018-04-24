@@ -56,7 +56,6 @@ go_test(
         "set_test.go",
     ],
     data = [
-        "//examples:config",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],

@@ -193,7 +193,6 @@ pkg_tar(
         "//:version",
         "//cluster:all-srcs",
         "//docs:all-srcs",
-        "//examples:all-srcs",
         "//hack/lib:all-srcs",
     ],
     extension = "tar.gz",
