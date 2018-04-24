@@ -295,7 +295,7 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   # If we're using custom network, use the subnet we already create for it as the one for ip-alias.
   # Note that this means SUBNETWORK would override KUBE_GCE_IP_ALIAS_SUBNETWORK in case of custom network.
   if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
-    IP_ALIAS_SUBNETWORK="${SUBNETWORK:-IP_ALIAS_SUBNETWORK}"
+    IP_ALIAS_SUBNETWORK="${SUBNETWORK}"
   fi
   # Reserve the services IP space to avoid being allocated for other GCP resources.
   SERVICE_CLUSTER_IP_SUBNETWORK=${KUBE_GCE_SERVICE_CLUSTER_IP_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-services}
