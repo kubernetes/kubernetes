@@ -120,8 +120,10 @@ func (m *Stub) Stop() error {
 
 // Register registers the device plugin for the given resourceName with Kubelet.
 func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerFlag bool) error {
-	conn, err := grpc.Dial(kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithTimeout(10*time.Second),
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}))
