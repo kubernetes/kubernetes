@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -399,7 +399,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(cinderVolumePluginName), mount.MountsInGlobalPDPath, devName)
+	return filepath.Join(host.GetPluginDir(cinderVolumePluginName), mount.MountsInGlobalPDPath, devName)
 }
 
 func (cd *cinderVolume) GetPath() string {
@@ -449,7 +449,7 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 		glog.V(4).Infof("Directory %s is not mounted", dir)
 		return fmt.Errorf("directory %s is not mounted", dir)
 	}
-	c.pdName = path.Base(refs[0])
+	c.pdName = filepath.Base(refs[0])
 	glog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
 
 	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
