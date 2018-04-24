@@ -59,38 +59,3 @@ func TestReset(t *testing.T) {
 		}
 	}
 }
-
-func TestSetCurrentUpdated(t *testing.T) {
-	source, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	otherSource, _, err := checkpoint.NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "other-name", Namespace: "namespace", UID: "other-uid"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	cases := []struct {
-		s          *fakeStore
-		newCurrent checkpoint.RemoteConfigSource
-		updated    bool
-	}{
-		{&fakeStore{current: nil}, nil, false},
-		{&fakeStore{current: nil}, source, true},
-		{&fakeStore{current: source}, source, false},
-		{&fakeStore{current: source}, nil, true},
-		{&fakeStore{current: source}, otherSource, true},
-	}
-	for _, c := range cases {
-		current := c.s.current
-		updated, err := setCurrentUpdated(c.s, c.newCurrent)
-		if err != nil {
-			t.Fatalf("case %q -> %q, unexpected error: %v", current, c.newCurrent, err)
-		}
-		if c.newCurrent != c.s.current {
-			t.Errorf("case %q -> %q, expect current UID to be %q, but got %q", current, c.newCurrent, c.newCurrent, c.s.current)
-		}
-		if c.updated != updated {
-			t.Errorf("case %q -> %q, expect setCurrentUpdated to return %t, but got %t", current, c.newCurrent, c.updated, updated)
-		}
-	}
-}

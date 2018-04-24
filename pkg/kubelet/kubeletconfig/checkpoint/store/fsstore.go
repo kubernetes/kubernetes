@@ -21,82 +21,99 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const (
-	curFile = ".cur"
-	lkgFile = ".lkg"
+	metaDir           = "meta"
+	currentFile       = "current"
+	lastKnownGoodFile = "last-known-good"
+
+	checkpointsDir = "checkpoints"
+	kubeletKey     = "kubelet" // TODO(mtaufen): eventually the API will have a way to parameterize the kubelet file name, and then we can remove this
 )
 
 // fsStore is for tracking checkpoints in the local filesystem, implements Store
 type fsStore struct {
 	// fs is the filesystem to use for storage operations; can be mocked for testing
 	fs utilfs.Filesystem
-	// checkpointsDir is the absolute path to the storage directory for fsStore
-	checkpointsDir string
+	// dir is the absolute path to the storage directory for fsStore
+	dir string
 }
 
-// NewFsStore returns a Store that saves its data in `checkpointsDir`
-func NewFsStore(fs utilfs.Filesystem, checkpointsDir string) Store {
+var _ Store = (*fsStore)(nil)
+
+// NewFsStore returns a Store that saves its data in dir
+func NewFsStore(fs utilfs.Filesystem, dir string) Store {
 	return &fsStore{
-		fs:             fs,
-		checkpointsDir: checkpointsDir,
+		fs:  fs,
+		dir: dir,
 	}
 }
 
 func (s *fsStore) Initialize() error {
-	utillog.Infof("initializing config checkpoints directory %q", s.checkpointsDir)
-	if err := utilfiles.EnsureDir(s.fs, s.checkpointsDir); err != nil {
+	utillog.Infof("initializing config checkpoints directory %q", s.dir)
+	// ensure top-level dir for store
+	if err := utilfiles.EnsureDir(s.fs, s.dir); err != nil {
 		return err
 	}
-	if err := utilfiles.EnsureFile(s.fs, filepath.Join(s.checkpointsDir, curFile)); err != nil {
+	// ensure metadata directory and reference files (tracks current and lkg configs)
+	if err := utilfiles.EnsureDir(s.fs, filepath.Join(s.dir, metaDir)); err != nil {
 		return err
 	}
-	return utilfiles.EnsureFile(s.fs, filepath.Join(s.checkpointsDir, lkgFile))
+	if err := utilfiles.EnsureFile(s.fs, s.metaPath(currentFile)); err != nil {
+		return err
+	}
+	if err := utilfiles.EnsureFile(s.fs, s.metaPath(lastKnownGoodFile)); err != nil {
+		return err
+	}
+	// ensure checkpoints directory (saves unpacked payloads in subdirectories named after payload UID)
+	return utilfiles.EnsureDir(s.fs, filepath.Join(s.dir, checkpointsDir))
 }
 
-func (s *fsStore) Exists(uid string) (bool, error) {
-	ok, err := utilfiles.FileExists(s.fs, filepath.Join(s.checkpointsDir, uid))
+func (s *fsStore) Exists(c checkpoint.RemoteConfigSource) (bool, error) {
+	// we check whether the directory was created for the resource
+	uid := c.UID()
+	ok, err := utilfiles.DirExists(s.fs, s.checkpointPath(uid))
 	if err != nil {
 		return false, fmt.Errorf("failed to determine whether checkpoint %q exists, error: %v", uid, err)
 	}
 	return ok, nil
 }
 
-func (s *fsStore) Save(c checkpoint.Checkpoint) error {
-	// encode the checkpoint
-	data, err := c.Encode()
-	if err != nil {
-		return err
-	}
-	// save the file
-	return utilfiles.ReplaceFile(s.fs, filepath.Join(s.checkpointsDir, c.UID()), data)
+func (s *fsStore) Save(c checkpoint.Payload) error {
+	// save the checkpoint's files in the appropriate checkpoint dir
+	return utilfiles.ReplaceDir(s.fs, s.checkpointPath(c.UID()), c.Files())
 }
 
-func (s *fsStore) Load(uid string) (checkpoint.Checkpoint, error) {
-	filePath := filepath.Join(s.checkpointsDir, uid)
-	utillog.Infof("loading configuration from %q", filePath)
-
-	// load the file
-	data, err := s.fs.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read checkpoint file %q, error: %v", filePath, err)
+func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.KubeletConfiguration, error) {
+	sourceFmt := fmt.Sprintf("%s:%s", source.APIPath(), source.UID())
+	// check if a checkpoint exists for the source
+	if ok, err := s.Exists(source); err != nil {
+		return nil, fmt.Errorf("failed to determine if a checkpoint exists for source %s", sourceFmt)
+	} else if !ok {
+		return nil, fmt.Errorf("no checkpoint for source %s", sourceFmt)
 	}
-
-	// decode it
-	c, err := checkpoint.DecodeCheckpoint(data)
+	// load the kubelet config file
+	utillog.Infof("loading kubelet configuration checkpoint for source %s", sourceFmt)
+	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID()), kubeletKey))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode checkpoint file %q, error: %v", filePath, err)
+		return nil, err
 	}
-	return c, nil
+	kc, err := loader.Load()
+	if err != nil {
+		return nil, err
+	}
+	return kc, nil
 }
 
 func (s *fsStore) CurrentModified() (time.Time, error) {
-	path := filepath.Join(s.checkpointsDir, curFile)
+	path := s.metaPath(currentFile)
 	info, err := s.fs.Stat(path)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to stat %q while checking modification time, error: %v", path, err)
@@ -105,34 +122,35 @@ func (s *fsStore) CurrentModified() (time.Time, error) {
 }
 
 func (s *fsStore) Current() (checkpoint.RemoteConfigSource, error) {
-	return s.sourceFromFile(curFile)
+	return readRemoteConfigSource(s.fs, s.metaPath(currentFile))
 }
 
 func (s *fsStore) LastKnownGood() (checkpoint.RemoteConfigSource, error) {
-	return s.sourceFromFile(lkgFile)
+	return readRemoteConfigSource(s.fs, s.metaPath(lastKnownGoodFile))
 }
 
 func (s *fsStore) SetCurrent(source checkpoint.RemoteConfigSource) error {
-	return s.setSourceFile(curFile, source)
-}
-
-func (s *fsStore) SetCurrentUpdated(source checkpoint.RemoteConfigSource) (bool, error) {
-	return setCurrentUpdated(s, source)
+	return writeRemoteConfigSource(s.fs, s.metaPath(currentFile), source)
 }
 
 func (s *fsStore) SetLastKnownGood(source checkpoint.RemoteConfigSource) error {
-	return s.setSourceFile(lkgFile, source)
+	return writeRemoteConfigSource(s.fs, s.metaPath(lastKnownGoodFile), source)
 }
 
 func (s *fsStore) Reset() (bool, error) {
 	return reset(s)
 }
 
-// sourceFromFile returns the RemoteConfigSource stored in the file at `s.checkpointsDir/relPath`,
-// or nil if the file is empty
-func (s *fsStore) sourceFromFile(relPath string) (checkpoint.RemoteConfigSource, error) {
-	path := filepath.Join(s.checkpointsDir, relPath)
-	data, err := s.fs.ReadFile(path)
+func (s *fsStore) checkpointPath(uid string) string {
+	return filepath.Join(s.dir, checkpointsDir, uid)
+}
+
+func (s *fsStore) metaPath(name string) string {
+	return filepath.Join(s.dir, metaDir, name)
+}
+
+func readRemoteConfigSource(fs utilfs.Filesystem, path string) (checkpoint.RemoteConfigSource, error) {
+	data, err := fs.ReadFile(path)
 	if err != nil {
 		return nil, err
 	} else if len(data) == 0 {
@@ -141,17 +159,15 @@ func (s *fsStore) sourceFromFile(relPath string) (checkpoint.RemoteConfigSource,
 	return checkpoint.DecodeRemoteConfigSource(data)
 }
 
-// set source file replaces the file at `s.checkpointsDir/relPath` with a file containing `source`
-func (s *fsStore) setSourceFile(relPath string, source checkpoint.RemoteConfigSource) error {
-	path := filepath.Join(s.checkpointsDir, relPath)
+func writeRemoteConfigSource(fs utilfs.Filesystem, path string, source checkpoint.RemoteConfigSource) error {
 	// if nil, reset the file
 	if source == nil {
-		return utilfiles.ReplaceFile(s.fs, path, []byte{})
+		return utilfiles.ReplaceFile(fs, path, []byte{})
 	}
 	// encode the source and save it to the file
 	data, err := source.Encode()
 	if err != nil {
 		return err
 	}
-	return utilfiles.ReplaceFile(s.fs, path, data)
+	return utilfiles.ReplaceFile(fs, path, data)
 }

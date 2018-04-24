@@ -51,8 +51,6 @@ const (
 
 	// CurFailLoadReasonFmt indicates that the Kubelet failed to load the current config checkpoint for an API source
 	CurFailLoadReasonFmt = "failed to load current: %s"
-	// CurFailParseReasonFmt indicates that the Kubelet failed to parse the current config checkpoint for an API source
-	CurFailParseReasonFmt = "failed to parse current: %s"
 	// CurFailValidateReasonFmt indicates that the Kubelet failed to validate the current config checkpoint for an API source
 	CurFailValidateReasonFmt = "failed to validate current: %s"
 
@@ -60,8 +58,6 @@ const (
 
 	// LkgFailLoadReasonFmt indicates that the Kubelet failed to load the last-known-good config checkpoint for an API source
 	LkgFailLoadReasonFmt = "failed to load last-known-good: %s"
-	// LkgFailParseReasonFmt indicates that the Kubelet failed to parse the last-known-good config checkpoint for an API source
-	LkgFailParseReasonFmt = "failed to parse last-known-good: %s"
 	// LkgFailValidateReasonFmt indicates that the Kubelet failed to validate the last-known-good config checkpoint for an API source
 	LkgFailValidateReasonFmt = "failed to validate last-known-good: %s"
 
