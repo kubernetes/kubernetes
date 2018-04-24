@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	libstrings "strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
@@ -77,7 +77,7 @@ func makeGlobalPDPath(host volume.VolumeHost, diskUri string, isManaged bool) (s
 	}
 	// "{m for managed b for blob}{hashed diskUri or DiskId depending on disk kind }"
 	diskName := fmt.Sprintf(uniqueDiskNameTemplate, prefix, hashedDiskUri)
-	pdPath := path.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
+	pdPath := filepath.Join(host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, diskName)
 
 	return pdPath, nil
 }

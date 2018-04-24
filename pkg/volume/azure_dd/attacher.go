@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -210,7 +209,7 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	}
 
 	if volumeSource.Kind == nil { // this spec was constructed from info on the node
-		pdPath := path.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volumeSource.DataDiskURI)
+		pdPath := filepath.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volumeSource.DataDiskURI)
 		return pdPath, nil
 	}
 

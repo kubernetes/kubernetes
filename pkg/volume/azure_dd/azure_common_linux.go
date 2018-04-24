@@ -20,7 +20,7 @@ package azure_dd
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"strconv"
 	libstrings "strings"
 
@@ -124,7 +124,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 			if lun == l {
 				// find the matching LUN
 				// read vendor and model to ensure it is a VHD disk
-				vendorPath := path.Join(sys_path, name, "vendor")
+				vendorPath := filepath.Join(sys_path, name, "vendor")
 				vendorBytes, err := io.ReadFile(vendorPath)
 				if err != nil {
 					glog.Errorf("failed to read device vendor, err: %v", err)
@@ -136,7 +136,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 					continue
 				}
 
-				modelPath := path.Join(sys_path, name, "model")
+				modelPath := filepath.Join(sys_path, name, "model")
 				modelBytes, err := io.ReadFile(modelPath)
 				if err != nil {
 					glog.Errorf("failed to read device model, err: %v", err)
@@ -149,7 +149,7 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 				}
 
 				// find a disk, validate name
-				dir := path.Join(sys_path, name, "block")
+				dir := filepath.Join(sys_path, name, "block")
 				if dev, err := io.ReadDir(dir); err == nil {
 					found := false
 					devName := dev[0].Name()
