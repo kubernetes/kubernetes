@@ -239,7 +239,7 @@ func newAllPhasePodList() *api.PodList {
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// This test can be safely deleted when we will not support multiple flag formats
-	root := NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	root := NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
 
 	if root.Parent() != nil {
 		t.Fatal("We expect the root command to be returned")
