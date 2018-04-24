@@ -901,12 +901,16 @@ func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.Pers
 // Returns a pod definition based on the namespace. The pod references the PVC's
 // name.  A slice of BASH commands can be supplied as args to be run by the pod.
 // SELinux testing requires to pass HostIPC and HostPID as booleansi arguments.
-func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) *v1.Pod {
+func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64) *v1.Pod {
 	if len(command) == 0 {
 		command = "while true; do sleep 1; done"
 	}
 	podName := "security-context-" + string(uuid.NewUUID())
-	fsGroup := int64(1000)
+	if fsGroup == nil {
+		fsGroup = func(i int64) *int64 {
+			return &i
+		}(1000)
+	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -920,7 +924,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 			HostIPC: hostIPC,
 			HostPID: hostPID,
 			SecurityContext: &v1.PodSecurityContext{
-				FSGroup: &fsGroup,
+				FSGroup: fsGroup,
 			},
 			Containers: []v1.Container{
 				{
@@ -996,14 +1000,14 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 }
 
 // create security pod with given claims
-func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions) (*v1.Pod, error) {
-	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel)
+func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
+	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}

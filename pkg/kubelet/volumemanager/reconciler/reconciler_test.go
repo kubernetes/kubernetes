@@ -1033,7 +1033,6 @@ func createTestClient() *fake.Clientset {
 							DevicePath: "fake/path",
 						},
 					}},
-				Spec: v1.NodeSpec{ExternalID: string(nodeName)},
 			}, nil
 		})
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {

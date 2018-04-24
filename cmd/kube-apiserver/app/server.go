@@ -183,7 +183,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	// just start the API server as is because clients don't get built correctly when you do this
 	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
 		if insecureServingOptions != nil {
-			insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig, kubeAPIServer.GenericAPIServer.RequestContextMapper())
+			insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
 			if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
 				return nil, err
 			}
@@ -211,7 +211,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	}
 
 	if insecureServingOptions != nil {
-		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig, aggregatorServer.GenericAPIServer.RequestContextMapper())
+		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
 		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
 			return nil, err
 		}
@@ -507,6 +507,13 @@ func BuildGenericConfig(
 			versionedInformers.Core().V1().Services().Lister(),
 		)
 	}
+	// resolve kubernetes.default.svc locally
+	localHost, err := url.Parse(genericConfig.LoopbackClientConfig.Host)
+	if err != nil {
+		lastErr = err
+		return
+	}
+	serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 
 	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
 	if err != nil {

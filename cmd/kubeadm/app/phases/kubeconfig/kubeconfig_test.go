@@ -72,12 +72,12 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			NodeName:        "valid-node-name",
 		},
 		{
-			API:             kubeadmapi.API{ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
 			CertificatesDir: pkidir,
 			NodeName:        "valid-node-name",
 		},
 		{
-			API:             kubeadmapi.API{ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
 			CertificatesDir: pkidir,
 			NodeName:        "valid-node-name",
 		},
@@ -146,7 +146,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts MasterConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
 			if err != nil {
 				t.Error(err)
 			}

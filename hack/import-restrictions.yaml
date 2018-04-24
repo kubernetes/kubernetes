@@ -17,6 +17,10 @@
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
 
+- baseImportPath: "./pkg/kubectl/genericclioptions/"
+  allowedImports:
+  - k8s.io/apimachinery
+
 - baseImportPath: "./vendor/k8s.io/apimachinery/"
   allowedImports:
   - k8s.io/apimachinery

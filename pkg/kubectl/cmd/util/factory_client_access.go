@@ -35,6 +35,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"sync"
+
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -62,13 +64,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/transport"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type ring0Factory struct {
-	flags            *pflag.FlagSet
-	clientConfig     clientcmd.ClientConfig
-	discoveryFactory DiscoveryClientFactory
-	clientCache      *ClientCache
+	flags             *pflag.FlagSet
+	clientConfig      clientcmd.ClientConfig
+	discoveryCacheDir string
+
+	requireMatchedServerVersion bool
+	checkServerVersion          sync.Once
+	matchesServerVersionErr     error
 }
 
 func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientAccessFactory {
@@ -79,63 +85,14 @@ func NewClientAccessFactory(optionalClientConfig clientcmd.ClientConfig) ClientA
 		clientConfig = DefaultClientConfig(flags)
 	}
 
-	return NewClientAccessFactoryFromDiscovery(flags, clientConfig, &discoveryFactory{clientConfig: clientConfig})
-}
-
-// NewClientAccessFactoryFromDiscovery allows an external caller to substitute a different discoveryFactory
-// Which allows for the client cache to be built in ring0, but still rely on a custom discovery client
-func NewClientAccessFactoryFromDiscovery(flags *pflag.FlagSet, clientConfig clientcmd.ClientConfig, discoveryFactory DiscoveryClientFactory) ClientAccessFactory {
 	flags.SetNormalizeFunc(utilflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
 
-	clientCache := NewClientCache(clientConfig, discoveryFactory)
-
 	f := &ring0Factory{
-		flags:            flags,
-		clientConfig:     clientConfig,
-		discoveryFactory: discoveryFactory,
-		clientCache:      clientCache,
+		flags:        flags,
+		clientConfig: clientConfig,
 	}
 
 	return f
-}
-
-type discoveryFactory struct {
-	clientConfig clientcmd.ClientConfig
-	cacheDir     string
-}
-
-func (f *discoveryFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	cfg, err := f.clientConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// The more groups you have, the more discovery requests you need to make.
-	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-	// double it just so we don't end up here again for a while.  This config is only used for discovery.
-	cfg.Burst = 100
-
-	if f.cacheDir != "" {
-		wt := cfg.WrapTransport
-		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			if wt != nil {
-				rt = wt(rt)
-			}
-			return transport.NewCacheRoundTripper(f.cacheDir, rt)
-		}
-	}
-
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
-	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
-}
-
-func (f *discoveryFactory) BindFlags(flags *pflag.FlagSet) {
-	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
-	flags.StringVar(&f.cacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
@@ -198,26 +155,83 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 }
 
 func (f *ring0Factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return f.discoveryFactory.DiscoveryClient()
+	cfg, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// The more groups you have, the more discovery requests you need to make.
+	// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
+	// double it just so we don't end up here again for a while.  This config is only used for discovery.
+	cfg.Burst = 100
+
+	if f.discoveryCacheDir != "" {
+		wt := cfg.WrapTransport
+		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			if wt != nil {
+				rt = wt(rt)
+			}
+			return transport.NewCacheRoundTripper(f.discoveryCacheDir, rt)
+		}
+	}
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
+	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
 func (f *ring0Factory) KubernetesClientSet() (*kubernetes.Clientset, error) {
-	return f.clientCache.KubernetesClientSetForVersion(nil)
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return kubernetes.NewForConfig(clientConfig)
 }
 
 func (f *ring0Factory) ClientSet() (internalclientset.Interface, error) {
-	return f.clientCache.ClientSetForVersion(nil)
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	return internalclientset.NewForConfig(clientConfig)
+}
+
+func (f *ring0Factory) checkMatchingServerVersion() error {
+	f.checkServerVersion.Do(func() {
+		if !f.requireMatchedServerVersion {
+			return
+		}
+		discoveryClient, err := f.DiscoveryClient()
+		if err != nil {
+			f.matchesServerVersionErr = err
+			return
+		}
+		f.matchesServerVersionErr = discovery.MatchesServerVersion(version.Get(), discoveryClient)
+	})
+
+	return f.matchesServerVersionErr
 }
 
 func (f *ring0Factory) ClientConfig() (*restclient.Config, error) {
-	return f.clientCache.ClientConfigForVersion(nil)
+	if err := f.checkMatchingServerVersion(); err != nil {
+		return nil, err
+	}
+	clientConfig, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	setKubernetesDefaults(clientConfig)
+	return clientConfig, nil
 }
 func (f *ring0Factory) BareClientConfig() (*restclient.Config, error) {
 	return f.clientConfig.ClientConfig()
 }
 
 func (f *ring0Factory) RESTClient() (*restclient.RESTClient, error) {
-	clientConfig, err := f.clientCache.ClientConfigForVersion(nil)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -352,10 +366,6 @@ func (f *ring0Factory) LabelsForObject(object runtime.Object) (map[string]string
 	return meta.NewAccessor().Labels(object)
 }
 
-func (f *ring0Factory) FlagSet() *pflag.FlagSet {
-	return f.flags
-}
-
 // Set showSecrets false to filter out stuff like secrets.
 func (f *ring0Factory) Command(cmd *cobra.Command, showSecrets bool) string {
 	if len(os.Args) == 0 {
@@ -395,9 +405,10 @@ func (f *ring0Factory) BindFlags(flags *pflag.FlagSet) {
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
-	flags.BoolVar(&f.clientCache.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
+	flags.BoolVar(&f.requireMatchedServerVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
 
-	f.discoveryFactory.BindFlags(flags)
+	defaultCacheDir := filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+	flags.StringVar(&f.discoveryCacheDir, FlagHTTPCacheDir, defaultCacheDir, "Default HTTP cache directory")
 
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
@@ -710,4 +721,20 @@ func InternalVersionDecoder() runtime.Decoder {
 func InternalVersionJSONEncoder() runtime.Encoder {
 	encoder := legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...)
 	return unstructured.JSONFallbackEncoder{Encoder: encoder}
+}
+
+// setKubernetesDefaults sets default values on the provided client config for accessing the
+// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
+// TODO this isn't what we want.  Each clientset should be setting defaults as it sees fit.
+func setKubernetesDefaults(config *restclient.Config) error {
+	// TODO remove this hack.  This is allowing the GetOptions to be serialized.
+	config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
+
+	if config.APIPath == "" {
+		config.APIPath = "/api"
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = legacyscheme.Codecs
+	}
+	return restclient.SetKubernetesDefaults(config)
 }

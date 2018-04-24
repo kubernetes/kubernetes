@@ -1,0 +1,69 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-gce-node
+spec:
+  selector:
+    matchLabels:
+      app: csi-gce-driver
+  serviceName: csi-gce
+  template:
+    metadata:
+      labels:
+        app: csi-gce-driver
+    spec:
+      serviceAccount: csi-gce-pd
+      containers:
+        - name: csi-driver-registrar
+          imagePullPolicy: Always
+          image: quay.io/k8scsi/driver-registrar:v0.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+        - name: gce-driver
+          securityContext:
+            privileged: true
+          imagePullPolicy: Always
+          image: gcr.io/google-containers/volume-csi/compute-persistent-disk-csi-driver:v0.2.0.alpha
+          args:
+            - "--v=5"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--nodeid=$(KUBE_NODE_NAME)"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: "Bidirectional"
+            - name: plugin-dir
+              mountPath: /csi
+            - name: device-dir
+              mountPath: /host/dev
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/com.google.csi.gcepd/
+            type: DirectoryOrCreate
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory

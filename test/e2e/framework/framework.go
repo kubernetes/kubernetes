@@ -399,16 +399,25 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	ns, err := createTestingNS(baseName, f.ClientSet, labels)
 	// check ns instead of err to see if it's nil as we may
 	// fail to create serviceAccount in it.
-	// In this case, we should not forget to delete the namespace.
-	if ns != nil {
-		f.namespacesToDelete = append(f.namespacesToDelete, ns)
-	}
+	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
 		CreatePrivilegedPSPBinding(f, ns.Name)
 	}
 
 	return ns, err
+}
+
+// AddNamespacesToDelete adds one or more namespaces to be deleted when the test
+// completes.
+func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
+	for _, ns := range namespaces {
+		if ns == nil {
+			continue
+		}
+		f.namespacesToDelete = append(f.namespacesToDelete, ns)
+
+	}
 }
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.

@@ -122,8 +122,6 @@ type EnvOptions struct {
 	Builder *resource.Builder
 	Infos   []*resource.Info
 
-	Cmd *cobra.Command
-
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 }
 
@@ -193,7 +191,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 	resources, envArgs, ok := envutil.SplitEnvironmentFromResources(args)
 	if !ok {
-		return cmdutil.UsageErrorf(o.Cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
+		return cmdutil.UsageErrorf(cmd, "all resources must be specified before environment changes: %s", strings.Join(args, " "))
 	}
 	if len(o.Filenames) == 0 && len(resources) < 1 {
 		return cmdutil.UsageErrorf(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
@@ -213,7 +211,6 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.EnvArgs = envArgs
 	o.Resources = resources
-	o.Cmd = cmd
 
 	if o.DryRun {
 		// TODO(juanvallejo): This can be cleaned up even further by creating
@@ -229,7 +226,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	o.PrintObj = printer.PrintObj
 
 	if o.List && len(o.Output) > 0 {
-		return cmdutil.UsageErrorf(o.Cmd, "--list and --output may not be specified together")
+		return cmdutil.UsageErrorf(cmd, "--list and --output may not be specified together")
 	}
 
 	return nil

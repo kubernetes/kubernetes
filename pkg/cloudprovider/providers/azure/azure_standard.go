@@ -110,12 +110,6 @@ func (az *Cloud) getLoadBalancerProbeID(lbName, lbRuleName string) string {
 }
 
 func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (vmSetName string) {
-	// Backends of Standard load balancer could belong to multiple VMAS or VMSS.
-	// Return "" to indicate so that following logic won't check this.
-	if az.useStandardLoadBalancer() {
-		return ""
-	}
-
 	vmSetName = strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix)
 	if strings.EqualFold(clusterName, vmSetName) {
 		vmSetName = az.vmSet.GetPrimaryVMSetName()
@@ -579,8 +573,9 @@ func (as *availabilitySet) GetPrimaryInterface(nodeName, vmSetName string) (netw
 		return network.Interface{}, err
 	}
 
-	// Check availability set
-	if vmSetName != "" {
+	// Check availability set.
+	// Backends of Standard load balancer could belong to multiple VMAS, so we don't check vmSet for it.
+	if vmSetName != "" && !as.useStandardLoadBalancer() {
 		expectedAvailabilitySetName := as.getAvailabilitySetID(vmSetName)
 		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
 			glog.V(3).Infof(
@@ -635,13 +630,15 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 			// sets, the same network interface couldn't be added to more than one load balancer of
 			// the same type. Omit those nodes (e.g. masters) so Azure ARM won't complain
 			// about this.
-			backendPool := *newBackendPools[0].ID
-			matches := backendPoolIDRE.FindStringSubmatch(backendPool)
-			if len(matches) == 2 {
-				lbName := matches[1]
-				if strings.HasSuffix(lbName, InternalLoadBalancerNameSuffix) == isInternal {
-					glog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, lbName)
-					return nil
+			for _, pool := range newBackendPools {
+				backendPool := *pool.ID
+				matches := backendPoolIDRE.FindStringSubmatch(backendPool)
+				if len(matches) == 2 {
+					lbName := matches[1]
+					if strings.HasSuffix(lbName, InternalLoadBalancerNameSuffix) == isInternal {
+						glog.V(4).Infof("Node %q has already been added to LB %q, omit adding it to a new one", nodeName, lbName)
+						return nil
+					}
 				}
 			}
 		}
@@ -704,7 +701,7 @@ func (as *availabilitySet) EnsureHostsInPool(serviceName string, nodes []*v1.Nod
 }
 
 // EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified vmSet.
-func (as *availabilitySet) EnsureBackendPoolDeleted(poolID, vmSetName string) error {
+func (as *availabilitySet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
 	// Do nothing for availability set.
 	return nil
 }

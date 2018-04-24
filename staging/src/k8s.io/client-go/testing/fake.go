@@ -131,13 +131,13 @@ func (c *Fake) Invokes(action Action, defaultReturnObj runtime.Object) (runtime.
 	c.Lock()
 	defer c.Unlock()
 
-	c.actions = append(c.actions, action)
+	c.actions = append(c.actions, action.DeepCopy())
 	for _, reactor := range c.ReactionChain {
 		if !reactor.Handles(action) {
 			continue
 		}
 
-		handled, ret, err := reactor.React(action)
+		handled, ret, err := reactor.React(action.DeepCopy())
 		if !handled {
 			continue
 		}
@@ -154,13 +154,13 @@ func (c *Fake) InvokesWatch(action Action) (watch.Interface, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.actions = append(c.actions, action)
+	c.actions = append(c.actions, action.DeepCopy())
 	for _, reactor := range c.WatchReactionChain {
 		if !reactor.Handles(action) {
 			continue
 		}
 
-		handled, ret, err := reactor.React(action)
+		handled, ret, err := reactor.React(action.DeepCopy())
 		if !handled {
 			continue
 		}
@@ -177,13 +177,13 @@ func (c *Fake) InvokesProxy(action Action) restclient.ResponseWrapper {
 	c.Lock()
 	defer c.Unlock()
 
-	c.actions = append(c.actions, action)
+	c.actions = append(c.actions, action.DeepCopy())
 	for _, reactor := range c.ProxyReactionChain {
 		if !reactor.Handles(action) {
 			continue
 		}
 
-		handled, ret, err := reactor.React(action)
+		handled, ret, err := reactor.React(action.DeepCopy())
 		if !handled || err != nil {
 			continue
 		}

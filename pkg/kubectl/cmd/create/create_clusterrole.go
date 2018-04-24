@@ -18,7 +18,6 @@ package create
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -26,6 +25,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -59,12 +59,9 @@ type CreateClusterRoleOptions struct {
 }
 
 // ClusterRole is a command to ease creating ClusterRoles.
-func NewCmdCreateClusterRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	c := &CreateClusterRoleOptions{
-		CreateRoleOptions: &CreateRoleOptions{
-			PrintFlags: NewPrintFlags("created"),
-			Out:        cmdOut,
-		},
+		CreateRoleOptions: NewCreateRoleOptions(ioStreams),
 	}
 	cmd := &cobra.Command{
 		Use: "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",

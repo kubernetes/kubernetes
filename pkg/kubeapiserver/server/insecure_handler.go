@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
@@ -38,20 +37,19 @@ import (
 // You shouldn't be using this.  It makes sig-auth sad.
 // InsecureServingInfo *ServingInfo
 
-func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config, contextMapper apirequest.RequestContextMapper) http.Handler {
+func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
-		handler = genericapifilters.WithAudit(handler, contextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+		handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
-		handler = genericapifilters.WithLegacyAudit(handler, contextMapper, c.LegacyAuditWriter)
+		handler = genericapifilters.WithLegacyAudit(handler, c.LegacyAuditWriter)
 	}
-	handler = genericapifilters.WithAuthentication(handler, contextMapper, insecureSuperuser{}, nil)
+	handler = genericapifilters.WithAuthentication(handler, insecureSuperuser{}, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, contextMapper, c.LongRunningFunc, c.RequestTimeout)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, contextMapper, c.LongRunningFunc)
-	handler = genericfilters.WithWaitGroup(handler, contextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
-	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c), contextMapper)
-	handler = apirequest.WithRequestContext(handler, contextMapper)
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
+	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c))
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler

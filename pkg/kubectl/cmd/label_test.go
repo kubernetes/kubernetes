@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -335,8 +334,8 @@ func TestLabelErrors(t *testing.T) {
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
 			}
-			opts := LabelOptions{}
-			err := opts.Complete(buf, cmd, testCase.args)
+			opts := NewLabelOptions(buf, buf)
+			err := opts.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = opts.Validate()
 			}
@@ -392,9 +391,9 @@ func TestLabelForResourceFromFile(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(tf, buf, buf)
-	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}}}
-	err := opts.Complete(buf, cmd, []string{"a=b"})
+	opts := NewLabelOptions(buf, buf)
+	opts.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
+	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -425,10 +424,10 @@ func TestLabelLocal(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(tf, buf, buf)
-	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
-		Filenames: []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
-		local: true}
-	err := opts.Complete(buf, cmd, []string{"a=b"})
+	opts := NewLabelOptions(buf, buf)
+	opts.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
+	opts.local = true
+	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -482,9 +481,10 @@ func TestLabelMultipleObjects(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
-	opts := LabelOptions{all: true}
+	opts := NewLabelOptions(buf, buf)
+	opts.all = true
 	cmd := NewCmdLabel(tf, buf, buf)
-	err := opts.Complete(buf, cmd, []string{"pods", "a=b"})
+	err := opts.Complete(tf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}

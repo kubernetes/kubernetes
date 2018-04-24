@@ -6048,6 +6048,13 @@ func TestValidatePod(t *testing.T) {
 											Values:   []string{"value1", "value2"},
 										},
 									},
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"host1"},
+										},
+									},
 								},
 							},
 						},
@@ -6506,6 +6513,83 @@ func TestValidatePod(t *testing.T) {
 									MatchExpressions: []core.NodeSelectorRequirement{
 										{
 											Key: "key1",
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, more values for field selector": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].values",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"host1", "host2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, invalid operator": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].operator",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: core.NodeSelectorOpExists,
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid node field selector requirement in node affinity, invalid key": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchFields[0].key",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{
+								{
+									MatchFields: []core.NodeSelectorRequirement{
+										{
+											Key:      "metadata.namespace",
+											Operator: core.NodeSelectorOpIn,
+											Values:   []string{"ns1"},
 										},
 									},
 								},
@@ -9364,9 +9448,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName("hugepages-1Gi"):     resource.MustParse("0"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -9380,9 +9461,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
-			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
 			},
 		},
 		{
@@ -9399,7 +9477,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a valid taint to a node
 				Taints: []core.Taint{{Key: "GPU", Value: "true", Effect: "NoSchedule"}},
 			},
@@ -9437,9 +9514,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -9455,8 +9529,7 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
-				PodCIDR:    "192.168.0.0/16",
+				PodCIDR: "192.168.0.0/16",
 			},
 		},
 	}
@@ -9479,29 +9552,11 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		"invalid-labels": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "abc-123",
 				Labels: invalidSelector,
-			},
-			Status: core.NodeStatus{
-				Capacity: core.ResourceList{
-					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
-					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
-		},
-		"missing-external-id": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
 			},
 			Status: core.NodeStatus{
 				Capacity: core.ResourceList{
@@ -9515,7 +9570,6 @@ func TestValidateNode(t *testing.T) {
 				Name: "dedicated-node1",
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with an empty key to a node
 				Taints: []core.Taint{{Key: "", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
@@ -9525,7 +9579,6 @@ func TestValidateNode(t *testing.T) {
 				Name: "dedicated-node1",
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with an invalid  key to a node
 				Taints: []core.Taint{{Key: "NoUppercaseOrSpecialCharsLike=Equals", Value: "special-user-1", Effect: "NoSchedule"}},
 			},
@@ -9544,7 +9597,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with a bad value to a node
 				Taints: []core.Taint{{Key: "dedicated", Value: "some\\bad\\value", Effect: "NoSchedule"}},
 			},
@@ -9563,7 +9615,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with an empty effect to a node
 				Taints: []core.Taint{{Key: "dedicated", Value: "special-user-3", Effect: ""}},
 			},
@@ -9582,7 +9633,6 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add a taint with NoExecute effect to a node
 				Taints: []core.Taint{{Key: "dedicated", Value: "special-user-3", Effect: "NoScheduleNoAdmit"}},
 			},
@@ -9592,7 +9642,6 @@ func TestValidateNode(t *testing.T) {
 				Name: "dedicated-node1",
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
 				// Add two taints to the node with the same key and effect; should be rejected.
 				Taints: []core.Taint{
 					{Key: "dedicated", Value: "special-user-1", Effect: "NoSchedule"},
@@ -9621,9 +9670,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
-			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
 			},
 		},
 		"invalid-podController": {
@@ -9657,9 +9703,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		"multiple-pre-allocated-hugepages": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -9678,9 +9721,6 @@ func TestValidateNode(t *testing.T) {
 					core.ResourceName("hugepages-1Gi"):     resource.MustParse("10Gi"),
 				},
 			},
-			Spec: core.NodeSpec{
-				ExternalID: "external",
-			},
 		},
 		"invalid-pod-cidr": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -9696,8 +9736,7 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				ExternalID: "external",
-				PodCIDR:    "192.168.0.0",
+				PodCIDR: "192.168.0.0",
 			},
 		},
 	}

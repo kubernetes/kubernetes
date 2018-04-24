@@ -109,25 +109,3 @@ func TestUIDContext(t *testing.T) {
 		t.Fatalf("Error getting UID")
 	}
 }
-
-//TestUserAgentContext validates that a useragent can be get/set on a context object
-func TestUserAgentContext(t *testing.T) {
-	ctx := NewContext()
-	_, ok := UserAgentFrom(ctx)
-	if ok {
-		t.Fatalf("Should not be ok because there is no UserAgent on the context")
-	}
-
-	ctx = WithUserAgent(
-		ctx,
-		"TestUserAgent",
-	)
-	result, ok := UserAgentFrom(ctx)
-	if !ok {
-		t.Fatalf("Error getting UserAgent")
-	}
-	expectedResult := "TestUserAgent"
-	if result != expectedResult {
-		t.Fatalf("Get user agent error, Expected: %s, Actual: %s", expectedResult, result)
-	}
-}

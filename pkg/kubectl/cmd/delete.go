@@ -103,8 +103,7 @@ type DeleteOptions struct {
 	GracePeriod int
 	Timeout     time.Duration
 
-	Include3rdParty bool
-	Output          string
+	Output string
 
 	Mapper meta.RESTMapper
 	Result *resource.Result

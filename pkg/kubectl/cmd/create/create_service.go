@@ -17,30 +17,29 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // NewCmdCreateService is a macro command to create a new service
-func NewCmdCreateService(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Command {
+func NewCmdCreateService(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service",
 		Aliases: []string{"svc"},
 		Short:   i18n.T("Create a service using specified subcommand."),
 		Long:    "Create a service using specified subcommand.",
-		Run:     cmdutil.DefaultSubCommandRun(errOut),
+		Run:     cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
-	cmd.AddCommand(NewCmdCreateServiceClusterIP(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateServiceNodePort(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateServiceLoadBalancer(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateServiceExternalName(f, cmdOut))
+	cmd.AddCommand(NewCmdCreateServiceClusterIP(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateServiceNodePort(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateServiceLoadBalancer(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateServiceExternalName(f, ioStreams))
 
 	return cmd
 }
@@ -66,12 +65,9 @@ type ServiceClusterIPOpts struct {
 }
 
 // NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
-func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &ServiceClusterIPOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -141,12 +137,9 @@ type ServiceNodePortOpts struct {
 }
 
 // NewCmdCreateServiceNodePort is a macro command for creating a NodePort service
-func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &ServiceNodePortOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -213,12 +206,9 @@ type ServiceLoadBalancerOpts struct {
 }
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating a LoadBalancer service
-func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &ServiceLoadBalancerOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
@@ -287,12 +277,9 @@ type ServiceExternalNameOpts struct {
 }
 
 // NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service
-func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &ServiceExternalNameOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{

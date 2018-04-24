@@ -495,12 +495,14 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	var failureMessage string
 
 	jobHaveNewFailure := failed > job.Status.Failed
+	exceedsBackoffLimit := jobHaveNewFailure && (int32(previousRetry)+1 > *job.Spec.BackoffLimit)
 
-	// check if the number of failed jobs increased since the last syncJob
-	if jobHaveNewFailure && (int32(previousRetry)+1 > *job.Spec.BackoffLimit) {
+	if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
+		// check if the number of pod restart exceeds backoff (for restart OnFailure only)
+		// OR if the number of failed jobs increased since the last syncJob
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
-		failureMessage = "Job has reach the specified backoff limit"
+		failureMessage = "Job has reached the specified backoff limit"
 	} else if pastActiveDeadline(&job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
@@ -612,6 +614,30 @@ func (jm *JobController) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh cha
 		}(i)
 	}
 	wait.Wait()
+}
+
+// pastBackoffLimitOnFailure checks if container restartCounts sum exceeds BackoffLimit
+// this method applies only to pods with restartPolicy == OnFailure
+func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
+	if job.Spec.Template.Spec.RestartPolicy != v1.RestartPolicyOnFailure {
+		return false
+	}
+	result := int32(0)
+	for i := range pods {
+		po := pods[i]
+		if po.Status.Phase != v1.PodRunning {
+			continue
+		}
+		for j := range po.Status.InitContainerStatuses {
+			stat := po.Status.InitContainerStatuses[j]
+			result += stat.RestartCount
+		}
+		for j := range po.Status.ContainerStatuses {
+			stat := po.Status.ContainerStatuses[j]
+			result += stat.RestartCount
+		}
+	}
+	return result >= *job.Spec.BackoffLimit
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.

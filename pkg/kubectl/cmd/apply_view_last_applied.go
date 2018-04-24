@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -38,8 +38,8 @@ type ViewLastAppliedOptions struct {
 	OutputFormat                 string
 	All                          bool
 	Factory                      cmdutil.Factory
-	Out                          io.Writer
-	ErrOut                       io.Writer
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -57,16 +57,16 @@ var (
 		kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
-func NewViewLastAppliedOptions(out, err io.Writer) *ViewLastAppliedOptions {
+func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastAppliedOptions {
 	return &ViewLastAppliedOptions{
-		Out:          out,
-		ErrOut:       err,
 		OutputFormat: "yaml",
+
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-	options := NewViewLastAppliedOptions(out, err)
+func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	options := NewViewLastAppliedOptions(ioStreams)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{

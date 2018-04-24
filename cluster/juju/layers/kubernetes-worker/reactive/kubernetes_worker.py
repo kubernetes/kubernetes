@@ -735,7 +735,7 @@ def launch_default_ingress_controller():
                 "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
         elif context['arch'] == 'arm64':
             context['ingress_image'] = \
-                "gcr.io/google-containers/nginx-ingress-controller-arm64:0.9.0-beta.15" # noqa
+                "k8s.gcr.io/nginx-ingress-controller-arm64:0.9.0-beta.15"
         else:
             context['ingress_image'] = \
                 "k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.15" # noqa

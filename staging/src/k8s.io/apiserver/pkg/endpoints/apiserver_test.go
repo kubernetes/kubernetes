@@ -130,7 +130,6 @@ var accessor = meta.NewAccessor()
 var selfLinker runtime.SelfLinker = accessor
 var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
-var requestContextMapper request.RequestContextMapper
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -238,7 +237,6 @@ func init() {
 	mapper = nsMapper
 	namespaceMapper = nsMapper
 	admissionControl = alwaysAdmit{}
-	requestContextMapper = request.NewRequestContextMapper()
 
 	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
@@ -295,8 +293,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 
 		ParameterCodec: parameterCodec,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
+		Admit: admissionControl,
 	}
 
 	// groupless v1 version
@@ -334,13 +331,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
 		}
 	}
-
-	handler := genericapifilters.WithAudit(mux, requestContextMapper, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	handler := genericapifilters.WithAudit(mux, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
 	})
-	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
 
 	return &defaultAPIServer{handler, container}
 }
@@ -1225,11 +1220,8 @@ func TestListCompression(t *testing.T) {
 		}
 		var handler = handleInternal(storage, admissionControl, selfLinker, nil)
 
-		requestContextMapper = request.NewRequestContextMapper()
-
-		handler = filters.WithCompression(handler, requestContextMapper)
-		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-		handler = request.WithRequestContext(handler, requestContextMapper)
+		handler = filters.WithCompression(handler)
+		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 
 		server := httptest.NewServer(handler)
 
@@ -1635,13 +1627,10 @@ func TestGetCompression(t *testing.T) {
 		namespace:   "default",
 	}
 
-	requestContextMapper = request.NewRequestContextMapper()
-
 	storage["simple"] = &simpleStorage
 	handler := handleLinker(storage, selfLinker)
-	handler = filters.WithCompression(handler, requestContextMapper)
-	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler = filters.WithCompression(handler)
+	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -2887,76 +2876,6 @@ func TestDeleteMissing(t *testing.T) {
 	}
 }
 
-func TestPatch(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	ID := "id"
-	item := &genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ID,
-			Namespace: "", // update should allow the client to send an empty namespace
-			UID:       "uid",
-		},
-		Other: "bar",
-	}
-	simpleStorage := SimpleRESTStorage{item: *item}
-	storage["simple"] = &simpleStorage
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
-		name:        ID,
-		namespace:   metav1.NamespaceDefault,
-	}
-	handler := handleLinker(storage, selfLinker)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
-	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	dump, _ := httputil.DumpResponse(response, true)
-	t.Log(string(dump))
-
-	if simpleStorage.updated == nil || simpleStorage.updated.Labels["foo"] != "bar" {
-		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
-	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
-	}
-}
-
-func TestPatchRequiresMatchingName(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	ID := "id"
-	item := &genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ID,
-			Namespace: "", // update should allow the client to send an empty namespace
-			UID:       "uid",
-		},
-		Other: "bar",
-	}
-	simpleStorage := SimpleRESTStorage{item: *item}
-	storage["simple"] = &simpleStorage
-	handler := handle(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-
-	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
-	request.Header.Set("Content-Type", "application/merge-patch+json")
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
-}
-
 func TestUpdate(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
@@ -3297,9 +3216,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Typer:     scheme,
 		Linker:    selfLinker,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
-		Mapper:  namespaceMapper,
+		Admit:  admissionControl,
+		Mapper: namespaceMapper,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3328,9 +3246,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Typer:     scheme,
 		Linker:    selfLinker,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
-		Mapper:  namespaceMapper,
+		Admit:  admissionControl,
+		Mapper: namespaceMapper,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3343,8 +3260,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver())
 
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
@@ -3744,7 +3660,7 @@ func (obj *UnregisteredAPIObject) DeepCopyObject() runtime.Object {
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		responsewriters.WriteObjectNegotiated(request.NewContext(), codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
+		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
 	// We send a 200 status code before we encode the object, so we expect OK, but there will
@@ -3954,8 +3870,7 @@ func TestXGSubresource(t *testing.T) {
 
 		ParameterCodec: parameterCodec,
 
-		Admit:   admissionControl,
-		Context: requestContextMapper,
+		Admit: admissionControl,
 
 		Root:                   "/" + prefix,
 		GroupVersion:           testGroupVersion,
@@ -4058,8 +3973,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 }
 
 func newTestServer(handler http.Handler) *httptest.Server {
-	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver(), requestContextMapper)
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
 	return httptest.NewServer(handler)
 }
 

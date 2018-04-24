@@ -308,13 +308,12 @@ func TestImpersonationFilter(t *testing.T) {
 		},
 	}
 
-	requestContextMapper := request.NewRequestContextMapper()
 	var ctx request.Context
 	var actualUser user.Info
 	var lock sync.Mutex
 
 	doNothingHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		currentCtx, _ := requestContextMapper.Get(req)
+		currentCtx := req.Context()
 		user, exists := request.UserFrom(currentCtx)
 		if !exists {
 			actualUser = nil
@@ -345,8 +344,8 @@ func TestImpersonationFilter(t *testing.T) {
 			}()
 			lock.Lock()
 			defer lock.Unlock()
-			requestContextMapper.Update(req, ctx)
-			currentCtx, _ := requestContextMapper.Get(req)
+			req = req.WithContext(ctx)
+			currentCtx := req.Context()
 
 			user, exists := request.UserFrom(currentCtx)
 			if !exists {
@@ -358,8 +357,7 @@ func TestImpersonationFilter(t *testing.T) {
 
 			delegate.ServeHTTP(w, req)
 		})
-	}(WithImpersonation(doNothingHandler, requestContextMapper, impersonateAuthorizer{}, serializer.NewCodecFactory(runtime.NewScheme())))
-	handler = request.WithRequestContext(handler, requestContextMapper)
+	}(WithImpersonation(doNothingHandler, impersonateAuthorizer{}, serializer.NewCodecFactory(runtime.NewScheme())))
 
 	server := httptest.NewServer(handler)
 	defer server.Close()

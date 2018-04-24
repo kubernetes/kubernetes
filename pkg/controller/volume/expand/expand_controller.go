@@ -227,6 +227,10 @@ func (expc *expandController) GetVolumeDevicePluginDir(pluginName string) string
 	return ""
 }
 
+func (expc *expandController) GetPodsDir() string {
+	return ""
+}
+
 func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return ""
 }
@@ -297,4 +301,8 @@ func (expc *expandController) GetNodeLabels() (map[string]string, error) {
 
 func (expc *expandController) GetNodeName() types.NodeName {
 	return ""
+}
+
+func (expc *expandController) GetEventRecorder() record.EventRecorder {
+	return expc.recorder
 }

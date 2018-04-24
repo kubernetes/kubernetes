@@ -19,7 +19,6 @@ package util
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 	"syscall"
@@ -193,19 +192,6 @@ func TestMerge(t *testing.T) {
 			t.Errorf("testcase[%d], unexpected non-error", i)
 		}
 	}
-}
-
-type fileHandler struct {
-	data []byte
-}
-
-func (f *fileHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	if req.URL.Path == "/error" {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-	res.WriteHeader(http.StatusOK)
-	res.Write(f.data)
 }
 
 type checkErrTestCase struct {

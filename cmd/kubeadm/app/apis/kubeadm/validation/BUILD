@@ -18,6 +18,7 @@ go_library(
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/validation:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/node:go_default_library",

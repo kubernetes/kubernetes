@@ -192,6 +192,9 @@ func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
 		Err: nil,
 	}
 	kubelet.cloud = fakeCloud
+	kubelet.cloudproviderRequestParallelism = make(chan int, 1)
+	kubelet.cloudproviderRequestSync = make(chan int)
+	kubelet.cloudproviderRequestTimeout = 10 * time.Second
 
 	kubelet.setNodeAddress(&existingNode)
 
@@ -912,7 +915,6 @@ func TestRegisterWithApiServer(t *testing.T) {
 					kubeletapis.LabelArch:     goruntime.GOARCH,
 				},
 			},
-			Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 		}, nil
 	})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
@@ -966,7 +968,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		ErrStatus: metav1.Status{Reason: metav1.StatusReasonConflict},
 	}
 
-	newNode := func(cmad bool, externalID string) *v1.Node {
+	newNode := func(cmad bool) *v1.Node {
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
@@ -974,9 +976,6 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 					kubeletapis.LabelOS:       goruntime.GOOS,
 					kubeletapis.LabelArch:     goruntime.GOARCH,
 				},
-			},
-			Spec: v1.NodeSpec{
-				ExternalID: externalID,
 			},
 		}
 
@@ -1010,17 +1009,17 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 		{
 			name:            "success case - existing node - no change in CMAD",
-			newNode:         newNode(true, "a"),
+			newNode:         newNode(true),
 			createError:     alreadyExists,
-			existingNode:    newNode(true, "a"),
+			existingNode:    newNode(true),
 			expectedResult:  true,
 			expectedActions: 2,
 		},
 		{
 			name:            "success case - existing node - CMAD disabled",
-			newNode:         newNode(false, "a"),
+			newNode:         newNode(false),
 			createError:     alreadyExists,
-			existingNode:    newNode(true, "a"),
+			existingNode:    newNode(true),
 			expectedResult:  true,
 			expectedActions: 3,
 			testSavedNode:   true,
@@ -1029,9 +1028,9 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 		{
 			name:            "success case - existing node - CMAD enabled",
-			newNode:         newNode(true, "a"),
+			newNode:         newNode(true),
 			createError:     alreadyExists,
-			existingNode:    newNode(false, "a"),
+			existingNode:    newNode(false),
 			expectedResult:  true,
 			expectedActions: 3,
 			testSavedNode:   true,
@@ -1039,23 +1038,15 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			savedNodeCMAD:   true,
 		},
 		{
-			name:            "success case - external ID changed",
-			newNode:         newNode(false, "b"),
-			createError:     alreadyExists,
-			existingNode:    newNode(false, "a"),
-			expectedResult:  false,
-			expectedActions: 3,
-		},
-		{
 			name:            "create failed",
-			newNode:         newNode(false, "b"),
+			newNode:         newNode(false),
 			createError:     conflict,
 			expectedResult:  false,
 			expectedActions: 1,
 		},
 		{
 			name:            "get existing node failed",
-			newNode:         newNode(false, "a"),
+			newNode:         newNode(false),
 			createError:     alreadyExists,
 			getError:        conflict,
 			expectedResult:  false,
@@ -1063,19 +1054,10 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 		{
 			name:            "update existing node failed",
-			newNode:         newNode(false, "a"),
+			newNode:         newNode(false),
 			createError:     alreadyExists,
-			existingNode:    newNode(true, "a"),
+			existingNode:    newNode(true),
 			patchError:      conflict,
-			expectedResult:  false,
-			expectedActions: 3,
-		},
-		{
-			name:            "delete existing node failed",
-			newNode:         newNode(false, "b"),
-			createError:     alreadyExists,
-			existingNode:    newNode(false, "a"),
-			deleteError:     conflict,
 			expectedResult:  false,
 			expectedActions: 3,
 		},

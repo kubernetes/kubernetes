@@ -2737,6 +2737,7 @@ func Convert_core_NodeSelectorRequirement_To_v1_NodeSelectorRequirement(in *core
 
 func autoConvert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(in *v1.NodeSelectorTerm, out *core.NodeSelectorTerm, s conversion.Scope) error {
 	out.MatchExpressions = *(*[]core.NodeSelectorRequirement)(unsafe.Pointer(&in.MatchExpressions))
+	out.MatchFields = *(*[]core.NodeSelectorRequirement)(unsafe.Pointer(&in.MatchFields))
 	return nil
 }
 
@@ -2747,6 +2748,7 @@ func Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(in *v1.NodeSelectorTer
 
 func autoConvert_core_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *core.NodeSelectorTerm, out *v1.NodeSelectorTerm, s conversion.Scope) error {
 	out.MatchExpressions = *(*[]v1.NodeSelectorRequirement)(unsafe.Pointer(&in.MatchExpressions))
+	out.MatchFields = *(*[]v1.NodeSelectorRequirement)(unsafe.Pointer(&in.MatchFields))
 	return nil
 }
 
@@ -2757,11 +2759,11 @@ func Convert_core_NodeSelectorTerm_To_v1_NodeSelectorTerm(in *core.NodeSelectorT
 
 func autoConvert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s conversion.Scope) error {
 	out.PodCIDR = in.PodCIDR
-	out.ExternalID = in.ExternalID
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	out.Taints = *(*[]core.Taint)(unsafe.Pointer(&in.Taints))
 	out.ConfigSource = (*core.NodeConfigSource)(unsafe.Pointer(in.ConfigSource))
+	out.DoNotUse_ExternalID = in.DoNotUse_ExternalID
 	return nil
 }
 
@@ -2772,11 +2774,11 @@ func Convert_v1_NodeSpec_To_core_NodeSpec(in *v1.NodeSpec, out *core.NodeSpec, s
 
 func autoConvert_core_NodeSpec_To_v1_NodeSpec(in *core.NodeSpec, out *v1.NodeSpec, s conversion.Scope) error {
 	out.PodCIDR = in.PodCIDR
-	out.ExternalID = in.ExternalID
 	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	out.Taints = *(*[]v1.Taint)(unsafe.Pointer(&in.Taints))
 	out.ConfigSource = (*v1.NodeConfigSource)(unsafe.Pointer(in.ConfigSource))
+	out.DoNotUse_ExternalID = in.DoNotUse_ExternalID
 	return nil
 }
 

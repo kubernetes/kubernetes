@@ -32,11 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/util/flag"
 	manualfake "k8s.io/client-go/rest/fake"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -46,23 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
-
-func TestNewFactoryDefaultFlagBindings(t *testing.T) {
-	factory := NewFactory(nil)
-
-	if !factory.FlagSet().HasFlags() {
-		t.Errorf("Expected flags, but didn't get any")
-	}
-}
-
-func TestNewFactoryNoFlagBindings(t *testing.T) {
-	clientConfig := clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), &clientcmd.ConfigOverrides{})
-	factory := NewFactory(clientConfig)
-
-	if factory.FlagSet().HasFlags() {
-		t.Errorf("Expected zero flags, but got %v", factory.FlagSet())
-	}
-}
 
 func TestPortsForObject(t *testing.T) {
 	f := NewFactory(nil)
@@ -208,18 +188,6 @@ func TestCanBeExposed(t *testing.T) {
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-	}
-}
-
-func TestFlagUnderscoreRenaming(t *testing.T) {
-	factory := NewFactory(nil)
-
-	factory.FlagSet().SetNormalizeFunc(flag.WordSepNormalizeFunc)
-	factory.FlagSet().Bool("valid_flag", false, "bool value")
-
-	// In case of failure of this test check this PR: spf13/pflag#23
-	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
-		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
 	}
 }
 

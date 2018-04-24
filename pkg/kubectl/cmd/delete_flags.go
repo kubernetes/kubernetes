@@ -68,8 +68,6 @@ type DeleteFlags struct {
 	Now            *bool
 	Timeout        *time.Duration
 	Output         *string
-
-	IncludeThirdParty *bool
 }
 
 func (f *DeleteFlags) ToOptions(out, errOut io.Writer) *DeleteOptions {
@@ -110,10 +108,6 @@ func (f *DeleteFlags) ToOptions(out, errOut io.Writer) *DeleteOptions {
 		options.Timeout = *f.Timeout
 	}
 
-	if f.IncludeThirdParty != nil {
-		options.Include3rdParty = *f.IncludeThirdParty
-	}
-
 	return options
 }
 
@@ -146,16 +140,10 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 		cmd.Flags().StringVarP(f.Output, "output", "o", *f.Output, "Output mode. Use \"-o name\" for shorter output (resource/name).")
 	}
 
-	// TODO: this is deprecated. Remove.
-	if f.IncludeThirdParty != nil {
-		cmd.Flags().BoolVar(f.IncludeThirdParty, "include-extended-apis", *f.IncludeThirdParty, "If true, include definitions of new APIs via calls to the API server. [default true]")
-		cmd.Flags().MarkDeprecated("include-extended-apis", "No longer required.")
-	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
 func NewDeleteCommandFlags(usage string) *DeleteFlags {
-	includeThirdParty := true
 	cascade := true
 	gracePeriod := -1
 
@@ -182,14 +170,11 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		Now:            &now,
 		Timeout:        &timeout,
 		Output:         &output,
-
-		IncludeThirdParty: &includeThirdParty,
 	}
 }
 
 // NewDeleteFlags provides default flags and values for use in commands outside of "delete"
 func NewDeleteFlags(usage string) *DeleteFlags {
-	includeThirdParty := true
 	cascade := true
 	gracePeriod := -1
 
@@ -204,8 +189,6 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 
 		Cascade:     &cascade,
 		GracePeriod: &gracePeriod,
-
-		IncludeThirdParty: &includeThirdParty,
 
 		// add non-defaults
 		Force:   &force,

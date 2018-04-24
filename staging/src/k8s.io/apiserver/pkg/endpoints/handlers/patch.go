@@ -76,7 +76,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		ctx := scope.ContextFunc(req)
+		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())

@@ -70,9 +70,6 @@ func TestMain(m *testing.M) {
 			Name:              "node",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
-		Spec: corev1.NodeSpec{
-			ExternalID: "node",
-		},
 		Status: corev1.NodeStatus{},
 	}
 

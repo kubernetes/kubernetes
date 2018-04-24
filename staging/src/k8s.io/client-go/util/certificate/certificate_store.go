@@ -46,6 +46,15 @@ type fileStore struct {
 	keyFile        string
 }
 
+// FileStore is a store that provides certificate retrieval as well as
+// the path on disk of the current PEM.
+type FileStore interface {
+	Store
+	// CurrentPath returns the path on disk of the current certificate/key
+	// pair encoded as PEM files.
+	CurrentPath() string
+}
+
 // NewFileStore returns a concrete implementation of a Store that is based on
 // storing the cert/key pairs in a single file per pair on disk in the
 // designated directory. When starting up it will look for the currently
@@ -64,7 +73,7 @@ func NewFileStore(
 	certDirectory string,
 	keyDirectory string,
 	certFile string,
-	keyFile string) (Store, error) {
+	keyFile string) (FileStore, error) {
 
 	s := fileStore{
 		pairNamePrefix: pairNamePrefix,
@@ -77,6 +86,11 @@ func NewFileStore(
 		return nil, err
 	}
 	return &s, nil
+}
+
+// CurrentPath returns the path to the current version of these certificates.
+func (s *fileStore) CurrentPath() string {
+	return filepath.Join(s.certDirectory, s.filename(currentPair))
 }
 
 // recover checks if there is a certificate rotation that was interrupted while

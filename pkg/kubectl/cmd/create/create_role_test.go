@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"bytes"
 	"reflect"
 	"testing"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestCreateRole(t *testing.T) {
@@ -129,8 +129,8 @@ func TestCreateRole(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdCreateRole(tf, buf)
+			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdCreateRole(tf, ioStreams)
 			cmd.Flags().Set("dry-run", "true")
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("verb", test.verbs)
@@ -360,8 +360,7 @@ func TestComplete(t *testing.T) {
 	tf.Client = &fake.RESTClient{}
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCreateRole(tf, buf)
+	cmd := NewCmdCreateRole(tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("resource", "pods,deployments.extensions")
 
 	tests := map[string]struct {

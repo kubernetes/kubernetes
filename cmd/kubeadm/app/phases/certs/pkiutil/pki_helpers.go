@@ -29,6 +29,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -286,9 +287,17 @@ func GetAPIServerAltNames(cfg *kubeadmapi.MasterConfiguration) (*certutil.AltNam
 		},
 	}
 
-	// add api server dns advertise address
+	// add api server controlPlaneEndpoint if present (dns or ip)
 	if len(cfg.API.ControlPlaneEndpoint) > 0 {
-		altNames.DNSNames = append(altNames.DNSNames, cfg.API.ControlPlaneEndpoint)
+		if host, _, err := kubeadmutil.ParseHostPort(cfg.API.ControlPlaneEndpoint); err == nil {
+			if ip := net.ParseIP(host); ip != nil {
+				altNames.IPs = append(altNames.IPs, ip)
+			} else {
+				altNames.DNSNames = append(altNames.DNSNames, host)
+			}
+		} else {
+			return nil, fmt.Errorf("error parsing API api.controlPlaneEndpoint %q: %s", cfg.API.ControlPlaneEndpoint, err)
+		}
 	}
 
 	appendSANsToAltNames(altNames, cfg.APIServerCertSANs, kubeadmconstants.APIServerCertName)

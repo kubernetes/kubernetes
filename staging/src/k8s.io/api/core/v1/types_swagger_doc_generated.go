@@ -865,8 +865,8 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 }
 
 var map_LocalVolumeSource = map[string]string{
-	"":     "Local represents directly-attached storage with node affinity",
-	"path": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device",
+	"":     "Local represents directly-attached storage with node affinity (Beta feature)",
+	"path": "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled.",
 }
 
 func (LocalVolumeSource) SwaggerDoc() map[string]string {
@@ -1034,8 +1034,9 @@ func (NodeSelectorRequirement) SwaggerDoc() map[string]string {
 }
 
 var map_NodeSelectorTerm = map[string]string{
-	"":                 "A null or empty node selector term matches no objects.",
-	"matchExpressions": "Required. A list of node selector requirements. The requirements are ANDed.",
+	"":                 "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
+	"matchExpressions": "A list of node selector requirements by node's labels.",
+	"matchFields":      "A list of node selector requirements by node's fields.",
 }
 
 func (NodeSelectorTerm) SwaggerDoc() map[string]string {
@@ -1045,11 +1046,11 @@ func (NodeSelectorTerm) SwaggerDoc() map[string]string {
 var map_NodeSpec = map[string]string{
 	"":              "NodeSpec describes the attributes that a node is created with.",
 	"podCIDR":       "PodCIDR represents the pod IP range assigned to the node.",
-	"externalID":    "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration",
 	"taints":        "If specified, the node's taints.",
 	"configSource":  "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field",
+	"externalID":    "Deprecated. Not all kubelets will set this field. Remove field after 1.13. see: https://issues.k8s.io/61966",
 }
 
 func (NodeSpec) SwaggerDoc() map[string]string {

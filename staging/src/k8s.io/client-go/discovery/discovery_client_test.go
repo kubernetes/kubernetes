@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package discovery_test
+package discovery
 
 import (
 	"encoding/json"
@@ -23,7 +23,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/googleapis/gnostic/OpenAPIv2"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
-	. "k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -128,6 +129,21 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 			t.Errorf("expected empty list, got: %q", groupVersions)
 		}
 	}
+}
+func TestGetServerGroupsWithTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	tmp := defaultTimeout
+	defaultTimeout = 1 * time.Second
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	_, err := client.ServerGroups()
+	if err == nil || strings.Contains(err.Error(), "deadline") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defaultTimeout = tmp
 }
 
 func TestGetServerResourcesWithV1Server(t *testing.T) {

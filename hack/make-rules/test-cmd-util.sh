@@ -592,9 +592,10 @@ run_pod_tests() {
   # Post-condition: valid-pod's record annotation still contains command with --record=true
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*--record=true.*"
 
-  ### Record label change with unspecified flag and previous change already recorded
+  ### Record label change with specified flag and previous change already recorded
+  ### we are no longer tricked by data from another user into revealing more information about our client
   # Command
-  kubectl label pods valid-pod new-record-change=true "${kube_flags[@]}"
+  kubectl label pods valid-pod new-record-change=true --record=true "${kube_flags[@]}"
   # Post-condition: valid-pod's record annotation contains new change
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*new-record-change=true.*"
 
@@ -1296,9 +1297,9 @@ run_kubectl_run_tests() {
   kubectl run nginx-extensions "--image=$IMAGE_NGINX" "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment.extensions "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
-  # and old generator was used, iow. old defaults are applied
+  # new generator was used
   output_message=$(kubectl get deployment.extensions/nginx-extensions -o jsonpath='{.spec.revisionHistoryLimit}')
-  kube::test::if_has_not_string "${output_message}" '2'
+  kube::test::if_has_string "${output_message}" '2'
   # Clean up
   kubectl delete deployment nginx-extensions "${kube_flags[@]}"
   # Command
@@ -3924,7 +3925,7 @@ run_cmd_with_img_tests() {
 
   # Test that a valid image reference value is provided as the value of --image in `kubectl run <name> --image`
   output_message=$(kubectl run test1 --image=validname)
-  kube::test::if_has_string "${output_message}" 'deployment.apps "test1" created'
+  kube::test::if_has_string "${output_message}" 'deployment.apps/test1 created'
   kubectl delete deployments test1
   # test invalid image name
   output_message=$(! kubectl run test2 --image=InvalidImageName 2>&1)

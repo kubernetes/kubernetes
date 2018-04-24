@@ -2275,10 +2275,17 @@ Spec:
   Allowing ingress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
-    From PodSelector: id=app2,id2=app3
-    From NamespaceSelector: id=app2,id2=app3
-    From NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
-    From IPBlock:
+    From:
+      NamespaceSelector: id=ns1,id2=ns2
+      PodSelector: id=pod1,id2=pod2
+    From:
+      PodSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    From:
+      IPBlock:
         CIDR: 192.168.0.0/16
         Except: 192.168.3.0/24, 192.168.4.0/24
     ----------
@@ -2287,10 +2294,17 @@ Spec:
   Allowing egress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
-    To PodSelector: id=app2,id2=app3
-    To NamespaceSelector: id=app2,id2=app3
-    To NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
-    To IPBlock:
+    To:
+      NamespaceSelector: id=ns1,id2=ns2
+      PodSelector: id=pod1,id2=pod2
+    To:
+      PodSelector: id=app2,id2=app3
+    To:
+      NamespaceSelector: id=app2,id2=app3
+    To:
+      NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    To:
+      IPBlock:
         CIDR: 192.168.0.0/16
         Except: 192.168.3.0/24, 192.168.4.0/24
     ----------
@@ -2327,6 +2341,20 @@ Spec:
 						{Port: &port82, Protocol: &protoTCP},
 					},
 					From: []networking.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "pod1",
+									"id2": "pod2",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "ns1",
+									"id2": "ns2",
+								},
+							},
+						},
 						{
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -2371,6 +2399,20 @@ Spec:
 						{Port: &port82, Protocol: &protoTCP},
 					},
 					To: []networking.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "pod1",
+									"id2": "pod2",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "ns1",
+									"id2": "ns2",
+								},
+							},
+						},
 						{
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{

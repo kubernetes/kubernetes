@@ -113,6 +113,11 @@ const (
 	// TODO: Make this 30 seconds once #4566 is resolved.
 	PodStartTimeout = 5 * time.Minute
 
+	// Same as `PodStartTimeout` to wait for the pod to be started, but shorter.
+	// Use it case by case when we are sure pod start will not be delayed
+	// minutes by slow docker pulls or something else.
+	PodStartShortTimeout = 1 * time.Minute
+
 	// If there are any orphaned namespaces to clean up, this test is running
 	// on a long lived cluster. A long wait here is preferably to spurious test
 	// failures caused by leaked resources from a previous test run.
@@ -155,6 +160,10 @@ const (
 
 	// How long claims have to become dynamically provisioned
 	ClaimProvisionTimeout = 5 * time.Minute
+
+	// Same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
+	// Use it case by case when we are sure this timeout is enough.
+	ClaimProvisionShortTimeout = 1 * time.Minute
 
 	// How long claims have to become bound
 	ClaimBindingTimeout = 3 * time.Minute
@@ -380,6 +389,22 @@ func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !NodeOSDistroIs(supportedNodeOsDistros...) {
 		Skipf("Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
 	}
+}
+
+func SkipUnlessSecretExistsAfterWait(c clientset.Interface, name, namespace string, timeout time.Duration) {
+	Logf("Waiting for secret %v in namespace %v to exist in duration %v", name, namespace, timeout)
+	start := time.Now()
+	if wait.PollImmediate(15*time.Second, timeout, func() (bool, error) {
+		_, err := c.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			Logf("Secret %v in namespace %v still does not exist after duration %v", name, namespace, time.Since(start))
+			return false, nil
+		}
+		return true, nil
+	}) != nil {
+		Skipf("Secret %v in namespace %v did not exist after timeout of %v", name, namespace, timeout)
+	}
+	Logf("Secret %v in namespace %v found after duration %v", name, namespace, time.Since(start))
 }
 
 func SkipIfContainerRuntimeIs(runtimes ...string) {

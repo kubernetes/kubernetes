@@ -30,6 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -248,6 +249,10 @@ type VolumeHost interface {
 	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/
 	GetVolumeDevicePluginDir(pluginName string) string
 
+	// GetPodsDir returns the absolute path to a directory where all the pods
+	// information is stored
+	GetPodsDir() string
+
 	// GetPodVolumeDir returns the absolute path a directory which
 	// represents the named volume under the named plugin for the given
 	// pod.  If the specified pod does not exist, the result of this call
@@ -313,6 +318,9 @@ type VolumeHost interface {
 
 	// Returns the name of the node
 	GetNodeName() types.NodeName
+
+	// Returns the event recorder of kubelet.
+	GetEventRecorder() record.EventRecorder
 }
 
 // VolumePluginMgr tracks registered plugins.

@@ -29,13 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestGetAuthorizerAttributes(t *testing.T) {
-	mapper := request.NewRequestContextMapper()
-
 	testcases := map[string]struct {
 		Verb               string
 		Path               string
@@ -113,15 +109,10 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 		var attribs authorizer.Attributes
 		var err error
 		var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			ctx, ok := mapper.Get(req)
-			if !ok {
-				responsewriters.InternalError(w, req, errors.New("no context found for request"))
-				return
-			}
+			ctx := req.Context()
 			attribs, err = GetAuthorizerAttributes(ctx)
 		})
-		handler = WithRequestInfo(handler, newTestRequestInfoResolver(), mapper)
-		handler = request.WithRequestContext(handler, mapper)
+		handler = WithRequestInfo(handler, newTestRequestInfoResolver())
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 
 		if err != nil {
@@ -181,11 +172,11 @@ func TestAuditAnnotation(t *testing.T) {
 	negotiatedSerializer := serializer.DirectCodecFactory{CodecFactory: serializer.NewCodecFactory(scheme)}
 	for k, tc := range testcases {
 		audit := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-		handler := WithAuthorization(&fakeHTTPHandler{}, &fakeRequestContextMapper{
-			audit: audit,
-		}, tc.authorizer, negotiatedSerializer)
+		handler := WithAuthorization(&fakeHTTPHandler{}, tc.authorizer, negotiatedSerializer)
+		// TODO: fake audit injector
 
 		req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+		req = withTestContext(req, nil, audit)
 		req.RemoteAddr = "127.0.0.1"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 		assert.Equal(t, tc.decisionAnnotation, audit.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")

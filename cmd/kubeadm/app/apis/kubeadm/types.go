@@ -133,7 +133,17 @@ type MasterConfiguration struct {
 type API struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
-	// ControlPlaneEndpoint sets the DNS address with optional port for the API server
+	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
+	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
+	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
+	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
+	// the BindPort is used.
+	// Possible usages are:
+	// e.g. In an cluster with more than one control plane instances, this field should be
+	// assigned the address of the external load balancer in front of the
+	// control plane instances.
+	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
+	// could be used for assigning a stable DNS to the control plane.
 	ControlPlaneEndpoint string
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
@@ -306,4 +316,51 @@ type AuditPolicyConfiguration struct {
 	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
 	LogMaxAge *int32
 	//TODO(chuckha) add other options for audit policy.
+}
+
+// CommonConfiguration defines the list of common configuration elements and the getter
+// methods that must exist for both the MasterConfiguration and NodeConfiguration objects.
+// This is used internally to deduplicate the kubeadm preflight checks.
+type CommonConfiguration interface {
+	GetCRISocket() string
+	GetNodeName() string
+	GetKubernetesVersion() string
+}
+
+// GetCRISocket will return the CRISocket that is defined for the MasterConfiguration.
+// This is used internally to deduplicate the kubeadm preflight checks.
+func (cfg *MasterConfiguration) GetCRISocket() string {
+	return cfg.CRISocket
+}
+
+// GetNodeName will return the NodeName that is defined for the MasterConfiguration.
+// This is used internally to deduplicate the kubeadm preflight checks.
+func (cfg *MasterConfiguration) GetNodeName() string {
+	return cfg.NodeName
+}
+
+// GetKubernetesVersion will return the KubernetesVersion that is defined for the MasterConfiguration.
+// This is used internally to deduplicate the kubeadm preflight checks.
+func (cfg *MasterConfiguration) GetKubernetesVersion() string {
+	return cfg.KubernetesVersion
+}
+
+// GetCRISocket will return the CRISocket that is defined for the NodeConfiguration.
+// This is used internally to deduplicate the kubeadm preflight checks.
+func (cfg *NodeConfiguration) GetCRISocket() string {
+	return cfg.CRISocket
+}
+
+// GetNodeName will return the NodeName that is defined for the NodeConfiguration.
+// This is used internally to deduplicate the kubeadm preflight checks.
+func (cfg *NodeConfiguration) GetNodeName() string {
+	return cfg.NodeName
+}
+
+// GetKubernetesVersion will return an empty string since KubernetesVersion is not a
+// defined property for NodeConfiguration. This will just cause the regex validation
+// of the defined version to be skipped during the preflight checks.
+// This is used internally to deduplicate the kubeadm preflight checks.
+func (cfg *NodeConfiguration) GetKubernetesVersion() string {
+	return ""
 }

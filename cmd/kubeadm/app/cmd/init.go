@@ -485,7 +485,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Exit earlier if we're dryrunning
 	if i.dryRun {
-		fmt.Println("[dryrun] finished dry-running successfully. Above are the resources that would be created")
+		fmt.Println("[dryrun] finished dry-running successfully. Above are the resources that would be created")
 		return nil
 	}
 
@@ -536,7 +536,7 @@ func printFilesIfDryRunning(dryRun bool, manifestDir string) error {
 		return nil
 	}
 
-	glog.Infof("[dryrun] wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
+	glog.Infof("[dryrun] wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
 	glog.Infoln("[dryrun] the certificates or kubeconfig files would not be printed due to their sensitive nature")
 	glog.Infof("[dryrun] please examine the %q directory for details about what would be written\n", manifestDir)
 

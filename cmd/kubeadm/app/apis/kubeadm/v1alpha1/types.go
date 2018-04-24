@@ -125,7 +125,17 @@ type MasterConfiguration struct {
 type API struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string `json:"advertiseAddress"`
-	// ControlPlaneEndpoint sets the DNS address for the API server
+	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
+	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
+	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
+	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
+	// the BindPort is used.
+	// Possible usages are:
+	// e.g. In an cluster with more than one control plane instances, this field should be
+	// assigned the address of the external load balancer in front of the
+	// control plane instances.
+	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
+	// could be used for assigning a stable DNS to the control plane.
 	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.

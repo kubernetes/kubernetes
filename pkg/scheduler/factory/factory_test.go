@@ -46,7 +46,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-const enableEquivalenceCache = true
+const (
+	enableEquivalenceCache = true
+	disablePodPreemption   = false
+)
 
 func TestCreate(t *testing.T) {
 	handler := utiltesting.FakeHandler{
@@ -533,6 +536,7 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
+		disablePodPreemption,
 	)
 }
 

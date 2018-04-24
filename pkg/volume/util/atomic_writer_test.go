@@ -804,7 +804,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 
 	cleanPathPayload := make(map[string]FileProjection, len(payload))
 	for k, v := range payload {
-		cleanPathPayload[path.Clean(k)] = v
+		cleanPathPayload[filepath.Clean(k)] = v
 	}
 
 	if !reflect.DeepEqual(cleanPathPayload, observedPayload) {

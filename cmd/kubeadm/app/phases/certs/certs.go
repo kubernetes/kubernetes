@@ -611,8 +611,9 @@ type certKeyLocation struct {
 	uxName     string
 }
 
-// UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case when the CA Cert
-// is present but the CA Key is not. This allows us to, e.g., skip generating certs or not start the csr signing controller.
+// UsingExternalCA determines whether the user is relying on an external CA.  We currently implicitly determine this is the case
+// when both the CA Cert and the front proxy CA Cert are present but the CA Key and front proxy CA Key are not.
+// This allows us to, e.g., skip generating certs or not start the csr signing controller.
 func UsingExternalCA(cfg *kubeadmapi.MasterConfiguration) (bool, error) {
 
 	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -621,7 +622,7 @@ func UsingExternalCA(cfg *kubeadmapi.MasterConfiguration) (bool, error) {
 
 	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
 	if _, err := os.Stat(caKeyPath); !os.IsNotExist(err) {
-		return false, fmt.Errorf("ca.key exists")
+		return false, fmt.Errorf("%s exists", kubeadmconstants.CAKeyName)
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, kubeadmconstants.APIServerCertAndKeyBaseName, "API server"}); err != nil {
@@ -636,8 +637,13 @@ func UsingExternalCA(cfg *kubeadmapi.MasterConfiguration) (bool, error) {
 		return false, err
 	}
 
-	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
+	if err := validateCACert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
 		return false, err
+	}
+
+	frontProxyCAKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)
+	if _, err := os.Stat(frontProxyCAKeyPath); !os.IsNotExist(err) {
+		return false, fmt.Errorf("%s exists", kubeadmconstants.FrontProxyCAKeyName)
 	}
 
 	if err := validateSignedCert(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, kubeadmconstants.FrontProxyClientCertAndKeyBaseName, "front-proxy client"}); err != nil {

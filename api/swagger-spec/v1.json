@@ -18667,10 +18667,6 @@
       "type": "string",
       "description": "PodCIDR represents the pod IP range assigned to the node."
      },
-     "externalID": {
-      "type": "string",
-      "description": "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated."
-     },
      "providerID": {
       "type": "string",
       "description": "ID of the node assigned by the cloud provider in the format: \u003cProviderName\u003e://\u003cProviderSpecificNodeID\u003e"
@@ -18689,6 +18685,10 @@
      "configSource": {
       "$ref": "v1.NodeConfigSource",
       "description": "If specified, the source to get node configuration from The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field"
+     },
+     "externalID": {
+      "type": "string",
+      "description": "Deprecated. Not all kubelets will set this field. Remove field after 1.13. see: https://issues.k8s.io/61966"
      }
     }
    },
@@ -19953,14 +19953,14 @@
    },
    "v1.LocalVolumeSource": {
     "id": "v1.LocalVolumeSource",
-    "description": "Local represents directly-attached storage with node affinity",
+    "description": "Local represents directly-attached storage with node affinity (Beta feature)",
     "required": [
      "path"
     ],
     "properties": {
      "path": {
       "type": "string",
-      "description": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device"
+      "description": "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled."
      }
     }
    },
@@ -20060,17 +20060,21 @@
    },
    "v1.NodeSelectorTerm": {
     "id": "v1.NodeSelectorTerm",
-    "description": "A null or empty node selector term matches no objects.",
-    "required": [
-     "matchExpressions"
-    ],
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
     "properties": {
      "matchExpressions": {
       "type": "array",
       "items": {
        "$ref": "v1.NodeSelectorRequirement"
       },
-      "description": "Required. A list of node selector requirements. The requirements are ANDed."
+      "description": "A list of node selector requirements by node's labels."
+     },
+     "matchFields": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.NodeSelectorRequirement"
+      },
+      "description": "A list of node selector requirements by node's fields."
      }
     }
    },

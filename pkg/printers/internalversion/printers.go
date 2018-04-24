@@ -574,6 +574,7 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 	}
 	if !initializing {
 		restarts = 0
+		hasRunning := false
 		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
 			container := pod.Status.ContainerStatuses[i]
 
@@ -589,8 +590,14 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 					reason = fmt.Sprintf("ExitCode:%d", container.State.Terminated.ExitCode)
 				}
 			} else if container.Ready && container.State.Running != nil {
+				hasRunning = true
 				readyContainers++
 			}
+		}
+
+		// change pod status back to "Running" if there is at least one container still reporting as "Running" status
+		if reason == "Completed" && hasRunning {
+			reason = "Running"
 		}
 	}
 

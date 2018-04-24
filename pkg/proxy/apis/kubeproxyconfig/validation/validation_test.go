@@ -749,3 +749,75 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
+	// TODO(rramkumar): This test is a copy of TestValidateKubeProxyNodePortAddress.
+	// Maybe some code can be shared?
+	newPath := field.NewPath("KubeProxyConfiguration")
+
+	successCases := []struct {
+		addresses []string
+	}{
+		{[]string{}},
+		{[]string{"127.0.0.0/8"}},
+		{[]string{"0.0.0.0/0"}},
+		{[]string{"::/0"}},
+		{[]string{"127.0.0.1/32", "1.2.3.0/24"}},
+		{[]string{"127.0.0.0/8"}},
+		{[]string{"127.0.0.1/32"}},
+		{[]string{"::1/128"}},
+		{[]string{"1.2.3.4/32"}},
+		{[]string{"10.20.30.0/24"}},
+		{[]string{"10.20.0.0/16", "100.200.0.0/16"}},
+		{[]string{"10.0.0.0/8"}},
+		{[]string{"2001:db8::/32"}},
+	}
+
+	for _, successCase := range successCases {
+		if errs := validateIPVSExcludeCIDRs(successCase.addresses, newPath.Child("ExcludeCIDRs")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		addresses []string
+		msg       string
+	}{
+		{
+			addresses: []string{"foo"},
+			msg:       "must be a valid IP block",
+		},
+		{
+			addresses: []string{"1.2.3"},
+			msg:       "must be a valid IP block",
+		},
+		{
+			addresses: []string{""},
+			msg:       "must be a valid IP block",
+		},
+		{
+			addresses: []string{"10.20.30.40"},
+			msg:       "must be a valid IP block",
+		},
+		{
+			addresses: []string{"::1"},
+			msg:       "must be a valid IP block",
+		},
+		{
+			addresses: []string{"2001:db8:1"},
+			msg:       "must be a valid IP block",
+		},
+		{
+			addresses: []string{"2001:db8:xyz/64"},
+			msg:       "must be a valid IP block",
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		if errs := validateIPVSExcludeCIDRs(errorCase.addresses, newPath.Child("ExcludeCIDRs")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}

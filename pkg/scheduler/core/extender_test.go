@@ -506,7 +506,18 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		}
 		queue := NewSchedulingQueue()
 		scheduler := NewGenericScheduler(
-			cache, nil, queue, test.predicates, algorithm.EmptyPredicateMetadataProducer, test.prioritizers, algorithm.EmptyPriorityMetadataProducer, extenders, nil, schedulertesting.FakePersistentVolumeClaimLister{}, false)
+			cache,
+			nil,
+			queue,
+			test.predicates,
+			algorithm.EmptyPredicateMetadataProducer,
+			test.prioritizers,
+			algorithm.EmptyPriorityMetadataProducer,
+			extenders,
+			nil,
+			schedulertesting.FakePersistentVolumeClaimLister{},
+			false,
+			false)
 		podIgnored := &v1.Pod{}
 		machine, err := scheduler.Schedule(podIgnored, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 		if test.expectsErr {

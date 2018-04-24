@@ -85,7 +85,6 @@ func NewCmdConvert(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddNonDeprecatedPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&options.local, "local", options.local, "If true, convert will NOT try to contact api-server but run locally.")
 	cmd.Flags().String("output-version", "", i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1').)"))
-	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
 

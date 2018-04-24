@@ -1434,11 +1434,13 @@ type KeyToPath struct {
 	Mode *int32
 }
 
-// Local represents directly-attached storage with node affinity
+// Local represents directly-attached storage with node affinity (Beta feature)
 type LocalVolumeSource struct {
-	// The full path to the volume on the node
-	// For alpha, this path must be a directory
-	// Once block as a source is supported, then this path can point to a block device
+	// The full path to the volume on the node.
+	// It can be either a directory or block device (disk, partition, ...).
+	// Directories can be represented only by PersistentVolume with VolumeMode=Filesystem.
+	// Block devices can be represented only by VolumeMode=Block, which also requires the
+	// BlockVolume alpha feature gate to be enabled.
 	Path string
 }
 
@@ -2105,10 +2107,13 @@ type NodeSelector struct {
 	NodeSelectorTerms []NodeSelectorTerm
 }
 
-// A null or empty node selector term matches no objects.
+// A null or empty node selector term matches no objects. The requirements of
+// them are ANDed.
 type NodeSelectorTerm struct {
-	//Required. A list of node selector requirements. The requirements are ANDed.
+	// A list of node selector requirements by node's labels.
 	MatchExpressions []NodeSelectorRequirement
+	// A list of node selector requirements by node's fields.
+	MatchFields []NodeSelectorRequirement
 }
 
 // A node selector requirement is a selector that contains values, a key, and an operator
@@ -3228,10 +3233,6 @@ type NodeSpec struct {
 	// +optional
 	PodCIDR string
 
-	// External ID of the node assigned by some machine database (e.g. a cloud provider)
-	// +optional
-	ExternalID string
-
 	// ID of the node assigned by the cloud provider
 	// Note: format is "<ProviderName>://<ProviderSpecificNodeID>"
 	// +optional
@@ -3249,6 +3250,11 @@ type NodeSpec struct {
 	// The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
 	// +optional
 	ConfigSource *NodeConfigSource
+
+	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
+	// see: https://issues.k8s.io/61966
+	// +optional
+	DoNotUse_ExternalID string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

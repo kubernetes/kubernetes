@@ -71,7 +71,7 @@ func TestImageLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ImageOptions{
+	opts := SetImageOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 			NamePrintFlags:     printers.NewNamePrintFlags(""),
@@ -105,17 +105,17 @@ func TestSetImageValidation(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		imageOptions *ImageOptions
+		imageOptions *SetImageOptions
 		expectErr    string
 	}{
 		{
 			name:         "test resource < 1 and filenames empty",
-			imageOptions: &ImageOptions{PrintFlags: printFlags},
+			imageOptions: &SetImageOptions{PrintFlags: printFlags},
 			expectErr:    "[one or more resources must be specified as <resource> <name> or <resource>/<name>, at least one image update is required]",
 		},
 		{
 			name: "test containerImages < 1",
-			imageOptions: &ImageOptions{
+			imageOptions: &SetImageOptions{
 				PrintFlags: printFlags,
 				Resources:  []string{"a", "b", "c"},
 
@@ -127,7 +127,7 @@ func TestSetImageValidation(t *testing.T) {
 		},
 		{
 			name: "test containerImages > 1 and all containers are already specified by *",
-			imageOptions: &ImageOptions{
+			imageOptions: &SetImageOptions{
 				PrintFlags: printFlags,
 				Resources:  []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
@@ -142,7 +142,7 @@ func TestSetImageValidation(t *testing.T) {
 		},
 		{
 			name: "success case",
-			imageOptions: &ImageOptions{
+			imageOptions: &SetImageOptions{
 				PrintFlags: printFlags,
 				Resources:  []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
@@ -193,7 +193,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := ImageOptions{
+	opts := SetImageOptions{
 		PrintFlags: &printers.PrintFlags{
 			JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 			NamePrintFlags:     printers.NewNamePrintFlags(""),
@@ -587,7 +587,7 @@ func TestSetImageRemote(t *testing.T) {
 			cmd := NewCmdImage(tf, out, out)
 			cmd.SetOutput(out)
 			cmd.Flags().Set("output", outputFormat)
-			opts := ImageOptions{
+			opts := SetImageOptions{
 				PrintFlags: &printers.PrintFlags{
 					JSONYamlPrintFlags: printers.NewJSONYamlPrintFlags(),
 					NamePrintFlags:     printers.NewNamePrintFlags(""),

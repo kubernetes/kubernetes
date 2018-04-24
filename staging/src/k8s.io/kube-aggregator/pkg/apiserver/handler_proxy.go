@@ -42,8 +42,6 @@ import (
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type proxyHandler struct {
-	contextMapper genericapirequest.RequestContextMapper
-
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
@@ -104,12 +102,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ctx, ok := r.contextMapper.Get(req)
-	if !ok {
-		http.Error(w, "missing context", http.StatusInternalServerError)
-		return
-	}
-	user, ok := genericapirequest.UserFrom(ctx)
+	user, ok := genericapirequest.UserFrom(req.Context())
 	if !ok {
 		http.Error(w, "missing user", http.StatusInternalServerError)
 		return

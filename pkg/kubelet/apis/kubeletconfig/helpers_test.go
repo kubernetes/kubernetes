@@ -147,6 +147,7 @@ var (
 		"CPUCFSQuota",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
+		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",
 		"CgroupsPerQOS",

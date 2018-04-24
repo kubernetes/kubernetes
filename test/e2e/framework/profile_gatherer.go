@@ -19,7 +19,6 @@ package framework
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -69,36 +68,44 @@ func gatherProfileOfKind(profileBaseName, kind string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to execute curl command on master through SSH: %v", err)
 	}
-	// Write the data to a temp file.
-	var tmpfile *os.File
-	tmpfile, err = ioutil.TempFile("", "apiserver-profile")
-	if err != nil {
-		return fmt.Errorf("Failed to create temp file for profile data: %v", err)
-	}
-	defer os.Remove(tmpfile.Name())
-	if _, err := tmpfile.Write([]byte(sshResult.Stdout)); err != nil {
-		return fmt.Errorf("Failed to write temp file with profile data: %v", err)
-	}
-	if err := tmpfile.Close(); err != nil {
-		return fmt.Errorf("Failed to close temp file: %v", err)
-	}
-	// Create a graph from the data and write it to a pdf file.
-	var cmd *exec.Cmd
+
 	var profilePrefix string
 	switch {
-	// TODO: Support other profile kinds if needed (e.g inuse_space, alloc_objects, mutex, etc)
 	case kind == "heap":
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", "--alloc_space", tmpfile.Name())
 		profilePrefix = "ApiserverMemoryProfile_"
 	case strings.HasPrefix(kind, "profile"):
-		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", tmpfile.Name())
 		profilePrefix = "ApiserverCPUProfile_"
 	default:
 		return fmt.Errorf("Unknown profile kind provided: %s", kind)
 	}
+
+	// Write the data to a file.
+	rawprofilePath := path.Join(getProfilesDirectoryPath(), profilePrefix+profileBaseName+".pprof")
+	rawprofile, err := os.Create(rawprofilePath)
+	if err != nil {
+		return fmt.Errorf("Failed to create file for the profile graph: %v", err)
+	}
+	defer rawprofile.Close()
+
+	if _, err := rawprofile.Write([]byte(sshResult.Stdout)); err != nil {
+		return fmt.Errorf("Failed to write file with profile data: %v", err)
+	}
+	if err := rawprofile.Close(); err != nil {
+		return fmt.Errorf("Failed to close file: %v", err)
+	}
+	// Create a graph from the data and write it to a pdf file.
+	var cmd *exec.Cmd
+	switch {
+	// TODO: Support other profile kinds if needed (e.g inuse_space, alloc_objects, mutex, etc)
+	case kind == "heap":
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", "--alloc_space", rawprofile.Name())
+	case strings.HasPrefix(kind, "profile"):
+		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", rawprofile.Name())
+	default:
+		return fmt.Errorf("Unknown profile kind provided: %s", kind)
+	}
 	outfilePath := path.Join(getProfilesDirectoryPath(), profilePrefix+profileBaseName+".pdf")
-	var outfile *os.File
-	outfile, err = os.Create(outfilePath)
+	outfile, err := os.Create(outfilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to create file for the profile graph: %v", err)
 	}

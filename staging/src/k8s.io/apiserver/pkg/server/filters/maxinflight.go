@@ -98,7 +98,6 @@ func WithMaxInFlightLimit(
 	handler http.Handler,
 	nonMutatingLimit int,
 	mutatingLimit int,
-	requestContextMapper apirequest.RequestContextMapper,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
 	startOnce.Do(startRecordingUsage)
@@ -115,11 +114,7 @@ func WithMaxInFlightLimit(
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, ok := requestContextMapper.Get(r)
-		if !ok {
-			handleError(w, r, fmt.Errorf("no context found for request, handler chain must be wrong"))
-			return
-		}
+		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))

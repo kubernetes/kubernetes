@@ -522,6 +522,10 @@ func (adc *attachDetachController) GetVolumeDevicePluginDir(podUID string) strin
 	return ""
 }
 
+func (adc *attachDetachController) GetPodsDir() string {
+	return ""
+}
+
 func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return ""
 }
@@ -606,4 +610,8 @@ func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
 
 func (adc *attachDetachController) GetNodeName() types.NodeName {
 	return ""
+}
+
+func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
+	return adc.recorder
 }

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -445,5 +447,59 @@ func TestUnsupportedPlugins(t *testing.T) {
 	provisionPlug, err := plugMgr.FindProvisionablePluginByName(localVolumePluginName)
 	if err == nil && provisionPlug != nil {
 		t.Errorf("Provisionable plugin found, expected none")
+	}
+}
+
+func TestFilterPodMounts(t *testing.T) {
+	tmpDir, plug := getPlugin(t)
+	defer os.RemoveAll(tmpDir)
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
+	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lvMounter, ok := mounter.(*localVolumeMounter)
+	if !ok {
+		t.Fatal("mounter is not localVolumeMounter")
+	}
+
+	host := volumetest.NewFakeVolumeHost(tmpDir, nil, nil)
+	podsDir := host.GetPodsDir()
+
+	cases := map[string]struct {
+		input    []string
+		expected []string
+	}{
+		"empty": {
+			[]string{},
+			[]string{},
+		},
+		"not-pod-mount": {
+			[]string{"/mnt/outside"},
+			[]string{},
+		},
+		"pod-mount": {
+			[]string{filepath.Join(podsDir, "pod-mount")},
+			[]string{filepath.Join(podsDir, "pod-mount")},
+		},
+		"not-directory-prefix": {
+			[]string{podsDir + "pod-mount"},
+			[]string{},
+		},
+		"mix": {
+			[]string{"/mnt/outside",
+				filepath.Join(podsDir, "pod-mount"),
+				"/another/outside",
+				filepath.Join(podsDir, "pod-mount2")},
+			[]string{filepath.Join(podsDir, "pod-mount"),
+				filepath.Join(podsDir, "pod-mount2")},
+		},
+	}
+	for name, test := range cases {
+		output := lvMounter.filterPodMounts(test.input)
+		if !reflect.DeepEqual(output, test.expected) {
+			t.Errorf("%v failed: output %+v doesn't equal expected %+v", name, output, test.expected)
+		}
 	}
 }

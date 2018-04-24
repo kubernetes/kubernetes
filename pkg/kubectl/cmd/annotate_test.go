@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"net/http"
 	"reflect"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -424,15 +424,15 @@ func TestAnnotateErrors(t *testing.T) {
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
-			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdAnnotate(tf, buf)
-			cmd.SetOutput(buf)
+			iostreams, _, bufOut, bufErr := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdAnnotate(tf, iostreams)
+			cmd.SetOutput(bufOut)
 
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
 			}
-			options := &AnnotateOptions{}
-			err := options.Complete(buf, cmd, testCase.args)
+			options := NewAnnotateOptions(iostreams)
+			err := options.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = options.Validate()
 			}
@@ -440,8 +440,11 @@ func TestAnnotateErrors(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", k, err)
 				return
 			}
-			if buf.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+			if bufOut.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(bufOut.Bytes()))
+			}
+			if bufErr.Len() > 0 {
+				t.Errorf("buffer should be empty: %s", string(bufErr.Bytes()))
 			}
 		})
 	}
@@ -485,12 +488,12 @@ func TestAnnotateObject(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	cmd.SetOutput(buf)
-	options := &AnnotateOptions{}
+	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd.SetOutput(bufOut)
+	options := NewAnnotateOptions(iostreams)
 	args := []string{"pods/foo", "a=b", "c-"}
-	if err := options.Complete(buf, cmd, args); err != nil {
+	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -539,13 +542,13 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	cmd.SetOutput(buf)
-	options := &AnnotateOptions{}
+	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd.SetOutput(bufOut)
+	options := NewAnnotateOptions(iostreams)
 	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b", "c-"}
-	if err := options.Complete(buf, cmd, args); err != nil {
+	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -571,12 +574,13 @@ func TestAnnotateLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	options := &AnnotateOptions{local: true}
+	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate(tf, iostreams)
+	options := NewAnnotateOptions(iostreams)
+	options.local = true
 	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b"}
-	if err := options.Complete(buf, cmd, args); err != nil {
+	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -626,12 +630,13 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdAnnotate(tf, buf)
-	cmd.SetOutput(buf)
-	options := &AnnotateOptions{all: true}
+	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd.SetOutput(iostreams.Out)
+	options := NewAnnotateOptions(iostreams)
+	options.all = true
 	args := []string{"pods", "a=b", "c-"}
-	if err := options.Complete(buf, cmd, args); err != nil {
+	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {

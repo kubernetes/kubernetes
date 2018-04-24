@@ -23,11 +23,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -72,8 +74,23 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`))
 )
 
+type ExposeServiceOptions struct {
+	FilenameOptions resource.FilenameOptions
+	RecordFlags     *genericclioptions.RecordFlags
+
+	Recorder genericclioptions.Recorder
+}
+
+func NewExposeServiceOptions() *ExposeServiceOptions {
+	return &ExposeServiceOptions{
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+	}
+}
+
 func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &resource.FilenameOptions{}
+	o := NewExposeServiceOptions()
 
 	validArgs := []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
@@ -88,12 +105,15 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    exposeLong,
 		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExpose(f, out, cmd, args, options)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.RunExpose(f, out, cmd, args))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
+
+	o.RecordFlags.AddFlags(cmd)
+
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "service/v2", i18n.T("The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."))
 	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
@@ -112,14 +132,25 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("cluster-ip", "", i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
 
 	usage := "identifying the resource to expose a service"
-	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
-func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -130,7 +161,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		Internal().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options).
+		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()
@@ -247,10 +278,8 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err != nil {
 			return err
 		}
-		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(object, f.Command(cmd, false)); err != nil {
-				return err
-			}
+		if err := o.Recorder.Record(object); err != nil {
+			glog.V(4).Infof("error recording current command: %v", err)
 		}
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {

@@ -18,10 +18,8 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-if [[ -z "${KUBE_ROOT:-}" ]]; then
-	KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-fi
-
+export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
@@ -31,7 +29,7 @@ fi
 
 # kube::golang::build_kube_toolchain installs the vendored go-bindata in
 # $GOPATH/bin, so make sure that's explicitly part of our $PATH.
-export PATH="${GOPATH}/bin:${PATH}"
+export PATH="${KUBE_OUTPUT_BINPATH}:${PATH}"
 
 if ! which go-bindata &>/dev/null ; then
 	echo "Cannot find go-bindata."

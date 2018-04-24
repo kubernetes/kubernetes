@@ -77022,13 +77022,13 @@
     }
    },
    "io.k8s.api.core.v1.LocalVolumeSource": {
-    "description": "Local represents directly-attached storage with node affinity",
+    "description": "Local represents directly-attached storage with node affinity (Beta feature)",
     "required": [
      "path"
     ],
     "properties": {
      "path": {
-      "description": "The full path to the volume on the node For alpha, this path must be a directory Once block as a source is supported, then this path can point to a block device",
+      "description": "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...). Directories can be represented only by PersistentVolume with VolumeMode=Filesystem. Block devices can be represented only by VolumeMode=Block, which also requires the BlockVolume alpha feature gate to be enabled.",
       "type": "string"
      }
     }
@@ -77345,13 +77345,17 @@
     }
    },
    "io.k8s.api.core.v1.NodeSelectorTerm": {
-    "description": "A null or empty node selector term matches no objects.",
-    "required": [
-     "matchExpressions"
-    ],
+    "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
     "properties": {
      "matchExpressions": {
-      "description": "Required. A list of node selector requirements. The requirements are ANDed.",
+      "description": "A list of node selector requirements by node's labels.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelectorRequirement"
+      }
+     },
+     "matchFields": {
+      "description": "A list of node selector requirements by node's fields.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelectorRequirement"
@@ -77367,7 +77371,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.NodeConfigSource"
      },
      "externalID": {
-      "description": "External ID of the node assigned by some machine database (e.g. a cloud provider). Deprecated.",
+      "description": "Deprecated. Not all kubelets will set this field. Remove field after 1.13. see: https://issues.k8s.io/61966",
       "type": "string"
      },
      "podCIDR": {

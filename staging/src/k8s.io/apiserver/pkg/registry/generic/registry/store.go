@@ -586,19 +586,15 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		} else {
 			// Check if the object's resource version matches the latest
 			// resource version.
-			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
-			if err != nil {
-				return nil, nil, err
-			}
-			if newVersion == 0 {
+			if resourceVersion == 0 {
 				// TODO: The Invalid error should have a field for Resource.
 				// After that field is added, we should fill the Resource and
 				// leave the Kind field empty. See the discussion in #18526.
 				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
-				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), newVersion, "must be specified for an update")}
+				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), resourceVersion, "must be specified for an update")}
 				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 			}
-			if newVersion != version {
+			if resourceVersion != version {
 				return nil, nil, kubeerr.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}

@@ -2547,6 +2547,13 @@ func (in *NodeSelectorTerm) DeepCopyInto(out *NodeSelectorTerm) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.MatchFields != nil {
+		in, out := &in.MatchFields, &out.MatchFields
+		*out = make([]NodeSelectorRequirement, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

@@ -17,13 +17,12 @@ limitations under the License.
 package create
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -44,12 +43,9 @@ type QuotaOpts struct {
 }
 
 // NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &QuotaOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: NewPrintFlags("created"),
-			CmdOut:     cmdOut,
-		},
+		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
