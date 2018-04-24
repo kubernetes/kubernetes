@@ -19,11 +19,14 @@ package api
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -44,20 +47,26 @@ var _ = SIGDescribe("api-namespaces", func() {
 		f.SkipNamespaceCreation = true
 
 		/*
-		   Testname: api-namespaces-create-name-valid
-		   Description: Check that creating a namespace with valid name parameter succeeds.
+		   Testname: api-namespaces-scenario-get-post-delete-get
+		   Description:
+		     1) check that the namespaceName does not already exist: get by name should not find it
+		     2) post it
+		     3) check that the newly created namespace is brought when get by name is invoked.
+		     4) check that the newly created namespace appears on the list.
+		     5) delete the namespace.
+		     6) check that the newly created namespace is NOT brought when get by name is invoked.
+		     7) check that the newly created namespace does NOT appear on the list.
 		*/
-		framework.ConformanceIt("scenario: get: not-found > post > list : present > get by name: found-and-matches >  delete >  get: not-found", func() {
+		framework.ConformanceIt("scenario: get: not-found > post > list : found > get by name: found-and-matches >  delete >  list: not-found > get: not-found", func() {
 			namespaceName :=
 				strings.Join([]string{"testbasename", string(uuid.NewUUID())}, "")
 
-			// namespace should be not found
+			By(fmt.Sprintf("namespaceName:[%v] should not be found\n", namespaceName))
 			getOptions := metav1.GetOptions{}
 			namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
 			Expect(err).To(HaveOccurred())
 
-			// creating namespace
-			By(fmt.Sprintf(" creating namespaceName:[%v]\n", namespaceName))
+			By(fmt.Sprintf("creating namespaceName:[%v]\n", namespaceName))
 			namespaceCreationData := &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespaceName,
@@ -65,12 +74,6 @@ var _ = SIGDescribe("api-namespaces", func() {
 			}
 			namespace, err = f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
 			Expect(err).NotTo(HaveOccurred())
-
-			// scheduling for deletion once the tests ends
-			defer func() {
-				err := f.ClientSet.CoreV1().Namespaces().Delete(namespace.ObjectMeta.Name, nil)
-				Expect(err).NotTo(HaveOccurred())
-			}()
 
 			v := newDefaultVerifier()
 			v.verifyName = func(namespace *v1.Namespace) {
@@ -80,15 +83,16 @@ var _ = SIGDescribe("api-namespaces", func() {
 				expectedSelfLink := strings.Join([]string{namespacesRootURL, namespaceName}, "")
 				Expect(namespace.ObjectMeta.SelfLink).To(Equal(expectedSelfLink))
 			}
+
+			By(fmt.Sprintf("running verifications\n"))
 			v.verifyAll(namespace)
 
-			// listing should return the just created namespace
+			By(fmt.Sprintf("listing all namespaces, should return the just created namespace\n"))
 			listOptions := metav1.ListOptions{}
 			var namespaces *v1.NamespaceList = nil
 			namespaces, err = f.ClientSet.CoreV1().Namespaces().List(listOptions)
 			Expect(err).NotTo(HaveOccurred())
 
-			// checking the namespace is present in the result
 			found := false
 			for _, namespaceItem := range namespaces.Items {
 				found = (namespaceItem.ObjectMeta.Name == namespaceName)
@@ -98,14 +102,121 @@ var _ = SIGDescribe("api-namespaces", func() {
 			}
 			Expect(found).To(BeTrue())
 
-			// looking for that specific namespace again
+			By(fmt.Sprintf("looking for that specific namespace again\n"))
 			namespace, err = f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
 			Expect(err).NotTo(HaveOccurred())
 
-			// verify same creation parameters
+			By(fmt.Sprintf("running verifications on returned by name namespace\n"))
 			v.verifyAll(namespace)
+
+			By(fmt.Sprintf("deleting namespace\n"))
+			err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.ObjectMeta.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// looking for that specific namespace again, should return not found
+			maxSeconds := 10
+			framework.ExpectNoError(wait.Poll(time.Second, time.Duration(maxSeconds)*time.Second,
+				func() (bool, error) {
+					namespace, err = f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
+
+					if err != nil {
+						By(fmt.Sprintf("namespace was probably already deleted\n"))
+						return true, nil
+					}
+
+					if namespace != nil && namespace.Status.Phase == "Terminating" {
+						By(fmt.Sprintf("namespace in terminating state,  wait\n"))
+						return false, nil
+					}
+					return true, nil
+				}))
+
+			By(fmt.Sprintf("listing should not return the deleted namespace\n"))
+			namespaces, err = f.ClientSet.CoreV1().Namespaces().List(listOptions)
+			Expect(err).NotTo(HaveOccurred())
+
+			found = false
+			for _, namespaceItem := range namespaces.Items {
+				found = (namespaceItem.ObjectMeta.Name == namespaceName)
+				if found {
+					break
+				}
+			}
+			Expect(found).To(BeFalse())
 		})
 
+		/*
+		   Testname: api-namespaces-scenario-get-post-patch-get
+		   Description:
+		     1) check that the namespaceName does not already exist: get by name should not find it
+		     2) post it
+		     3) check that the newly created namespace is brought when get by name is invoked.
+		     4) patch the namespace using labels
+		     5) check that the newly created namespace is brought when get by name is invoked.
+		     6) delete the namespace.
+		*/
+		framework.ConformanceIt("scenario: get:not found > post >  get by name: found-and-matches >  patch  > get: found > delete", func() {
+			namespaceName :=
+				strings.Join([]string{"testbasename", string(uuid.NewUUID())}, "")
+
+			By(fmt.Sprintf("namespaceName:[%v] should not be found\n", namespaceName))
+			getOptions := metav1.GetOptions{}
+			namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
+			Expect(err).To(HaveOccurred())
+
+			By(fmt.Sprintf(" creating namespaceName:[%v]\n", namespaceName))
+			namespaceCreationData := &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespaceName,
+				},
+			}
+			namespace, err = f.ClientSet.CoreV1().Namespaces().Create(namespaceCreationData)
+			Expect(err).NotTo(HaveOccurred())
+
+			v := newDefaultVerifier()
+			v.verifyName = func(namespace *v1.Namespace) {
+				Expect(namespace.ObjectMeta.Name).To(Equal(namespaceName)) // this should match our given namespaceName
+			}
+			v.verifySelfLink = func(namespace *v1.Namespace) {
+				expectedSelfLink := strings.Join([]string{namespacesRootURL, namespaceName}, "")
+				Expect(namespace.ObjectMeta.SelfLink).To(Equal(expectedSelfLink))
+			}
+			By(fmt.Sprintf("running verifications\n"))
+			v.verifyAll(namespace)
+
+			By(fmt.Sprintf("looking for that specific namespace again\n"))
+			namespace, err = f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("running verifications on returned by name namespace\n"))
+			v.verifyAll(namespace)
+
+			By(fmt.Sprintf("patching namespace with labels\n"))
+			labelName := "e2e-run"
+			labelValue := string(uuid.NewUUID())
+
+			labels := map[string]string{}
+			labels[labelName] = labelValue
+
+			patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, labelName, labelValue)
+
+			namespace, err = f.ClientSet.CoreV1().Namespaces().Patch(namespaceName, types.StrategicMergePatchType, []byte(patch))
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("running verifications on returned by name namespace, labels should be there\n"))
+			v.verifyLabels = func(namespace *v1.Namespace) {
+				Expect(namespace.ObjectMeta.Labels).To(Equal(labels))
+			}
+			v.verifyAll(namespace)
+
+			By(fmt.Sprintf("looking for that specific namespace again\n"))
+			namespace, err = f.ClientSet.CoreV1().Namespaces().Get(namespaceName, getOptions)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("deleting namespace\n"))
+			err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.ObjectMeta.Name, nil)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 })
 
@@ -189,6 +300,7 @@ func newDefaultVerifier() NamespaceVerifier {
 			//Expect(len(strings.TrimSpace(namespace.ObjectMeta.UID)) != 0).To(BeTrue())
 		},
 		verifyGeneration: func(namespace *v1.Namespace) {
+			By(fmt.Sprintf(">>>namespace.ObjectMeta.Generation:[%v]\n", namespace.ObjectMeta.Generation))
 			Expect(namespace.ObjectMeta.Generation).To(Equal(originalGeneration)) // this is brand new
 		},
 
