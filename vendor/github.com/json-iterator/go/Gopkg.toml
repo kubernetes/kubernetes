@@ -19,15 +19,8 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
+ignored = ["github.com/davecgh/go-spew*","github.com/google/gofuzz*","github.com/stretchr/testify*"]
 
 [[constraint]]
-  name = "github.com/davecgh/go-spew"
-  version = "1.1.0"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/google/gofuzz"
-
-[[constraint]]
-  name = "github.com/stretchr/testify"
-  version = "1.1.4"
+  name = "github.com/modern-go/reflect2"
+  version = "1.0.0"
