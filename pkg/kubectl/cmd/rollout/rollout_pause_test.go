@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
@@ -62,11 +63,11 @@ func TestRolloutPause(t *testing.T) {
 	}
 
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdRolloutPause(tf, buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdRolloutPause(tf, streams)
 
 	cmd.Run(cmd, []string{deploymentName})
-	expectedOutput := "deployment.apps \"" + deploymentName + "\" paused\n"
+	expectedOutput := "deployment.extensions/" + deploymentName + " paused\n"
 	if buf.String() != expectedOutput {
 		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
 	}
