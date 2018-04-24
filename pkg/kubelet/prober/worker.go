@@ -240,7 +240,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.
 		w.onHold = true
-		w.resultRun = 1
+		w.resultRun = 0
 	}
 
 	return true
