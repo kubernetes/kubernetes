@@ -120,7 +120,7 @@ KUBE_NEW_STORAGE_VERSIONS="storage.k8s.io/v1"
 # but KUBE_OLD_API_VERSION is the latest (storage) version.
 # Additionally use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
-KUBE_API_VERSIONS="v1,${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
+KUBE_API_VERSIONS="v1,autoscaling/v1,${KUBE_OLD_API_VERSION},${KUBE_NEW_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
 startApiServer ${KUBE_OLD_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
@@ -155,7 +155,7 @@ killApiServer
 # Still use KUBE_STORAGE_MEDIA_TYPE_JSON for storage encoding.
 #######################################################
 
-KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
+KUBE_API_VERSIONS="v1,autoscaling/v1,${KUBE_NEW_API_VERSION},${KUBE_OLD_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_OLD_API_VERSION}=true,${KUBE_NEW_API_VERSION}=true"
 startApiServer ${KUBE_NEW_STORAGE_VERSIONS} ${KUBE_STORAGE_MEDIA_TYPE_JSON}
 
@@ -186,7 +186,7 @@ killApiServer
 # However, change storage encoding to KUBE_STORAGE_MEDIA_TYPE_PROTOBUF.
 #######################################################
 
-KUBE_API_VERSIONS="v1,${KUBE_NEW_API_VERSION}"
+KUBE_API_VERSIONS="v1,autoscaling/v1,${KUBE_NEW_API_VERSION}"
 RUNTIME_CONFIG="api/all=false,api/v1=true,${KUBE_NEW_API_VERSION}=true"
 
 # This seems to reduce flakiness.
