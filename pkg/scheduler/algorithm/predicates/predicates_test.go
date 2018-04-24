@@ -911,10 +911,11 @@ func TestISCSIDiskConflicts(t *testing.T) {
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestPodFitsSelector(t *testing.T) {
 	tests := []struct {
-		pod    *v1.Pod
-		labels map[string]string
-		fits   bool
-		test   string
+		pod      *v1.Pod
+		labels   map[string]string
+		nodeName string
+		fits     bool
+		test     string
 	}{
 		{
 			pod:  &v1.Pod{},
@@ -1387,11 +1388,206 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: false,
 			test: "Pod with an invalid value in Affinity term won't be scheduled onto the node",
 		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_1",
+			fits:     true,
+			test:     "Pod with matchFields using In operator that matches the existing node",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			fits:     false,
+			test:     "Pod with matchFields using In operator that does not match the existing node",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     true,
+			test:     "Pod with two terms: matchFields does not match, but matchExpressions matches",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     false,
+			test:     "Pod with one term: matchFields does not match, but matchExpressions matches",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_1",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     true,
+			test:     "Pod with one term: both matchFields and matchExpressions match",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      algorithm.NodeFieldSelectorKeyNodeName,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node_1"},
+											},
+										},
+									},
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "foo",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"not-match-to-bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"foo": "bar"},
+			fits:     false,
+			test:     "Pod with two terms: both matchFields and matchExpressions do not match",
+		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
 
 	for _, test := range tests {
-		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.labels}}
+		node := v1.Node{ObjectMeta: metav1.ObjectMeta{
+			Name:   test.nodeName,
+			Labels: test.labels,
+		}}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
