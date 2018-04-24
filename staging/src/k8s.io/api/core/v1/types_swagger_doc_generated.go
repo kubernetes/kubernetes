@@ -1034,8 +1034,9 @@ func (NodeSelectorRequirement) SwaggerDoc() map[string]string {
 }
 
 var map_NodeSelectorTerm = map[string]string{
-	"":                 "A null or empty node selector term matches no objects.",
-	"matchExpressions": "Required. A list of node selector requirements. The requirements are ANDed.",
+	"":                 "A null or empty node selector term matches no objects. The requirements of them are ANDed.",
+	"matchExpressions": "A list of node selector requirements by node's labels.",
+	"matchFields":      "A list of node selector requirements by node's fields.",
 }
 
 func (NodeSelectorTerm) SwaggerDoc() map[string]string {
