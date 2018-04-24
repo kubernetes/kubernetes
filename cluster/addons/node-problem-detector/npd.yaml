@@ -42,6 +42,15 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
+      - name: logs
+        image: busybox
+        command:
+        - "/bin/sh"
+        - "-c"
+        - "sleep 20 && tail -f /var/log/node-problem-detector.log"
+        volumeMounts:
+        - name: log
+          mountPath: /var/log
       - name: node-problem-detector
         image: k8s.gcr.io/node-problem-detector:v0.4.1
         command:
