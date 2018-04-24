@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	dstrings "strings"
@@ -294,7 +294,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		options = append(options, "ro")
 	}
 
-	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
+	p := filepath.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
 	if err := os.MkdirAll(p, 0750); err != nil {
 		return fmt.Errorf("failed to create directory %v: %v", p, err)
 	}
@@ -302,7 +302,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// adding log-level ERROR to remove noise
 	// and more specific log path so each pod has
 	// its own log based on PV + Pod
-	log := path.Join(p, b.pod.Name+"-glusterfs.log")
+	log := filepath.Join(p, b.pod.Name+"-glusterfs.log")
 	options = append(options, "log-level=ERROR")
 	options = append(options, "log-file="+log)
 
