@@ -43,15 +43,7 @@ func (fakeConvertor) ConvertFieldLabel(version, kind, label, value string) (stri
 var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
-func fakeInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
-	return &VersionInterfaces{ObjectConvertor: validConvertor}, nil
-}
-
 var unmatchedErr = errors.New("no version")
-
-func unmatchedVersionInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
-	return nil, unmatchedErr
-}
 
 func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 	testGroup := "test.group"
@@ -71,7 +63,7 @@ func TestRESTMapperVersionAndKindForResource(t *testing.T) {
 		{Resource: schema.GroupVersionResource{Resource: "internalobjects"}, ExpectedGVK: testGroupVersion.WithKind("InternalObject")},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion})
 		if len(testCase.ExpectedGVK.Kind) != 0 {
 			mapper.Add(testCase.ExpectedGVK, RESTScopeNamespace)
 		}
@@ -104,7 +96,7 @@ func TestRESTMapperGroupForResource(t *testing.T) {
 		{Resource: schema.GroupVersionResource{Resource: "myobje"}, Err: true, GroupVersionKind: schema.GroupVersionKind{Group: "testapi", Version: "test", Kind: "MyObject"}},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testCase.GroupVersionKind.GroupVersion()}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testCase.GroupVersionKind.GroupVersion()})
 		mapper.Add(testCase.GroupVersionKind, RESTScopeNamespace)
 
 		actualGVK, err := mapper.KindFor(testCase.Resource)
@@ -249,7 +241,7 @@ func TestRESTMapperKindsFor(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		tcName := testCase.Name
-		mapper := NewDefaultRESTMapper(testCase.PreferredOrder, fakeInterfaces)
+		mapper := NewDefaultRESTMapper(testCase.PreferredOrder)
 		for _, kind := range testCase.KindsToRegister {
 			mapper.Add(kind, RESTScopeNamespace)
 		}
@@ -426,7 +418,7 @@ func TestRESTMapperResourcesFor(t *testing.T) {
 		tcName := testCase.Name
 
 		for _, partialResource := range []schema.GroupVersionResource{testCase.PluralPartialResourceToRequest, testCase.SingularPartialResourceToRequest} {
-			mapper := NewDefaultRESTMapper(testCase.PreferredOrder, fakeInterfaces)
+			mapper := NewDefaultRESTMapper(testCase.PreferredOrder)
 			for _, kind := range testCase.KindsToRegister {
 				mapper.Add(kind, RESTScopeNamespace)
 			}
@@ -511,7 +503,7 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 		{Kind: "lowercases", Plural: "lowercaseses", Singular: "lowercases"},
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion}, fakeInterfaces)
+		mapper := NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion})
 		// create singular/plural mapping
 		mapper.Add(testGroupVersion.WithKind(testCase.Kind), RESTScopeNamespace)
 
@@ -556,7 +548,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		// TODO: add test for a resource that exists in one version but not another
 	}
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
+		mapper := NewDefaultRESTMapper(testCase.DefaultVersions)
 		mapper.Add(internalGroupVersion.WithKind("InternalObject"), RESTScopeNamespace)
 
 		preferredVersions := []string{}
@@ -595,7 +587,7 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	internalObjectGK := schema.GroupKind{Group: "tgroup", Kind: "InternalObject"}
 	otherObjectGK := schema.GroupKind{Group: "tgroup", Kind: "OtherObject"}
 
-	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, fakeInterfaces)
+	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2})
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace)
 	mapper.Add(expectedGroupVersion2.WithKind("OtherObject"), RESTScopeNamespace)
 
@@ -696,7 +688,7 @@ func TestRESTMapperRESTMappings(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		mapper := NewDefaultRESTMapper(testCase.DefaultVersions, fakeInterfaces)
+		mapper := NewDefaultRESTMapper(testCase.DefaultVersions)
 		for _, gvk := range testCase.AddGroupVersionKind {
 			mapper.Add(gvk, RESTScopeNamespace)
 		}
@@ -735,7 +727,7 @@ func TestRESTMapperReportsErrorOnBadVersion(t *testing.T) {
 	expectedGroupVersion2 := schema.GroupVersion{Group: "tgroup", Version: "test2"}
 	internalObjectGK := schema.GroupKind{Group: "tgroup", Kind: "InternalObject"}
 
-	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2}, unmatchedVersionInterfaces)
+	mapper := NewDefaultRESTMapper([]schema.GroupVersion{expectedGroupVersion1, expectedGroupVersion2})
 	mapper.Add(expectedGroupVersion1.WithKind("InternalObject"), RESTScopeNamespace)
 	_, err := mapper.RESTMapping(internalObjectGK, "test3")
 	if err == nil {

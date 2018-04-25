@@ -157,18 +157,6 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 		SelfLinker:      runtime.SelfLinker(accessor),
 		RootScopedKinds: gmf.GroupArgs.RootScopedKinds,
 	}
-	for _, v := range externalVersions {
-		gvf := gmf.VersionArgs[v.Version]
-		if err := groupMeta.AddVersionInterfaces(
-			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
-			&meta.VersionInterfaces{
-				ObjectConvertor: scheme,
-			},
-		); err != nil {
-			return err
-		}
-	}
-	groupMeta.InterfacesFor = groupMeta.DefaultInterfacesFor
 	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
 
 	if err := m.RegisterGroup(*groupMeta); err != nil {
@@ -190,7 +178,7 @@ func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersi
 		ignoredKinds = gmf.GroupArgs.IgnoredKinds
 	}
 
-	mapper := meta.NewDefaultRESTMapper(externalVersions, groupMeta.InterfacesFor)
+	mapper := meta.NewDefaultRESTMapper(externalVersions)
 	for _, gv := range externalVersions {
 		for kind := range scheme.KnownTypes(gv) {
 			if ignoredKinds.Has(kind) {

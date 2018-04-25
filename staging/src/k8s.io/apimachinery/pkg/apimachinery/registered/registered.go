@@ -124,15 +124,6 @@ func (m *APIRegistrationManager) RegisteredVersionsForGroup(group string) []sche
 	return ret
 }
 
-// InterfacesFor is a union meta.VersionInterfacesFunc func for all registered types
-func (m *APIRegistrationManager) InterfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	groupMeta, err := m.Group(version.Group)
-	if err != nil {
-		return nil, err
-	}
-	return groupMeta.InterfacesFor(version)
-}
-
 // TODO: This is an expedient function, because we don't check if a Group is
 // supported throughout the code base. We will abandon this function and
 // checking the error returned by the Group() function.

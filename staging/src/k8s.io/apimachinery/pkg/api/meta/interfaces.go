@@ -23,11 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
-type VersionInterfaces struct {
-	ObjectConvertor runtime.ObjectConvertor
-}
-
 type ListMetaAccessor interface {
 	GetListMeta() List
 }

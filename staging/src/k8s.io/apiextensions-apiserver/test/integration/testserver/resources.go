@@ -325,7 +325,7 @@ func CreateNewScaleClient(crd *apiextensionsv1beta1.CustomResourceDefinition, co
 		},
 	}
 
-	restMapper := discovery.NewRESTMapper(resources, nil)
+	restMapper := discovery.NewRESTMapper(resources)
 	resolver := scale.NewDiscoveryScaleKindResolver(discoveryClient)
 
 	return scale.NewForConfig(config, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
