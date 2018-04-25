@@ -173,32 +173,46 @@ func (p *testPatcher) New() runtime.Object {
 }
 
 func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	currentPod := p.startingPod
-	if p.numUpdates > 0 {
-		currentPod = p.updatePod
-	}
-	p.numUpdates++
+	// Simulate GuaranteedUpdate behavior (retries internally on etcd changes if the incoming resource doesn't pin resourceVersion)
+	for {
+		currentPod := p.startingPod
+		if p.numUpdates > 0 {
+			currentPod = p.updatePod
+		}
+		p.numUpdates++
 
-	obj, err := objInfo.UpdatedObject(ctx, currentPod)
-	if err != nil {
-		return nil, false, err
-	}
-	inPod := obj.(*example.Pod)
-	if inPod.ResourceVersion != p.updatePod.ResourceVersion {
-		return nil, false, apierrors.NewConflict(example.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
-	}
+		// Remember the current resource version
+		currentResourceVersion := currentPod.ResourceVersion
 
-	if currentPod == nil {
-		if err := createValidation(currentPod); err != nil {
+		obj, err := objInfo.UpdatedObject(ctx, currentPod)
+		if err != nil {
 			return nil, false, err
 		}
-	} else {
-		if err := updateValidation(currentPod, inPod); err != nil {
-			return nil, false, err
+		inPod := obj.(*example.Pod)
+		if inPod.ResourceVersion == "" || inPod.ResourceVersion == "0" {
+			inPod.ResourceVersion = p.updatePod.ResourceVersion
 		}
-	}
+		if inPod.ResourceVersion != p.updatePod.ResourceVersion {
+			// If the patch didn't have an opinion on the resource version, retry like GuaranteedUpdate does
+			if inPod.ResourceVersion == currentResourceVersion {
+				continue
+			}
+			// If the patch changed the resource version and it mismatches, conflict
+			return nil, false, apierrors.NewConflict(example.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
+		}
 
-	return inPod, false, nil
+		if currentPod == nil {
+			if err := createValidation(currentPod); err != nil {
+				return nil, false, err
+			}
+		} else {
+			if err := updateValidation(currentPod, inPod); err != nil {
+				return nil, false, err
+			}
+		}
+
+		return inPod, false, nil
+	}
 }
 
 func (p *testPatcher) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -549,8 +563,7 @@ func TestPatchResourceWithConflict(t *testing.T) {
 		startingPod: &example.Pod{},
 		changedPod:  &example.Pod{},
 		updatePod:   &example.Pod{},
-
-		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
+		expectedPod: &example.Pod{},
 	}
 
 	// See issue #63104 for discussion of how much sense this makes.
@@ -575,6 +588,13 @@ func TestPatchResourceWithConflict(t *testing.T) {
 	tc.updatePod.ResourceVersion = "2"
 	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
 	tc.updatePod.Spec.NodeName = "anywhere"
+
+	tc.expectedPod.Name = name
+	tc.expectedPod.Namespace = namespace
+	tc.expectedPod.UID = uid
+	tc.expectedPod.ResourceVersion = "2"
+	tc.expectedPod.APIVersion = examplev1.SchemeGroupVersion.String()
+	tc.expectedPod.Spec.NodeName = "there"
 
 	tc.Run(t)
 }
