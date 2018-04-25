@@ -118,7 +118,7 @@ func (i *Info) Get() (err error) {
 		return err
 	}
 	i.Object = obj
-	i.ResourceVersion, _ = i.Mapping.MetadataAccessor.ResourceVersion(obj)
+	i.ResourceVersion, _ = metadataAccessor.ResourceVersion(obj)
 	return nil
 }
 
@@ -126,7 +126,7 @@ func (i *Info) Get() (err error) {
 // the Object will be updated even if name, namespace, or resourceVersion
 // attributes cannot be loaded from the object.
 func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
-	name, err := i.Mapping.MetadataAccessor.Name(obj)
+	name, err := metadataAccessor.Name(obj)
 	if err != nil {
 		if !ignoreError {
 			return err
@@ -134,7 +134,7 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	} else {
 		i.Name = name
 	}
-	namespace, err := i.Mapping.MetadataAccessor.Namespace(obj)
+	namespace, err := metadataAccessor.Namespace(obj)
 	if err != nil {
 		if !ignoreError {
 			return err
@@ -142,7 +142,7 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	} else {
 		i.Namespace = namespace
 	}
-	version, err := i.Mapping.MetadataAccessor.ResourceVersion(obj)
+	version, err := metadataAccessor.ResourceVersion(obj)
 	if err != nil {
 		if !ignoreError {
 			return err
@@ -617,7 +617,7 @@ func UpdateObjectNamespace(info *Info, err error) error {
 		return err
 	}
 	if info.Object != nil {
-		return info.Mapping.MetadataAccessor.SetNamespace(info.Object, info.Namespace)
+		return metadataAccessor.SetNamespace(info.Object, info.Namespace)
 	}
 	return nil
 }

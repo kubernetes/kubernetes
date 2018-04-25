@@ -321,7 +321,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		// Get the modified configuration of the object. Embed the result
 		// as an annotation in the modified configuration, so that it will appear
 		// in the patch sent to the server.
-		modified, err := kubectl.GetModifiedConfiguration(info, true, encoder)
+		modified, err := kubectl.GetModifiedConfiguration(info.Object, true, encoder)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 		}
@@ -335,7 +335,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
-			if err := kubectl.CreateApplyAnnotation(info, encoder); err != nil {
+			if err := kubectl.CreateApplyAnnotation(info.Object, encoder); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
@@ -346,11 +346,11 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
 				info.Refresh(obj, true)
-				if uid, err := info.Mapping.UID(info.Object); err != nil {
+				metadata, err := meta.Accessor(info.Object)
+				if err != nil {
 					return err
-				} else {
-					visitedUids.Insert(string(uid))
 				}
+				visitedUids.Insert(string(metadata.GetUID()))
 			}
 
 			count++
@@ -368,10 +368,12 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 
 		if !o.DryRun {
-			annotationMap, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
+			metadata, err := meta.Accessor(info.Object)
 			if err != nil {
 				return err
 			}
+
+			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
@@ -404,11 +406,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 
 			info.Refresh(patchedObject, true)
 
-			if uid, err := info.Mapping.UID(info.Object); err != nil {
-				return err
-			} else {
-				visitedUids.Insert(string(uid))
-			}
+			visitedUids.Insert(string(metadata.GetUID()))
 
 			if string(patchBytes) == "{}" && !printObject {
 				count++
@@ -607,26 +605,20 @@ func (p *pruner) prune(f cmdutil.Factory, namespace string, mapping *meta.RESTMa
 	}
 
 	for _, obj := range objs {
-		annots, err := mapping.MetadataAccessor.Annotations(obj)
+		metadata, err := meta.Accessor(obj)
 		if err != nil {
 			return err
 		}
+		annots := metadata.GetAnnotations()
 		if _, ok := annots[api.LastAppliedConfigAnnotation]; !ok {
 			// don't prune resources not created with apply
 			continue
 		}
-		uid, err := mapping.UID(obj)
-		if err != nil {
-			return err
-		}
+		uid := metadata.GetUID()
 		if p.visitedUids.Has(string(uid)) {
 			continue
 		}
-
-		name, err := mapping.Name(obj)
-		if err != nil {
-			return err
-		}
+		name := metadata.GetName()
 		if !p.dryRun {
 			if err := p.delete(namespace, name, mapping, scaler); err != nil {
 				return err
@@ -716,7 +708,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
-	original, err := kubectl.GetOriginalConfiguration(p.mapping, obj)
+	original, err := kubectl.GetOriginalConfiguration(obj)
 	if err != nil {
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
 	}

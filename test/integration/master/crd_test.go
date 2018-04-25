@@ -153,7 +153,7 @@ func TestCRD(t *testing.T) {
 	barComConfig := *result.ClientConfig
 	barComConfig.GroupVersion = &schema.GroupVersion{Group: "cr.bar.com", Version: "v1"}
 	barComConfig.APIPath = "/apis"
-	barComClient, err := dynamic.NewClient(&barComConfig)
+	barComClient, err := dynamic.NewClient(&barComConfig, *barComConfig.GroupVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

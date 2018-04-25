@@ -237,7 +237,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -412,7 +412,7 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(options.CreateAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 			return err
 		}
 

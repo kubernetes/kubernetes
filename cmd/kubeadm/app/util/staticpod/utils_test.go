@@ -17,6 +17,9 @@ limitations under the License.
 package staticpod
 
 import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -28,6 +31,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestComponentResources(t *testing.T) {
@@ -451,6 +455,76 @@ func TestGetExtraParameters(t *testing.T) {
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {
 			t.Errorf("failed getExtraParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+		}
+	}
+}
+
+const (
+	validPod = `
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - image: gcr.io/google_containers/etcd-amd64:3.1.11
+status: {}
+`
+	invalidPod = `---{ broken yaml @@@`
+)
+
+func TestReadStaticPodFromDisk(t *testing.T) {
+	tests := []struct {
+		description   string
+		podYaml       string
+		expectErr     bool
+		writeManifest bool
+	}{
+		{
+			description:   "valid pod is marshaled",
+			podYaml:       validPod,
+			writeManifest: true,
+			expectErr:     false,
+		},
+		{
+			description:   "invalid pod fails to unmarshal",
+			podYaml:       invalidPod,
+			writeManifest: true,
+			expectErr:     true,
+		},
+		{
+			description:   "non-existent file returns error",
+			podYaml:       ``,
+			writeManifest: false,
+			expectErr:     true,
+		},
+	}
+
+	for _, rt := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		manifestPath := filepath.Join(tmpdir, "pod.yaml")
+		if rt.writeManifest {
+			err := ioutil.WriteFile(manifestPath, []byte(rt.podYaml), 0644)
+			if err != nil {
+				t.Fatalf("Failed to write pod manifest\n%s\n\tfatal error: %v", rt.description, err)
+			}
+		}
+
+		_, actualErr := ReadStaticPodFromDisk(manifestPath)
+		if (actualErr != nil) != rt.expectErr {
+			t.Errorf(
+				"ReadStaticPodFromDisk failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
+				rt.expectErr,
+				(actualErr != nil),
+				actualErr,
+			)
 		}
 	}
 }

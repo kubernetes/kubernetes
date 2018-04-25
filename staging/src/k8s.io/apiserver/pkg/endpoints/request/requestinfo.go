@@ -17,6 +17,7 @@ limitations under the License.
 package request
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -232,12 +233,12 @@ type requestInfoKeyType int
 const requestInfoKey requestInfoKeyType = iota
 
 // WithRequestInfo returns a copy of parent in which the request info value is set
-func WithRequestInfo(parent Context, info *RequestInfo) Context {
+func WithRequestInfo(parent context.Context, info *RequestInfo) context.Context {
 	return WithValue(parent, requestInfoKey, info)
 }
 
 // RequestInfoFrom returns the value of the RequestInfo key on the ctx
-func RequestInfoFrom(ctx Context) (*RequestInfo, bool) {
+func RequestInfoFrom(ctx context.Context) (*RequestInfo, bool) {
 	info, ok := ctx.Value(requestInfoKey).(*RequestInfo)
 	return info, ok
 }

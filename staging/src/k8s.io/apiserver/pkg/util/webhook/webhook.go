@@ -48,7 +48,7 @@ func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 
 func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
-		if !registry.IsEnabledVersion(groupVersion) {
+		if !registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
 		}
 	}

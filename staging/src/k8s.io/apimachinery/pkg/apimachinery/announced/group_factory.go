@@ -72,32 +72,7 @@ func NewGroupMetaFactory(groupArgs *GroupMetaFactoryArgs, versions VersionToSche
 	return gmf
 }
 
-// Announce adds this Group factory to the global factory registry. It should
-// only be called if you constructed the GroupMetaFactory yourself via
-// NewGroupMetaFactory.
-// Note that this will panic on an error, since it's expected that you'll be
-// calling this at initialization time and any error is a result of a
-// programmer importing the wrong set of packages. If this assumption doesn't
-// work for you, just call DefaultGroupFactoryRegistry.AnnouncePreconstructedFactory
-// yourself.
-func (gmf *GroupMetaFactory) Announce(groupFactoryRegistry APIGroupFactoryRegistry) *GroupMetaFactory {
-	if err := groupFactoryRegistry.AnnouncePreconstructedFactory(gmf); err != nil {
-		panic(err)
-	}
-	return gmf
-}
-
 // GroupMetaFactory has the logic for actually assembling and registering a group.
-//
-// There are two ways of obtaining one of these.
-// 1. You can announce your group and versions separately, and then let the
-//    GroupFactoryRegistry assemble this object for you. (This allows group and
-//    versions to be imported separately, without referencing each other, to
-//    keep import trees small.)
-// 2. You can call NewGroupMetaFactory(), which is mostly a drop-in replacement
-//    for the old, bad way of doing things. You can then call .Announce() to
-//    announce your constructed factory to any code that would like to do
-//    things the new, better way.
 //
 // Note that GroupMetaFactory actually does construct GroupMeta objects, but
 // currently it does so in a way that's very entangled with an
@@ -112,13 +87,16 @@ type GroupMetaFactory struct {
 }
 
 // Register constructs the finalized prioritized version list and sanity checks
-// the announced group & versions. Then it calls register.
-func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) error {
+// the registered group & versions. Then it calls register.
+func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, scheme *runtime.Scheme) error {
 	if gmf.GroupArgs == nil {
-		return fmt.Errorf("partially announced groups are not allowed, only got versions: %#v", gmf.VersionArgs)
+		return fmt.Errorf("partially registered groups are not allowed, only got versions: %#v", gmf.VersionArgs)
 	}
 	if len(gmf.VersionArgs) == 0 {
-		return fmt.Errorf("group %v announced but no versions announced", gmf.GroupArgs.GroupName)
+		return fmt.Errorf("group %v registered but no versions registered", gmf.GroupArgs.GroupName)
+	}
+	if m.IsRegistered(gmf.GroupArgs.GroupName) {
+		return fmt.Errorf("the group %q has already been registered.", gmf.GroupArgs.GroupName)
 	}
 
 	pvSet := sets.NewString(gmf.GroupArgs.VersionPreferenceOrder...)
@@ -152,12 +130,56 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager) erro
 		glog.Warningf("group %v has multiple unprioritized versions: %#v. They will have an arbitrary preference order!", gmf.GroupArgs.GroupName, unprioritizedVersions)
 	}
 	if pvSet.Len() != 0 {
-		return fmt.Errorf("group %v has versions in the priority list that were never announced: %s", gmf.GroupArgs.GroupName, pvSet)
+		return fmt.Errorf("group %v has versions in the priority list that were never registered: %s", gmf.GroupArgs.GroupName, pvSet)
 	}
 	prioritizedVersions = append(prioritizedVersions, unprioritizedVersions...)
 	m.RegisterVersions(prioritizedVersions)
 	gmf.prioritizedVersionList = prioritizedVersions
+
+	externalVersions := []schema.GroupVersion{}
+	for _, v := range gmf.prioritizedVersionList {
+		if !m.IsAllowedVersion(v) {
+			continue
+		}
+		externalVersions = append(externalVersions, v)
+		gmf.VersionArgs[v.Version].AddToScheme(scheme)
+	}
+	if len(externalVersions) == 0 {
+		glog.V(4).Infof("No version is registered for group %v", gmf.GroupArgs.GroupName)
+		return nil
+	}
+
+	if gmf.GroupArgs.AddInternalObjectsToScheme != nil {
+		gmf.GroupArgs.AddInternalObjectsToScheme(scheme)
+	}
+
+	preferredExternalVersion := externalVersions[0]
+	accessor := meta.NewAccessor()
+
+	groupMeta := &apimachinery.GroupMeta{
+		GroupVersion:  preferredExternalVersion,
+		GroupVersions: externalVersions,
+		SelfLinker:    runtime.SelfLinker(accessor),
+	}
+	for _, v := range externalVersions {
+		gvf := gmf.VersionArgs[v.Version]
+		if err := groupMeta.AddVersionInterfaces(
+			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
+			&meta.VersionInterfaces{
+				ObjectConvertor: scheme,
+			},
+		); err != nil {
+			return err
+		}
+	}
+	groupMeta.InterfacesFor = groupMeta.DefaultInterfacesFor
+	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
+
+	if err := m.RegisterGroup(*groupMeta); err != nil {
+		return err
+	}
 	return nil
+
 }
 
 func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersions []schema.GroupVersion, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
@@ -187,69 +209,4 @@ func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersi
 	}
 
 	return mapper
-}
-
-// Enable enables group versions that are allowed, adds methods to the scheme, etc.
-func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme *runtime.Scheme) error {
-	externalVersions := []schema.GroupVersion{}
-	for _, v := range gmf.prioritizedVersionList {
-		if !m.IsAllowedVersion(v) {
-			continue
-		}
-		externalVersions = append(externalVersions, v)
-		if err := m.EnableVersions(v); err != nil {
-			return err
-		}
-		gmf.VersionArgs[v.Version].AddToScheme(scheme)
-	}
-	if len(externalVersions) == 0 {
-		glog.V(4).Infof("No version is registered for group %v", gmf.GroupArgs.GroupName)
-		return nil
-	}
-
-	if gmf.GroupArgs.AddInternalObjectsToScheme != nil {
-		gmf.GroupArgs.AddInternalObjectsToScheme(scheme)
-	}
-
-	preferredExternalVersion := externalVersions[0]
-	accessor := meta.NewAccessor()
-
-	groupMeta := &apimachinery.GroupMeta{
-		GroupVersion:  preferredExternalVersion,
-		GroupVersions: externalVersions,
-		SelfLinker:    runtime.SelfLinker(accessor),
-	}
-	for _, v := range externalVersions {
-		gvf := gmf.VersionArgs[v.Version]
-		if err := groupMeta.AddVersionInterfaces(
-			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
-			&meta.VersionInterfaces{
-				ObjectConvertor:  scheme,
-				MetadataAccessor: accessor,
-			},
-		); err != nil {
-			return err
-		}
-	}
-	groupMeta.InterfacesFor = groupMeta.DefaultInterfacesFor
-	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
-
-	if err := m.RegisterGroup(*groupMeta); err != nil {
-		return err
-	}
-	return nil
-}
-
-// RegisterAndEnable is provided only to allow this code to get added in multiple steps.
-// It's really bad that this is called in init() methods, but supporting this
-// temporarily lets us do the change incrementally.
-func (gmf *GroupMetaFactory) RegisterAndEnable(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) error {
-	if err := gmf.Register(registry); err != nil {
-		return err
-	}
-	if err := gmf.Enable(registry, scheme); err != nil {
-		return err
-	}
-
-	return nil
 }

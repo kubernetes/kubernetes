@@ -33,7 +33,6 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,15 +44,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-type InstallFunc func(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme)
+type InstallFunc func(registry *registered.APIRegistrationManager, scheme *runtime.Scheme)
 
 // RoundTripTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
 func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
-	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
 	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
-	installFn(groupFactoryRegistry, registry, scheme)
+	installFn(registry, scheme)
 
 	RoundTripTestForScheme(t, scheme, fuzzingFuncs)
 }
@@ -72,10 +70,9 @@ func RoundTripTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs f
 // RoundTripProtobufTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
 func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
-	groupFactoryRegistry := make(announced.APIGroupFactoryRegistry)
 	registry := registered.NewOrDie("")
 	scheme := runtime.NewScheme()
-	installFn(groupFactoryRegistry, registry, scheme)
+	installFn(registry, scheme)
 
 	RoundTripProtobufTestForScheme(t, scheme, fuzzingFuncs)
 }

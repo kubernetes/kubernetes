@@ -58,6 +58,7 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/buffered:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/log:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/audit/truncate:go_default_library",
         "//vendor/k8s.io/apiserver/plugin/pkg/audit/webhook:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

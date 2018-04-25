@@ -149,7 +149,7 @@ func (o *SetLastAppliedOptions) Validate(f cmdutil.Factory, cmd *cobra.Command) 
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
 		}
-		originalBuf, err := kubectl.GetOriginalConfiguration(info.Mapping, info.Object)
+		originalBuf, err := kubectl.GetOriginalConfiguration(info.Object)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 		}

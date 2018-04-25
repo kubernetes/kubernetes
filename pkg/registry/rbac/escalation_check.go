@@ -17,6 +17,7 @@ limitations under the License.
 package rbac
 
 import (
+	"context"
 	"fmt"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
-func EscalationAllowed(ctx genericapirequest.Context) bool {
+func EscalationAllowed(ctx context.Context) bool {
 	u, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
 		return false
@@ -44,7 +45,7 @@ func EscalationAllowed(ctx genericapirequest.Context) bool {
 }
 
 // BindingAuthorized returns true if the user associated with the context is explicitly authorized to bind the specified roleRef
-func BindingAuthorized(ctx genericapirequest.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) bool {
+func BindingAuthorized(ctx context.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) bool {
 	if a == nil {
 		return false
 	}

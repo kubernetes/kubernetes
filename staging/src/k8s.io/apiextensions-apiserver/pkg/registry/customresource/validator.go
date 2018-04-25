@@ -17,6 +17,7 @@ limitations under the License.
 package customresource
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
@@ -42,7 +42,7 @@ type customResourceValidator struct {
 	statusSchemaValidator *validate.SchemaValidator
 }
 
-func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+func (a customResourceValidator) Validate(ctx context.Context, obj runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
@@ -109,7 +109,7 @@ func (a customResourceValidator) Validate(ctx genericapirequest.Context, obj run
 	return validation.ValidateObjectMetaAccessor(accessor, a.namespaceScoped, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
 }
 
-func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	objAccessor, err := meta.Accessor(obj)
 	if err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}
@@ -180,7 +180,7 @@ func (a customResourceValidator) ValidateUpdate(ctx genericapirequest.Context, o
 	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))
 }
 
-func (a customResourceValidator) ValidateStatusUpdate(ctx genericapirequest.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	objAccessor, err := meta.Accessor(obj)
 	if err != nil {
 		return field.ErrorList{field.Invalid(field.NewPath("metadata"), nil, err.Error())}

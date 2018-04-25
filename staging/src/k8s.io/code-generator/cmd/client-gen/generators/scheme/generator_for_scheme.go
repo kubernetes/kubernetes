@@ -96,16 +96,14 @@ func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Write
 		"runtimeScheme":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Scheme"}),
 		"schemaGroupVersion":               c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"metav1AddToGroupVersion":          c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
-		"announcedAPIGroupFactoryRegistry": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/announced", Name: "APIGroupFactoryRegistry"}),
 		"registeredNewOrDie":               c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "NewOrDie"}),
 		"registeredAPIRegistrationManager": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "APIRegistrationManager"}),
 	}
 	globals := map[string]string{
-		"Scheme":               "Scheme",
-		"Codecs":               "Codecs",
-		"ParameterCodec":       "ParameterCodec",
-		"Registry":             "Registry",
-		"GroupFactoryRegistry": "GroupFactoryRegistry",
+		"Scheme":         "Scheme",
+		"Codecs":         "Codecs",
+		"ParameterCodec": "ParameterCodec",
+		"Registry":       "Registry",
 	}
 	for k, v := range globals {
 		if g.PrivateScheme {
@@ -140,20 +138,19 @@ var $.ParameterCodec$ = $.runtimeNewParameterCodec|raw$($.Scheme$)
 
 var registryRegistration = `
 var $.Registry$ = $.registeredNewOrDie|raw$($.osGetenv|raw$("KUBE_API_VERSIONS"))
-var $.GroupFactoryRegistry$ = make($.announcedAPIGroupFactoryRegistry|raw$)
 
 func init() {
 	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
-	Install($.GroupFactoryRegistry$, $.Registry$, $.Scheme$)
+	Install($.Registry$, $.Scheme$)
 }
 
 // Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry $.announcedAPIGroupFactoryRegistry|raw$, registry *$.registeredAPIRegistrationManager|raw$, scheme *$.runtimeScheme|raw$) {
+func Install(registry *$.registeredAPIRegistrationManager|raw$, scheme *$.runtimeScheme|raw$) {
 	$- range .allInstallGroups$
-	$.InstallPackageAlias$.Install(groupFactoryRegistry, registry, scheme)
+	$.InstallPackageAlias$.Install(registry, scheme)
 	$- end$
 	$if .customRegister$
-	ExtraInstall(groupFactoryRegistry, registry, scheme)
+	ExtraInstall(registry, scheme)
 	$end -$
 }
 `

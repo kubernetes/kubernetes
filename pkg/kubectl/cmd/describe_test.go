@@ -106,7 +106,7 @@ func TestDescribeObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {

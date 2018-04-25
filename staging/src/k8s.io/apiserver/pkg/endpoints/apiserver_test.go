@@ -19,6 +19,7 @@ package endpoints
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -146,23 +147,19 @@ func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error)
 	switch version {
 	case testGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	case newGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	case grouplessGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	case testGroup2Version:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, groupVersions)
@@ -414,7 +411,7 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := storage.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -429,11 +426,11 @@ func (storage *SimpleRESTStorage) Export(ctx request.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) ConvertToTable(ctx request.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
-func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
 		ListMeta: metav1.ListMeta{
@@ -488,7 +485,7 @@ func (h *OutputConnect) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte(h.response))
 }
 
-func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
@@ -496,11 +493,11 @@ func (storage *SimpleRESTStorage) Get(ctx request.Context, id string, options *m
 	return storage.item.DeepCopy(), storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) checkContext(ctx request.Context) {
+func (storage *SimpleRESTStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx request.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
@@ -523,7 +520,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -539,7 +536,7 @@ func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object
 	return obj, err
 }
 
-func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	storage.checkContext(ctx)
 	obj, err := objInfo.UpdatedObject(ctx, &storage.item)
 	if err != nil {
@@ -559,7 +556,7 @@ func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objIn
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx request.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
 	storage.checkContext(ctx)
@@ -608,7 +605,7 @@ func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}
 }
 
-func (s *ConnecterRESTStorage) Connect(ctx request.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
+func (s *ConnecterRESTStorage) Connect(ctx context.Context, id string, options runtime.Object, responder rest.Responder) (http.Handler, error) {
 	s.receivedConnectOptions = options
 	s.receivedID = id
 	s.receivedResponder = responder
@@ -633,7 +630,7 @@ type LegacyRESTStorage struct {
 	*SimpleRESTStorage
 }
 
-func (storage LegacyRESTStorage) Delete(ctx request.Context, id string) (runtime.Object, error) {
+func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
 	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
 	return obj, err
 }
@@ -659,7 +656,7 @@ type GetWithOptionsRESTStorage struct {
 	takesPath       string
 }
 
-func (r *GetWithOptionsRESTStorage) Get(ctx request.Context, name string, options runtime.Object) (runtime.Object, error) {
+func (r *GetWithOptionsRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
@@ -682,7 +679,7 @@ type GetWithOptionsRootRESTStorage struct {
 	takesPath       string
 }
 
-func (r *GetWithOptionsRootRESTStorage) Get(ctx request.Context, name string, options runtime.Object) (runtime.Object, error) {
+func (r *GetWithOptionsRootRESTStorage) Get(ctx context.Context, name string, options runtime.Object) (runtime.Object, error) {
 	if _, ok := options.(*genericapitesting.SimpleGetOptions); !ok {
 		return nil, fmt.Errorf("Unexpected options object: %#v", options)
 	}
@@ -704,7 +701,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -734,12 +731,12 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 	return storage.baseType
 }
 
-func (storage *SimpleTypedStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleTypedStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return storage.item.DeepCopyObject(), storage.errors["get"]
 }
 
-func (storage *SimpleTypedStorage) checkContext(ctx request.Context) {
+func (storage *SimpleTypedStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
 }
 
@@ -3831,7 +3828,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &genericapitesting.SimpleXGSubresource{}
 }
 
-func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
+func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil
 }
 

@@ -11,6 +11,7 @@ go_library(
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/printers:go_default_library",
@@ -36,7 +37,6 @@ go_test(
     srcs = ["get_test.go"],
     data = [
         "//api/openapi-spec:swagger-spec",
-        "//examples:config",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],
@@ -51,6 +51,7 @@ go_test(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",

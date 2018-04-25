@@ -18,7 +18,6 @@ package set
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/printers"
@@ -69,8 +68,6 @@ type SetResourcesOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 
 	Infos             []*resource.Info
-	Out               io.Writer
-	Err               io.Writer
 	Selector          string
 	ContainerSelector string
 	Output            string
@@ -88,25 +85,27 @@ type SetResourcesOptions struct {
 
 	UpdatePodSpecForObject func(obj runtime.Object, fn func(*v1.PodSpec) error) (bool, error)
 	Resources              []string
+
+	genericclioptions.IOStreams
 }
 
 // NewResourcesOptions returns a ResourcesOptions indicating all containers in the selected
 // pod templates are selected by default.
-func NewResourcesOptions(out io.Writer, errOut io.Writer) *SetResourcesOptions {
+func NewResourcesOptions(streams genericclioptions.IOStreams) *SetResourcesOptions {
 	return &SetResourcesOptions{
 		PrintFlags:  printers.NewPrintFlags("resource requirements updated"),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		Out:               out,
-		Err:               errOut,
 		ContainerSelector: "*",
+
+		IOStreams: streams,
 	}
 }
 
-func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	o := NewResourcesOptions(out, errOut)
+func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewResourcesOptions(streams)
 
 	resourceTypesWithPodTemplate := []string{}
 	for _, resource := range f.SuggestedPodTemplateResources() {

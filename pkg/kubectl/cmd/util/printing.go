@@ -136,7 +136,7 @@ func PrintObject(cmd *cobra.Command, obj runtime.Object, out io.Writer) error {
 func PrinterForOptions(options *printers.PrintOptions) (printers.ResourcePrinter, error) {
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{kubectlscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme}
-	encoder := kubectlscheme.Codecs.LegacyCodec(kubectlscheme.Registry.EnabledVersions()...)
+	encoder := kubectlscheme.Codecs.LegacyCodec(kubectlscheme.Registry.RegisteredGroupVersions()...)
 
 	printer, err := printers.GetStandardPrinter(kubectlscheme.Scheme, encoder, decoders, *options)
 	if err != nil {

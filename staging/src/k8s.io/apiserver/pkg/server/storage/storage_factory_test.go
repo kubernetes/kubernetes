@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +36,6 @@ var (
 	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
 	registry       = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	announce       = make(announced.APIGroupFactoryRegistry)
 	scheme         = runtime.NewScheme()
 	codecs         = serializer.NewCodecFactory(scheme)
 	parameterCodec = runtime.NewParameterCodec(scheme)
@@ -53,7 +51,7 @@ func init() {
 		&metav1.APIResourceList{},
 	)
 
-	exampleinstall.Install(announce, registry, scheme)
+	exampleinstall.Install(registry, scheme)
 }
 
 type fakeNegotiater struct {
@@ -119,8 +117,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 
 func TestUpdateEtcdOverrides(t *testing.T) {
 	registry := registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
-	announced := make(announced.APIGroupFactoryRegistry)
-	exampleinstall.Install(announced, registry, scheme)
+	exampleinstall.Install(registry, scheme)
 
 	testCases := []struct {
 		resource schema.GroupResource

@@ -89,7 +89,6 @@ go_library(
         "//pkg/kubectl/util/term:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
-        "//pkg/printers/internalversion:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",
@@ -178,7 +177,6 @@ go_test(
     data = [
         "testdata",
         "//api/openapi-spec:swagger-spec",
-        "//examples:config",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],

@@ -67,7 +67,7 @@ go_test(
         "create_test.go",
     ],
     data = [
-        "//examples:config",
+        "//test/e2e/testing-manifests:all-srcs",
     ],
     embed = [":go_default_library"],
     deps = [

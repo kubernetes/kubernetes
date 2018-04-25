@@ -9,7 +9,6 @@ cmd/kubeadm/app/apis/kubeadm/v1alpha1
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
-examples/guestbook-go
 pkg/api/endpoints
 pkg/api/ref
 pkg/api/testapi

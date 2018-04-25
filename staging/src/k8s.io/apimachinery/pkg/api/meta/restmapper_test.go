@@ -44,7 +44,7 @@ var validAccessor = resourceAccessor{}
 var validConvertor = fakeConvertor{}
 
 func fakeInterfaces(version schema.GroupVersion) (*VersionInterfaces, error) {
-	return &VersionInterfaces{ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, nil
+	return &VersionInterfaces{ObjectConvertor: validConvertor}, nil
 }
 
 var unmatchedErr = errors.New("no version")
@@ -577,8 +577,8 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 			t.Errorf("%d: unexpected resource: %#v", i, mapping)
 		}
 
-		if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
-			t.Errorf("%d: missing codec and accessor: %#v", i, mapping)
+		if mapping.ObjectConvertor == nil {
+			t.Errorf("%d: missing codec: %#v", i, mapping)
 		}
 
 		groupVersion := testCase.ExpectedGroupVersion
@@ -727,8 +727,8 @@ func TestRESTMapperRESTMappings(t *testing.T) {
 			if mapping.Resource != exp.Resource {
 				t.Errorf("%d - %d: unexpected resource: %#v", i, j, mapping)
 			}
-			if mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
-				t.Errorf("%d - %d: missing codec and accessor: %#v", i, j, mapping)
+			if mapping.ObjectConvertor == nil {
+				t.Errorf("%d - %d: missing codec: %#v", i, j, mapping)
 			}
 			if mapping.GroupVersionKind != exp.GroupVersionKind {
 				t.Errorf("%d - %d: unexpected GroupVersionKind: %#v", i, j, mapping)

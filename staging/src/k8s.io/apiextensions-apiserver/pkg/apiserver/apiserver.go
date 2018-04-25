@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,10 +52,9 @@ import (
 )
 
 var (
-	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
-	Registry             = registered.NewOrDie("")
-	Scheme               = runtime.NewScheme()
-	Codecs               = serializer.NewCodecFactory(Scheme)
+	Registry = registered.NewOrDie("")
+	Scheme   = runtime.NewScheme()
+	Codecs   = serializer.NewCodecFactory(Scheme)
 
 	// if you modify this, make sure you update the crEncoder
 	unversionedVersion = schema.GroupVersion{Group: "", Version: "v1"}
@@ -71,7 +69,7 @@ var (
 )
 
 func init() {
-	install.Install(groupFactoryRegistry, Registry, Scheme)
+	install.Install(Registry, Scheme)
 
 	// we need to add the options to empty v1
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})

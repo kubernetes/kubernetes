@@ -2277,15 +2277,13 @@ EOF
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] ||
      ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
-    if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]] &&
-       [[ "${METADATA_AGENT_VERSION:-}" != "" ]]; then
+    if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]]; then
       metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
       metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
       metadata_agent_cluster_level_cpu_request="${METADATA_AGENT_CLUSTER_LEVEL_CPU_REQUEST:-40m}"
       metadata_agent_cluster_level_memory_request="${METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST:-50Mi}"
       setup-addon-manifests "addons" "metadata-agent/stackdriver"
       metadata_agent_yaml="${dst_dir}/metadata-agent/stackdriver/metadata-agent.yaml"
-      sed -i -e "s@{{ metadata_agent_version }}@${METADATA_AGENT_VERSION}@g" "${metadata_agent_yaml}"
       sed -i -e "s@{{ metadata_agent_cpu_request }}@${metadata_agent_cpu_request}@g" "${metadata_agent_yaml}"
       sed -i -e "s@{{ metadata_agent_memory_request }}@${metadata_agent_memory_request}@g" "${metadata_agent_yaml}"
       sed -i -e "s@{{ metadata_agent_cluster_level_cpu_request }}@${metadata_agent_cluster_level_cpu_request}@g" "${metadata_agent_yaml}"

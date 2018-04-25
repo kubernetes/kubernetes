@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/client-go/informers"
@@ -155,8 +155,7 @@ func TestInstallAPIGroups(t *testing.T) {
 
 		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 			return &meta.VersionInterfaces{
-				ObjectConvertor:  scheme,
-				MetadataAccessor: meta.NewAccessor(),
+				ObjectConvertor: scheme,
 			}, nil
 		}
 
@@ -468,7 +467,7 @@ func (p *testGetterStorage) New() runtime.Object {
 	}
 }
 
-func (p *testGetterStorage) Get(ctx apirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testGetterStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, nil
 }
 

@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
@@ -254,17 +255,17 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
 				create.NewCmdCreate(f, ioStreams),
-				NewCmdExposeService(f, out),
-				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, in, out, err),
-				deprecatedAlias("run-container", NewCmdRun(f, in, out, err)),
+				NewCmdExposeService(f, ioStreams),
+				NewCmdRun(f, ioStreams),
+				set.NewCmdSet(f, ioStreams),
+				deprecatedAlias("run-container", NewCmdRun(f, ioStreams)),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				resource.NewCmdGet(f, out, err),
-				NewCmdExplain(f, out, err),
+				resource.NewCmdGet(f, ioStreams),
+				NewCmdExplain(f, ioStreams),
 				NewCmdEdit(f, ioStreams),
 				NewCmdDelete(f, out, err),
 			},
@@ -378,3 +379,5 @@ func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Comman
 	cmd.Hidden = true
 	return cmd
 }
+
+var metadataAccessor = meta.NewAccessor()

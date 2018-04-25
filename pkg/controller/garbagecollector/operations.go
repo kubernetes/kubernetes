@@ -30,6 +30,14 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+// cluster scoped resources don't have namespaces.  Default to the item's namespace, but clear it for cluster scoped resources
+func resourceDefaultNamespace(resource *metav1.APIResource, defaultNamespace string) string {
+	if resource.Namespaced {
+		return defaultNamespace
+	}
+	return ""
+}
+
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
 // namespace> tuple to a unversioned.APIResource struct.
 func (gc *GarbageCollector) apiResource(apiVersion, kind string) (*metav1.APIResource, error) {
@@ -60,7 +68,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.De
 	uid := item.UID
 	preconditions := metav1.Preconditions{UID: &uid}
 	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions, PropagationPolicy: policy}
-	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
+	return client.Resource(resource, resourceDefaultNamespace(resource, item.Namespace)).Delete(item.Name, &deleteOptions)
 }
 
 func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstructured, error) {
@@ -73,7 +81,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstr
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.Namespace).Get(item.Name, metav1.GetOptions{})
+	return client.Resource(resource, resourceDefaultNamespace(resource, item.Namespace)).Get(item.Name, metav1.GetOptions{})
 }
 
 func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -86,7 +94,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.Namespace).Update(obj)
+	return client.Resource(resource, resourceDefaultNamespace(resource, item.Namespace)).Update(obj)
 }
 
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*unstructured.Unstructured, error) {
@@ -99,7 +107,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*un
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.Namespace).Patch(item.Name, types.StrategicMergePatchType, patch)
+	return client.Resource(resource, resourceDefaultNamespace(resource, item.Namespace)).Patch(item.Name, types.StrategicMergePatchType, patch)
 }
 
 // TODO: Using Patch when strategicmerge supports deleting an entry from a

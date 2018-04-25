@@ -276,7 +276,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		    Description: Make sure that the pod is restarted with a docker exec
 			liveness probe with timeout.
 	*/
-	framework.ConformanceIt("should be restarted with a docker exec liveness probe with timeout ", func() {
+	It("should be restarted with a docker exec liveness probe with timeout ", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
 		framework.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		runLivenessTest(f, &v1.Pod{

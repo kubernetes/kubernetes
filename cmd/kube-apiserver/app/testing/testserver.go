@@ -107,6 +107,7 @@ func StartTestServer(t Logger, customFlags []string, storageConfig *storagebacke
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
 	}
 
+	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {

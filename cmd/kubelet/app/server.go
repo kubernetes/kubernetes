@@ -169,6 +169,10 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				glog.Fatal(err)
 			}
 
+			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
+				glog.Warning("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
+			}
+
 			// load kubelet config file, if provided
 			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
 				kubeletConfig, err = loadConfigFile(configFile)
@@ -335,7 +339,10 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode")
-		mounter = mount.NewNsenterMounter()
+		mounter, err = mount.NewNsenterMounter()
+		if err != nil {
+			return nil, err
+		}
 		writer = &kubeio.NsenterWriter{}
 	}
 

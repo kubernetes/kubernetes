@@ -19,7 +19,6 @@ package scheme
 import (
 	"os"
 
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,9 +27,6 @@ import (
 )
 
 // All kubectl code should eventually switch to use this Registry and Scheme instead of the global ones.
-
-// GroupFactoryRegistry is the APIGroupFactoryRegistry (overlaps a bit with Registry, see comments in package for details)
-var GroupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
 
 // Registry is an instance of an API registry.
 var Registry = registered.NewOrDie(os.Getenv("KUBE_API_VERSIONS"))

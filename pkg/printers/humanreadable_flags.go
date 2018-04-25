@@ -47,7 +47,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool,
 		return nil, false, nil
 	}
 
-	encoder := scheme.Codecs.LegacyCodec(scheme.Registry.EnabledVersions()...)
+	encoder := scheme.Codecs.LegacyCodec(scheme.Registry.RegisteredGroupVersions()...)
 	decoder := scheme.Codecs.UniversalDecoder()
 
 	showKind := false

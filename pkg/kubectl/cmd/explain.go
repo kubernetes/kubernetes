@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/explain"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -49,8 +49,20 @@ var (
 		kubectl explain pods.spec.containers`))
 )
 
+type ExplainOptions struct {
+	genericclioptions.IOStreams
+}
+
+func NewExplainOptions(streams genericclioptions.IOStreams) *ExplainOptions {
+	return &ExplainOptions{
+		IOStreams: streams,
+	}
+}
+
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
+func NewCmdExplain(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewExplainOptions(streams)
+
 	cmd := &cobra.Command{
 		Use: "explain RESOURCE",
 		DisableFlagsInUseLine: true,
@@ -58,7 +70,7 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 		Long:    explainLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExplain(f, out, cmdErr, cmd, args)
+			err := o.RunExplain(f, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -68,9 +80,9 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 }
 
 // RunExplain executes the appropriate steps to print a model's documentation
-func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+func (o *ExplainOptions) RunExplain(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintf(cmdErr, "You must specify the type of resource to explain. %s\n\n", cmdutil.ValidResourceTypeList(f))
+		fmt.Fprintf(o.ErrOut, "You must specify the type of resource to explain. %s\n\n", cmdutil.ValidResourceTypeList(f))
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 	if len(args) > 1 {
@@ -120,5 +132,5 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 		return fmt.Errorf("Couldn't find resource for %q", gvk)
 	}
 
-	return explain.PrintModelDescription(fieldsPath, out, schema, gvk, recursive)
+	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, recursive)
 }

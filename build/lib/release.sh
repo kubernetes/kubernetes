@@ -481,7 +481,6 @@ EOF
   mkdir -p "${release_stage}/hack"
   cp -R "${KUBE_ROOT}/hack/lib" "${release_stage}/hack/"
 
-  cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"

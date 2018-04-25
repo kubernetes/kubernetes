@@ -25,9 +25,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
@@ -68,51 +66,47 @@ func TestNewRemoteConfigSource(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		src, _, err := NewRemoteConfigSource(c.source)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		// underlying object should match the object passed in
-		if !apiequality.Semantic.DeepEqual(c.expect.object(), src.object()) {
-			t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(src))
-		}
+		t.Run(c.desc, func(t *testing.T) {
+			source, _, err := NewRemoteConfigSource(c.source)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// underlying object should match the object passed in
+			if !apiequality.Semantic.DeepEqual(c.expect.object(), source.object()) {
+				t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(source))
+			}
+		})
 	}
 }
 
 func TestRemoteConfigMapUID(t *testing.T) {
-	cases := []string{"", "uid", "376dfb73-56db-11e7-a01e-42010a800002"}
-	for _, uidIn := range cases {
-		cpt := &remoteConfigMap{
-			&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: types.UID(uidIn)}},
-		}
-		// UID method should return the correct value of the UID
-		uidOut := cpt.UID()
-		if uidIn != uidOut {
-			t.Errorf("expect UID() to return %q, but got %q", uidIn, uidOut)
-		}
+	const expect = "uid"
+	source, _, err := NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: expect}})
+	if err != nil {
+		t.Fatalf("error constructing remote config source: %v", err)
+	}
+	uid := source.UID()
+	if expect != uid {
+		t.Errorf("expect %q, but got %q", expect, uid)
 	}
 }
 
 func TestRemoteConfigMapAPIPath(t *testing.T) {
-	name := "name"
-	namespace := "namespace"
-	cpt := &remoteConfigMap{
-		&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: name, Namespace: namespace, UID: ""}},
+	const namespace = "namespace"
+	const name = "name"
+	source, _, err := NewRemoteConfigSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: name, Namespace: namespace, UID: "uid"}})
+	if err != nil {
+		t.Fatalf("error constructing remote config source: %v", err)
 	}
-	expect := fmt.Sprintf(configMapAPIPathFmt, cpt.source.ConfigMapRef.Namespace, cpt.source.ConfigMapRef.Name)
-	// APIPath() method should return the correct path to the referenced resource
-	path := cpt.APIPath()
+	expect := fmt.Sprintf(configMapAPIPathFmt, namespace, name)
+	path := source.APIPath()
 	if expect != path {
-		t.Errorf("expect APIPath() to return %q, but got %q", expect, namespace)
+		t.Errorf("expect %q, but got %q", expect, path)
 	}
 }
 
 func TestRemoteConfigMapDownload(t *testing.T) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	cm := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "name",
@@ -120,36 +114,76 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 			UID:       "uid",
 		}}
 	client := fakeclient.NewSimpleClientset(cm)
+	payload, err := NewConfigMapPayload(cm)
+	if err != nil {
+		t.Fatalf("error constructing payload: %v", err)
+	}
+
+	makeSource := func(source *apiv1.NodeConfigSource) RemoteConfigSource {
+		s, _, err := NewRemoteConfigSource(source)
+		if err != nil {
+			t.Fatalf("error constructing remote config source %v", err)
+		}
+		return s
+	}
 
 	cases := []struct {
 		desc   string
 		source RemoteConfigSource
-		expect Checkpoint
+		expect Payload
 		err    string
 	}{
-
 		// object doesn't exist
 		{"object doesn't exist",
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "bogus", Namespace: "namespace", UID: "bogus"}}},
+			makeSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "bogus", Namespace: "namespace", UID: "bogus"}}),
 			nil, "not found"},
 		// UID of downloaded object doesn't match UID of referent found via namespace/name
 		{"UID is incorrect for namespace/name",
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "bogus"}}},
+			makeSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "bogus"}}),
 			nil, "does not match"},
 		// successful download
 		{"object exists and reference is correct",
-			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}}},
-			&configMapCheckpoint{kubeletCodecs, cm}, ""},
+			makeSource(&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}}),
+			payload, ""},
 	}
 
 	for _, c := range cases {
-		cpt, _, err := c.source.Download(client)
-		if utiltest.SkipRest(t, c.desc, err, c.err) {
-			continue
-		}
-		// "downloaded" object should match the expected
-		if !apiequality.Semantic.DeepEqual(c.expect.object(), cpt.object()) {
-			t.Errorf("case %q, expect Checkpoint %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(cpt))
-		}
+		t.Run(c.desc, func(t *testing.T) {
+			payload, _, err := c.source.Download(client)
+			utiltest.ExpectError(t, err, c.err)
+			if err != nil {
+				return
+			}
+			// downloaded object should match the expected
+			if !apiequality.Semantic.DeepEqual(c.expect.object(), payload.object()) {
+				t.Errorf("case %q, expect Checkpoint %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(payload))
+			}
+		})
+	}
+}
+
+func TestEqualRemoteConfigSources(t *testing.T) {
+	cases := []struct {
+		desc   string
+		a      RemoteConfigSource
+		b      RemoteConfigSource
+		expect bool
+	}{
+		{"both nil", nil, nil, true},
+		{"a nil", nil, &remoteConfigMap{}, false},
+		{"b nil", &remoteConfigMap{}, nil, false},
+		{"neither nil, equal", &remoteConfigMap{}, &remoteConfigMap{}, true},
+		{"neither nil, not equal",
+			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "a"}}},
+			&remoteConfigMap{},
+			false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			if EqualRemoteConfigSources(c.a, c.b) != c.expect {
+				t.Errorf("expected EqualRemoteConfigSources to return %t, but got %t", c.expect, !c.expect)
+			}
+		})
 	}
 }

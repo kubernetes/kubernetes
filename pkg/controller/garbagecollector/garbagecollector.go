@@ -303,7 +303,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = client.Resource(resource, item.identity.Namespace).Get(reference.Name, metav1.GetOptions{})
+	owner, err = client.Resource(resource, resourceDefaultNamespace(resource, item.identity.Namespace)).Get(reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)

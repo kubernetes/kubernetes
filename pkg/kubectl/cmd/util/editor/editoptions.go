@@ -362,7 +362,7 @@ func (o *EditOptions) Run() error {
 		}
 		var annotationInfos []*resource.Info
 		for i := range infos {
-			data, err := kubectl.GetOriginalConfiguration(infos[i].Mapping, infos[i].Object)
+			data, err := kubectl.GetOriginalConfiguration(infos[i].Object)
 			if err != nil {
 				return err
 			}
@@ -625,7 +625,7 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
 		if o.ApplyAnnotation {
-			if err := kubectl.CreateOrUpdateAnnotation(true, info, cmdutil.InternalVersionJSONEncoder()); err != nil {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
 				return err
 			}
 		}

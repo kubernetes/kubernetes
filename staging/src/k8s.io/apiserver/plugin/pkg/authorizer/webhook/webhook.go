@@ -242,9 +242,6 @@ var registry = registered.NewOrDie("")
 
 func init() {
 	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
 }
 
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
