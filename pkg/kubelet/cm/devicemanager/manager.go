@@ -338,6 +338,7 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		// to avoid potential orphaned devices upon re-registration
 		devices := make(map[string]pluginapi.Device)
 		for _, device := range old.getDevices() {
+			device.Health = pluginapi.Unhealthy
 			devices[device.ID] = device
 		}
 		existingDevs = devices
