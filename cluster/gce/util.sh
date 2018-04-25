@@ -677,6 +677,9 @@ function construct-kubelet-flags {
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
+  if [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+    flags+=" --max-pods=${MAX_PODS_PER_NODE}"
+  fi
 
   KUBELET_ARGS="${flags}"
 }
@@ -1136,6 +1139,11 @@ EOF
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
     cat >>$file <<EOF
 SCHEDULING_ALGORITHM_PROVIDER: $(yaml-quote ${SCHEDULING_ALGORITHM_PROVIDER})
+EOF
+  fi
+  if [ -n "${MAX_PODS_PER_NODE:-}" ]; then
+    cat >>$file <<EOF
+MAX_PODS_PER_NODE: $(yaml-quote ${MAX_PODS_PER_NODE})
 EOF
   fi
 }
