@@ -151,14 +151,7 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
-func NewDefaultStorageFactory(
-	config storagebackend.Config,
-	defaultMediaType string,
-	defaultSerializer runtime.StorageSerializer,
-	resourceEncodingConfig ResourceEncodingConfig,
-	resourceConfig APIResourceConfigSource,
-	specialDefaultResourcePrefixes map[schema.GroupResource]string,
-) *DefaultStorageFactory {
+func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource, specialDefaultResourcePrefixes map[schema.GroupResource]string) *DefaultStorageFactory {
 	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
@@ -240,7 +233,7 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 
 func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
-		if s.APIResourceConfigSource.AnyVersionForGroupEnabled(potentialStorageResource.Group) {
+		if s.APIResourceConfigSource.AnyVersionOfResourceEnabled(potentialStorageResource) {
 			return potentialStorageResource
 		}
 	}

@@ -1123,5 +1123,8 @@ func diffMapKeys(a, b interface{}, stringer func(interface{}) string) []string {
 
 type allResourceSource struct{}
 
-func (*allResourceSource) AnyVersionForGroupEnabled(group string) bool     { return true }
-func (*allResourceSource) VersionEnabled(version schema.GroupVersion) bool { return true }
+func (*allResourceSource) AnyVersionOfResourceEnabled(resource schema.GroupResource) bool { return true }
+func (*allResourceSource) AllResourcesForVersionEnabled(version schema.GroupVersion) bool { return true }
+func (*allResourceSource) AnyResourcesForGroupEnabled(group string) bool                  { return true }
+func (*allResourceSource) ResourceEnabled(resource schema.GroupVersionResource) bool      { return true }
+func (*allResourceSource) AnyResourcesForVersionEnabled(version schema.GroupVersion) bool { return true }
