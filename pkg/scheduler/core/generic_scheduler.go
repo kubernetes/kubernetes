@@ -468,7 +468,6 @@ func podFitsOnNode(
 		eCacheAvailable  bool
 		failedPredicates []algorithm.PredicateFailureReason
 	)
-	predicateResults := make(map[string]HostPredicate)
 
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
@@ -532,20 +531,11 @@ func podFitsOnNode(
 						}
 
 						if eCacheAvailable {
-							// Store data to update equivClassCacheafter this loop.
-							if res, exists := predicateResults[predicateKey]; exists {
-								res.Fit = res.Fit && fit
-								res.FailReasons = append(res.FailReasons, reasons...)
-								predicateResults[predicateKey] = res
-							} else {
-								predicateResults[predicateKey] = HostPredicate{Fit: fit, FailReasons: reasons}
-							}
 							// Skip update if NodeInfo is stale.
 							if cache != nil && cache.IsUpToDate(info) {
-								result := predicateResults[predicateKey]
 								ecache.UpdateCachedPredicateItem(
 									pod.GetName(), info.Node().GetName(),
-									predicateKey, result.Fit, result.FailReasons, equivCacheInfo.hash, false)
+									predicateKey, fit, reasons, equivCacheInfo.hash, false)
 							}
 						}
 					}
