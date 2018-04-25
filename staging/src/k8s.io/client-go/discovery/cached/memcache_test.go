@@ -17,116 +17,65 @@ limitations under the License.
 package cached
 
 import (
-	"errors"
-	"reflect"
-	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/discovery/fake"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
-type fakeDiscovery struct {
-	*fake.FakeDiscovery
-
-	lock        sync.Mutex
-	groupList   *metav1.APIGroupList
-	resourceMap map[string]*metav1.APIResourceList
-}
-
-func (c *fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if rl, ok := c.resourceMap[groupVersion]; ok {
-		return rl, nil
-	}
-	return nil, errors.New("doesn't exist")
-}
-
-func (c *fakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.groupList == nil {
-		return nil, errors.New("doesn't exist")
-	}
-	return c.groupList, nil
-}
-
 func TestClient(t *testing.T) {
-	fake := &fakeDiscovery{
-		groupList: &metav1.APIGroupList{
-			Groups: []metav1.APIGroup{{
-				Name: "astronomy",
-				Versions: []metav1.GroupVersionForDiscovery{{
-					GroupVersion: "astronomy/v8beta1",
-					Version:      "v8beta1",
-				}},
-			}},
-		},
-		resourceMap: map[string]*metav1.APIResourceList{
-			"astronomy/v8beta1": {
-				GroupVersion: "astronomy/v8beta1",
-				APIResources: []metav1.APIResource{{
-					Name:         "dwarfplanets",
-					SingularName: "dwarfplanet",
-					Namespaced:   true,
-					Kind:         "DwarfPlanet",
-					ShortNames:   []string{"dp"},
-				}},
-			},
-		},
-	}
-
-	c := NewMemCacheClient(fake)
+	fakeClient := fake.NewSimpleClientset()
+	fakeDiscovery := fakeClient.Discovery().(*fakediscovery.FakeDiscovery)
+	fakeDiscovery.Resources = append(fakeDiscovery.Resources, &metav1.APIResourceList{
+		GroupVersion: "astronomy/v8beta1",
+		APIResources: []metav1.APIResource{{
+			Name:         "dwarfplanets",
+			SingularName: "dwarfplanet",
+			Namespaced:   true,
+			Kind:         "DwarfPlanet",
+			ShortNames:   []string{"dp"},
+		}},
+	})
+	c := NewMemCacheClient(fakeDiscovery)
 	g, err := c.ServerGroups()
-	if err == nil {
-		t.Errorf("Unexpected non-error.")
-	}
-	if c.Fresh() {
-		t.Errorf("Expected not fresh.")
-	}
+	assert.Error(t, err, "unexpectedly get cached server groups")
+	assert.False(t, c.Fresh(), "expect not fresh")
 
 	c.Invalidate()
-	if !c.Fresh() {
-		t.Errorf("Expected fresh.")
-	}
+
+	assert.True(t, c.Fresh(), "expect not fresh")
 
 	g, err = c.ServerGroups()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := fake.groupList, g; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %#v, got %#v", e, a)
-	}
+	assert.NoError(t, err, "fail to get group list")
+	groupList, err := fakeDiscovery.ServerGroups()
+	assert.NoError(t, err, "fail to get group list")
+	assert.Equal(t, g, groupList, "server group mismatched")
 	r, err := c.ServerResourcesForGroupVersion("astronomy/v8beta1")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := fake.resourceMap["astronomy/v8beta1"], r; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %#v, got %#v", e, a)
-	}
+	assert.NoError(t, err, "fail to get server resource")
+	groupResources, err := fakeDiscovery.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	assert.NoError(t, err, "fail to get server resource")
+	assert.Equal(t, groupResources, r, "server resources mismatched")
 
-	fake.lock.Lock()
-	fake.resourceMap = map[string]*metav1.APIResourceList{
-		"astronomy/v8beta1": {
-			GroupVersion: "astronomy/v8beta1",
-			APIResources: []metav1.APIResource{{
-				Name:         "stars",
-				SingularName: "star",
-				Namespaced:   true,
-				Kind:         "Star",
-				ShortNames:   []string{"s"},
-			}},
-		},
-	}
-	fake.lock.Unlock()
+	fakeClient.Fake.Lock()
+	fakeClient.Fake.Resources = append(fakeClient.Fake.Resources, &metav1.APIResourceList{
+		GroupVersion: "astronomy/v8beta1",
+		APIResources: []metav1.APIResource{{
+			Name:         "stars",
+			SingularName: "star",
+			Namespaced:   true,
+			Kind:         "Star",
+			ShortNames:   []string{"s"},
+		}},
+	})
+	fakeClient.Fake.Unlock()
 
 	c.Invalidate()
+	groupResources, err = fakeDiscovery.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	assert.NoError(t, err, "fail to get server resource")
 	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := fake.resourceMap["astronomy/v8beta1"], r; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %#v, got %#v", e, a)
-	}
+	assert.NoError(t, err, "fail to server resources after invalidate")
+	assert.Equal(t, groupResources, r, "server resources mismatched after invalidate")
 }

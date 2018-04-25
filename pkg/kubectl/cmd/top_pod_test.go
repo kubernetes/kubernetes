@@ -25,15 +25,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	apiversion "k8s.io/apimachinery/pkg/version"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/kubernetes/fake"
+	fakerest "k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -168,9 +165,9 @@ func TestTopPod(t *testing.T) {
 
 			ns := legacyscheme.Codecs
 
-			tf.Client = &fake.RESTClient{
+			tf.Client = &fakerest.RESTClient{
 				NegotiatedSerializer: ns,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
 					case p == "/api":
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
@@ -313,9 +310,9 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 
 			ns := legacyscheme.Codecs
 
-			tf.Client = &fake.RESTClient{
+			tf.Client = &fakerest.RESTClient{
 				NegotiatedSerializer: ns,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p := req.URL.Path; {
 					case p == "/api":
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
@@ -377,52 +374,6 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			}
 		})
 	}
-}
-
-type fakeDiscovery struct{}
-
-// ServerGroups returns the supported groups, with information like supported versions and the
-// preferred version.
-func (d *fakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
-	return nil, nil
-}
-
-// ServerResourcesForGroupVersion returns the supported resources for a group and version.
-func (d *fakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-// ServerResources returns the supported resources for all groups and versions.
-func (d *fakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-// ServerPreferredResources returns the supported resources with the version preferred by the
-// server.
-func (d *fakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-// ServerPreferredNamespacedResources returns the supported namespaced resources with the
-// version preferred by the server.
-func (d *fakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-// ServerVersion retrieves and parses the server's version (git version).
-func (d *fakeDiscovery) ServerVersion() (*apiversion.Info, error) {
-	return nil, nil
-}
-
-// OpenAPISchema retrieves and parses the swagger API schema the server supports.
-func (d *fakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
-	return nil, nil
-}
-
-// RESTClient returns a RESTClient that is used to communicate
-// with API server by this client implementation.
-func (d *fakeDiscovery) RESTClient() restclient.Interface {
-	return nil
 }
 
 func TestTopPodCustomDefaults(t *testing.T) {
@@ -511,9 +462,9 @@ func TestTopPodCustomDefaults(t *testing.T) {
 
 			ns := legacyscheme.Codecs
 
-			tf.Client = &fake.RESTClient{
+			tf.Client = &fakerest.RESTClient{
 				NegotiatedSerializer: ns,
-				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
 					case p == "/api":
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
@@ -542,7 +493,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 					Scheme:    "https",
 					Service:   "custom-heapster-service",
 				},
-				DiscoveryClient: &fakeDiscovery{},
+				DiscoveryClient: fake.NewSimpleClientset().Discovery(),
 			}
 			cmd := NewCmdTopPod(tf, opts, buf)
 			for name, value := range testCase.flags {
