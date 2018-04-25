@@ -50,6 +50,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -211,10 +212,8 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 		t.Fatalf("unexpected conversion of unstructured object to structured: %s", diff.ObjectReflectDiff(convertedObj, obj))
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
@@ -254,10 +253,9 @@ func TestGetSchemaObject(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.Run(cmd, []string{"replicationcontrollers", "foo"})
 
 	if !strings.Contains(buf.String(), "foo") {
@@ -280,10 +278,9 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -335,10 +332,9 @@ func TestGetObjects(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -384,10 +380,9 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "yaml")
@@ -430,10 +425,8 @@ func TestGetSortedObjects(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	// sorting with metedata.name
@@ -462,10 +455,9 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
@@ -490,10 +482,9 @@ func TestGetListObjects(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
@@ -518,10 +509,9 @@ func TestGetAllListObjects(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("show-all", "true")
 	cmd.Run(cmd, []string{"pods"})
@@ -547,10 +537,9 @@ func TestGetListComponentStatus(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, statuses)},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
@@ -598,10 +587,9 @@ func TestGetMixedGenericObjects(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods"})
@@ -650,10 +638,9 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
@@ -691,10 +678,9 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	}
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("output", "json")
@@ -796,10 +782,9 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("selector", "a=b")
@@ -841,10 +826,9 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("field-selector", "a=b")
@@ -888,10 +872,9 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
@@ -918,10 +901,9 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Lookup("output").Value.Set("yaml")
 	cmd.Flags().Set("show-all", "false")
@@ -1035,10 +1017,9 @@ func TestWatchLabelSelector(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1088,10 +1069,9 @@ func TestWatchFieldSelector(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1135,10 +1115,9 @@ func TestWatchResource(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1180,10 +1159,9 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1226,10 +1204,9 @@ func TestWatchOnlyResource(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
@@ -1273,10 +1250,9 @@ func TestWatchOnlyList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
 
-	cmd := NewCmdGet(tf, buf, errBuf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")

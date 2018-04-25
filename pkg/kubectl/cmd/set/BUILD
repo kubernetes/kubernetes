@@ -66,6 +66,7 @@ go_test(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
+        "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/printers:go_default_library",

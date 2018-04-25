@@ -17,11 +17,9 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 	"testing"
@@ -43,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -65,8 +64,8 @@ func TestSetEnvLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdEnv(tf, os.Stdin, buf, buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdEnv(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
@@ -80,8 +79,8 @@ func TestSetEnvLocal(t *testing.T) {
 		},
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
-		Out:   buf,
-		Local: true,
+		Local:     true,
+		IOStreams: streams,
 	}
 	err := opts.Complete(tf, cmd, []string{"env=prod"})
 	if err == nil {
@@ -114,8 +113,8 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdEnv(tf, os.Stdin, buf, buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdEnv(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
@@ -129,8 +128,8 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 		},
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		Out:   buf,
-		Local: true,
+		Local:     true,
+		IOStreams: streams,
 	}
 	err := opts.Complete(tf, cmd, []string{"env=prod"})
 	if err == nil {
@@ -507,9 +506,8 @@ func TestSetEnvRemote(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			out := new(bytes.Buffer)
-			cmd := NewCmdEnv(tf, out, out, out)
-			cmd.SetOutput(out)
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdEnv(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := EnvOptions{
 				PrintFlags: &printers.PrintFlags{
@@ -518,8 +516,9 @@ func TestSetEnvRemote(t *testing.T) {
 
 					OutputFormat: &outputFormat,
 				},
-				Out:   out,
-				Local: false}
+				Local:     false,
+				IOStreams: streams,
+			}
 			err := opts.Complete(tf, cmd, input.args)
 			assert.NoError(t, err)
 			err = opts.RunEnv(tf)

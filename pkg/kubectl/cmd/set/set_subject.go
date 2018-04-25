@@ -18,7 +18,6 @@ package set
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/printers"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -61,8 +61,6 @@ type SubjectOptions struct {
 	resource.FilenameOptions
 
 	Infos             []*resource.Info
-	Out               io.Writer
-	Err               io.Writer
 	Selector          string
 	ContainerSelector string
 	Output            string
@@ -75,15 +73,20 @@ type SubjectOptions struct {
 	ServiceAccounts []string
 
 	PrintObj printers.ResourcePrinterFunc
+
+	genericclioptions.IOStreams
 }
 
-func NewCmdSubject(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := &SubjectOptions{
+func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
+	return &SubjectOptions{
 		PrintFlags: printers.NewPrintFlags("subjects updated"),
 
-		Out: out,
-		Err: errOut,
+		IOStreams: streams,
 	}
+}
+
+func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	options := NewSubjectOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",

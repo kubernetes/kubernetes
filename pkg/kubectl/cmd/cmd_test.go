@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/resource"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -253,7 +254,7 @@ func Example_printServiceWithLabels() {
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
-	cmd := resource.NewCmdGet(tf, os.Stdout, os.Stderr)
+	cmd := resource.NewCmdGet(tf, genericclioptions.NewTestIOStreamsDiscard())
 	svc := &api.ServiceList{
 		Items: []api.Service{
 			{
