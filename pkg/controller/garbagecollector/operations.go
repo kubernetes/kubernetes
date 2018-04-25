@@ -89,7 +89,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured
 	return client.Resource(resource, item.Namespace).Update(obj)
 }
 
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*unstructured.Unstructured, error) {
+func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersionKind(fqKind)
 	if err != nil {
@@ -99,7 +99,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*un
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.Namespace).Patch(item.Name, types.StrategicMergePatchType, patch)
+	return client.Resource(resource, item.Namespace).Patch(item.Name, pt, patch)
 }
 
 // TODO: Using Patch when strategicmerge supports deleting an entry from a
