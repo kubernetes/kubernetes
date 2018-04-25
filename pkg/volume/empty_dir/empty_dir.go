@@ -19,7 +19,7 @@ package empty_dir
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -416,7 +416,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return path.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, stringsutil.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
+	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, stringsutil.EscapeQualifiedNameForDisk(emptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {

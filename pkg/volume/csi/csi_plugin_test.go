@@ -19,7 +19,7 @@ package csi
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	api "k8s.io/api/core/v1"
@@ -156,7 +156,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 
 		// create the data file
 		if tc.data != nil {
-			mountDir := path.Join(getTargetPath(testPodUID, tc.specVolID, plug.host), "/mount")
+			mountDir := filepath.Join(getTargetPath(testPodUID, tc.specVolID, plug.host), "/mount")
 			if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
 				t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 			}

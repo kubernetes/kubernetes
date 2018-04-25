@@ -18,7 +18,6 @@ package downwardapi
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -291,7 +290,7 @@ func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
 }
 
 func (b *downwardAPIVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+	return filepath.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.DownwardAPIVolumeSource, bool) {
