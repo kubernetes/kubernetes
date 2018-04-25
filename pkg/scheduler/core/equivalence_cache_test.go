@@ -253,7 +253,7 @@ func TestRunPredicate(t *testing.T) {
 			ecache := NewEquivalenceCache()
 			equivClass := ecache.getEquivalenceClassInfo(pod)
 			if test.expectCacheHit {
-				ecache.UpdateCachedPredicateItem(pod.Name, node.Node().Name, "testPredicate", test.expectFit, test.expectedReasons, equivClass.hash)
+				ecache.updateResult(pod.Name, node.Node().Name, "testPredicate", test.expectFit, test.expectedReasons, equivClass.hash)
 			}
 
 			fit, reasons, err := ecache.RunPredicate(test.pred.predicate, "testPredicate", pod, meta, node, equivClass, test.cache)
@@ -287,7 +287,7 @@ func TestRunPredicate(t *testing.T) {
 			if !test.expectCacheHit && test.pred.callCount == 0 {
 				t.Errorf("Predicate should be called")
 			}
-			_, _, invalid := ecache.PredicateWithECache(pod.Name, node.Node().Name, "testPredicate", equivClass.hash)
+			_, _, invalid := ecache.lookupResult(pod.Name, node.Node().Name, "testPredicate", equivClass.hash)
 			if invalid && test.expectCacheWrite {
 				t.Errorf("Cache write should happen")
 			}
@@ -301,7 +301,7 @@ func TestRunPredicate(t *testing.T) {
 	}
 }
 
-func TestUpdateCachedPredicateItem(t *testing.T) {
+func TestUpdateResult(t *testing.T) {
 	tests := []struct {
 		name               string
 		pod                string
@@ -350,7 +350,7 @@ func TestUpdateCachedPredicateItem(t *testing.T) {
 					test.equivalenceHash: predicateItem,
 				})
 		}
-		ecache.UpdateCachedPredicateItem(
+		ecache.updateResult(
 			test.pod,
 			test.nodeName,
 			test.predicateKey,
@@ -374,7 +374,7 @@ func TestUpdateCachedPredicateItem(t *testing.T) {
 	}
 }
 
-func TestPredicateWithECache(t *testing.T) {
+func TestLookupResult(t *testing.T) {
 	tests := []struct {
 		name                              string
 		podName                           string
@@ -460,7 +460,7 @@ func TestPredicateWithECache(t *testing.T) {
 	for _, test := range tests {
 		ecache := NewEquivalenceCache()
 		// set cached item to equivalence cache
-		ecache.UpdateCachedPredicateItem(
+		ecache.updateResult(
 			test.podName,
 			test.nodeName,
 			test.predicateKey,
@@ -476,7 +476,7 @@ func TestPredicateWithECache(t *testing.T) {
 			ecache.InvalidateCachedPredicateItem(test.nodeName, predicateKeys)
 		}
 		// calculate predicate with equivalence cache
-		fit, reasons, invalid := ecache.PredicateWithECache(test.podName,
+		fit, reasons, invalid := ecache.lookupResult(test.podName,
 			test.nodeName,
 			test.predicateKey,
 			test.equivalenceHashForCalPredicate,
@@ -668,7 +668,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 
 	for _, test := range tests {
 		// set cached item to equivalence cache
-		ecache.UpdateCachedPredicateItem(
+		ecache.updateResult(
 			test.podName,
 			test.nodeName,
 			testPredicate,
@@ -735,7 +735,7 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 
 	for _, test := range tests {
 		// set cached item to equivalence cache
-		ecache.UpdateCachedPredicateItem(
+		ecache.updateResult(
 			test.podName,
 			test.nodeName,
 			testPredicate,

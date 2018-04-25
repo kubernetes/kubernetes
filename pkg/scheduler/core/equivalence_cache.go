@@ -86,7 +86,7 @@ func (ec *EquivalenceCache) RunPredicate(
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	ec.Lock()
 	defer ec.Unlock()
-	fit, reasons, invalid := ec.PredicateWithECache(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash, false)
+	fit, reasons, invalid := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash, false)
 	if !invalid {
 		return fit, reasons, nil
 	}
@@ -96,13 +96,13 @@ func (ec *EquivalenceCache) RunPredicate(
 	}
 	// Skip update if NodeInfo is stale.
 	if cache != nil && cache.IsUpToDate(nodeInfo) {
-		ec.UpdateCachedPredicateItem(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, fit, reasons, equivClassInfo.hash, false)
+		ec.updateResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, fit, reasons, equivClassInfo.hash, false)
 	}
 	return fit, reasons, nil
 }
 
-// UpdateCachedPredicateItem updates pod predicate for equivalence class
-func (ec *EquivalenceCache) UpdateCachedPredicateItem(
+// updateResult updates the cached result of a predicate.
+func (ec *EquivalenceCache) updateResult(
 	podName, nodeName, predicateKey string,
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
@@ -134,12 +134,11 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(
 	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, podName, nodeName, predicateItem)
 }
 
-// PredicateWithECache returns:
-// 1. if fit
-// 2. reasons if not fit
-// 3. if this cache is invalid
-// based on cached predicate results
-func (ec *EquivalenceCache) PredicateWithECache(
+// lookupResult returns cached predicate results:
+// 1. if pod fit
+// 2. reasons if pod did not fit
+// 3. if cache item is not found
+func (ec *EquivalenceCache) lookupResult(
 	podName, nodeName, predicateKey string,
 	equivalenceHash uint64, needLock bool,
 ) (bool, []algorithm.PredicateFailureReason, bool) {
