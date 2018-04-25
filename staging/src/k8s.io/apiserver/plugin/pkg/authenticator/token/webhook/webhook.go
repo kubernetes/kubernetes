@@ -18,7 +18,6 @@ limitations under the License.
 package webhook
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -121,9 +120,6 @@ var registry = registered.NewOrDie("")
 
 func init() {
 	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
 }
 
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,

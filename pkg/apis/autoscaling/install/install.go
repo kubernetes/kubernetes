@@ -29,11 +29,11 @@ import (
 )
 
 func init() {
-	Install(legacyscheme.GroupFactoryRegistry, legacyscheme.Registry, legacyscheme.Scheme)
+	Install(legacyscheme.Registry, legacyscheme.Scheme)
 }
 
 // Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
+func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  autoscaling.GroupName,
@@ -44,7 +44,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 			v1.SchemeGroupVersion.Version:      v1.AddToScheme,
 			v2beta1.SchemeGroupVersion.Version: v2beta1.AddToScheme,
 		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
+	).Register(registry, scheme); err != nil {
 		panic(err)
 	}
 }
