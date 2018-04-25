@@ -19,7 +19,6 @@ package gce_pd
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -93,7 +92,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 		}
 	}
 
-	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
+	return filepath.Join(diskByIdPath, diskGooglePrefix+pdName), nil
 }
 
 func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -247,7 +246,7 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
 func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	pdName := path.Base(volumeName)
+	pdName := filepath.Base(volumeName)
 
 	attached, err := detacher.gceDisks.DiskIsAttached(pdName, nodeName)
 	if err != nil {
