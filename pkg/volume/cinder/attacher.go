@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -362,7 +362,7 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 }
 
 func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	volumeID := path.Base(volumeName)
+	volumeID := filepath.Base(volumeName)
 	if err := detacher.waitOperationFinished(volumeID); err != nil {
 		return err
 	}

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -380,7 +380,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 			return err
 		}
 
-		keyring_file = path.Join(keyringPath, fileName)
+		keyring_file = filepath.Join(keyringPath, fileName)
 
 	} else {
 		keyring_file = cephfsVolume.secret_file
