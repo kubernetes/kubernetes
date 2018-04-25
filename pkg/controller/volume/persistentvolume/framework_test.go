@@ -132,7 +132,7 @@ type volumeReactor struct {
 	ctrl                 *PersistentVolumeController
 	fakeVolumeWatch      *watch.FakeWatcher
 	fakeClaimWatch       *watch.FakeWatcher
-	lock                 sync.Mutex
+	lock                 sync.RWMutex
 	errors               []reactorError
 }
 
@@ -300,8 +300,8 @@ func (r *volumeReactor) injectReactError(action core.Action) error {
 // checkVolumes compares all expectedVolumes with set of volumes at the end of
 // the test and reports differences.
 func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 
 	expectedMap := make(map[string]*v1.PersistentVolume)
 	gotMap := make(map[string]*v1.PersistentVolume)
@@ -336,8 +336,8 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*v1.PersistentVolume) err
 // checkClaims compares all expectedClaims with set of claims at the end of the
 // test and reports differences.
 func (r *volumeReactor) checkClaims(expectedClaims []*v1.PersistentVolumeClaim) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 
 	expectedMap := make(map[string]*v1.PersistentVolumeClaim)
 	gotMap := make(map[string]*v1.PersistentVolumeClaim)

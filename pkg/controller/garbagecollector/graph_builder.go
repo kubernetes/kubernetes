@@ -78,7 +78,7 @@ type GraphBuilder struct {
 	// each monitor list/watches a resource, the results are funneled to the
 	// dependencyGraphBuilder
 	monitors    monitors
-	monitorLock sync.Mutex
+	monitorLock sync.RWMutex
 	// informersStarted is closed after after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -302,8 +302,8 @@ func (gb *GraphBuilder) startMonitors() {
 // true at one time, and then later return false if all monitors were
 // reconstructed.
 func (gb *GraphBuilder) IsSynced() bool {
-	gb.monitorLock.Lock()
-	defer gb.monitorLock.Unlock()
+	gb.monitorLock.RLock()
+	defer gb.monitorLock.RUnlock()
 
 	if len(gb.monitors) == 0 {
 		return false

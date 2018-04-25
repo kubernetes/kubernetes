@@ -122,7 +122,7 @@ func (r realJobControl) DeleteJob(namespace string, name string) error {
 }
 
 type fakeJobControl struct {
-	sync.Mutex
+	sync.RWMutex
 	Job           *batchv1.Job
 	Jobs          []batchv1.Job
 	DeleteJobName []string
@@ -147,8 +147,8 @@ func (f *fakeJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1
 }
 
 func (f *fakeJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
-	f.Lock()
-	defer f.Unlock()
+	f.RLock()
+	defer f.RUnlock()
 	if f.Err != nil {
 		return nil, f.Err
 	}
@@ -224,7 +224,7 @@ func (r realPodControl) DeletePod(namespace string, name string) error {
 }
 
 type fakePodControl struct {
-	sync.Mutex
+	sync.RWMutex
 	Pods          []v1.Pod
 	DeletePodName []string
 	Err           error
@@ -233,8 +233,8 @@ type fakePodControl struct {
 var _ podControlInterface = &fakePodControl{}
 
 func (f *fakePodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
-	f.Lock()
-	defer f.Unlock()
+	f.RLock()
+	defer f.RUnlock()
 	if f.Err != nil {
 		return nil, f.Err
 	}
