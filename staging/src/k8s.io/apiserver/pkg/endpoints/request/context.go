@@ -19,7 +19,6 @@ package request
 import (
 	"context"
 	"errors"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,27 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
-// Context carries values across API boundaries.
-// This context matches the context.Context interface
-// (https://blog.golang.org/context), for the purposes
-// of passing the api.Context through to the storage tier.
-// TODO: Determine the extent that this abstraction+interface
-// is used by the api, and whether we can remove.
-type Context interface {
-	// Value returns the value associated with key or nil if none.
-	Value(key interface{}) interface{}
-
-	// Deadline returns the time when this Context will be canceled, if any.
-	Deadline() (deadline time.Time, ok bool)
-
-	// Done returns a channel that is closed when this Context is canceled
-	// or times out.
-	Done() <-chan struct{}
-
-	// Err indicates why this context was canceled, after the Done channel
-	// is closed.
-	Err() error
-}
+type Context = context.Context
 
 // The key type is unexported to prevent collisions
 type key int
@@ -61,9 +40,6 @@ const (
 
 	// uidKey is the context key for the uid to assign to an object on create.
 	uidKey
-
-	// userAgentKey is the context key for the request user agent.
-	userAgentKey
 
 	// auditKey is the context key for the audit event.
 	auditKey
@@ -103,15 +79,6 @@ func NamespaceFrom(ctx Context) (string, bool) {
 func NamespaceValue(ctx Context) string {
 	namespace, _ := NamespaceFrom(ctx)
 	return namespace
-}
-
-// WithNamespaceDefaultIfNone returns a context whose namespace is the default if and only if the parent context has no namespace value
-func WithNamespaceDefaultIfNone(parent Context) Context {
-	namespace, ok := NamespaceFrom(parent)
-	if !ok || len(namespace) == 0 {
-		return WithNamespace(parent, metav1.NamespaceDefault)
-	}
-	return parent
 }
 
 // WithUser returns a copy of parent in which the user value is set
