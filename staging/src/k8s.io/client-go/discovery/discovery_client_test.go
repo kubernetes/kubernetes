@@ -131,18 +131,23 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 	}
 }
 func TestGetServerGroupsWithTimeout(t *testing.T) {
+	done := make(chan bool)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		time.Sleep(2 * time.Second)
+		// first we need to write headers, otherwise http client will complain about
+		// exceeding timeout awaiting headers, only after we can block the call
 		w.WriteHeader(http.StatusOK)
+		<-done
 	}))
 	defer server.Close()
+	defer close(done)
 	tmp := defaultTimeout
-	defaultTimeout = 1 * time.Second
+	defaultTimeout = 2 * time.Second
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	_, err := client.ServerGroups()
-	if err == nil || strings.Contains(err.Error(), "deadline") {
+	if err == nil || !strings.Contains(err.Error(), "deadline") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	done <- true
 	defaultTimeout = tmp
 }
 
