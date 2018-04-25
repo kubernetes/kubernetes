@@ -115,21 +115,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg.DiscoveryTokenAPIServers = args
-
-			var err error
-			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
-				kubeadmutil.CheckErr(err)
-			}
-
-			legacyscheme.Scheme.Default(cfg)
-			internalcfg := &kubeadmapi.NodeConfiguration{}
-			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
-
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
-			kubeadmutil.CheckErr(err)
-
-			j, err := NewJoin(cfgPath, args, internalcfg, ignorePreflightErrorsSet)
+			j, err := NewValidJoin(cfg, args, skipPreFlight, cfgPath, featureGatesString, ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Validate(cmd))
 			kubeadmutil.CheckErr(j.Run(out))
@@ -140,6 +126,27 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &ignorePreflightErrors)
 
 	return cmd
+}
+
+// NewValidJoin validates the command line that are passed to the cobra command
+func NewValidJoin(cfg *kubeadmapiext.NodeConfiguration, args []string, skipPreFlight bool, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
+	cfg.DiscoveryTokenAPIServers = args
+
+	var err error
+	if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
+		return nil, err
+	}
+
+	legacyscheme.Scheme.Default(cfg)
+	internalcfg := &kubeadmapi.NodeConfiguration{}
+	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewJoin(cfgPath, args, internalcfg, ignorePreflightErrorsSet)
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
