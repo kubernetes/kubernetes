@@ -115,7 +115,18 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return nil
 		}
 
-		result, err := patchResource(
+		p := patcher{
+			codec:           codec,
+			namer:           scope.Namer,
+			creater:         scope.Creater,
+			defaulter:       scope.Defaulter,
+			unsafeConvertor: scope.Convertor,
+			kind:            scope.Kind,
+			resource:        scope.Resource,
+			trace:           trace,
+		}
+
+		result, err := p.patchResource(
 			ctx,
 			updateMutation,
 			rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
@@ -125,7 +136,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name,
 			patchType,
 			patchJS,
-			scope.Namer, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec, trace)
+		)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -149,8 +160,23 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 
 type mutateObjectUpdateFunc func(obj, old runtime.Object) error
 
+type patcher struct {
+
+	// Pieces of RequestScope
+	namer           ScopeNamer
+	creater         runtime.ObjectCreater
+	defaulter       runtime.ObjectDefaulter
+	unsafeConvertor runtime.ObjectConvertor
+	resource        schema.GroupVersionResource
+	kind            schema.GroupVersionKind
+
+	codec runtime.Codec
+
+	trace *utiltrace.Trace
+}
+
 // patchResource divides PatchResource for easier unit testing
-func patchResource(
+func (p *patcher) patchResource(
 	ctx request.Context,
 	updateMutation mutateObjectUpdateFunc,
 	createValidation rest.ValidateObjectFunc,
@@ -161,14 +187,6 @@ func patchResource(
 	name string,
 	patchType types.PatchType,
 	patchJS []byte,
-	namer ScopeNamer,
-	creater runtime.ObjectCreater,
-	defaulter runtime.ObjectDefaulter,
-	unsafeConvertor runtime.ObjectConvertor,
-	kind schema.GroupVersionKind,
-	resource schema.GroupVersionResource,
-	codec runtime.Codec,
-	trace *utiltrace.Trace,
 ) (runtime.Object, error) {
 
 	namespace := request.NamespaceValue(ctx)
@@ -186,11 +204,11 @@ func patchResource(
 	// and is given the currently persisted object as input.
 	applyPatch := func(_ request.Context, _, currentObject runtime.Object) (runtime.Object, error) {
 		// Make sure we actually have a persisted currentObject
-		trace.Step("About to apply patch")
+		p.trace.Step("About to apply patch")
 		if hasUID, err := hasUID(currentObject); err != nil {
 			return nil, err
 		} else if !hasUID {
-			return nil, errors.NewNotFound(resource.GroupResource(), name)
+			return nil, errors.NewNotFound(p.resource.GroupResource(), name)
 		}
 
 		currentResourceVersion := ""
@@ -213,7 +231,7 @@ func patchResource(
 			// representations.
 			switch patchType {
 			case types.JSONPatchType, types.MergePatchType:
-				originalJS, patchedJS, err := patchObjectJSON(patchType, codec, currentObject, patchJS, objToUpdate, versionedObj)
+				originalJS, patchedJS, err := patchObjectJSON(patchType, p.codec, currentObject, patchJS, objToUpdate, versionedObj)
 				if err != nil {
 					return nil, interpretPatchError(err)
 				}
@@ -241,11 +259,11 @@ func patchResource(
 			case types.StrategicMergePatchType:
 				// Since the patch is applied on versioned objects, we need to convert the
 				// current object to versioned representation first.
-				currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
+				currentVersionedObject, err := p.unsafeConvertor.ConvertToVersion(currentObject, p.kind.GroupVersion())
 				if err != nil {
 					return nil, err
 				}
-				versionedObjToUpdate, err := creater.New(kind)
+				versionedObjToUpdate, err := p.creater.New(p.kind)
 				if err != nil {
 					return nil, err
 				}
@@ -254,12 +272,12 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
-				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
+				if err := strategicPatchObject(p.codec, p.defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
 					return nil, err
 				}
 				// Convert the object back to unversioned.
-				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-				unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+				gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+				unversionedObjToUpdate, err := p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
 				if err != nil {
 					return nil, err
 				}
@@ -276,7 +294,7 @@ func patchResource(
 					return patchMap, nil
 				}
 			}
-			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
+			if err := checkName(objToUpdate, name, namespace, p.namer); err != nil {
 				return nil, err
 			}
 			return objToUpdate, nil
@@ -292,7 +310,7 @@ func patchResource(
 
 			// Since the patch is applied on versioned objects, we need to convert the
 			// current object to versioned representation first.
-			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
+			currentVersionedObject, err := p.unsafeConvertor.ConvertToVersion(currentObject, p.kind.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
@@ -310,7 +328,7 @@ func patchResource(
 				}
 			} else {
 				// Compute current patch.
-				currentObjJS, err := runtime.Encode(codec, currentObject)
+				currentObjJS, err := runtime.Encode(p.codec, currentObject)
 				if err != nil {
 					return nil, err
 				}
@@ -350,19 +368,19 @@ func patchResource(
 					return nil, lastConflictErr
 				}
 				// Otherwise manufacture one of our own
-				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
+				return nil, errors.NewConflict(p.resource.GroupResource(), name, patchDiffErr)
 			}
 
-			versionedObjToUpdate, err := creater.New(kind)
+			versionedObjToUpdate, err := p.creater.New(p.kind)
 			if err != nil {
 				return nil, err
 			}
-			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+			if err := applyPatchToObject(p.codec, p.defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
 				return nil, err
 			}
 			// Convert the object back to unversioned.
-			gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-			objToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+			gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+			objToUpdate, err := p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
@@ -374,7 +392,7 @@ func patchResource(
 	// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object and the patched object as input.
 	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-		trace.Step("About to check admission control")
+		p.trace.Step("About to check admission control")
 		return patchedObject, updateMutation(patchedObject, currentObject)
 	}
 	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, applyPatch, applyAdmission)
