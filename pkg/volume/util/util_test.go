@@ -1105,3 +1105,50 @@ func TestMakeAbsolutePath(t *testing.T) {
 		}
 	}
 }
+
+func TestIsReady(t *testing.T) {
+	tests := []struct {
+		// Function that prepares directory structure for the test under given
+		// base.
+		prepare  func(base string) string
+		dir      string
+		expected bool
+	}{
+		{
+			prepare: func(dir string) string {
+				SetReady(dir)
+				return dir
+			},
+			expected: true,
+		},
+		{
+			prepare: func(dir string) string {
+				return dir
+			},
+			expected: false,
+		},
+		{
+			prepare: func(dir string) string {
+				_, err := ioutil.TempFile(dir, "not-ready")
+				if err != nil {
+					t.Fatalf("error creating temp file: %v", err)
+				}
+				return dir
+			},
+			expected: false,
+		},
+	}
+	for _, test := range tests {
+		tmpDir, err := utiltesting.MkTmpdir("tmpDir")
+		defer os.RemoveAll(tmpDir)
+		if err != nil {
+			t.Fatalf("error creating temp dir: %v", err)
+		}
+		test.dir = test.prepare(tmpDir)
+		actual := IsReady(test.dir)
+		if actual != test.expected {
+			t.Errorf("Expected %v saw %v", test.expected, actual)
+		}
+
+	}
+}
