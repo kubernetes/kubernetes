@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/resource"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/get"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -264,8 +264,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				resource.NewCmdGet(f, ioStreams),
 				NewCmdExplain(f, ioStreams),
+				get.NewCmdGet(f, ioStreams),
 				NewCmdEdit(f, ioStreams),
 				NewCmdDelete(f, out, err),
 			},

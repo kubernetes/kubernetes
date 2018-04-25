@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package printers
+package get
 
 import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 // HumanPrintFlags provides default flags necessary for printing.
@@ -40,11 +42,28 @@ type HumanPrintFlags struct {
 	WithNamespace      bool
 }
 
+// EnsureWithKind sets the provided GroupKind humanreadable value.
+// If the kind received is non-empty, the "showKind" humanreadable
+// printer option is set to true.
+func (f *HumanPrintFlags) EnsureWithKind(kind schema.GroupKind) error {
+	showKind := !kind.Empty()
+
+	f.Kind = kind
+	f.ShowKind = &showKind
+	return nil
+}
+
+// EnsureWithNamespace sets the "WithNamespace" humanreadable option to true.
+func (f *HumanPrintFlags) EnsureWithNamespace() error {
+	f.WithNamespace = true
+	return nil
+}
+
 // ToPrinter receives an outputFormat and returns a printer capable of
 // handling human-readable output.
-func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool, error) {
+func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	if len(outputFormat) > 0 && outputFormat != "wide" {
-		return nil, false, nil
+		return nil, printers.NoCompatiblePrinterError{Options: f}
 	}
 
 	encoder := scheme.Codecs.LegacyCodec(scheme.Registry.RegisteredGroupVersions()...)
@@ -65,7 +84,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool,
 		columnLabels = *f.ColumnLabels
 	}
 
-	p := NewHumanReadablePrinter(encoder, decoder, PrintOptions{
+	p := printers.NewHumanReadablePrinter(encoder, decoder, printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
 		NoHeaders:     f.NoHeaders,
@@ -74,14 +93,11 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (ResourcePrinter, bool,
 		ColumnLabels:  columnLabels,
 		ShowLabels:    showLabels,
 	})
-
-	// TODO(juanvallejo): enable this here once we wire commands to instantiate PrintFlags directly.
-	// PrintHandlers are currently added through cmd/util/printing.go#PrinterForOptions
-	//printersinternal.AddHandlers(p)
+	printersinternal.AddHandlers(p)
 
 	// TODO(juanvallejo): handle sorting here
 
-	return p, true, nil
+	return p, nil
 }
 
 // AddFlags receives a *cobra.Command reference and binds
@@ -103,19 +119,19 @@ func (f *HumanPrintFlags) AddFlags(c *cobra.Command) {
 
 // NewHumanPrintFlags returns flags associated with
 // human-readable printing, with default values set.
-func NewHumanPrintFlags(kind schema.GroupKind, noHeaders, withNamespace, absoluteTimestamps bool) *HumanPrintFlags {
+func NewHumanPrintFlags() *HumanPrintFlags {
 	showLabels := false
 	sortBy := ""
 	showKind := false
 	columnLabels := []string{}
 
 	return &HumanPrintFlags{
-		NoHeaders:          noHeaders,
-		WithNamespace:      withNamespace,
-		AbsoluteTimestamps: absoluteTimestamps,
+		NoHeaders:          false,
+		WithNamespace:      false,
+		AbsoluteTimestamps: false,
 		ColumnLabels:       &columnLabels,
 
-		Kind:       kind,
+		Kind:       schema.GroupKind{},
 		ShowLabels: &showLabels,
 		SortBy:     &sortBy,
 		ShowKind:   &showKind,

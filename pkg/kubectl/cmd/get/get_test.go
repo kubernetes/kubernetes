@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resource
+package get
 
 import (
 	"bytes"
@@ -513,7 +513,6 @@ func TestGetAllListObjects(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet(tf, streams)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("show-all", "true")
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := `NAME      READY     STATUS    RESTARTS   AGE
@@ -886,32 +885,6 @@ node/foo   Unknown   <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
-	}
-}
-
-func TestGetByFormatForcesFlag(t *testing.T) {
-	pods, _, _ := testData()
-
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-	codec := legacyscheme.Codecs.LegacyCodec(scheme.Versions...)
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
-	}
-	tf.Namespace = "test"
-
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Flags().Lookup("output").Value.Set("yaml")
-	cmd.Flags().Set("show-all", "false")
-	cmd.Run(cmd, []string{"pods"})
-
-	showAllFlag, _ := cmd.Flags().GetBool("show-all")
-	if showAllFlag {
-		t.Error("expected showAll to not be true when getting resource")
 	}
 }
 

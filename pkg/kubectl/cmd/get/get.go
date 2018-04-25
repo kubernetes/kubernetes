@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resource
+package get
 
 import (
 	"encoding/json"
@@ -52,6 +52,11 @@ import (
 
 // GetOptions contains the input to the get command.
 type GetOptions struct {
+	PrintFlags           *PrintFlags
+	ToPrinter            func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	IsGeneric            bool
+	PrintWithOpenAPICols bool
+
 	resource.FilenameOptions
 
 	Raw       string
@@ -67,10 +72,9 @@ type GetOptions struct {
 
 	ServerPrint bool
 
+	NoHeaders      bool
 	Sort           bool
 	IgnoreNotFound bool
-	ShowKind       bool
-	LabelColumns   []string
 	Export         bool
 
 	IncludeUninitialized bool
@@ -129,7 +133,8 @@ const (
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
-		ChunkSize: 500,
+		PrintFlags: NewGetPrintFlags(),
+		ChunkSize:  500,
 
 		IOStreams: streams,
 	}
@@ -138,7 +143,7 @@ func NewGetOptions(streams genericclioptions.IOStreams) *GetOptions {
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	options := NewGetOptions(streams)
+	o := NewGetOptions(streams)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
@@ -148,77 +153,112 @@ func NewCmdGet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 		Long:    getLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(f, cmd, args))
-			cmdutil.CheckErr(options.Validate(cmd))
-			cmdutil.CheckErr(options.Run(f, cmd, args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Run(f, cmd, args))
 		},
 		SuggestFor: []string{"list", "ps"},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
 	}
 
-	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
-	cmd.Flags().BoolVarP(&options.Watch, "watch", "w", options.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
-	cmd.Flags().BoolVar(&options.WatchOnly, "watch-only", options.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
-	cmd.Flags().Int64Var(&options.ChunkSize, "chunk-size", options.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
-	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", options.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
-	cmd.Flags().StringVarP(&options.LabelSelector, "selector", "l", options.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringVar(&options.FieldSelector, "field-selector", options.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	cmd.Flags().BoolVar(&options.AllNamespaces, "all-namespaces", options.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	o.PrintFlags.AddFlags(cmd)
+
+	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
+	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
+	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().Int64Var(&o.ChunkSize, "chunk-size", o.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
+	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	cmd.Flags().BoolVar(&o.AllNamespaces, "all-namespaces", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)
-	cmdutil.AddPrinterFlags(cmd)
 	addOpenAPIPrintColumnFlags(cmd)
 	addServerPrintColumnFlags(cmd)
-	cmd.Flags().BoolVar(&options.ShowKind, "show-kind", options.ShowKind, "If present, list the resource type for the requested object(s).")
-	cmd.Flags().StringSliceVarP(&options.LabelColumns, "label-columns", "L", options.LabelColumns, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
-	cmd.Flags().BoolVar(&options.Export, "export", options.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
-	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, "identifying the resource to get from a server.")
+	cmd.Flags().BoolVar(&o.Export, "export", o.Export, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to get from a server.")
 	return cmd
 }
 
 // Complete takes the command arguments and factory and infers any remaining options.
-func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	if len(options.Raw) > 0 {
+func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(o.Raw) > 0 {
 		if len(args) > 0 {
 			return fmt.Errorf("arguments may not be passed when --raw is specified")
 		}
 		return nil
 	}
 
-	options.ServerPrint = cmdutil.GetFlagBool(cmd, useServerPrintColumns)
+	o.ServerPrint = cmdutil.GetFlagBool(cmd, useServerPrintColumns)
 
 	var err error
-	options.Namespace, options.ExplicitNamespace, err = f.DefaultNamespace()
+	o.Namespace, o.ExplicitNamespace, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	if options.AllNamespaces {
-		options.ExplicitNamespace = false
+	if o.AllNamespaces {
+		o.ExplicitNamespace = false
 	}
 
 	isSorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
 		return err
 	}
-	options.Sort = len(isSorting) > 0
+	o.Sort = len(isSorting) > 0
+
+	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 
 	// TODO (soltysh): currently we don't support sorting and custom columns
 	// with server side print. So in these cases force the old behavior.
 	outputOption := cmd.Flags().Lookup("output").Value.String()
-	if options.Sort && outputOption == "custom-columns" {
-		options.ServerPrint = false
+	if o.Sort && outputOption == "custom-columns" {
+		o.ServerPrint = false
 	}
 
-	options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
+	// obtain printer here in order to determine if we are
+	// printing humanreadable or generic output.
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	o.IsGeneric = printer.IsGeneric()
+
+	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
+	o.PrintWithOpenAPICols = cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
+
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+		// make a new copy of current flags / opts before mutating
+		printFlags := o.PrintFlags.Copy()
+
+		if mapping != nil {
+			if !cmdSpecifiesOutputFmt(cmd) && o.PrintWithOpenAPICols {
+				if apiSchema, err := f.OpenAPISchema(); err == nil {
+					printFlags.UseOpenAPIColumns(apiSchema, mapping)
+				}
+			}
+			if resource.MultipleTypesRequested(args) {
+				printFlags.EnsureWithKind(mapping.GroupVersionKind.GroupKind())
+			}
+		}
+		if withNamespace {
+			printFlags.EnsureWithNamespace()
+		}
+
+		printer, err := printFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
+	}
 
 	switch {
-	case options.Watch || options.WatchOnly:
+	case o.Watch || o.WatchOnly:
 		// include uninitialized objects when watching on a single object
 		// unless explicitly set --include-uninitialized=false
-		options.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
+		o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
-		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-			fmt.Fprintf(options.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.ValidResourceTypeList(f))
+		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.ValidResourceTypeList(f))
 			fullCmdName := cmd.Parent().CommandPath()
 			usageString := "Required resource not specified."
 			if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {
@@ -232,15 +272,15 @@ func (options *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 }
 
 // Validate checks the set of flags provided by the user.
-func (options *GetOptions) Validate(cmd *cobra.Command) error {
-	if len(options.Raw) > 0 {
-		if options.Watch || options.WatchOnly || len(options.LabelSelector) > 0 || options.Export {
+func (o *GetOptions) Validate(cmd *cobra.Command) error {
+	if len(o.Raw) > 0 {
+		if o.Watch || o.WatchOnly || len(o.LabelSelector) > 0 || o.Export {
 			return fmt.Errorf("--raw may not be specified with other flags that filter the server request or alter the output")
 		}
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
 			return cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
 		}
-		if _, err := url.ParseRequestURI(options.Raw); err != nil {
+		if _, err := url.ParseRequestURI(o.Raw); err != nil {
 			return cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
 		}
 	}
@@ -255,35 +295,29 @@ func (options *GetOptions) Validate(cmd *cobra.Command) error {
 
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
-func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	if len(options.Raw) > 0 {
-		return options.raw(f)
+func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(o.Raw) > 0 {
+		return o.raw(f)
 	}
-	if options.Watch || options.WatchOnly {
-		return options.watch(f, cmd, args)
-	}
-
-	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := cmdutil.PrinterForOptions(printOpts)
-	if err != nil {
-		return err
+	if o.Watch || o.WatchOnly {
+		return o.watch(f, cmd, args)
 	}
 
 	r := f.NewBuilder().
 		Unstructured().
-		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
-		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
-		LabelSelectorParam(options.LabelSelector).
-		FieldSelectorParam(options.FieldSelector).
-		ExportParam(options.Export).
-		RequestChunksOf(options.ChunkSize).
-		IncludeUninitialized(options.IncludeUninitialized).
+		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
+		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
+		FieldSelectorParam(o.FieldSelector).
+		ExportParam(o.Export).
+		RequestChunksOf(o.ChunkSize).
+		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
 		Flatten().
 		TransformRequests(func(req *rest.Request) {
-			if options.ServerPrint && !printer.IsGeneric() && !options.Sort {
+			if o.ServerPrint && !o.IsGeneric && !o.Sort {
 				group := metav1beta1.GroupName
 				version := metav1beta1.SchemeGroupVersion.Version
 
@@ -293,15 +327,15 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		}).
 		Do()
 
-	if options.IgnoreNotFound {
+	if o.IgnoreNotFound {
 		r.IgnoreErrors(kapierrors.IsNotFound)
 	}
 	if err := r.Err(); err != nil {
 		return err
 	}
 
-	if printer.IsGeneric() {
-		return options.printGeneric(printer, r)
+	if o.IsGeneric {
+		return o.printGeneric(r)
 	}
 
 	allErrs := []error{}
@@ -313,8 +347,8 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
-		if options.ServerPrint {
-			table, err := options.decodeIntoTable(cmdutil.InternalVersionJSONEncoder(), infos[ix].Object)
+		if o.ServerPrint {
+			table, err := o.decodeIntoTable(cmdutil.InternalVersionJSONEncoder(), infos[ix].Object)
 			if err == nil {
 				infos[ix].Object = table
 			} else {
@@ -332,35 +366,26 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 	var sorter *kubectl.RuntimeSort
-	if options.Sort && len(objs) > 1 {
+	if o.Sort && len(objs) > 1 {
 		// TODO: questionable
 		if sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, sorting); err != nil {
 			return err
 		}
 	}
 
-	// use the default printer for each object
-	printer = nil
+	var printer printers.ResourcePrinter
 	var lastMapping *meta.RESTMapping
-	w := printers.GetNewTabWriter(options.Out)
-
-	useOpenAPIPrintColumns := cmdutil.GetFlagBool(cmd, useOpenAPIPrintColumnFlagLabel)
-
-	showKind := options.ShowKind || resource.MultipleTypesRequested(args) || cmdutil.MustPrintWithKinds(objs, infos, sorter)
-
-	noHeaders := cmdutil.GetFlagBool(cmd, "no-headers")
+	nonEmptyObjCount := 0
+	w := printers.GetNewTabWriter(o.Out)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
-		var original runtime.Object
 		var info *resource.Info
 		if sorter != nil {
 			info = infos[sorter.OriginalPosition(ix)]
 			mapping = info.Mapping
-			original = info.Object
 		} else {
 			info = infos[ix]
 			mapping = info.Mapping
-			original = info.Object
 		}
 
 		// if dealing with a table that has no rows, skip remaining steps
@@ -371,29 +396,24 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 			}
 		}
 
+		nonEmptyObjCount++
+
+		printWithNamespace := o.AllNamespaces
+		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			printWithNamespace = false
+		}
+
 		if shouldGetNewPrinterForMapping(printer, lastMapping, mapping) {
-			if printer != nil {
-				w.Flush()
+			w.Flush()
+
+			// TODO: this doesn't belong here
+			// add linebreak between resource groups (if there is more than one)
+			// skip linebreak above first resource group
+			if lastMapping != nil && !o.NoHeaders {
+				fmt.Fprintln(o.ErrOut)
 			}
 
-			printWithNamespace := options.AllNamespaces
-			if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
-				printWithNamespace = false
-			}
-
-			printOpts := cmdutil.ExtractCmdPrintOptions(cmd, printWithNamespace)
-			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
-			// then get the default output options for this mapping from OpenAPI schema.
-			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				updatePrintOptionsForOpenAPI(f, mapping, printOpts)
-			}
-
-			if showKind && mapping != nil {
-				printOpts.WithKind = true
-				printOpts.Kind = mapping.GroupVersionKind.GroupKind()
-			}
-
-			printer, err = cmdutil.PrinterForOptions(printOpts)
+			printer, err = o.ToPrinter(mapping, printWithNamespace)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -402,66 +422,33 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				continue
 			}
 
-			// TODO: this doesn't belong here
-			// add linebreak between resource groups (if there is more than one)
-			// skip linebreak above first resource group
-			if lastMapping != nil && !noHeaders {
-				fmt.Fprintf(options.ErrOut, "%s\n", "")
-			}
-
 			lastMapping = mapping
 		}
 
-		typedObj := info.AsInternal()
-
-		objToPrint := typedObj
-		if printer.IsGeneric() {
-			// use raw object as received from the builder when using generic
-			// printer instead of decodedObj
-			objToPrint = original
-		}
-		if err := printer.PrintObj(objToPrint, w); err != nil {
-			if !errs.Has(err.Error()) {
-				errs.Insert(err.Error())
-				allErrs = append(allErrs, err)
-			}
-			continue
-		}
+		printer.PrintObj(info.AsInternal(), w)
 	}
 	w.Flush()
-	nonEmptyObjCount := 0
-	for _, obj := range objs {
-		if table, ok := obj.(*metav1beta1.Table); ok {
-			// exclude any Table objects with empty rows from our total object count
-			if len(table.Rows) == 0 {
-				continue
-			}
-		}
-
-		nonEmptyObjCount++
-	}
-
-	if nonEmptyObjCount == 0 && !options.IgnoreNotFound {
-		fmt.Fprintln(options.ErrOut, "No resources found.")
+	if nonEmptyObjCount == 0 && !o.IgnoreNotFound {
+		fmt.Fprintln(o.ErrOut, "No resources found.")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
 
 // raw makes a simple HTTP request to the provided path on the server using the default
 // credentials.
-func (options *GetOptions) raw(f cmdutil.Factory) error {
+func (o *GetOptions) raw(f cmdutil.Factory) error {
 	restClient, err := f.RESTClient()
 	if err != nil {
 		return err
 	}
 
-	stream, err := restClient.Get().RequestURI(options.Raw).Stream()
+	stream, err := restClient.Get().RequestURI(o.Raw).Stream()
 	if err != nil {
 		return err
 	}
 	defer stream.Close()
 
-	_, err = io.Copy(options.Out, stream)
+	_, err = io.Copy(o.Out, stream)
 	if err != nil && err != io.EOF {
 		return err
 	}
@@ -470,16 +457,16 @@ func (options *GetOptions) raw(f cmdutil.Factory) error {
 
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
-func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	r := f.NewBuilder().
 		Unstructured().
-		NamespaceParam(options.Namespace).DefaultNamespace().AllNamespaces(options.AllNamespaces).
-		FilenameParam(options.ExplicitNamespace, &options.FilenameOptions).
-		LabelSelectorParam(options.LabelSelector).
-		FieldSelectorParam(options.FieldSelector).
-		ExportParam(options.Export).
-		RequestChunksOf(options.ChunkSize).
-		IncludeUninitialized(options.IncludeUninitialized).
+		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
+		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.LabelSelector).
+		FieldSelectorParam(o.FieldSelector).
+		ExportParam(o.Export).
+		RequestChunksOf(o.ChunkSize).
+		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().
@@ -514,8 +501,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
-	printer, err := cmdutil.PrinterForOptions(printOpts)
+	printer, err := o.ToPrinter(mapping, o.AllNamespaces)
 	if err != nil {
 		return err
 	}
@@ -540,9 +526,9 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	}
 
 	// print the current object
-	if !options.WatchOnly {
+	if !o.WatchOnly {
 		var objsToPrint []runtime.Object
-		writer := printers.GetNewTabWriter(options.Out)
+		writer := printers.GetNewTabWriter(o.Out)
 
 		if isList {
 			objsToPrint, _ = meta.ExtractList(obj)
@@ -550,10 +536,12 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 			objsToPrint = append(objsToPrint, obj)
 		}
 		for _, objToPrint := range objsToPrint {
-			// printing always takes the internal version, but the watch event uses externals
-			// TODO fix printing to use server-side or be version agnostic
-			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-			if err := printer.PrintObj(attemptToConvertToInternal(objToPrint, mapping, internalGV), writer); err != nil {
+			if !o.IsGeneric {
+				// printing always takes the internal version, but the watch event uses externals
+				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
+				objToPrint = attemptToConvertToInternal(objToPrint, mapping, internalGV)
+			}
+			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 		}
@@ -579,7 +567,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 			// printing always takes the internal version, but the watch event uses externals
 			// TODO fix printing to use server-side or be version agnostic
 			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-			if err := printer.PrintObj(attemptToConvertToInternal(e.Object, mapping, internalGV), options.Out); err != nil {
+			if err := printer.PrintObj(attemptToConvertToInternal(e.Object, mapping, internalGV), o.Out); err != nil {
 				return false, err
 			}
 			return false, nil
@@ -599,7 +587,7 @@ func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConv
 	return internalObject
 }
 
-func (options *GetOptions) decodeIntoTable(encoder runtime.Encoder, obj runtime.Object) (runtime.Object, error) {
+func (o *GetOptions) decodeIntoTable(encoder runtime.Encoder, obj runtime.Object) (runtime.Object, error) {
 	if obj.GetObjectKind().GroupVersionKind().Kind != "Table" {
 		return nil, fmt.Errorf("attempt to decode non-Table object into a v1beta1.Table")
 	}
@@ -618,7 +606,7 @@ func (options *GetOptions) decodeIntoTable(encoder runtime.Encoder, obj runtime.
 	return table, nil
 }
 
-func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *resource.Result) error {
+func (o *GetOptions) printGeneric(r *resource.Result) error {
 	// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 	// 1. if there is more than one item, combine them all into a single list
 	// 2. if there is a single item and that item is a list, leave it as its specific list
@@ -633,8 +621,13 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 		errs = append(errs, err)
 	}
 
-	if len(infos) == 0 && options.IgnoreNotFound {
+	if len(infos) == 0 && o.IgnoreNotFound {
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
+	}
+
+	printer, err := o.ToPrinter(nil, false)
+	if err != nil {
+		return err
 	}
 
 	var obj runtime.Object
@@ -694,13 +687,13 @@ func (options *GetOptions) printGeneric(printer printers.ResourcePrinter, r *res
 		for _, item := range items {
 			list.Items = append(list.Items, *item.(*unstructured.Unstructured))
 		}
-		if err := printer.PrintObj(list, options.Out); err != nil {
+		if err := printer.PrintObj(list, o.Out); err != nil {
 			errs = append(errs, err)
 		}
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
-	if printErr := printer.PrintObj(obj, options.Out); printErr != nil {
+	if printErr := printer.PrintObj(obj, o.Out); printErr != nil {
 		errs = append(errs, printErr)
 	}
 

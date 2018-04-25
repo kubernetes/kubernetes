@@ -150,6 +150,13 @@ package_group(
 )
 
 package_group(
+    name = "pkg_kubectl_cmd_get_CONSUMERS",
+    packages = [
+        "//pkg/kubectl/cmd",
+    ],
+)
+
+package_group(
     name = "pkg_kubectl_cmd_rollout_CONSUMERS",
     packages = [
         "//pkg/kubectl/cmd",
@@ -177,7 +184,7 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
         "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/resource",
+        "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/templates",
@@ -199,7 +206,7 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/resource",
+        "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/explain",
@@ -233,7 +240,7 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
         "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/resource",
+        "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/testing",
@@ -303,7 +310,7 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
         "//pkg/kubectl/cmd/create",
-        "//pkg/kubectl/cmd/resource",
+        "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/testing",
