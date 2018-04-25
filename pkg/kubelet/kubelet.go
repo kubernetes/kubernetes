@@ -521,6 +521,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		containerManager:     kubeDeps.ContainerManager,
 		containerRuntimeName: containerRuntime,
 		nodeIP:               parsedNodeIP,
+		nodeIPValidator:      validateNodeIP,
 		clock:                clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
@@ -1069,6 +1070,9 @@ type Kubelet struct {
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
+
+	// use this function to validate the kubelet nodeIP
+	nodeIPValidator func(net.IP) error
 
 	// If non-nil, this is a unique identifier for the node in an external database, eg. cloudprovider
 	providerID string

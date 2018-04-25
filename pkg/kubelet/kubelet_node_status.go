@@ -407,7 +407,7 @@ func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 // Set IP and hostname addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 	if kl.nodeIP != nil {
-		if err := validateNodeIP(kl.nodeIP); err != nil {
+		if err := kl.nodeIPValidator(kl.nodeIP); err != nil {
 			return fmt.Errorf("failed to validate nodeIP: %v", err)
 		}
 		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
@@ -467,12 +467,22 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		}
 		if kl.nodeIP != nil {
 			enforcedNodeAddresses := []v1.NodeAddress{}
+
+			var nodeIPType v1.NodeAddressType
 			for _, nodeAddress := range nodeAddresses {
 				if nodeAddress.Address == kl.nodeIP.String() {
 					enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+					nodeIPType = nodeAddress.Type
+					break
 				}
 			}
 			if len(enforcedNodeAddresses) > 0 {
+				for _, nodeAddress := range nodeAddresses {
+					if nodeAddress.Type != nodeIPType && nodeAddress.Type != v1.NodeHostName {
+						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+					}
+				}
+
 				enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: kl.GetHostname()})
 				node.Status.Addresses = enforcedNodeAddresses
 				return nil
@@ -513,7 +523,7 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 			var addrs []net.IP
 			addrs, _ = net.LookupIP(node.Name)
 			for _, addr := range addrs {
-				if err = validateNodeIP(addr); err == nil {
+				if err = kl.nodeIPValidator(addr); err == nil {
 					if addr.To4() != nil {
 						ipAddr = addr
 						break
