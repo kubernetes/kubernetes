@@ -29,13 +29,14 @@ import (
 
 	"fmt"
 
-	"path/filepath"
-
 	"github.com/vmware/govmomi/vim25/mo"
 	"io/ioutil"
+	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
+	"k8s.io/kubernetes/pkg/util/version"
+	"path/filepath"
 )
 
 const (
@@ -472,7 +473,12 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 		if err != nil {
 			return nodesToRetry, err
 		}
-		nodeUUID := strings.ToLower(GetUUIDFromProviderID(node.Spec.ProviderID))
+		nodeUUID, err := GetNodeUUID(&node)
+		if err != nil {
+			glog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+			return nodesToRetry, err
+		}
+		nodeUUID = strings.ToLower(nodeUUID)
 		glog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %s", nodeName, nodeUUID, vmMoMap)
 		vclib.VerifyVolumePathsForVM(vmMoMap[nodeUUID], nodeVolumes[nodeName], convertToString(nodeName), attached)
 	}
@@ -541,4 +547,33 @@ func GetVMUUID() (string, error) {
 
 func GetUUIDFromProviderID(providerID string) string {
 	return strings.TrimPrefix(providerID, ProviderPrefix)
+}
+
+func IsUUIDSupportedNode(node *v1.Node) (bool, error) {
+	newVersion, err := version.ParseSemantic("v1.9.4")
+	if err != nil {
+		glog.Errorf("Failed to determine whether node %+v is old with error %v", node, err)
+		return false, err
+	}
+	nodeVersion, err := version.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
+	if err != nil {
+		glog.Errorf("Failed to determine whether node %+v is old with error %v", node, err)
+		return false, err
+	}
+	if nodeVersion.LessThan(newVersion) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func GetNodeUUID(node *v1.Node) (string, error) {
+	oldNode, err := IsUUIDSupportedNode(node)
+	if err != nil {
+		glog.Errorf("Failed to get node UUID for node %+v with error %v", node, err)
+		return "", err
+	}
+	if oldNode {
+		return node.Status.NodeInfo.SystemUUID, nil
+	}
+	return GetUUIDFromProviderID(node.Spec.ProviderID), nil
 }
