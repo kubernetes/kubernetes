@@ -26,13 +26,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 var (
@@ -75,11 +73,6 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 		ShowEvents: true,
 	}
 
-	// TODO: this should come from the factory, and may need to be loaded from the server, and so is probably
-	//   going to have to be removed
-	validArgs := printersinternal.DescribableResources()
-	argAliases := kubectl.ResourceAliases(validArgs)
-
 	cmd := &cobra.Command{
 		Use: "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		DisableFlagsInUseLine: true,
@@ -90,8 +83,6 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 			err := RunDescribe(f, out, cmdErr, cmd, args, options, describerSettings)
 			cmdutil.CheckErr(err)
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
 	}
 	usage := "containing the resource to describe"
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)

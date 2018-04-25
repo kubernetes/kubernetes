@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	externalclient "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
@@ -123,7 +124,16 @@ func (pw *prefixWriter) Flush() {
 	}
 }
 
-func describerMap(c clientset.Interface, externalclient externalclient.Interface) map[schema.GroupKind]printers.Describer {
+func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]printers.Describer, error) {
+	c, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	externalclient, err := externalclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	m := map[schema.GroupKind]printers.Describer{
 		api.Kind("Pod"):                   &PodDescriber{c},
 		api.Kind("ReplicationController"): &ReplicationControllerDescriber{c},
@@ -164,24 +174,19 @@ func describerMap(c clientset.Interface, externalclient externalclient.Interface
 		scheduling.Kind("PriorityClass"):               &PriorityClassDescriber{c},
 	}
 
-	return m
-}
-
-// DescribableResources lists all resource types we can describe.
-func DescribableResources() []string {
-	keys := make([]string, 0)
-
-	for k := range describerMap(nil, nil) {
-		resource := strings.ToLower(k.Kind)
-		keys = append(keys, resource)
-	}
-	return keys
+	return m, nil
 }
 
 // DescriberFor returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind schema.GroupKind, c clientset.Interface, externalclient externalclient.Interface) (printers.Describer, bool) {
-	f, ok := describerMap(c, externalclient)[kind]
+func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.Describer, bool) {
+	describers, err := describerMap(clientConfig)
+	if err != nil {
+		glog.V(1).Info(err)
+		return nil, false
+	}
+
+	f, ok := describers[kind]
 	return f, ok
 }
 
