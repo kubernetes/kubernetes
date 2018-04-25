@@ -326,7 +326,6 @@ docs/user-guide/kubectl/kubectl_plugin.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
 docs/user-guide/kubectl/kubectl_replace.md
-docs/user-guide/kubectl/kubectl_rolling-update.md
 docs/user-guide/kubectl/kubectl_rollout.md
 docs/user-guide/kubectl/kubectl_rollout_history.md
 docs/user-guide/kubectl/kubectl_rollout_pause.md

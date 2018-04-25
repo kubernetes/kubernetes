@@ -81,9 +81,11 @@ func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Perform a rolling update of the given ReplicationController"),
-		Long:    rollingUpdateLong,
-		Example: rollingUpdateExample,
+		Short:      "Perform a rolling update. This command is deprecated, use rollout instead.",
+		Long:       rollingUpdateLong,
+		Example:    rollingUpdateExample,
+		Deprecated: `use "rollout" instead`,
+		Hidden:     true,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunRollingUpdate(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
