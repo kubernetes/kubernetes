@@ -338,6 +338,12 @@ func (c *nodePlugin) admitNode(nodeName string, a admission.Attributes) error {
 		if node.Spec.ConfigSource != nil && !apiequality.Semantic.DeepEqual(node.Spec.ConfigSource, oldNode.Spec.ConfigSource) {
 			return admission.NewForbidden(a, fmt.Errorf("cannot update configSource to a new non-nil configSource"))
 		}
+
+		// Don't allow a node to update its own taints. This would allow a node to remove or modify its
+		// taints in a way that would let it steer disallowed workloads to itself.
+		if !apiequality.Semantic.DeepEqual(node.Spec.Taints, oldNode.Spec.Taints) {
+			return admission.NewForbidden(a, fmt.Errorf("cannot modify taints"))
+		}
 	}
 
 	return nil
