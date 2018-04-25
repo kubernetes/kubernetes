@@ -38,7 +38,6 @@ test/e2e/common/container_probe.go: "should *not* be restarted with a exec \"cat
 test/e2e/common/container_probe.go: "should be restarted with a /healthz http liveness probe "
 test/e2e/common/container_probe.go: "should have monotonically increasing restart count  [Slow]"
 test/e2e/common/container_probe.go: "should *not* be restarted with a /healthz http liveness probe "
-test/e2e/common/container_probe.go: "should be restarted with a docker exec liveness probe with timeout "
 test/e2e/common/docker_containers.go: "should use the image defaults if command and args are blank "
 test/e2e/common/docker_containers.go: "should be able to override the image's default arguments (docker cmd) "
 test/e2e/common/docker_containers.go: "should be able to override the image's default command (docker entrypoint) "
