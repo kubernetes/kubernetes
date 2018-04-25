@@ -317,10 +317,14 @@ func (r *Request) Param(paramName, s string) *Request {
 // VersionedParams will not write query parameters that have omitempty set and are empty. If a
 // parameter has already been set it is appended to (Params and VersionedParams are additive).
 func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
+	return r.SpecificallyVersionedParams(obj, codec, *r.content.GroupVersion)
+}
+
+func (r *Request) SpecificallyVersionedParams(obj runtime.Object, codec runtime.ParameterCodec, version schema.GroupVersion) *Request {
 	if r.err != nil {
 		return r
 	}
-	params, err := codec.EncodeParameters(obj, *r.content.GroupVersion)
+	params, err := codec.EncodeParameters(obj, version)
 	if err != nil {
 		r.err = err
 		return r
@@ -485,6 +489,19 @@ func (r *Request) tryThrottle() {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch() (watch.Interface, error) {
+	return r.WatchWithSpecificDecoders(
+		func(body io.ReadCloser) streaming.Decoder {
+			framer := r.serializers.Framer.NewFrameReader(body)
+			return streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
+		},
+		r.serializers.Decoder,
+	)
+}
+
+// WatchWithSpecificDecoders attempts to begin watching the requested location with a *different* decoder.
+// Turns out that you want one "standard" decoder for the watch event and one "personal" decoder for the content
+// Returns a watch.Interface, or an error.
+func (r *Request) WatchWithSpecificDecoders(wrapperDecoderFn func(io.ReadCloser) streaming.Decoder, embeddedDecoder runtime.Decoder) (watch.Interface, error) {
 	// We specifically don't want to rate limit watches, so we
 	// don't use r.throttle here.
 	if r.err != nil {
@@ -532,9 +549,8 @@ func (r *Request) Watch() (watch.Interface, error) {
 		}
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
-	framer := r.serializers.Framer.NewFrameReader(resp.Body)
-	decoder := streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
-	return watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, r.serializers.Decoder)), nil
+	wrapperDecoder := wrapperDecoderFn(resp.Body)
+	return watch.NewStreamWatcher(restclientwatch.NewDecoder(wrapperDecoder, embeddedDecoder)), nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.

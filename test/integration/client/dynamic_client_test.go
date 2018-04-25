@@ -45,7 +45,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	client := clientset.NewForConfigOrDie(config)
-	dynamicClient, err := dynamic.NewClient(config)
+	dynamicClient, err := dynamic.NewClient(config, *gv)
 	_ = dynamicClient
 	if err != nil {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
