@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"path"
+	"path/filepath"
 
 	"time"
 
@@ -74,7 +74,7 @@ func testFlexVolume(driver string, cs clientset.Interface, config framework.Volu
 // controller-manager if 'restart' is true.
 func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath string, restart bool) {
 	flexDir := getFlexDir(c, node, vendor, driver)
-	flexFile := path.Join(flexDir, driver)
+	flexFile := filepath.Join(flexDir, driver)
 
 	host := ""
 	if node != nil {
@@ -146,7 +146,7 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 			}
 		}
 	}
-	flexDir := path.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
+	flexDir := filepath.Join(volumePluginDir, fmt.Sprintf("/%s~%s/", vendor, driver))
 	return flexDir
 }
 
@@ -210,8 +210,8 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 		driver := "dummy"
 		driverInstallAs := driver + "-" + suffix
 
-		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
+		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", filepath.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(cs, &node, "k8s", driverInstallAs, filepath.Join(driverDir, driver), true /* restart */)
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
@@ -228,10 +228,10 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 		driver := "dummy-attachable"
 		driverInstallAs := driver + "-" + suffix
 
-		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
-		By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
+		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", filepath.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(cs, &node, "k8s", driverInstallAs, filepath.Join(driverDir, driver), true /* restart */)
+		By(fmt.Sprintf("installing flexvolume %s on master as %s", filepath.Join(driverDir, driver), driverInstallAs))
+		installFlex(cs, nil, "k8s", driverInstallAs, filepath.Join(driverDir, driver), true /* restart */)
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
@@ -250,8 +250,8 @@ var _ = utils.SIGDescribe("Flexvolumes [Disruptive]", func() {
 		driver := "dummy"
 		driverInstallAs := driver + "-" + suffix
 
-		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver), false /* restart */)
+		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", filepath.Join(driverDir, driver), node.Name, driverInstallAs))
+		installFlex(cs, &node, "k8s", driverInstallAs, filepath.Join(driverDir, driver), false /* restart */)
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
