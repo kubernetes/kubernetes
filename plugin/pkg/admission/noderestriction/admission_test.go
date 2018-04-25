@@ -105,7 +105,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				UID:              "quxUID",
 				KubeletConfigKey: "kubelet",
 			}}}}
-		othernodeObj = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
+		mynodeObjTaintA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "A"}}}}
+		mynodeObjTaintB = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{Taints: []api.Taint{{Key: "mykey", Value: "B"}}}}
+		othernodeObj    = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "othernode"}}
 
 		mymirrorpod      = makeTestPod("ns", "mymirrorpod", "mynode", true)
 		othermirrorpod   = makeTestPod("ns", "othermirrorpod", "othernode", true)
@@ -634,6 +636,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "",
 		},
 		{
+			name:       "allow create of my node with taints",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, mynode),
+			err:        "",
+		},
+		{
 			name:       "allow update of my node",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
@@ -680,6 +688,30 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjConfigA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
 			err:        "",
+		},
+		{
+			name:       "allow update of my node: no change to taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "",
+		},
+		{
+			name:       "forbid update of my node: add taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObj, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "cannot modify taints",
+		},
+		{
+			name:       "forbid update of my node: remove taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObj, mynodeObjTaintA, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "cannot modify taints",
+		},
+		{
+			name:       "forbid update of my node: change taints",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, mynodeObjTaintB, nodeKind, mynodeObj.Namespace, mynodeObj.Name, nodeResource, "", admission.Update, mynode),
+			err:        "cannot modify taints",
 		},
 
 		// Other node object
