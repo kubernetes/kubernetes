@@ -1016,6 +1016,7 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   KUBE_FASTBUILD=true make ginkgo cross
 
   apt install -y sudo
+  apt-get remove -y systemd
 
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
