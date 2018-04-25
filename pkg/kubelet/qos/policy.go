@@ -29,7 +29,6 @@ const (
 	PodInfraOOMAdj        int = -998
 	KubeletOOMScoreAdj    int = -999
 	DockerOOMScoreAdj     int = -999
-	KubeProxyOOMScoreAdj  int = -999
 	guaranteedOOMScoreAdj int = -998
 	besteffortOOMScoreAdj int = 1000
 )

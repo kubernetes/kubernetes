@@ -23,7 +23,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -47,7 +46,7 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 		obj.MetricsBindAddress += fmt.Sprintf(":%v", ports.ProxyStatusPort)
 	}
 	if obj.OOMScoreAdj == nil {
-		temp := int32(qos.KubeProxyOOMScoreAdj)
+		temp := int32(-999)
 		obj.OOMScoreAdj = &temp
 	}
 	if obj.ResourceContainer == "" {

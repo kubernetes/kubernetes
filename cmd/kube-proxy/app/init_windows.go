@@ -20,8 +20,6 @@ package app
 
 import (
 	"k8s.io/kubernetes/pkg/windows/service"
-
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -33,8 +31,4 @@ func initForOS(windowsService bool) error {
 		return service.InitService(serviceName)
 	}
 	return nil
-}
-
-func (o *Options) addOSFlags(fs *pflag.FlagSet) {
-	fs.BoolVar(&o.WindowsService, "windows-service", o.WindowsService, "Enable Windows Service Control Manager API integration")
 }

@@ -16,8 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package options
 
-func initForOS(service bool) error {
-	return nil
+import (
+	"github.com/spf13/pflag"
+)
+
+func addOSFlags(o *Options, fs *pflag.FlagSet) {
 }

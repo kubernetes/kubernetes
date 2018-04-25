@@ -28,6 +28,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
@@ -93,9 +94,9 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		"::",
 	}
 	for _, addr := range bindAddresses {
-		options := NewOptions()
+		options := options.NewOptions()
 
-		options.config = &kubeproxyconfig.KubeProxyConfiguration{
+		options.Config = &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: addr,
 		}
 		options.CleanupAndExit = true
@@ -330,12 +331,12 @@ nodePortAddresses:
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 		}
 
-		options := NewOptions()
+		options := options.NewOptions()
 
 		yaml := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
 			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
-		config, err := options.loadConfig([]byte(yaml))
+		config, err := options.LoadConfig([]byte(yaml))
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 		if !reflect.DeepEqual(expected, config) {
 			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
@@ -368,9 +369,9 @@ func TestLoadConfigFailures(t *testing.T) {
 	}
 	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"
 	for _, tc := range testCases {
-		options := NewOptions()
+		options := options.NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)
-		_, err := options.loadConfig([]byte(config))
+		_, err := options.LoadConfig([]byte(config))
 		if assert.Error(t, err, tc.name) {
 			assert.Contains(t, err.Error(), tc.expErr, tc.name)
 		}
