@@ -377,10 +377,6 @@ func (c *linuxContainer) start(process *Process, isInit bool) error {
 				}
 			}
 		}
-	} else {
-		c.state = &runningState{
-			c: c,
-		}
 	}
 	return nil
 }
@@ -1801,8 +1797,7 @@ func (c *linuxContainer) bootstrapData(cloneFlags uintptr, nsMaps map[configs.Na
 					Value: []byte(c.newgidmapPath),
 				})
 			}
-			// The following only applies if we are root.
-			if !c.config.Rootless {
+			if requiresRootOrMappingTool(c.config) {
 				// check if we have CAP_SETGID to setgroup properly
 				pid, err := capability.NewPid(0)
 				if err != nil {
@@ -1846,4 +1841,11 @@ func ignoreTerminateErrors(err error) error {
 		return nil
 	}
 	return err
+}
+
+func requiresRootOrMappingTool(c *configs.Config) bool {
+	gidMap := []configs.IDMap{
+		{ContainerID: 0, HostID: os.Getegid(), Size: 1},
+	}
+	return !reflect.DeepEqual(c.GidMappings, gidMap)
 }
