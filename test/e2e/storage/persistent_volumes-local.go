@@ -18,7 +18,6 @@ package storage
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
