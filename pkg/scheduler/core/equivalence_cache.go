@@ -38,7 +38,7 @@ const maxCacheEntries = 100
 // 1. a map of AlgorithmCache with node name as key
 // 2. function to get equivalence pod
 type EquivalenceCache struct {
-	sync.RWMutex
+	mu             sync.Mutex
 	algorithmCache map[string]AlgorithmCache
 }
 
@@ -84,9 +84,9 @@ func (ec *EquivalenceCache) RunPredicate(
 	equivClassInfo *equivalenceClassInfo,
 	cache schedulercache.Cache,
 ) (bool, []algorithm.PredicateFailureReason, error) {
-	ec.Lock()
-	defer ec.Unlock()
-	fit, reasons, invalid := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash, false)
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
+	fit, reasons, invalid := ec.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClassInfo.hash)
 	if !invalid {
 		return fit, reasons, nil
 	}
@@ -96,7 +96,7 @@ func (ec *EquivalenceCache) RunPredicate(
 	}
 	// Skip update if NodeInfo is stale.
 	if cache != nil && cache.IsUpToDate(nodeInfo) {
-		ec.updateResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, fit, reasons, equivClassInfo.hash, false)
+		ec.updateResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, fit, reasons, equivClassInfo.hash)
 	}
 	return fit, reasons, nil
 }
@@ -107,12 +107,7 @@ func (ec *EquivalenceCache) updateResult(
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
 	equivalenceHash uint64,
-	needLock bool,
 ) {
-	if needLock {
-		ec.Lock()
-		defer ec.Unlock()
-	}
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
 		ec.algorithmCache[nodeName] = newAlgorithmCache()
 	}
@@ -140,12 +135,8 @@ func (ec *EquivalenceCache) updateResult(
 // 3. if cache item is not found
 func (ec *EquivalenceCache) lookupResult(
 	podName, nodeName, predicateKey string,
-	equivalenceHash uint64, needLock bool,
+	equivalenceHash uint64,
 ) (bool, []algorithm.PredicateFailureReason, bool) {
-	if needLock {
-		ec.RLock()
-		defer ec.RUnlock()
-	}
 	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
 		predicateKey, podName, nodeName)
 	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
@@ -170,8 +161,8 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItem(nodeName string, predi
 	if len(predicateKeys) == 0 {
 		return
 	}
-	ec.Lock()
-	defer ec.Unlock()
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
 	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
 		for predicateKey := range predicateKeys {
 			algorithmCache.predicatesCache.Remove(predicateKey)
@@ -185,8 +176,8 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemOfAllNodes(predicateKey
 	if len(predicateKeys) == 0 {
 		return
 	}
-	ec.Lock()
-	defer ec.Unlock()
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
 	// algorithmCache uses nodeName as key, so we just iterate it and invalid given predicates
 	for _, algorithmCache := range ec.algorithmCache {
 		for predicateKey := range predicateKeys {
@@ -199,8 +190,8 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemOfAllNodes(predicateKey
 
 // InvalidateAllCachedPredicateItemOfNode marks all cached items on given node as invalid
 func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName string) {
-	ec.Lock()
-	defer ec.Unlock()
+	ec.mu.Lock()
+	defer ec.mu.Unlock()
 	delete(ec.algorithmCache, nodeName)
 	glog.V(5).Infof("Done invalidating all cached predicates on node: %s", nodeName)
 }
