@@ -139,80 +139,163 @@ func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.hostname = testKubeletHostname
 
-	existingNode := v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
-		Spec:       v1.NodeSpec{},
+	cases := []struct {
+		name              string
+		nodeIP            net.IP
+		nodeAddresses     []v1.NodeAddress
+		expectedAddresses []v1.NodeAddress
+		shouldError       bool
+	}{
+		{
+			name:   "A single InternalIP",
+			nodeIP: net.ParseIP("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "NodeIP is external",
+			nodeIP: net.ParseIP("55.55.55.55"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			// Accommodating #45201 and #49202
+			name:   "InternalIP and ExternalIP are the same",
+			nodeIP: net.ParseIP("55.55.55.55"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "An Internal/ExternalIP, an Internal/ExternalDNS",
+			nodeIP: net.ParseIP("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalDNS, Address: "ip-10-1-1-1.us-west-2.compute.internal"},
+				{Type: v1.NodeExternalDNS, Address: "ec2-55-55-55-55.us-west-2.compute.amazonaws.com"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalDNS, Address: "ip-10-1-1-1.us-west-2.compute.internal"},
+				{Type: v1.NodeExternalDNS, Address: "ec2-55-55-55-55.us-west-2.compute.amazonaws.com"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "An Internal with multiple internal IPs",
+			nodeIP: net.ParseIP("10.1.1.1"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "10.2.2.2"},
+				{Type: v1.NodeInternalIP, Address: "10.3.3.3"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:   "An InternalIP that isn't valid: should error",
+			nodeIP: net.ParseIP("10.2.2.2"),
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: nil,
+			shouldError:       true,
+		},
 	}
-
-	// TODO : is it possible to mock validateNodeIP() to avoid relying on the host interface addresses ?
-	addrs, err := net.InterfaceAddrs()
-	assert.NoError(t, err)
-	for _, addr := range addrs {
-		var ip net.IP
-		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
-			ip = v.IP
+	for _, testCase := range cases {
+		// testCase setup
+		existingNode := v1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+			Spec:       v1.NodeSpec{},
 		}
-		if ip != nil && !ip.IsLoopback() && ip.To4() != nil {
-			kubelet.nodeIP = ip
-			break
+
+		kubelet.nodeIP = testCase.nodeIP
+
+		fakeCloud := &fakecloud.FakeCloud{
+			Addresses: testCase.nodeAddresses,
+			Err:       nil,
 		}
-	}
-	assert.NotNil(t, kubelet.nodeIP)
+		kubelet.cloud = fakeCloud
+		kubelet.cloudproviderRequestParallelism = make(chan int, 1)
+		kubelet.cloudproviderRequestSync = make(chan int)
+		kubelet.cloudproviderRequestTimeout = 10 * time.Second
+		kubelet.nodeIPValidator = func(nodeIP net.IP) error {
+			return nil
+		}
 
-	fakeCloud := &fakecloud.FakeCloud{
-		Addresses: []v1.NodeAddress{
-			{
-				Type:    v1.NodeExternalIP,
-				Address: "132.143.154.163",
-			},
-			{
-				Type:    v1.NodeExternalIP,
-				Address: kubelet.nodeIP.String(),
-			},
-			{
-				Type:    v1.NodeInternalIP,
-				Address: "132.143.154.164",
-			},
-			{
-				Type:    v1.NodeInternalIP,
-				Address: kubelet.nodeIP.String(),
-			},
-			{
-				Type:    v1.NodeInternalIP,
-				Address: "132.143.154.165",
-			},
-			{
-				Type:    v1.NodeHostName,
-				Address: testKubeletHostname,
-			},
-		},
-		Err: nil,
-	}
-	kubelet.cloud = fakeCloud
-	kubelet.cloudproviderRequestParallelism = make(chan int, 1)
-	kubelet.cloudproviderRequestSync = make(chan int)
-	kubelet.cloudproviderRequestTimeout = 10 * time.Second
+		// execute method
+		err := kubelet.setNodeAddress(&existingNode)
+		if err != nil && !testCase.shouldError {
+			t.Errorf("Unexpected error for test %s: %q", testCase.name, err)
+			continue
+		} else if err != nil && testCase.shouldError {
+			// expected an error
+			continue
+		}
 
-	kubelet.setNodeAddress(&existingNode)
+		// Sort both sets for consistent equality
+		sortNodeAddresses(testCase.expectedAddresses)
+		sortNodeAddresses(existingNode.Status.Addresses)
 
-	expectedAddresses := []v1.NodeAddress{
-		{
-			Type:    v1.NodeExternalIP,
-			Address: kubelet.nodeIP.String(),
-		},
-		{
-			Type:    v1.NodeInternalIP,
-			Address: kubelet.nodeIP.String(),
-		},
-		{
-			Type:    v1.NodeHostName,
-			Address: testKubeletHostname,
-		},
+		assert.True(
+			t,
+			apiequality.Semantic.DeepEqual(
+				testCase.expectedAddresses,
+				existingNode.Status.Addresses,
+			),
+			fmt.Sprintf("Test %s failed %%s", testCase.name),
+			diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses),
+		)
 	}
-	assert.True(t, apiequality.Semantic.DeepEqual(expectedAddresses, existingNode.Status.Addresses), "%s", diff.ObjectDiff(expectedAddresses, existingNode.Status.Addresses))
+}
+
+// sortableNodeAddress is a type for sorting []v1.NodeAddress
+type sortableNodeAddress []v1.NodeAddress
+
+func (s sortableNodeAddress) Len() int { return len(s) }
+func (s sortableNodeAddress) Less(i, j int) bool {
+	return (string(s[i].Type) + s[i].Address) < (string(s[j].Type) + s[j].Address)
+}
+func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
+
+func sortNodeAddresses(addrs sortableNodeAddress) {
+	sort.Sort(addrs)
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
