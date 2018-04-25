@@ -56,6 +56,9 @@ type CustomResourceDefinitionSpec struct {
 	// Top-level and per-version subresources are mutually exclusive.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,6,opt,name=subresources"`
+	// DeleteStrategy describes graceful delete properties for a CustomResource
+	// +optional
+	DeleteStrategy *CustomResourceDeleteStrategy `json:"deleteStrategy,omitempty" protobuf:"bytes,7,opt,name=deleteStrategy"`
 	// Versions is the list of all supported versions for this resource.
 	// If Version field is provided, this field is optional.
 	// Validation: All versions must use the same validation schema for now. i.e., top
@@ -177,6 +180,9 @@ type CustomResourceDefinitionVersion struct {
 	// This field is alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
 	// +optional
 	Subresources *CustomResourceSubresources `json:"subresources,omitempty" protobuf:"bytes,5,opt,name=subresources"`
+	// DeleteStrategy describes graceful delete properties for a CustomResource
+	// +optional
+	DeleteStrategy *CustomResourceDeleteStrategy `json:"deleteStrategy,omitempty" protobuf:"bytes,7,opt,name=deleteStrategy"`
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// Top-level and per-version columns are mutually exclusive.
 	// Per-version columns must not all be set to identical values (top-level columns should be used instead)
@@ -425,4 +431,17 @@ type ConversionResponse struct {
 	// `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message`
 	// will be used to construct an error message for the end user.
 	Result metav1.Status `json:"result" protobuf:"bytes,3,name=result"`
+}
+
+type CustomResourceDeleteStrategy struct {
+	// `defaultTerminatingGracePeriodSeconds` defines the default deletion grace period. This period will be set in the custom resource
+	// metadata, if not deletionGracePeriodSeconds wer set on a DELETE.
+	// Defaults to zero, which is equivalent to a force delete
+	DefaultTerminatingGracePeriodSeconds int64 `json:"defaultTerminatingGracePeriodSeconds" protobuf:"varint,1,opt,name=defaultTerminatingGracePeriodSeconds"`
+
+	// `terminatingGracePeriodSecondsPath` defines the JSON path inside of a CustomResource that corresponds to Spec.TerminatingGracePeriodSeconds
+	// Only JSON paths without the array notation are allowed.
+	// Must be a JSON Path under .spec.
+	// If there is no value under the given path in the CustomResource, the defaultGracefulDeletePeriod will be taken from the default grace period
+	TerminatingGracePeriodSecondsPath string `json:"terminatingGracePeriodSecondsPath" protobuf:"bytes,2,opt,name=teminatingGracePeriodSecondsPath"`
 }

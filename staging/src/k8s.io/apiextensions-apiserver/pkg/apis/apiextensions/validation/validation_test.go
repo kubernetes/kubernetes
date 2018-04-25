@@ -416,6 +416,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural: "plural",
 					},
+					DeleteStrategy: &apiextensions.CustomResourceDeleteStrategy{},
 				},
 			},
 			errors: []validationMatch{
@@ -426,6 +427,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				required("spec", "names", "singular"),
 				required("spec", "names", "kind"),
 				required("spec", "names", "listKind"),
+				required("spec","deleteStrategy","terminatingGracePeriodSecondsPath"),
 			},
 		},
 		{
@@ -459,6 +461,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "value()*a",
 						ListKind: "value()*a",
 					},
+					DeleteStrategy: &apiextensions.CustomResourceDeleteStrategy{
+						DefaultTerminatingGracePeriodSeconds: -1,
+						TerminatingGracePeriodSecondsPath: ".notspec.lala",
+					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -486,6 +492,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("status", "acceptedNames", "listKind"), // kind == listKind
 				invalid("spec", "versions"),
 				invalid("spec", "version"),
+				invalid("spec","deleteStrategy","terminatingGracePeriodSecondsPath"),
+				invalid("spec", "deleteStrategy","defaultTerminatingGracePeriodSeconds"),
 			},
 		},
 		{

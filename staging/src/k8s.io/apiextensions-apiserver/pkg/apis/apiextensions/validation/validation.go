@@ -207,6 +207,22 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 	allErrs = append(allErrs, ValidateCustomResourceConversion(spec.Conversion, fldPath.Child("conversion"))...)
 
+	if spec.DeleteStrategy != nil {
+		if path := spec.DeleteStrategy.TerminatingGracePeriodSecondsPath; len(path) > 0 {
+			// should be constrained json path under .spec
+			if errs := validateSimpleJSONPath(path, fldPath.Child("deleteStrategy","terminatingGracePeriodSecondsPath")); len(errs) > 0 {
+				allErrs = append(allErrs, errs...)
+			} else if !strings.HasPrefix(path, ".spec.") {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("deleteStrategy","terminatingGracePeriodSecondsPath"), path, "must be a json path under .spec"))
+			}
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("deleteStrategy","terminatingGracePeriodSecondsPath"),""))
+		}
+		if period := spec.DeleteStrategy.DefaultTerminatingGracePeriodSeconds; period < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deleteStrategy","defaultTerminatingGracePeriodSeconds"),period, "must be greater or equal to zero") )
+		}
+	}
+
 	return allErrs
 }
 

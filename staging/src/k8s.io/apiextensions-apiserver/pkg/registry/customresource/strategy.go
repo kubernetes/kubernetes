@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"strings"
 )
 
 // customResourceStrategy implements behavior for CustomResources.
@@ -47,9 +48,41 @@ type customResourceStrategy struct {
 	validator       customResourceValidator
 	status          *apiextensions.CustomResourceSubresourceStatus
 	scale           *apiextensions.CustomResourceSubresourceScale
+	deleteStrategy  *apiextensions.CustomResourceDeleteStrategy
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+// CheckGracefulDelete allows a custom resource to be gracefully deleted. It updates the DeleteOptions to
+// reflect the desired grace value.
+func (c customResourceStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
+
+	// If delete strategy is not set, do force deletes
+	if c.deleteStrategy == nil {
+		return false
+	}
+
+	// If no delete options are set, do a force delete
+	if options == nil {
+		return false
+	}
+
+	// If no period was specified in the delete body
+	if options.GracePeriodSeconds == nil {
+		options.GracePeriodSeconds = &c.deleteStrategy.DefaultTerminatingGracePeriodSeconds
+
+		customResourceObject := obj.(*unstructured.Unstructured)
+		customResource := customResourceObject.UnstructuredContent()
+
+		if len (c.deleteStrategy.TerminatingGracePeriodSecondsPath) >0 {
+			period, exists, err := unstructured.NestedInt64(customResource, strings.Split("spec."+c.deleteStrategy.TerminatingGracePeriodSecondsPath, ".")...)
+			if exists && err == nil {
+				options.GracePeriodSeconds = &period
+			}
+		}
+	}
+	return true
+}
+
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale, deleteStrategy *apiextensions.CustomResourceDeleteStrategy) customResourceStrategy {
 	return customResourceStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
@@ -62,6 +95,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			schemaValidator:       schemaValidator,
 			statusSchemaValidator: statusSchemaValidator,
 		},
+		deleteStrategy: deleteStrategy,
 	}
 }
 

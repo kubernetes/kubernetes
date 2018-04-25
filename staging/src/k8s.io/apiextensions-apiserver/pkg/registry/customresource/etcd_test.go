@@ -89,6 +89,11 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 	}
 	table, _ := tableconvertor.New(headers)
 
+	deleteStrategy := &apiextensions.CustomResourceDeleteStrategy{
+		DefaultTerminatingGracePeriodSeconds: 30,
+		TerminatingGracePeriodSecondsPath: ".spec.terminatingGracePeriodSeconds",
+	}
+
 	storage := customresource.NewStorage(
 		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
 		kind,
@@ -101,6 +106,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 			nil,
 			status,
 			scale,
+			deleteStrategy,
 		),
 		restOptions,
 		[]string{"all"},
@@ -178,9 +184,11 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.CustomResource.Store.DestroyFunc()
-	test := registrytest.New(t, storage.CustomResource.Store)
+	test := registrytest.New(t, storage.CustomResource.Store).ReturnDeletedObject()
 	test.TestDelete(validNewCustomResource())
+	test.TestDeleteGraceful(validNewCustomResource(), 30)
 }
+
 
 func TestGenerationNumber(t *testing.T) {
 	storage, server := newStorage(t)

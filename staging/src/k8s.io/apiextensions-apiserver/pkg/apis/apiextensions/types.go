@@ -70,6 +70,9 @@ type CustomResourceDefinitionSpec struct {
 	// Top-level and per-version columns are mutually exclusive.
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	// DeleteStrategy describes graceful delete properties for a CustomResource
+	// +optional
+	DeleteStrategy *CustomResourceDeleteStrategy
 
 	// `conversion` defines conversion settings for the CRD.
 	Conversion *CustomResourceConversion
@@ -179,6 +182,9 @@ type CustomResourceDefinitionVersion struct {
 	// be explicitly set to null
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	// DeleteStrategy describes graceful delete properties for a CustomResource
+	// +optional
+	DeleteStrategy *CustomResourceDeleteStrategy
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.
@@ -365,4 +371,16 @@ type CustomResourceSubresourceScale struct {
 	// subresource will default to the empty string.
 	// +optional
 	LabelSelectorPath *string
+}
+
+type CustomResourceDeleteStrategy struct {
+	// DefaultTerminatingGracePeriodSeconds defines the default deletion grace period. This period will be set in the custom resource
+	// metadata, if not deletionGracePeriodSeconds wer set on a DELETE.
+	// Defaults to zero, which is equivalent to a force delete
+	DefaultTerminatingGracePeriodSeconds int64
+	// TerminatingGracePeriodSecondsPath defines the JSON path inside of a CUstomResource that corresponds to Spec.TerminatingGracePeriodSeconds
+	// Only JSON paths without the array notation are allowed.
+	// Must be a JSON Path under .spec.
+	// If there is no value under the given path in the CustomResource, the defaultGracefulDeletePeriod will be taken from the default grace period
+	TerminatingGracePeriodSecondsPath string
 }

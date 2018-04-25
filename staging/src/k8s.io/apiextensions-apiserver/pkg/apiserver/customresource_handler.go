@@ -520,6 +520,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				statusValidator,
 				statusSpec,
 				scaleSpec,
+				crd.Spec.DeleteStrategy,
 			),
 			crdConversionRESTOptionsGetter{
 				RESTOptionsGetter: r.restOptionsGetter,
