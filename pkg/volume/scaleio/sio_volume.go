@@ -19,7 +19,7 @@ package scaleio
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -353,7 +353,7 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 func (v *sioVolume) setSioMgr() error {
 	glog.V(4).Info(log("setting up sio mgr for spec  %s", v.volSpecName))
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
-	configName := path.Join(podDir, sioConfigFileName)
+	configName := filepath.Join(podDir, sioConfigFileName)
 	if v.sioMgr == nil {
 		configData, err := loadConfig(configName) // try to load config if exist
 		if err != nil {
@@ -408,7 +408,7 @@ func (v *sioVolume) setSioMgr() error {
 // resetSioMgr creates scaleio manager from existing (cached) config data
 func (v *sioVolume) resetSioMgr() error {
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
-	configName := path.Join(podDir, sioConfigFileName)
+	configName := filepath.Join(podDir, sioConfigFileName)
 	if v.sioMgr == nil {
 		// load config data from disk
 		configData, err := loadConfig(configName)
