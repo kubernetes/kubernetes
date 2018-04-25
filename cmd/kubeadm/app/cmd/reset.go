@@ -110,7 +110,7 @@ func NewReset(in io.Reader, ignorePreflightErrors sets.String, forceReset bool, 
 		if err := s.Err(); err != nil {
 			return nil, err
 		}
-		if s.Text() != "y" {
+		if strings.ToLower(s.Text()) != "y" {
 			return nil, errors.New("Aborted reset operation")
 		}
 	}
