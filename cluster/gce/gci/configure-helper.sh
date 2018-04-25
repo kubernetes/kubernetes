@@ -1323,7 +1323,7 @@ function prepare-etcd-manifest {
 }
 
 function start-etcd-empty-dir-cleanup-pod {
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.yaml" "/etc/kubernetes/manifests"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-trusty/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.yaml" "/etc/kubernetes/manifests"
 }
 
 # Starts etcd server pod (and etcd-events pod if needed).
