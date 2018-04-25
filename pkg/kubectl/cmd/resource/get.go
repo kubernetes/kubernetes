@@ -532,7 +532,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 	if isList {
 		// the resourceVersion of list objects is ~now but won't return
 		// an initial watch event
-		rv, err = mapping.MetadataAccessor.ResourceVersion(obj)
+		rv, err = meta.NewAccessor().ResourceVersion(obj)
 		if err != nil {
 			return err
 		}

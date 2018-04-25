@@ -26,7 +26,6 @@ import (
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
 	runtime.ObjectConvertor
-	MetadataAccessor
 }
 
 type ListMetaAccessor interface {
@@ -113,7 +112,6 @@ type RESTMapping struct {
 	Scope RESTScope
 
 	runtime.ObjectConvertor
-	MetadataAccessor
 }
 
 // RESTMapper allows clients to map resources to kind, and map kind and version

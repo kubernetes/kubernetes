@@ -502,7 +502,7 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 	}
 
 	// Update the annotation used by kubectl apply
-	if err := kubectl.UpdateApplyAnnotation(info, codec); err != nil {
+	if err := kubectl.UpdateApplyAnnotation(info.Object, codec); err != nil {
 		return nil, err
 	}
 
@@ -515,15 +515,6 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "dry-run")
-}
-
-// ContainsChangeCause checks if input resource info contains change-cause annotation.
-func ContainsChangeCause(info *resource.Info) bool {
-	annotations, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
-	if err != nil {
-		return false
-	}
-	return len(annotations[kubectl.ChangeCauseAnnotation]) > 0
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args

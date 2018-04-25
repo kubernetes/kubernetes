@@ -970,11 +970,11 @@ func (c *allClient) destroy(obj runtime.Object, mapping *meta.RESTMapping) error
 		return err
 	}
 	namespaced := mapping.Scope.Name() == meta.RESTScopeNameNamespace
-	name, err := mapping.MetadataAccessor.Name(obj)
+	name, err := meta.NewAccessor().Name(obj)
 	if err != nil {
 		return err
 	}
-	ns, err := mapping.MetadataAccessor.Namespace(obj)
+	ns, err := meta.NewAccessor().Namespace(obj)
 	if err != nil {
 		return err
 	}

@@ -205,8 +205,7 @@ func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	codec := codecs.LegacyCodec(UnlikelyGV)
 	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{UnlikelyGV, ValidVersionGV}, func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: meta.NewAccessor(),
+			ObjectConvertor: scheme,
 		}, versionErrIfFalse(version == ValidVersionGV || version == UnlikelyGV)
 	})
 	for _, gv := range []schema.GroupVersion{UnlikelyGV, ValidVersionGV} {
@@ -442,8 +441,7 @@ func (f *TestFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 			// provide typed objects for these two versions
 			case ValidVersionGV, UnlikelyGV:
 				return &meta.VersionInterfaces{
-					ObjectConvertor:  scheme.Scheme,
-					MetadataAccessor: meta.NewAccessor(),
+					ObjectConvertor: scheme.Scheme,
 				}, nil
 				// otherwise fall back to the legacy scheme
 			default:

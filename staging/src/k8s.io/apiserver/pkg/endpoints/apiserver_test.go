@@ -146,23 +146,19 @@ func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error)
 	switch version {
 	case testGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	case newGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	case grouplessGroupVersion:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	case testGroup2Version:
 		return &meta.VersionInterfaces{
-			ObjectConvertor:  scheme,
-			MetadataAccessor: accessor,
+			ObjectConvertor: scheme,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, groupVersions)

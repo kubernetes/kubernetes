@@ -536,8 +536,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 			GroupVersionKind: gvk,
 			Scope:            scope,
 
-			ObjectConvertor:  interfaces.ObjectConvertor,
-			MetadataAccessor: interfaces.MetadataAccessor,
+			ObjectConvertor: interfaces.ObjectConvertor,
 		})
 	}
 
