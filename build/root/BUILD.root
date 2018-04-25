@@ -70,6 +70,7 @@ filegroup(
         "//staging:all-srcs",
         "//test:all-srcs",
         "//third_party:all-srcs",
+        "//translations:all-srcs",
         "//vendor:all-srcs",
     ],
     tags = ["automanaged"],
