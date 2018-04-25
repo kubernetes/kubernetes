@@ -320,6 +320,39 @@ kind: KubeProxyConfiguration
 **  SupportIPVSProxyMode: true**
 ```
 
+If your cluster was installed by kubeadm, you should edit the `featureGates` field in the `kubeadm-config` ConfigMap. You can do this using `kubectl -n kube-system edit cm kubeadm-config` before upgrading. For example:
+
+kubeadm-config Before:
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+data:
+  MasterConfiguration: |
+    kubeProxy:
+      config:
+        featureGates: "SupportIPVSProxyMode=true"
+```
+
+kubeadm-config After:
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeadm-config
+data:
+  MasterConfiguration: |
+    kubeProxy:
+      config:
+        featureGates:
+          SupportIPVSProxyMode: true
+```
+
+If no featureGates was specified in `kubeadm-config`, just change `featureGates: ""` to `featureGates: {}`.
+
 ([#57962](https://github.com/kubernetes/kubernetes/pull/57962), [@xiangpengzhao](https://github.com/xiangpengzhao))
 
 * The `kubeletconfig` API group has graduated from alpha to beta, and the name has changed to `kubelet.config.k8s.io`. Please use `kubelet.config.k8s.io/v1beta1`, as `kubeletconfig/v1alpha1` is no longer available.  ([#53833](https://github.com/kubernetes/kubernetes/pull/53833), [@mtaufen](https://github.com/mtaufen))
