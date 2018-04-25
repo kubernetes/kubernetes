@@ -17,6 +17,8 @@ limitations under the License.
 package customresource
 
 import (
+	"context"
+
 	"github.com/go-openapi/validate"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -28,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -69,7 +70,7 @@ func (a customResourceStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a CustomResource before creation.
-func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
 		customResourceObject := obj.(*unstructured.Unstructured)
 		customResource := customResourceObject.UnstructuredContent()
@@ -85,7 +86,7 @@ func (a customResourceStrategy) PrepareForCreate(ctx genericapirequest.Context, 
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (a customResourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
 		return
 	}
@@ -126,7 +127,7 @@ func (a customResourceStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 }
 
 // Validate validates a new CustomResource.
-func (a customResourceStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return a.validator.Validate(ctx, obj, a.scale)
 }
 
@@ -146,7 +147,7 @@ func (customResourceStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user updating status.
-func (a customResourceStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return a.validator.ValidateUpdate(ctx, obj, old, a.scale)
 }
 

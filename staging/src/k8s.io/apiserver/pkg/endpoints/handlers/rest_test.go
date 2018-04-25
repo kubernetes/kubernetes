@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -171,7 +172,7 @@ func (p *testPatcher) New() runtime.Object {
 	return &example.Pod{}
 }
 
-func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	currentPod := p.startingPod
 	if p.numUpdates > 0 {
 		currentPod = p.updatePod
@@ -200,7 +201,7 @@ func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.Upda
 	return inPod, false, nil
 }
 
-func (p *testPatcher) Get(ctx request.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (p *testPatcher) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	p.t.Fatal("Unexpected call to testPatcher.Get")
 	return nil, errors.New("Unexpected call to testPatcher.Get")
 }

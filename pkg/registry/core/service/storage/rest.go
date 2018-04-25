@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -130,23 +131,23 @@ func (rs *REST) NewList() runtime.Object {
 	return rs.services.NewList()
 }
 
-func (rs *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return rs.services.Get(ctx, name, options)
 }
 
-func (rs *REST) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	return rs.services.List(ctx, options)
 }
 
-func (rs *REST) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	return rs.services.Watch(ctx, options)
 }
 
-func (rs *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (rs *REST) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	return rs.services.Export(ctx, name, opts)
 }
 
-func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(registry.Strategy, ctx, obj); err != nil {
@@ -207,7 +208,7 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, create
 	return out, err
 }
 
-func (rs *REST) Delete(ctx genericapirequest.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (rs *REST) Delete(ctx context.Context, id string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	// TODO: handle graceful
 	obj, _, err := rs.services.Delete(ctx, id, options)
 	if err != nil {
@@ -320,7 +321,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -413,7 +414,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url.URL, http.RoundTripper, error) {
+func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
 	svcScheme, svcName, portStr, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
@@ -486,11 +487,11 @@ func (rs *REST) ResourceLocation(ctx genericapirequest.Context, id string) (*url
 	return nil, nil, errors.NewServiceUnavailable(fmt.Sprintf("no endpoints available for service %q", id))
 }
 
-func (r *REST) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return r.services.ConvertToTable(ctx, object, tableOptions)
 }
 
-func isValidAddress(ctx genericapirequest.Context, addr *api.EndpointAddress, pods rest.Getter) error {
+func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
 	if addr.TargetRef == nil {
 		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
 	}

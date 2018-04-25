@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -40,7 +41,7 @@ import (
 
 // getterFunc performs a get request with the given context and object name. The request
 // may be used to deserialize an options object to pass to the getter.
-type getterFunc func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error)
+type getterFunc func(ctx context.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error)
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
@@ -80,7 +81,7 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
+		func(ctx context.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			// check for export
 			options := metav1.GetOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
@@ -110,7 +111,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
+		func(ctx context.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
 			trace.Step("About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {

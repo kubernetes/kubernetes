@@ -17,6 +17,7 @@ limitations under the License.
 package registry
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -99,14 +100,14 @@ type Store struct {
 	// entire collection (listing and watching).
 	//
 	// KeyRootFunc and KeyFunc must be supplied together or not at all.
-	KeyRootFunc func(ctx genericapirequest.Context) string
+	KeyRootFunc func(ctx context.Context) string
 
 	// KeyFunc returns the key for a specific object in the collection.
 	// KeyFunc is called for Create/Update/Get/Delete. Note that 'namespace'
 	// can be gotten from ctx.
 	//
 	// KeyFunc and KeyRootFunc must be supplied together or not at all.
-	KeyFunc func(ctx genericapirequest.Context, name string) (string, error)
+	KeyFunc func(ctx context.Context, name string) (string, error)
 
 	// ObjectNameFunc returns the name of an object or an error.
 	ObjectNameFunc func(obj runtime.Object) (string, error)
@@ -190,7 +191,7 @@ const (
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
-func NamespaceKeyRootFunc(ctx genericapirequest.Context, prefix string) string {
+func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 	key := prefix
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if ok && len(ns) > 0 {
@@ -202,7 +203,7 @@ func NamespaceKeyRootFunc(ctx genericapirequest.Context, prefix string) string {
 // NamespaceKeyFunc is the default function for constructing storage paths to
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
-func NamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name string) (string, error) {
+func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
@@ -220,7 +221,7 @@ func NamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name string)
 
 // NoNamespaceKeyFunc is the default function for constructing storage paths
 // to a resource relative to the given prefix without a namespace.
-func NoNamespaceKeyFunc(ctx genericapirequest.Context, prefix string, name string) (string, error) {
+func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
 	}
@@ -263,7 +264,7 @@ func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
 
 // List returns a list of items matching labels and field according to the
 // store's PredicateFunc.
-func (e *Store) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -286,7 +287,7 @@ func (e *Store) List(ctx genericapirequest.Context, options *metainternalversion
 
 // ListPredicate returns a list of all the items matching the given
 // SelectionPredicate.
-func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	if options == nil {
 		// By default we should serve the request from etcd.
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
@@ -309,7 +310,7 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 }
 
 // Create inserts a new item according to the unique key from the object.
-func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -372,7 +373,7 @@ func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, create
 
 // WaitForInitialized holds until the object is initialized, or returns an error if the default limit expires.
 // This method is exposed publicly for consumers of generic rest tooling.
-func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (e *Store) WaitForInitialized(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
 	// return early if we don't have initializers, or if they've completed already
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -453,7 +454,7 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 // shouldDeleteDuringUpdate checks if a Update is removing all the object's
 // finalizers. If so, it further checks if the object's
 // DeletionGracePeriodSeconds is 0.
-func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key string, obj, existing runtime.Object) bool {
+func (e *Store) shouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing runtime.Object) bool {
 	newMeta, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -469,7 +470,7 @@ func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key stri
 
 // shouldDeleteForFailedInitialization returns true if the provided object is initializing and has
 // a failure recorded.
-func (e *Store) shouldDeleteForFailedInitialization(ctx genericapirequest.Context, obj runtime.Object) bool {
+func (e *Store) shouldDeleteForFailedInitialization(ctx context.Context, obj runtime.Object) bool {
 	m, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -483,7 +484,7 @@ func (e *Store) shouldDeleteForFailedInitialization(ctx genericapirequest.Contex
 
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
-func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	glog.V(6).Infof("going to delete %s from registry, triggered by update", name)
 	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
@@ -509,7 +510,7 @@ func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -662,7 +663,7 @@ func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.
 }
 
 // Get retrieves the item from storage.
-func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj := e.NewFunc()
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -681,7 +682,7 @@ func (e *Store) Get(ctx genericapirequest.Context, name string, options *metav1.
 
 // qualifiedResourceFromContext attempts to retrieve a GroupResource from the context's request info.
 // If the context has no request info, DefaultQualifiedResource is used.
-func (e *Store) qualifiedResourceFromContext(ctx genericapirequest.Context) schema.GroupResource {
+func (e *Store) qualifiedResourceFromContext(ctx context.Context) schema.GroupResource {
 	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
 		return schema.GroupResource{Group: info.APIGroup, Resource: info.Resource}
 	}
@@ -700,7 +701,7 @@ var (
 // priority, there are three factors affect whether to add/remove the
 // FinalizerOrphanDependents: options, existing finalizers of the object,
 // and e.DeleteStrategy.DefaultGarbageCollectionPolicy.
-func shouldOrphanDependents(ctx genericapirequest.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) bool {
+func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) bool {
 	// Get default GC policy from this REST object type
 	gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy)
 	var defaultGCPolicy rest.GarbageCollectionPolicy
@@ -750,7 +751,7 @@ func shouldOrphanDependents(ctx genericapirequest.Context, e *Store, accessor me
 // priority, there are three factors affect whether to add/remove the
 // FinalizerDeleteDependents: options, existing finalizers of the object, and
 // e.DeleteStrategy.DefaultGarbageCollectionPolicy.
-func shouldDeleteDependents(ctx genericapirequest.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) bool {
+func shouldDeleteDependents(ctx context.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) bool {
 	// Get default GC policy from this REST object type
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok && gcStrategy.DefaultGarbageCollectionPolicy(ctx) == rest.Unsupported {
 		// return false to indicate that we should NOT delete in foreground
@@ -793,7 +794,7 @@ func shouldDeleteDependents(ctx genericapirequest.Context, e *Store, accessor me
 // The finalizers returned are intended to be handled by the garbage collector.
 // If garbage collection is disabled for the store, this function returns false
 // to ensure finalizers aren't set which will never be cleared.
-func deletionFinalizersForGarbageCollection(ctx genericapirequest.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
+func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
 	if !e.EnableGarbageCollection {
 		return false, []string{}
 	}
@@ -857,7 +858,7 @@ func markAsDeleting(obj runtime.Object) (err error) {
 //    should be deleted immediately
 // 4. a new output object with the state that was updated
 // 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
 	out = e.NewFunc()
@@ -937,7 +938,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -1015,7 +1016,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	if listOptions == nil {
 		listOptions = &metainternalversion.ListOptions{}
 	} else {
@@ -1092,7 +1093,7 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
 // returns the decorated deleted object if appropriate.
-func (e *Store) finalizeDelete(ctx genericapirequest.Context, obj runtime.Object, runHooks bool) (runtime.Object, error) {
+func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks bool) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
 		if err := e.AfterDelete(obj); err != nil {
 			return nil, err
@@ -1127,7 +1128,7 @@ func (e *Store) finalizeDelete(ctx genericapirequest.Context, obj runtime.Object
 // WatchPredicate. If possible, you should customize PredicateFunc to produce
 // a matcher that matches by key. SelectionPredicate does this for you
 // automatically.
-func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -1147,7 +1148,7 @@ func (e *Store) Watch(ctx genericapirequest.Context, options *metainternalversio
 }
 
 // WatchPredicate starts a watch for the items that matches.
-func (e *Store) WatchPredicate(ctx genericapirequest.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
@@ -1209,7 +1210,7 @@ func exportObjectMeta(accessor metav1.Object, exact bool) {
 }
 
 // Export implements the rest.Exporter interface
-func (e *Store) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
+func (e *Store) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
 	obj, err := e.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -1299,17 +1300,17 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	// Set the default behavior for storage key generation
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
 		if isNamespaced {
-			e.KeyRootFunc = func(ctx genericapirequest.Context) string {
+			e.KeyRootFunc = func(ctx context.Context) string {
 				return NamespaceKeyRootFunc(ctx, prefix)
 			}
-			e.KeyFunc = func(ctx genericapirequest.Context, name string) (string, error) {
+			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
 				return NamespaceKeyFunc(ctx, prefix, name)
 			}
 		} else {
-			e.KeyRootFunc = func(ctx genericapirequest.Context) string {
+			e.KeyRootFunc = func(ctx context.Context) string {
 				return prefix
 			}
-			e.KeyFunc = func(ctx genericapirequest.Context, name string) (string, error) {
+			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
 				return NoNamespaceKeyFunc(ctx, prefix, name)
 			}
 		}
@@ -1395,7 +1396,7 @@ func (e *Store) startObservingCount(period time.Duration) func() {
 	return func() { close(stopCh) }
 }
 
-func (e *Store) ConvertToTable(ctx genericapirequest.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}
