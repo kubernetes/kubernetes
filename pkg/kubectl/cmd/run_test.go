@@ -194,7 +194,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			tf.Namespace = "test"
 			tf.ClientConfigVal = &restclient.Config{}
 
-			cmd := NewCmdRun(tf, os.Stdin, os.Stdout, os.Stderr)
+			cmd := NewCmdRun(tf, genericclioptions.NewTestIOStreamsDiscard())
 			cmd.Flags().Set("image", "nginx")
 			cmd.Flags().Set("generator", "run/v1")
 
@@ -210,9 +210,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
-				In:     os.Stdin,
-				Out:    os.Stdout,
-				ErrOut: os.Stderr,
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
 				Image:     "nginx",
 				Generator: "run/v1",
@@ -375,14 +373,13 @@ func TestGenerateService(t *testing.T) {
 				return
 			}
 
+			ioStreams, _, buff, _ := genericclioptions.NewTestIOStreams()
 			deleteFlags := NewDeleteFlags("to use to replace the resource.")
-			buff := &bytes.Buffer{}
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(os.Stdout, os.Stderr),
 
-				Out:    buff,
-				ErrOut: buff,
+				IOStreams: ioStreams,
 
 				Port:     test.port,
 				Recorder: genericclioptions.NoopRecorder{},
@@ -519,19 +516,17 @@ func TestRunValidations(t *testing.T) {
 			}
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
-			inBuf := bytes.NewReader([]byte{})
-			outBuf := bytes.NewBuffer([]byte{})
-			errBuf := bytes.NewBuffer([]byte{})
 
-			cmd := NewCmdRun(tf, inBuf, outBuf, errBuf)
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdRun(tf, streams)
 			for flagName, flagValue := range test.flags {
 				cmd.Flags().Set(flagName, flagValue)
 			}
 			cmd.Run(cmd, test.args)
 
 			var err error
-			if errBuf.Len() > 0 {
-				err = fmt.Errorf("%v", errBuf.String())
+			if bufErr.Len() > 0 {
+				err = fmt.Errorf("%v", bufErr.String())
 			}
 			if err != nil && len(test.expectedErr) > 0 {
 				if !strings.Contains(err.Error(), test.expectedErr) {

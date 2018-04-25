@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
@@ -51,8 +52,6 @@ import (
 
 // GetOptions contains the input to the get command.
 type GetOptions struct {
-	Out, ErrOut io.Writer
-
 	resource.FilenameOptions
 
 	Raw       string
@@ -75,6 +74,8 @@ type GetOptions struct {
 	Export         bool
 
 	IncludeUninitialized bool
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -126,18 +127,18 @@ const (
 )
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
-func NewGetOptions(out io.Writer, errOut io.Writer) *GetOptions {
+func NewGetOptions(streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
-		Out:       out,
-		ErrOut:    errOut,
 		ChunkSize: 500,
+
+		IOStreams: streams,
 	}
 }
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
-	options := NewGetOptions(out, errOut)
+func NewCmdGet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	options := NewGetOptions(streams)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{

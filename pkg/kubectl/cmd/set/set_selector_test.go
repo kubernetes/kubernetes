@@ -17,7 +17,6 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
 	"net/http"
 	"reflect"
 	"strings"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestUpdateSelectorForObjectTypes(t *testing.T) {
@@ -331,9 +331,8 @@ func TestSelectorTest(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdSelector(tf, buf)
-	cmd.SetOutput(buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdSelector(tf, streams)
 	cmd.Flags().Set("output", "name")
 	cmd.Flags().Set("local", "true")
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/service.yaml")

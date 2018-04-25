@@ -19,7 +19,6 @@ package set
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"k8s.io/kubernetes/pkg/printers"
 
@@ -62,8 +61,6 @@ type SetServiceAccountOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 
 	fileNameOptions        resource.FilenameOptions
-	out                    io.Writer
-	err                    io.Writer
 	dryRun                 bool
 	shortOutput            bool
 	all                    bool
@@ -75,23 +72,24 @@ type SetServiceAccountOptions struct {
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
+
+	genericclioptions.IOStreams
 }
 
-func NewSetServiceAccountOptions(out, errOut io.Writer) *SetServiceAccountOptions {
+func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
 		PrintFlags:  printers.NewPrintFlags("serviceaccount updated"),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		out: out,
-		err: errOut,
+		IOStreams: streams,
 	}
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
-func NewCmdServiceAccount(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := NewSetServiceAccountOptions(out, errOut)
+func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSetServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
@@ -199,7 +197,7 @@ func (o *SetServiceAccountOptions) Run() error {
 			continue
 		}
 		if o.local || o.dryRun {
-			if err := o.PrintObj(patch.Info.AsVersioned(), o.out); err != nil {
+			if err := o.PrintObj(patch.Info.AsVersioned(), o.Out); err != nil {
 				return err
 			}
 			continue
@@ -211,7 +209,7 @@ func (o *SetServiceAccountOptions) Run() error {
 		}
 		info.Refresh(patched, true)
 
-		if err := o.PrintObj(info.AsVersioned(), o.out); err != nil {
+		if err := o.PrintObj(info.AsVersioned(), o.Out); err != nil {
 			return err
 		}
 	}

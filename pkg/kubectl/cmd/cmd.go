@@ -255,17 +255,17 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
 				create.NewCmdCreate(f, ioStreams),
-				NewCmdExposeService(f, out),
-				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, in, out, err),
-				deprecatedAlias("run-container", NewCmdRun(f, in, out, err)),
+				NewCmdExposeService(f, ioStreams),
+				NewCmdRun(f, ioStreams),
+				set.NewCmdSet(f, ioStreams),
+				deprecatedAlias("run-container", NewCmdRun(f, ioStreams)),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				resource.NewCmdGet(f, out, err),
-				NewCmdExplain(f, out, err),
+				resource.NewCmdGet(f, ioStreams),
+				NewCmdExplain(f, ioStreams),
 				NewCmdEdit(f, ioStreams),
 				NewCmdDelete(f, out, err),
 			},

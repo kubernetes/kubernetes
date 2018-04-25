@@ -17,7 +17,6 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -64,8 +64,8 @@ func TestResourcesLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(tf, buf, buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdResources(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
@@ -79,11 +79,12 @@ func TestResourcesLocal(t *testing.T) {
 		},
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
-		Out:               buf,
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",
-		ContainerSelector: "*"}
+		ContainerSelector: "*",
+		IOStreams:         streams,
+	}
 
 	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
@@ -118,8 +119,8 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdResources(tf, buf, buf)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdResources(tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
@@ -133,11 +134,12 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 		},
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
-		Out:               buf,
 		Local:             true,
 		Limits:            "cpu=200m,memory=512Mi",
 		Requests:          "cpu=200m,memory=512Mi",
-		ContainerSelector: "*"}
+		ContainerSelector: "*",
+		IOStreams:         streams,
+	}
 
 	err := opts.Complete(tf, cmd, []string{})
 	if err == nil {
@@ -501,9 +503,8 @@ func TestSetResourcesRemote(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			buf := new(bytes.Buffer)
-			cmd := NewCmdResources(tf, buf, buf)
-			cmd.SetOutput(buf)
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdResources(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetResourcesOptions{
 				PrintFlags: &printers.PrintFlags{
@@ -513,9 +514,10 @@ func TestSetResourcesRemote(t *testing.T) {
 					OutputFormat: &outputFormat,
 				},
 
-				Out:               buf,
 				Limits:            "cpu=200m,memory=512Mi",
-				ContainerSelector: "*"}
+				ContainerSelector: "*",
+				IOStreams:         streams,
+			}
 			err := opts.Complete(tf, cmd, input.args)
 			if err == nil {
 				err = opts.Validate()

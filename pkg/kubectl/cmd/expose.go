@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
 	"regexp"
 	"strings"
 
@@ -79,18 +78,20 @@ type ExposeServiceOptions struct {
 	RecordFlags     *genericclioptions.RecordFlags
 
 	Recorder genericclioptions.Recorder
+	genericclioptions.IOStreams
 }
 
-func NewExposeServiceOptions() *ExposeServiceOptions {
+func NewExposeServiceOptions(streams genericclioptions.IOStreams) *ExposeServiceOptions {
 	return &ExposeServiceOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
-		Recorder: genericclioptions.NoopRecorder{},
+		Recorder:  genericclioptions.NoopRecorder{},
+		IOStreams: streams,
 	}
 }
 
-func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	o := NewExposeServiceOptions()
+func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewExposeServiceOptions(streams)
 
 	validArgs := []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
@@ -106,7 +107,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.RunExpose(f, out, cmd, args))
+			cmdutil.CheckErr(o.RunExpose(f, cmd, args))
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
@@ -150,7 +151,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	return err
 }
 
-func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -284,9 +285,9 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, out io.Writer, cmd *
 		info.Refresh(object, true)
 		if cmdutil.GetDryRunFlag(cmd) {
 			if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-				return cmdutil.PrintObject(cmd, object, out)
+				return cmdutil.PrintObject(cmd, object, o.Out)
 			}
-			cmdutil.PrintSuccess(false, out, info.Object, true, "exposed")
+			cmdutil.PrintSuccess(false, o.Out, info.Object, true, "exposed")
 			return nil
 		}
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
@@ -300,10 +301,10 @@ func (o *ExposeServiceOptions) RunExpose(f cmdutil.Factory, out io.Writer, cmd *
 		}
 
 		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
-			return cmdutil.PrintObject(cmd, object, out)
+			return cmdutil.PrintObject(cmd, object, o.Out)
 		}
 
-		cmdutil.PrintSuccess(false, out, info.Object, false, "exposed")
+		cmdutil.PrintSuccess(false, o.Out, info.Object, false, "exposed")
 		return nil
 	})
 	if err != nil {

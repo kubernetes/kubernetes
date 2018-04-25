@@ -18,7 +18,6 @@ package set
 
 import (
 	"fmt"
-	"io"
 
 	"k8s.io/kubernetes/pkg/printers"
 
@@ -53,7 +52,6 @@ type SetSelectorOptions struct {
 	resources []string
 	selector  *metav1.LabelSelector
 
-	out              io.Writer
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	PrintObj printers.ResourcePrinterFunc
@@ -61,6 +59,8 @@ type SetSelectorOptions struct {
 
 	builder *resource.Builder
 	mapper  meta.RESTMapper
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -77,20 +77,20 @@ var (
         kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
-func NewSelectorOptions(out io.Writer) *SetSelectorOptions {
+func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
 	return &SetSelectorOptions{
 		PrintFlags:  printers.NewPrintFlags("selector updated"),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		out: out,
+		IOStreams: streams,
 	}
 }
 
 // NewCmdSelector is the "set selector" command.
-func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	o := NewSelectorOptions(out)
+func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewSelectorOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
@@ -226,7 +226,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			return o.PrintObj(info.Object, o.out)
+			return o.PrintObj(info.Object, o.Out)
 		}
 
 		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
@@ -235,7 +235,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 		}
 
 		info.Refresh(patched, true)
-		return o.PrintObj(patch.Info.AsVersioned(), o.out)
+		return o.PrintObj(patch.Info.AsVersioned(), o.Out)
 	})
 }
 

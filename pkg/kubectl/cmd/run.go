@@ -118,12 +118,10 @@ type RunOptions struct {
 	Schedule       string
 	TTY            bool
 
-	In     io.Reader
-	Out    io.Writer
-	ErrOut io.Writer
+	genericclioptions.IOStreams
 }
 
-func NewRunOptions(in io.Reader, out, errOut io.Writer) *RunOptions {
+func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
 		PrintFlags:  printers.NewPrintFlags("created"),
 		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
@@ -131,14 +129,12 @@ func NewRunOptions(in io.Reader, out, errOut io.Writer) *RunOptions {
 
 		Recorder: genericclioptions.NoopRecorder{},
 
-		In:     in,
-		Out:    out,
-		ErrOut: errOut,
+		IOStreams: streams,
 	}
 }
 
-func NewCmdRun(f cmdutil.Factory, in io.Reader, out, errOut io.Writer) *cobra.Command {
-	o := NewRunOptions(in, out, errOut)
+func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewRunOptions(streams)
 
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
