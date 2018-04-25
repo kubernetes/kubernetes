@@ -56,10 +56,7 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		m, err := NewAPIRegistrationManager("")
-		if err != nil {
-			t.Fatalf("Unexpected failure to make a manager: %v", err)
-		}
+		m := NewAPIRegistrationManager()
 		for _, groupMeta := range testCase.groupMetas {
 			m.RegisterGroup(groupMeta)
 		}

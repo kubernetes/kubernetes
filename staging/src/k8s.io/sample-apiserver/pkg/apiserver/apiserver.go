@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	registry = registered.NewOrDie("")
+	registry = registered.NewAPIRegistrationManager()
 	Scheme   = runtime.NewScheme()
 	Codecs   = serializer.NewCodecFactory(Scheme)
 )

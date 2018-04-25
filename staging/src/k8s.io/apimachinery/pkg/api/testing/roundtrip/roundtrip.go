@@ -49,7 +49,7 @@ type InstallFunc func(registry *registered.APIRegistrationManager, scheme *runti
 // RoundTripTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
 func RoundTripTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
-	registry := registered.NewOrDie("")
+	registry := registered.NewAPIRegistrationManager()
 	scheme := runtime.NewScheme()
 	installFn(registry, scheme)
 
@@ -70,7 +70,7 @@ func RoundTripTestForScheme(t *testing.T, scheme *runtime.Scheme, fuzzingFuncs f
 // RoundTripProtobufTestForAPIGroup is convenient to call from your install package to make sure that a "bare" install of your group provides
 // enough information to round trip
 func RoundTripProtobufTestForAPIGroup(t *testing.T, installFn InstallFunc, fuzzingFuncs fuzzer.FuzzerFuncs) {
-	registry := registered.NewOrDie("")
+	registry := registered.NewAPIRegistrationManager()
 	scheme := runtime.NewScheme()
 	installFn(registry, scheme)
 

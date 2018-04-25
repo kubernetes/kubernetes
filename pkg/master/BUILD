@@ -19,7 +19,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/master",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admission/install:go_default_library",
         "//pkg/apis/admissionregistration/install:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
