@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -86,7 +85,7 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	}
 
 	PdidWithNoHypens := strings.Replace(volumeSource.PdID, "-", "", -1)
-	return path.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHypens), nil
+	return filepath.Join(diskByIDPath, diskPhotonPrefix+PdidWithNoHypens), nil
 }
 
 func (attacher *photonPersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -156,7 +155,7 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 				// map path with spec.Name()
 				volName := spec.Name()
 				realPath, _ := filepath.EvalSymlinks(devicePath)
-				deviceName := path.Base(realPath)
+				deviceName := filepath.Base(realPath)
 				volNameToDeviceName[volName] = deviceName
 				return devicePath, nil
 			}
