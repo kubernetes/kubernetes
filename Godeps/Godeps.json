@@ -494,11 +494,6 @@
 			"Rev": "20e2ce2cf8852dc78bd42b76698dcd8dcd77b7b1"
 		},
 		{
-			"ImportPath": "github.com/codegangsta/negroni",
-			"Comment": "v0.1.0-62-g8d75e11",
-			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
-		},
-		{
 			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi/v0",
 			"Comment": "v0.2.0",
 			"Rev": "35d9f9d77954980e449e52c3f3e43c21bd8171f5"
@@ -1266,16 +1261,6 @@
 			"Rev": "f12c6236fe7b5cf6bcf30e5935d08cb079d78334"
 		},
 		{
-			"ImportPath": "github.com/garyburd/redigo/internal",
-			"Comment": "v1.0.0-1-gb8dc900",
-			"Rev": "b8dc90050f24c1a73a52f107f3f575be67b21b7c"
-		},
-		{
-			"ImportPath": "github.com/garyburd/redigo/redis",
-			"Comment": "v1.0.0-1-gb8dc900",
-			"Rev": "b8dc90050f24c1a73a52f107f3f575be67b21b7c"
-		},
-		{
 			"ImportPath": "github.com/ghodss/yaml",
 			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
 		},
@@ -1898,14 +1883,6 @@
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/pagination",
 			"Rev": "6da026c32e2d622cc242d32984259c77237aefe1"
-		},
-		{
-			"ImportPath": "github.com/gorilla/context",
-			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
-		},
-		{
-			"ImportPath": "github.com/gorilla/mux",
-			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
@@ -2827,11 +2804,6 @@
 			"ImportPath": "github.com/xiang90/probing",
 			"Comment": "0.0.1",
 			"Rev": "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
-		},
-		{
-			"ImportPath": "github.com/xyproto/simpleredis",
-			"Comment": "v1.0-13-g5292687",
-			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
