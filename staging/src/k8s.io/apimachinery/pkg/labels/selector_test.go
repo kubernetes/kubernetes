@@ -156,10 +156,9 @@ func TestSetMatches(t *testing.T) {
 	expectMatchDirect(t, Set{"baz": "blah"}, labelset)
 	expectMatchDirect(t, Set{"foo": "bar", "baz": "blah"}, labelset)
 
-	//TODO: bad values not handled for the moment in SelectorFromSet
-	//expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
-	//expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
-	//expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
+	expectNoMatchDirect(t, Set{"foo": "lah"}, labelset)
+	expectNoMatchDirect(t, Set{"baz": "new"}, labelset)
+	expectNoMatchDirect(t, Set{"foo": "far", "foobar": "bar", "baz": "blah"}, labelset)
 }
 
 func TestNilMapIsValid(t *testing.T) {
