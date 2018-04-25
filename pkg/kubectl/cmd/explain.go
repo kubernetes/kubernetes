@@ -21,9 +21,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/explain"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -51,27 +53,36 @@ var (
 
 type ExplainOptions struct {
 	genericclioptions.IOStreams
+
+	CmdParent  string
+	ApiVersion string
+	Recursive  bool
+
+	Mapper meta.RESTMapper
+	Schema openapi.Resources
 }
 
-func NewExplainOptions(streams genericclioptions.IOStreams) *ExplainOptions {
+func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *ExplainOptions {
 	return &ExplainOptions{
 		IOStreams: streams,
+		CmdParent: parent,
 	}
 }
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewExplainOptions(streams)
+func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{
 		Use: "explain RESOURCE",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Documentation of resources"),
-		Long:    explainLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
+		Long:    explainLong + "\n\n" + cmdutil.SuggestApiResources(parent),
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := o.RunExplain(f, cmd, args)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Validate(args))
+			cmdutil.CheckErr(o.Run(args))
 		},
 	}
 	cmd.Flags().Bool("recursive", false, "Print the fields of fields (Currently only 1 level deep)")
@@ -79,24 +90,40 @@ func NewCmdExplain(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-// RunExplain executes the appropriate steps to print a model's documentation
-func (o *ExplainOptions) RunExplain(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	o.Recursive = cmdutil.GetFlagBool(cmd, "recursive")
+	o.ApiVersion = cmdutil.GetFlagString(cmd, "api-version")
+
+	o.Mapper, _ = f.Object()
+
+	var err error
+	o.Schema, err = f.OpenAPISchema()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *ExplainOptions) Validate(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintf(o.ErrOut, "You must specify the type of resource to explain. %s\n\n", cmdutil.ValidResourceTypeList(f))
-		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
+		return fmt.Errorf("You must specify the type of resource to explain. %s\n", cmdutil.SuggestApiResources(o.CmdParent))
 	}
 	if len(args) > 1 {
-		return cmdutil.UsageErrorf(cmd, "We accept only this format: explain RESOURCE")
+		return fmt.Errorf("We accept only this format: explain RESOURCE\n")
 	}
 
-	recursive := cmdutil.GetFlagBool(cmd, "recursive")
-	apiVersionString := cmdutil.GetFlagString(cmd, "api-version")
+	return nil
+}
 
-	mapper, _ := f.Object()
+// Run executes the appropriate steps to print a model's documentation
+func (o *ExplainOptions) Run(args []string) error {
+	recursive := o.Recursive
+	apiVersionString := o.ApiVersion
+
 	// TODO: After we figured out the new syntax to separate group and resource, allow
 	// the users to use it in explain (kubectl explain <group><syntax><resource>).
 	// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
-	inModel, fieldsPath, err := explain.SplitAndParseResourceRequest(args[0], mapper)
+	inModel, fieldsPath, err := explain.SplitAndParseResourceRequest(args[0], o.Mapper)
 	if err != nil {
 		return err
 	}
@@ -105,10 +132,10 @@ func (o *ExplainOptions) RunExplain(f cmdutil.Factory, cmd *cobra.Command, args 
 	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(inModel)
 	gvk := schema.GroupVersionKind{}
 	if fullySpecifiedGVR != nil {
-		gvk, _ = mapper.KindFor(*fullySpecifiedGVR)
+		gvk, _ = o.Mapper.KindFor(*fullySpecifiedGVR)
 	}
 	if gvk.Empty() {
-		gvk, err = mapper.KindFor(groupResource.WithVersion(""))
+		gvk, err = o.Mapper.KindFor(groupResource.WithVersion(""))
 		if err != nil {
 			return err
 		}
@@ -122,12 +149,7 @@ func (o *ExplainOptions) RunExplain(f cmdutil.Factory, cmd *cobra.Command, args 
 		gvk = apiVersion.WithKind(gvk.Kind)
 	}
 
-	resources, err := f.OpenAPISchema()
-	if err != nil {
-		return err
-	}
-
-	schema := resources.LookupResource(gvk)
+	schema := o.Schema.LookupResource(gvk)
 	if schema == nil {
 		return fmt.Errorf("Couldn't find resource for %q", gvk)
 	}

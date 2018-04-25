@@ -264,8 +264,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdExplain(f, ioStreams),
-				get.NewCmdGet(f, ioStreams),
+				NewCmdExplain("kubectl", f, ioStreams),
+				get.NewCmdGet("kubectl", f, ioStreams),
 				NewCmdEdit(f, ioStreams),
 				NewCmdDelete(f, out, err),
 			},
@@ -294,7 +294,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
-				NewCmdDescribe(f, out, err),
+				NewCmdDescribe("kubectl", f, ioStreams),
 				NewCmdLogs(f, out, err),
 				NewCmdAttach(f, in, out, err),
 				NewCmdExec(f, in, out, err),
@@ -317,7 +317,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Settings Commands:",
 			Commands: []*cobra.Command{
 				NewCmdLabel(f, ioStreams),
-				NewCmdAnnotate(f, ioStreams),
+				NewCmdAnnotate("kubectl", f, ioStreams),
 				NewCmdCompletion(out, ""),
 			},
 		},

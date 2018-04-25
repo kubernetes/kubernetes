@@ -67,7 +67,7 @@ var (
 		kubectl describe pods frontend`))
 )
 
-func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
+func NewCmdDescribe(parent string, f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 	describerSettings := &printers.DescriberSettings{
 		ShowEvents: true,
@@ -77,7 +77,7 @@ func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 		Use: "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Show details of a specific resource or group of resources"),
-		Long:    describeLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
+		Long:    describeLong + "\n\n" + cmdutil.SuggestApiResources(parent),
 		Example: describeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmdErr, cmd, args, options, describerSettings)
@@ -104,7 +104,7 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 		enforceNamespace = false
 	}
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-		fmt.Fprintf(cmdErr, "You must specify the type of resource to describe. %s\n\n", cmdutil.ValidResourceTypeList(f))
+		fmt.Fprintf(cmdErr, "You must specify the type of resource to describe. %s\n\n", cmdutil.SuggestApiResources(cmd.Parent().Name()))
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
