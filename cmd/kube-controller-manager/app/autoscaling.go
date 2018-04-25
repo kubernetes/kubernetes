@@ -21,7 +21,6 @@ limitations under the License.
 package app
 
 import (
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	discocache "k8s.io/client-go/discovery/cached"
@@ -77,7 +76,7 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 	// TODO: we need something like deferred discovery REST mapper that calls invalidate
 	// on cache misses.
 	cachedDiscovery := discocache.NewMemCacheClient(hpaClientGoClient.Discovery())
-	restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscovery, apimeta.InterfacesForUnstructured)
+	restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
 	restMapper.Reset()
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it

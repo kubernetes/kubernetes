@@ -40,7 +40,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	coretesting "k8s.io/client-go/testing"
 )
 
@@ -101,7 +100,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 	if err != nil {
 		t.Fatalf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
-	restMapper := discovery.NewRESTMapper(restMapperRes, apimeta.InterfacesForUnstructured)
+	restMapper := discovery.NewRESTMapper(restMapperRes)
 
 	autoscalingScale := &autoscalingv1.Scale{
 		TypeMeta: metav1.TypeMeta{

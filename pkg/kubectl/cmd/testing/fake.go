@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -203,11 +202,7 @@ func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 
 	codecs := serializer.NewCodecFactory(scheme)
 	codec := codecs.LegacyCodec(UnlikelyGV)
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{UnlikelyGV, ValidVersionGV}, func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, versionErrIfFalse(version == ValidVersionGV || version == UnlikelyGV)
-	})
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{UnlikelyGV, ValidVersionGV})
 	for _, gv := range []schema.GroupVersion{UnlikelyGV, ValidVersionGV} {
 		for kind := range scheme.KnownTypes(gv) {
 			gvk := gv.WithKind(kind)
@@ -435,21 +430,7 @@ func (f *TestFactory) ClientSetForVersion(requiredVersion *schema.GroupVersion) 
 
 func (f *TestFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	groupResources := testDynamicResources()
-	mapper := discovery.NewRESTMapper(
-		groupResources,
-		meta.InterfacesForUnstructuredConversion(func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-			switch version {
-			// provide typed objects for these two versions
-			case ValidVersionGV, UnlikelyGV:
-				return &meta.VersionInterfaces{
-					ObjectConvertor: scheme.Scheme,
-				}, nil
-				// otherwise fall back to the legacy scheme
-			default:
-				return legacyscheme.Registry.InterfacesFor(version)
-			}
-		}),
-	)
+	mapper := discovery.NewRESTMapper(groupResources)
 	// for backwards compatibility with existing tests, allow rest mappings from the scheme to show up
 	// TODO: make this opt-in?
 	mapper = meta.FirstHitRESTMapper{

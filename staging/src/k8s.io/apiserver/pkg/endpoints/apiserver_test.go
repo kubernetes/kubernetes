@@ -130,33 +130,6 @@ func init() {
 	examplev1.AddToScheme(scheme)
 }
 
-func interfacesFor(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	switch version {
-	case testGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	case newGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	case grouplessGroupVersion:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	case testGroup2Version:
-		return &meta.VersionInterfaces{
-			ObjectConvertor: scheme,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, groupVersions)
-	}
-}
-
-func newMapper() *meta.DefaultRESTMapper {
-	return meta.NewDefaultRESTMapper([]schema.GroupVersion{testGroupVersion, newGroupVersion}, interfacesFor)
-}
-
 func addGrouplessTypes() {
 	scheme.AddKnownTypes(grouplessGroupVersion,
 		&genericapitesting.Simple{}, &genericapitesting.SimpleList{}, &metav1.ListOptions{}, &metav1.ExportOptions{},

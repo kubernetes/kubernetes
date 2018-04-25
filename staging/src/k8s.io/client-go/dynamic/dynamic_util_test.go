@@ -19,9 +19,7 @@ package dynamic
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -45,7 +43,7 @@ func TestDiscoveryRESTMapper(t *testing.T) {
 		Kind:    "test_kind",
 	}
 
-	mapper, err := NewDiscoveryRESTMapper(resources, versionInterfaces)
+	mapper, err := NewDiscoveryRESTMapper(resources)
 	if err != nil {
 		t.Fatalf("unexpected error creating mapper: %s", err)
 	}
@@ -78,12 +76,4 @@ func TestDiscoveryRESTMapper(t *testing.T) {
 			t.Errorf("KindFor(%#v) = %#v; want %#v", res, got, gvk)
 		}
 	}
-}
-
-// VersionInterfaces provides an object converter and metadata
-// accessor appropriate for use with unstructured objects.
-func versionInterfaces(schema.GroupVersion) (*meta.VersionInterfaces, error) {
-	return &meta.VersionInterfaces{
-		ObjectConvertor: &unstructured.UnstructuredObjectConverter{},
-	}, nil
 }

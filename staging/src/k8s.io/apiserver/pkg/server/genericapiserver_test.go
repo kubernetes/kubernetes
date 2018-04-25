@@ -153,20 +153,13 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
 		metav1.AddToGroupVersion(scheme, v1GroupVersion)
 
-		interfacesFor := func(version schema.GroupVersion) (*meta.VersionInterfaces, error) {
-			return &meta.VersionInterfaces{
-				ObjectConvertor: scheme,
-			}, nil
-		}
-
-		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv}, interfacesFor)
+		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv})
 		for kind := range scheme.KnownTypes(gv) {
 			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
 		}
 		groupMeta := apimachinery.GroupMeta{
 			GroupVersions: []schema.GroupVersion{gv},
 			RESTMapper:    mapper,
-			InterfacesFor: interfacesFor,
 		}
 
 		return APIGroupInfo{
