@@ -21,13 +21,8 @@ import (
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
-}
 
 // Funcs returns the fuzzer functions for the batch api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
@@ -41,7 +36,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.Parallelism = &parallelism
 			j.BackoffLimit = &backoffLimit
 			if c.Rand.Int31()%2 == 0 {
-				j.ManualSelector = newBool(true)
+				j.ManualSelector = utilpointer.BoolPtr(true)
 			} else {
 				j.ManualSelector = nil
 			}

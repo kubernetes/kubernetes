@@ -44,6 +44,7 @@ go_library(
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/security/apparmor:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//pkg/util/version:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",

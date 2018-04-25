@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const defaultContainerName = "test-c"
@@ -812,12 +813,10 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	hostPortPod.Spec.Containers[0].Ports = []api.ContainerPort{{HostPort: 1}}
 
 	readOnlyRootFSPodFalse := defaultPod()
-	readOnlyRootFSFalse := false
-	readOnlyRootFSPodFalse.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &readOnlyRootFSFalse
+	readOnlyRootFSPodFalse.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = utilpointer.BoolPtr(false)
 
 	readOnlyRootFSPodTrue := defaultPod()
-	readOnlyRootFSTrue := true
-	readOnlyRootFSPodTrue.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &readOnlyRootFSTrue
+	readOnlyRootFSPodTrue.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = utilpointer.BoolPtr(true)
 
 	seccompPSP := defaultPSP()
 	seccompPSP.Annotations = map[string]string{

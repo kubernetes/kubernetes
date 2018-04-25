@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -170,7 +171,6 @@ profile %s flags=(attach_disconnected) {
 }
 
 func createAppArmorProfileLoader(f *framework.Framework) {
-	True := true
 	One := int32(1)
 	loader := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
@@ -189,7 +189,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 						Image: imageutils.GetE2EImage(imageutils.AppArmorLoader),
 						Args:  []string{"-poll", "10s", "/profiles"},
 						SecurityContext: &api.SecurityContext{
-							Privileged: &True,
+							Privileged: utilpointer.BoolPtr(true),
 						},
 						VolumeMounts: []api.VolumeMount{{
 							Name:      "sys",

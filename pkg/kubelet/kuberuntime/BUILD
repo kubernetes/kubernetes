@@ -150,6 +150,7 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

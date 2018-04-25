@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func TestSetDefaultCronJob(t *testing.T) {
@@ -39,7 +40,7 @@ func TestSetDefaultCronJob(t *testing.T) {
 			expected: &batchv2alpha1.CronJob{
 				Spec: batchv2alpha1.CronJobSpec{
 					ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
-					Suspend:           newBool(false),
+					Suspend:           utilpointer.BoolPtr(false),
 				},
 			},
 		},
@@ -47,13 +48,13 @@ func TestSetDefaultCronJob(t *testing.T) {
 			original: &batchv2alpha1.CronJob{
 				Spec: batchv2alpha1.CronJobSpec{
 					ConcurrencyPolicy: batchv2alpha1.ForbidConcurrent,
-					Suspend:           newBool(true),
+					Suspend:           utilpointer.BoolPtr(true),
 				},
 			},
 			expected: &batchv2alpha1.CronJob{
 				Spec: batchv2alpha1.CronJobSpec{
 					ConcurrencyPolicy: batchv2alpha1.ForbidConcurrent,
-					Suspend:           newBool(true),
+					Suspend:           utilpointer.BoolPtr(true),
 				},
 			},
 		},
@@ -95,10 +96,4 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
-}
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
 }

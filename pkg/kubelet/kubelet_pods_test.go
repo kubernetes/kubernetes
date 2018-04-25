@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
 	// to "v1"?
@@ -52,7 +53,6 @@ import (
 )
 
 func TestMakeMounts(t *testing.T) {
-	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
 	propagationNone := v1.MountPropagationNone
@@ -161,7 +161,7 @@ func TestMakeMounts(t *testing.T) {
 					},
 				},
 				SecurityContext: &v1.SecurityContext{
-					Privileged: &bTrue,
+					Privileged: utilpointer.BoolPtr(true),
 				},
 			},
 			expectedMounts: []kubecontainer.Mount{

@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -46,8 +47,6 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 
 	rootUser := int64(0)
 	anyUser := int64(1000)
-	runAsNonRootTrue := true
-	runAsNonRootFalse := false
 	for _, test := range []struct {
 		desc     string
 		sc       *v1.SecurityContext
@@ -72,7 +71,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Pass if RunAsNonRoot is false (image user is root)",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootFalse,
+				RunAsNonRoot: utilpointer.BoolPtr(false),
 			},
 			uid:  &rootUser,
 			fail: false,
@@ -80,7 +79,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Pass if RunAsNonRoot is false (RunAsUser is root)",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootFalse,
+				RunAsNonRoot: utilpointer.BoolPtr(false),
 				RunAsUser:    &rootUser,
 			},
 			uid:  &rootUser,
@@ -89,7 +88,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Fail if container's RunAsUser is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsNonRoot: utilpointer.BoolPtr(true),
 				RunAsUser:    &rootUser,
 			},
 			uid:  &rootUser,
@@ -98,7 +97,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Fail if image's user is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsNonRoot: utilpointer.BoolPtr(true),
 			},
 			uid:  &rootUser,
 			fail: true,
@@ -106,7 +105,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Fail if image's username is set and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsNonRoot: utilpointer.BoolPtr(true),
 			},
 			username: "test",
 			fail:     true,
@@ -114,7 +113,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Pass if image's user is non-root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsNonRoot: utilpointer.BoolPtr(true),
 			},
 			uid:  &anyUser,
 			fail: false,
@@ -122,7 +121,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Pass if container's user and image's user aren't set and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				RunAsNonRoot: utilpointer.BoolPtr(true),
 			},
 			fail: false,
 		},

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
@@ -89,7 +90,6 @@ func TestGenerateContainerConfig(t *testing.T) {
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 
 	runAsUser := int64(0)
-	runAsNonRootTrue := true
 	podWithContainerSecurityContext := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -105,7 +105,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 					Command:         []string{"testCommand"},
 					WorkingDir:      "testWorkingDir",
 					SecurityContext: &v1.SecurityContext{
-						RunAsNonRoot: &runAsNonRootTrue,
+						RunAsNonRoot: utilpointer.BoolPtr(true),
 						RunAsUser:    &runAsUser,
 					},
 				},
@@ -123,7 +123,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	image.Username = "test"
 
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
-	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
+	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = utilpointer.BoolPtr(true)
 
 	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, kubecontainer.ContainerTypeRegular)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")

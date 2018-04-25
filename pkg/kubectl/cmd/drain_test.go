@@ -51,6 +51,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
 const (
@@ -60,8 +61,6 @@ const (
 
 var node *corev1.Node
 var cordoned_node *corev1.Node
-
-func boolptr(b bool) *bool { return &b }
 
 func TestMain(m *testing.M) {
 	// Create a node.
@@ -264,8 +263,8 @@ func TestDrain(t *testing.T) {
 					Kind:               "ReplicationController",
 					Name:               "rc",
 					UID:                "123",
-					BlockOwnerDeletion: boolptr(true),
-					Controller:         boolptr(true),
+					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					Controller:         utilpointer.BoolPtr(true),
 				},
 			},
 		},
@@ -298,8 +297,8 @@ func TestDrain(t *testing.T) {
 					APIVersion:         "extensions/v1beta1",
 					Kind:               "DaemonSet",
 					Name:               "ds",
-					BlockOwnerDeletion: boolptr(true),
-					Controller:         boolptr(true),
+					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					Controller:         utilpointer.BoolPtr(true),
 				},
 			},
 		},
@@ -320,8 +319,8 @@ func TestDrain(t *testing.T) {
 					APIVersion:         "extensions/v1beta1",
 					Kind:               "DaemonSet",
 					Name:               "ds",
-					BlockOwnerDeletion: boolptr(true),
-					Controller:         boolptr(true),
+					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					Controller:         utilpointer.BoolPtr(true),
 				},
 			},
 		},
@@ -373,8 +372,8 @@ func TestDrain(t *testing.T) {
 					APIVersion:         "v1",
 					Kind:               "Job",
 					Name:               "job",
-					BlockOwnerDeletion: boolptr(true),
-					Controller:         boolptr(true),
+					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					Controller:         utilpointer.BoolPtr(true),
 				},
 			},
 		},
@@ -405,8 +404,8 @@ func TestDrain(t *testing.T) {
 					APIVersion:         "v1",
 					Kind:               "ReplicaSet",
 					Name:               "rs",
-					BlockOwnerDeletion: boolptr(true),
-					Controller:         boolptr(true),
+					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					Controller:         utilpointer.BoolPtr(true),
 				},
 			},
 		},

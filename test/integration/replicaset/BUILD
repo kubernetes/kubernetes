@@ -16,6 +16,7 @@ go_test(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/replicaset:go_default_library",
+        "//pkg/util/pointer:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
