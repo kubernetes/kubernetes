@@ -75,11 +75,6 @@ func init() {
 		case jsoniter.NumberValue:
 			var number json.Number
 			iter.ReadVal(&number)
-			u64, err := strconv.ParseUint(string(number), 10, 64)
-			if err == nil {
-				*(*interface{})(ptr) = u64
-				return
-			}
 			i64, err := strconv.ParseInt(string(number), 10, 64)
 			if err == nil {
 				*(*interface{})(ptr) = i64
