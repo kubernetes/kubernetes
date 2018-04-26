@@ -308,7 +308,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
 				NewCmdApply("kubectl", f, ioStreams),
-				NewCmdPatch(f, out),
+				NewCmdPatch(f, ioStreams),
 				NewCmdReplace(f, out, err),
 				NewCmdConvert(f, ioStreams),
 			},
@@ -349,8 +349,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), out, err))
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
-	cmds.AddCommand(NewCmdVersion(f, out))
-	cmds.AddCommand(NewCmdApiVersions(f, out))
+	cmds.AddCommand(NewCmdVersion(f, ioStreams))
+	cmds.AddCommand(NewCmdApiVersions(f, ioStreams))
 	cmds.AddCommand(NewCmdApiResources(f, ioStreams))
 	cmds.AddCommand(NewCmdOptions(out))
 
