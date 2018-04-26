@@ -243,6 +243,7 @@ docs/man/man1/kubectl-set-serviceaccount.1
 docs/man/man1/kubectl-set-subject.1
 docs/man/man1/kubectl-set.1
 docs/man/man1/kubectl-taint.1
+docs/man/man1/kubectl-token.1
 docs/man/man1/kubectl-top-node.1
 docs/man/man1/kubectl-top-pod.1
 docs/man/man1/kubectl-top.1
@@ -342,6 +343,7 @@ docs/user-guide/kubectl/kubectl_set_selector.md
 docs/user-guide/kubectl/kubectl_set_serviceaccount.md
 docs/user-guide/kubectl/kubectl_set_subject.md
 docs/user-guide/kubectl/kubectl_taint.md
+docs/user-guide/kubectl/kubectl_token.md
 docs/user-guide/kubectl/kubectl_top.md
 docs/user-guide/kubectl/kubectl_top_node.md
 docs/user-guide/kubectl/kubectl_top_pod.md
@@ -387,6 +389,7 @@ docs/yaml/kubectl/kubectl_run.yaml
 docs/yaml/kubectl/kubectl_scale.yaml
 docs/yaml/kubectl/kubectl_set.yaml
 docs/yaml/kubectl/kubectl_taint.yaml
+docs/yaml/kubectl/kubectl_token.yaml
 docs/yaml/kubectl/kubectl_top.yaml
 docs/yaml/kubectl/kubectl_uncordon.yaml
 docs/yaml/kubectl/kubectl_version.yaml

@@ -311,6 +311,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out, err),
 				NewCmdConvert(f, ioStreams),
+				NewCmdToken(f, out),
 			},
 		},
 		{
