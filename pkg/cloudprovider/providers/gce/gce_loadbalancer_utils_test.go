@@ -131,6 +131,8 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 	c := cloud.NewMockGCE(&gceProjectRouter{gce})
 	c.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
 	c.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+	c.MockTargetPools.AddHealthCheckHook = mock.AddHealthCheckHook
+	c.MockTargetPools.RemoveHealthCheckHook = mock.RemoveHealthCheckHook
 	c.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
 	c.MockAddresses.InsertHook = mock.InsertAddressHook
 	c.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
@@ -147,6 +149,7 @@ func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
 
 	c.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
 	c.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
+	c.MockHttpHealthChecks.UpdateHook = mock.UpdateHTTPHealthCheckHook
 	c.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
 
 	keyGA := meta.GlobalKey("key-ga")
