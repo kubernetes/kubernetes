@@ -55,7 +55,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			randomDefinition := testserver.NewRandomNameCustomResourceDefinition(v1beta1.ClusterScoped)
 
 			//create CRD and waits for the resource to be recognized and available.
-			_, err = testserver.CreateNewCustomResourceDefinition(randomDefinition, apiExtensionClient, f.ClientPool)
+			err = testserver.CreateNewCustomResourceDefinition(randomDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
 				framework.Failf("failed to create CustomResourceDefinition: %v", err)
 			}

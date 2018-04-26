@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -167,23 +168,23 @@ func link(t *testing.T, owner, dependent metav1.Object) {
 
 func createRandomCustomResourceDefinition(
 	t *testing.T, apiExtensionClient apiextensionsclientset.Interface,
-	clientPool dynamic.ClientPool,
+	dynamicClient dynamic.DynamicInterface,
 	namespace string,
-) (*apiextensionsv1beta1.CustomResourceDefinition, dynamic.ResourceInterface) {
+) (*apiextensionsv1beta1.CustomResourceDefinition, dynamic.DynamicResourceInterface) {
 	// Create a random custom resource definition and ensure it's available for
 	// use.
 	definition := apiextensionstestserver.NewRandomNameCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
 
-	client, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, clientPool)
+	err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
 	}
 
 	// Get a client for the custom resource.
-	resourceClient := client.Resource(&metav1.APIResource{
-		Name:       definition.Spec.Names.Plural,
-		Namespaced: true,
-	}, namespace)
+	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Version, Resource: definition.Spec.Names.Plural}
+
+	resourceClient := dynamicClient.NamespacedResource(gvr, namespace)
+
 	return definition, resourceClient
 }
 
@@ -192,7 +193,7 @@ type testContext struct {
 	gc                 *garbagecollector.GarbageCollector
 	clientSet          clientset.Interface
 	apiExtensionClient apiextensionsclientset.Interface
-	clientPool         dynamic.ClientPool
+	dynamicClient      dynamic.DynamicInterface
 	startGC            func(workers int)
 	// syncPeriod is how often the GC started with startGC will be resynced.
 	syncPeriod time.Duration
@@ -226,6 +227,10 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	config.ContentConfig = dynamic.ContentConfig()
 	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+	dynamicClient, err := dynamic.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("failed to create dynamicClient: %v", err)
+	}
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
@@ -262,7 +267,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		gc:                 gc,
 		clientSet:          clientSet,
 		apiExtensionClient: apiExtensionClient,
-		clientPool:         clientPool,
+		dynamicClient:      dynamicClient,
 		startGC:            startGC,
 		syncPeriod:         syncPeriod,
 	}
@@ -797,11 +802,11 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
-	clientSet, apiExtensionClient, clientPool := ctx.clientSet, ctx.apiExtensionClient, ctx.clientPool
+	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
 	ns := createNamespaceOrDie("crd-cascading", clientSet, t)
 
-	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, clientPool, ns.Name)
+	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
 	owner := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner"))
@@ -857,13 +862,13 @@ func TestMixedRelationships(t *testing.T) {
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
-	clientSet, apiExtensionClient, clientPool := ctx.clientSet, ctx.apiExtensionClient, ctx.clientPool
+	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
-	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, clientPool, ns.Name)
+	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
 	customOwner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")))
@@ -955,13 +960,13 @@ func TestCRDDeletionCascading(t *testing.T) {
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 
-	clientSet, apiExtensionClient, clientPool := ctx.clientSet, ctx.apiExtensionClient, ctx.clientPool
+	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
-	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, clientPool, ns.Name)
+	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
 	owner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")))
