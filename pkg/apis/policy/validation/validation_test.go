@@ -336,7 +336,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
 	}
 
 	invalidAllowedHostPathMissingPath := validPSP()
@@ -566,8 +566,8 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey:  "docker/default",
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo,*",
+		seccomp.DefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
+		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()

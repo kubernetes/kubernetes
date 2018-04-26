@@ -167,7 +167,12 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/k8s.io/api/core/v1:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

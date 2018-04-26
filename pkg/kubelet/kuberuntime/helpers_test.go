@@ -232,19 +232,34 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 			expectedProfile: "",
 		},
 		{
+			description: "pod runtime/default seccomp profile should return runtime/default",
+			annotation: map[string]string{
+				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+			},
+			expectedProfile: v1.SeccompProfileRuntimeDefault,
+		},
+		{
 			description: "pod docker/default seccomp profile should return docker/default",
 			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "docker/default",
+				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
 			},
-			expectedProfile: "docker/default",
+			expectedProfile: v1.DeprecatedSeccompProfileDockerDefault,
+		},
+		{
+			description: "pod runtime/default seccomp profile with containerName should return runtime/default",
+			annotation: map[string]string{
+				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+			},
+			containerName:   "container1",
+			expectedProfile: v1.SeccompProfileRuntimeDefault,
 		},
 		{
 			description: "pod docker/default seccomp profile with containerName should return docker/default",
 			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "docker/default",
+				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
 			},
 			containerName:   "container1",
-			expectedProfile: "docker/default",
+			expectedProfile: v1.DeprecatedSeccompProfileDockerDefault,
 		},
 		{
 			description: "pod unconfined seccomp profile should return unconfined",

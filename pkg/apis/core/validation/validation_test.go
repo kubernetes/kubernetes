@@ -6343,12 +6343,22 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
+		{ // runtime default seccomp profile
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
+				},
+			},
+			Spec: validPodSpec(nil),
+		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "docker/default",
+					core.SeccompPodAnnotationKey: core.DeprecatedSeccompProfileDockerDefault,
 				},
 			},
 			Spec: validPodSpec(nil),
