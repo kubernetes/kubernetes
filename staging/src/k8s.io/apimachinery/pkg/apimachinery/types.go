@@ -26,9 +26,6 @@ import (
 
 // GroupMeta stores the metadata of a group.
 type GroupMeta struct {
-	// GroupVersion represents the preferred version of the group.
-	GroupVersion schema.GroupVersion
-
 	// GroupVersions is Group + all versions in that group.
 	GroupVersions []schema.GroupVersion
 
@@ -68,7 +65,7 @@ func (gm *GroupMeta) DefaultInterfacesFor(version schema.GroupVersion) (*meta.Ve
 // TODO: remove the "Interfaces" suffix and make this also maintain the
 // .GroupVersions member.
 func (gm *GroupMeta) AddVersionInterfaces(version schema.GroupVersion, interfaces *meta.VersionInterfaces) error {
-	if e, a := gm.GroupVersion.Group, version.Group; a != e {
+	if e, a := gm.GroupVersions[0].Group, version.Group; a != e {
 		return fmt.Errorf("got a version in group %v, but am in group %v", a, e)
 	}
 	if gm.InterfacesByVersion == nil {

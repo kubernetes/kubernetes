@@ -24,10 +24,6 @@ import (
 
 func TestAdd(t *testing.T) {
 	gm := GroupMeta{
-		GroupVersion: schema.GroupVersion{
-			Group:   "test",
-			Version: "v1",
-		},
 		GroupVersions: []schema.GroupVersion{{Group: "test", Version: "v1"}},
 	}
 

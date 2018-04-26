@@ -35,7 +35,7 @@ import (
 
 func TestDeepCopyApiObjects(t *testing.T) {
 	for i := 0; i < *roundtrip.FuzzIters; i++ {
-		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion} {
+		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0]} {
 			f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 			for kind := range legacyscheme.Scheme.KnownTypes(version) {
 				doDeepCopyTest(t, version.WithKind(kind), f)
@@ -79,7 +79,7 @@ func doDeepCopyTest(t *testing.T, kind schema.GroupVersionKind, f *fuzz.Fuzzer) 
 
 func TestDeepCopySingleType(t *testing.T) {
 	for i := 0; i < *roundtrip.FuzzIters; i++ {
-		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion} {
+		for _, version := range []schema.GroupVersion{testapi.Default.InternalGroupVersion(), legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0]} {
 			f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 			doDeepCopyTest(t, version.WithKind("Pod"), f)
 		}

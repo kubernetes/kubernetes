@@ -63,7 +63,7 @@ func (m *APIRegistrationManager) RegisterVersions(availableVersions []schema.Gro
 
 // RegisterGroup adds the given group to the list of registered groups.
 func (m *APIRegistrationManager) RegisterGroup(groupMeta apimachinery.GroupMeta) error {
-	groupName := groupMeta.GroupVersion.Group
+	groupName := groupMeta.GroupVersions[0].Group
 	if _, found := m.groupMetaMap[groupName]; found {
 		return fmt.Errorf("group %q is already registered in groupsMap: %v", groupName, m.groupMetaMap)
 	}
@@ -224,7 +224,7 @@ func (m *APIRegistrationManager) AllPreferredGroupVersions() string {
 	}
 	var defaults []string
 	for _, groupMeta := range m.groupMetaMap {
-		defaults = append(defaults, groupMeta.GroupVersion.String())
+		defaults = append(defaults, groupMeta.GroupVersions[0].String())
 	}
 	sort.Strings(defaults)
 	return strings.Join(defaults, ",")

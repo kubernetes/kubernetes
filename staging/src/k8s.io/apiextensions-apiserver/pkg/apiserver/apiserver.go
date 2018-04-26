@@ -130,7 +130,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	apiResourceConfig := c.GenericConfig.MergedResourceConfig
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, Registry, Scheme, metav1.ParameterCodec, Codecs)
 	if apiResourceConfig.VersionEnabled(v1beta1.SchemeGroupVersion) {
-		apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 		storage := map[string]rest.Storage{}
 		// customresourcedefinitions
 		customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)

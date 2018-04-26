@@ -199,7 +199,7 @@ func objectListToVersionedObject(objects []runtime.Object, specifiedOutputVersio
 	if !specifiedOutputVersion.Empty() {
 		targetVersions = append(targetVersions, specifiedOutputVersion)
 	}
-	targetVersions = append(targetVersions, scheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+	targetVersions = append(targetVersions, scheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 	converted, err := tryConvert(scheme.Scheme, objectList, targetVersions...)
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 		if !specifiedOutputVersion.Empty() {
 			targetVersions = append(targetVersions, specifiedOutputVersion)
 		}
-		targetVersions = append(targetVersions, scheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		targetVersions = append(targetVersions, scheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0])
 
 		converted, err := tryConvert(scheme.Scheme, object, targetVersions...)
 		if err != nil {

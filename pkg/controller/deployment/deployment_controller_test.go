@@ -78,7 +78,7 @@ func newRSWithStatus(name string, specReplicas, statusReplicas int, selector map
 
 func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSurge, maxUnavailable *intstr.IntOrString, selector map[string]string) *extensions.Deployment {
 	d := extensions.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersion.String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: legacyscheme.Registry.GroupOrDie(extensions.GroupName).GroupVersions[0].String()},
 		ObjectMeta: metav1.ObjectMeta{
 			UID:         uuid.NewUUID(),
 			Name:        name,

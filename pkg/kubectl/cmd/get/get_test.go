@@ -77,7 +77,7 @@ func defaultClientConfig() *restclient.Config {
 		ContentConfig: restclient.ContentConfig{
 			NegotiatedSerializer: scheme.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &scheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         &scheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
 		},
 	}
 }
