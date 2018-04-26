@@ -244,6 +244,7 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 	return templates.LongDesc(`Valid resource types include:
 	
 			* all
+			* apiservices
 			* certificatesigningrequests (aka 'csr')
 			* clusterrolebindings
 			* clusterroles
