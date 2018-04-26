@@ -326,7 +326,7 @@ func CreateKubeAPIServerConfig(
 		return
 	}
 
-	storageFactory, lastErr := BuildStorageFactory(s)
+	storageFactory, lastErr := BuildStorageFactory(s, genericConfig.MergedResourceConfig)
 	if lastErr != nil {
 		return
 	}
@@ -443,6 +443,9 @@ func BuildGenericConfig(
 	if lastErr = s.Features.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
+	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Registry); lastErr != nil {
+		return
+	}
 
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, legacyscheme.Scheme)
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
@@ -457,7 +460,7 @@ func BuildGenericConfig(
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 
-	storageFactory, lastErr := BuildStorageFactory(s)
+	storageFactory, lastErr := BuildStorageFactory(s, genericConfig.MergedResourceConfig)
 	if lastErr != nil {
 		return
 	}
@@ -630,7 +633,7 @@ func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.Shar
 
 // BuildStorageFactory constructs the storage factory. If encryption at rest is used, it expects
 // all supported KMS plugins to be registered in the KMS plugin registry before being called.
-func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultStorageFactory, error) {
+func BuildStorageFactory(s *options.ServerRunOptions, apiResourceConfig *serverstorage.ResourceConfig) (*serverstorage.DefaultStorageFactory, error) {
 	storageGroupsToEncodingVersion, err := s.StorageSerialization.StorageGroupsToEncodingVersion()
 	if err != nil {
 		return nil, fmt.Errorf("error generating storage version map: %s", err)
@@ -646,7 +649,7 @@ func BuildStorageFactory(s *options.ServerRunOptions) (*serverstorage.DefaultSto
 			storage.Resource("volumeattachments").WithVersion("v1beta1"),
 			admissionregistration.Resource("initializerconfigurations").WithVersion("v1alpha1"),
 		},
-		master.DefaultAPIResourceConfigSource(), s.APIEnablement.RuntimeConfig)
+		apiResourceConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error in initializing storage factory: %s", err)
 	}
@@ -787,6 +790,7 @@ func defaultOptions(s *options.ServerRunOptions) error {
 			}
 		}
 	}
+
 	return nil
 }
 

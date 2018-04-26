@@ -54,6 +54,14 @@ func createAPIExtensionsConfig(
 	etcdOptions.StorageConfig.Codec = apiextensionsapiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
+	// override MergedResourceConfig with apiextensions defaults and registry
+	if err := commandOptions.APIEnablement.ApplyTo(
+		&genericConfig,
+		apiextensionsapiserver.DefaultAPIResourceConfigSource(),
+		apiextensionsapiserver.Registry); err != nil {
+		return nil, err
+	}
+
 	apiextensionsConfig := &apiextensionsapiserver.Config{
 		GenericConfig: &genericapiserver.RecommendedConfig{
 			Config:                genericConfig,
