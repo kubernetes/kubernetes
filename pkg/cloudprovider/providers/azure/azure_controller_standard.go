@@ -24,7 +24,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
 // AttachDisk attaches a vhd to vm
@@ -156,71 +155,16 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 	return err
 }
 
-// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI
-func (as *availabilitySet) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
+// GetDataDisks gets a list of data disks attached to the node.
+func (as *availabilitySet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
 	vm, err := as.getVirtualMachine(nodeName)
 	if err != nil {
-		return -1, err
-	}
-	disks := *vm.StorageProfile.DataDisks
-	for _, disk := range disks {
-		if disk.Lun != nil && (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
-			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && *disk.Vhd.URI == diskURI) ||
-			(disk.ManagedDisk != nil && *disk.ManagedDisk.ID == diskURI) {
-			// found the disk
-			glog.V(4).Infof("azureDisk - find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
-			return *disk.Lun, nil
-		}
-	}
-	return -1, fmt.Errorf("Cannot find Lun for disk %s", diskName)
-}
-
-// GetNextDiskLun searches all vhd attachment on the host and find unused lun
-// return -1 if all luns are used
-func (as *availabilitySet) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
-	vm, err := as.getVirtualMachine(nodeName)
-	if err != nil {
-		return -1, err
-	}
-	used := make([]bool, maxLUN)
-	disks := *vm.StorageProfile.DataDisks
-	for _, disk := range disks {
-		if disk.Lun != nil {
-			used[*disk.Lun] = true
-		}
-	}
-	for k, v := range used {
-		if !v {
-			return int32(k), nil
-		}
-	}
-	return -1, fmt.Errorf("All Luns are used")
-}
-
-// DisksAreAttached checks if a list of volumes are attached to the node with the specified NodeName
-func (as *availabilitySet) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
-	attached := make(map[string]bool)
-	for _, diskName := range diskNames {
-		attached[diskName] = false
-	}
-	vm, err := as.getVirtualMachine(nodeName)
-	if err == cloudprovider.InstanceNotFound {
-		// if host doesn't exist, no need to detach
-		glog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
-			nodeName, diskNames)
-		return attached, nil
-	} else if err != nil {
-		return attached, err
+		return nil, err
 	}
 
-	disks := *vm.StorageProfile.DataDisks
-	for _, disk := range disks {
-		for _, diskName := range diskNames {
-			if disk.Name != nil && diskName != "" && *disk.Name == diskName {
-				attached[diskName] = true
-			}
-		}
+	if vm.StorageProfile.DataDisks == nil {
+		return nil, nil
 	}
 
-	return attached, nil
+	return *vm.StorageProfile.DataDisks, nil
 }
