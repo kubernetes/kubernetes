@@ -43,7 +43,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/handlers:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/features:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
