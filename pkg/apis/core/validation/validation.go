@@ -379,29 +379,25 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (map[string]cor
 func IsMatchedVolume(name string, volumes map[string]core.VolumeSource) bool {
 	if _, ok := volumes[name]; ok {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func isMatchedDevice(name string, volumes map[string]core.VolumeSource) (bool, bool) {
 	if source, ok := volumes[name]; ok {
 		if source.PersistentVolumeClaim != nil {
 			return true, true
-		} else {
-			return true, false
 		}
-	} else {
-		return false, false
+		return true, false
 	}
+	return false, false
 }
 
 func mountNameAlreadyExists(name string, devices map[string]string) bool {
 	if _, ok := devices[name]; ok {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func mountPathAlreadyExists(mountPath string, devices map[string]string) bool {
@@ -417,9 +413,8 @@ func mountPathAlreadyExists(mountPath string, devices map[string]string) bool {
 func deviceNameAlreadyExists(name string, mounts map[string]string) bool {
 	if _, ok := mounts[name]; ok {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func devicePathAlreadyExists(devicePath string, mounts map[string]string) bool {
@@ -4201,9 +4196,8 @@ func isLocalStorageResource(name string) bool {
 	if name == string(core.ResourceEphemeralStorage) || name == string(core.ResourceRequestsEphemeralStorage) ||
 		name == string(core.ResourceLimitsEphemeralStorage) {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // Validate resource names that can go in a resource quota
