@@ -610,13 +610,13 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceOrKindArg)
 	gvk := schema.GroupVersionKind{}
 	if fullySpecifiedGVR != nil {
-		gvk, _ = b.mapper.KindFor(*fullySpecifiedGVR)
+		gvk, _ = b.mapper.RESTMapper.KindFor(*fullySpecifiedGVR)
 	}
 	if gvk.Empty() {
-		gvk, _ = b.mapper.KindFor(groupResource.WithVersion(""))
+		gvk, _ = b.mapper.RESTMapper.KindFor(groupResource.WithVersion(""))
 	}
 	if !gvk.Empty() {
-		return b.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		return b.mapper.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	}
 
 	fullySpecifiedGVK, groupKind := schema.ParseKindArg(resourceOrKindArg)
@@ -626,12 +626,12 @@ func (b *Builder) mappingFor(resourceOrKindArg string) (*meta.RESTMapping, error
 	}
 
 	if !fullySpecifiedGVK.Empty() {
-		if mapping, err := b.mapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
+		if mapping, err := b.mapper.RESTMapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
 			return mapping, nil
 		}
 	}
 
-	mapping, err := b.mapper.RESTMapping(groupKind, gvk.Version)
+	mapping, err := b.mapper.RESTMapper.RESTMapping(groupKind, gvk.Version)
 	if err != nil {
 		// if we error out here, it is because we could not match a resource or a kind
 		// for the given argument. To maintain consistency with previous behavior,
@@ -752,7 +752,7 @@ func (b *Builder) visitBySelector() *Result {
 
 	visitors := []Visitor{}
 	for _, mapping := range mappings {
-		client, err := b.mapper.ClientForMapping(mapping)
+		client, err := b.mapper.ClientMapper.ClientForMapping(mapping)
 		if err != nil {
 			result.err = err
 			return result
@@ -802,7 +802,7 @@ func (b *Builder) visitByResource() *Result {
 		if _, ok := clients[s]; ok {
 			continue
 		}
-		client, err := b.mapper.ClientForMapping(mapping)
+		client, err := b.mapper.ClientMapper.ClientForMapping(mapping)
 		if err != nil {
 			result.err = err
 			return result
@@ -881,7 +881,7 @@ func (b *Builder) visitByName() *Result {
 	}
 	mapping := mappings[0]
 
-	client, err := b.mapper.ClientForMapping(mapping)
+	client, err := b.mapper.ClientMapper.ClientForMapping(mapping)
 	if err != nil {
 		result.err = err
 		return result
