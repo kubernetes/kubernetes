@@ -18,7 +18,6 @@ package apimachinery
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -29,12 +28,6 @@ type GroupMeta struct {
 	GroupVersions []schema.GroupVersion
 
 	RootScopedKinds sets.String
-
-	// SelfLinker can set or get the SelfLink field of all API types.
-	// TODO: when versioning changes, make this part of each API definition.
-	// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
-	// to go through the InterfacesFor method below.
-	SelfLinker runtime.SelfLinker
 
 	// RESTMapper provides the default mapping between REST paths and the objects declared in a Scheme and all known
 	// versions.
