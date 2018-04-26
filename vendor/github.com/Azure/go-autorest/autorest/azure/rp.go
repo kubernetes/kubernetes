@@ -70,11 +70,8 @@ func DoRetryWithRegistration(client autorest.Client) autorest.SendDecorator {
 }
 
 func getProvider(re RequestError) (string, error) {
-	if re.ServiceError != nil {
-		if re.ServiceError.Details != nil && len(*re.ServiceError.Details) > 0 {
-			detail := (*re.ServiceError.Details)[0].(map[string]interface{})
-			return detail["target"].(string), nil
-		}
+	if re.ServiceError != nil && len(re.ServiceError.Details) > 0 {
+		return re.ServiceError.Details[0]["target"].(string), nil
 	}
 	return "", errors.New("provider was not found in the response")
 }
