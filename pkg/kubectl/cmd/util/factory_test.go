@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -470,7 +471,7 @@ func TestDiscoveryReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
+	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
 	b := resource.NewBuilder(
 		&resource.Mapper{
 			RESTMapper:   mapper,

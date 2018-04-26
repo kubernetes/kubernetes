@@ -45,18 +45,6 @@ func Install(registry *registered.APIRegistrationManager, scheme *runtime.Scheme
 				"PersistentVolume",
 				"ComponentStatus",
 			),
-			IgnoredKinds: sets.NewString(
-				"ListOptions",
-				"DeleteOptions",
-				"Status",
-				"PodLogOptions",
-				"PodExecOptions",
-				"PodAttachOptions",
-				"PodPortForwardOptions",
-				"PodProxyOptions",
-				"NodeProxyOptions",
-				"ServiceProxyOptions",
-			),
 		},
 		announced.VersionToSchemeFunc{
 			v1.SchemeGroupVersion.Version: v1.AddToScheme,

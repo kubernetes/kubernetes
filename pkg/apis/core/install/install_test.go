@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	internal "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -63,43 +62,6 @@ func TestCodec(t *testing.T) {
 	}
 	if other.APIVersion != legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions[0].Version || other.Kind != "Pod" {
 		t.Errorf("unexpected unmarshalled object %#v", other)
-	}
-}
-
-func TestRESTMapper(t *testing.T) {
-	gv := schema.GroupVersion{Group: "", Version: "v1"}
-	rcGVK := gv.WithKind("ReplicationController")
-	podTemplateGVK := gv.WithKind("PodTemplate")
-
-	if gvk, err := legacyscheme.Registry.RESTMapper().KindFor(internal.SchemeGroupVersion.WithResource("replicationcontrollers")); err != nil || gvk != rcGVK {
-		t.Errorf("unexpected version mapping: %v %v", gvk, err)
-	}
-
-	if m, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(podTemplateGVK.GroupKind(), ""); err != nil || m.GroupVersionKind != podTemplateGVK || m.Resource != "podtemplates" {
-		t.Errorf("unexpected version mapping: %#v %v", m, err)
-	}
-
-	for _, version := range legacyscheme.Registry.GroupOrDie(internal.GroupName).GroupVersions {
-		mapping, err := legacyscheme.Registry.GroupOrDie(internal.GroupName).RESTMapper.RESTMapping(rcGVK.GroupKind(), version.Version)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if mapping.Resource != "replicationControllers" && mapping.Resource != "replicationcontrollers" {
-			t.Errorf("incorrect resource name: %#v", mapping)
-		}
-		if mapping.GroupVersionKind.GroupVersion() != version {
-			t.Errorf("incorrect version: %v", mapping)
-		}
-
-		rc := &internal.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-		name, err := meta.NewAccessor().Name(rc)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if name != "foo" {
-			t.Errorf("bad name: %q", name)
-		}
 	}
 }
 

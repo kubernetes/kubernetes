@@ -21,7 +21,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,7 +48,6 @@ type GroupMetaFactoryArgs struct {
 	VersionPreferenceOrder []string
 	// RootScopedKinds are resources that are not namespaced.
 	RootScopedKinds sets.String // nil is allowed
-	IgnoredKinds    sets.String // nil is allowed
 
 	// May be nil if there are no internal objects.
 	AddInternalObjectsToScheme SchemeFunc
@@ -154,40 +152,9 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 		GroupVersions:   externalVersions,
 		RootScopedKinds: gmf.GroupArgs.RootScopedKinds,
 	}
-	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
 
 	if err := m.RegisterGroup(*groupMeta); err != nil {
 		return err
 	}
 	return nil
-
-}
-
-func (gmf *GroupMetaFactory) newRESTMapper(scheme *runtime.Scheme, externalVersions []schema.GroupVersion, groupMeta *apimachinery.GroupMeta) meta.RESTMapper {
-	// the list of kinds that are scoped at the root of the api hierarchy
-	// if a kind is not enumerated here, it is assumed to have a namespace scope
-	rootScoped := sets.NewString()
-	if gmf.GroupArgs.RootScopedKinds != nil {
-		rootScoped = gmf.GroupArgs.RootScopedKinds
-	}
-	ignoredKinds := sets.NewString()
-	if gmf.GroupArgs.IgnoredKinds != nil {
-		ignoredKinds = gmf.GroupArgs.IgnoredKinds
-	}
-
-	mapper := meta.NewDefaultRESTMapper(externalVersions)
-	for _, gv := range externalVersions {
-		for kind := range scheme.KnownTypes(gv) {
-			if ignoredKinds.Has(kind) {
-				continue
-			}
-			scope := meta.RESTScopeNamespace
-			if rootScoped.Has(kind) {
-				scope = meta.RESTScopeRoot
-			}
-			mapper.Add(gv.WithKind(kind), scope)
-		}
-	}
-
-	return mapper
 }

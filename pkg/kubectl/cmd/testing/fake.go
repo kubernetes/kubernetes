@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -433,7 +434,7 @@ func (f *TestFactory) RESTMapper() meta.RESTMapper {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			legacyscheme.Registry.RESTMapper(),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme),
 		},
 	}
 
