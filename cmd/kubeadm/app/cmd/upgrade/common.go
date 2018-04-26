@@ -87,7 +87,7 @@ func enforceRequirements(flags *cmdUpgradeFlags, dryRun bool, newK8sVersion stri
 		client: client,
 		cfg:    cfg,
 		// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-		versionGetter: upgrade.NewKubeVersionGetter(client, os.Stdout),
+		versionGetter: upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion),
 		// Use the waiter conditionally based on the dryrunning variable
 		waiter: getWaiter(dryRun, client),
 	}, nil
