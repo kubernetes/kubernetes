@@ -17,7 +17,6 @@ limitations under the License.
 package apimachinery
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -28,8 +27,4 @@ type GroupMeta struct {
 	GroupVersions []schema.GroupVersion
 
 	RootScopedKinds sets.String
-
-	// RESTMapper provides the default mapping between REST paths and the objects declared in a Scheme and all known
-	// versions.
-	RESTMapper meta.RESTMapper
 }
