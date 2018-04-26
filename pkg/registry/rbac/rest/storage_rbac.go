@@ -18,7 +18,6 @@ package rest
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -71,15 +70,15 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1alpha1.SchemeGroupVersion.Version] = p.storage(rbacapiv1alpha1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1alpha1.SchemeGroupVersion
 	}
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1beta1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(rbacapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1beta1.SchemeGroupVersion.Version] = p.storage(rbacapiv1beta1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1beta1.SchemeGroupVersion
 	}
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(rbacapiv1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1.SchemeGroupVersion.Version] = p.storage(rbacapiv1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
 		apiGroupInfo.GroupMeta.GroupVersion = rbacapiv1.SchemeGroupVersion
 	}
@@ -88,48 +87,31 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 }
 
 func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	once := new(sync.Once)
-	var (
-		authorizationRuleResolver  rbacregistryvalidation.AuthorizationRuleResolver
-		rolesStorage               rest.StandardStorage
-		roleBindingsStorage        rest.StandardStorage
-		clusterRolesStorage        rest.StandardStorage
-		clusterRoleBindingsStorage rest.StandardStorage
+	storage := map[string]rest.Storage{}
+	rolesStorage := rolestore.NewREST(restOptionsGetter)
+	roleBindingsStorage := rolebindingstore.NewREST(restOptionsGetter)
+	clusterRolesStorage := clusterrolestore.NewREST(restOptionsGetter)
+	clusterRoleBindingsStorage := clusterrolebindingstore.NewREST(restOptionsGetter)
+
+	authorizationRuleResolver := rbacregistryvalidation.NewDefaultRuleResolver(
+		role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
+		rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(roleBindingsStorage)},
+		clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterRolesStorage)},
+		clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterRoleBindingsStorage)},
 	)
 
-	initializeStorage := func() {
-		once.Do(func() {
-			rolesStorage = rolestore.NewREST(restOptionsGetter)
-			roleBindingsStorage = rolebindingstore.NewREST(restOptionsGetter)
-			clusterRolesStorage = clusterrolestore.NewREST(restOptionsGetter)
-			clusterRoleBindingsStorage = clusterrolebindingstore.NewREST(restOptionsGetter)
+	// roles
+	storage["roles"] = rolepolicybased.NewStorage(rolesStorage, authorizationRuleResolver)
 
-			authorizationRuleResolver = rbacregistryvalidation.NewDefaultRuleResolver(
-				role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
-				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(roleBindingsStorage)},
-				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterRolesStorage)},
-				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterRoleBindingsStorage)},
-			)
-		})
-	}
+	// rolebindings
+	storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 
-	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
-		initializeStorage()
-		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, authorizationRuleResolver)
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
-		initializeStorage()
-		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, p.Authorizer, authorizationRuleResolver)
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
-		initializeStorage()
-		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, authorizationRuleResolver)
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
-		initializeStorage()
-		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
-	}
+	// clusterroles
+	storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, authorizationRuleResolver)
+
+	// clusterrolebindings
+	storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
+
 	return storage
 }
 

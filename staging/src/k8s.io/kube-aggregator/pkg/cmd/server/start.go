@@ -38,6 +38,7 @@ const defaultEtcdPathPrefix = "/registry/kube-aggregator.kubernetes.io/"
 
 type AggregatorOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
+	APIEnablement      *genericoptions.APIEnablementOptions
 
 	// ProxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
 	// this to confirm the proxy's identity
@@ -76,6 +77,7 @@ func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct
 // AddFlags is necessary because hyperkube doesn't work using cobra, so we have to have different registration and execution paths
 func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 	o.RecommendedOptions.AddFlags(fs)
+	o.APIEnablement.AddFlags(fs)
 	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
 }
@@ -83,7 +85,8 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 	o := &AggregatorOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
+		APIEnablement:      genericoptions.NewAPIEnablementOptions(),
 
 		StdOut: out,
 		StdErr: err,
@@ -95,6 +98,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 func (o AggregatorOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
+	errors = append(errors, o.APIEnablement.Validate(aggregatorscheme.Registry)...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -111,6 +115,9 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	serverConfig := genericapiserver.NewRecommendedConfig(aggregatorscheme.Codecs)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig, aggregatorscheme.Scheme); err != nil {
+		return err
+	}
+	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), aggregatorscheme.Registry); err != nil {
 		return err
 	}
 	serverConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
