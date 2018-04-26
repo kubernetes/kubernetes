@@ -70,6 +70,7 @@ go_test(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/schedulercache:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",

@@ -18,8 +18,9 @@ package priorities
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -409,11 +410,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			}
 		}
 		list, err := priorityFunction(BalancedResourceAllocationMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(test.expectedList, list) {
-			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-		}
+		assert.NoErrorf(t, err, "unexpected error: %v", err)
+		assert.EqualValuesf(t, test.expectedList, list, "%s: expected %#v, got %#v", test.test, test.expectedList, list)
 	}
 }
