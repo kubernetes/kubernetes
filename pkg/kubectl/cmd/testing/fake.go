@@ -259,6 +259,7 @@ func NewTestFactory() *TestFactory {
 	return &TestFactory{
 		Factory:        cmdutil.NewFactory(config),
 		tempConfigFile: configFile,
+		Client:         &fake.RESTClient{},
 	}
 }
 

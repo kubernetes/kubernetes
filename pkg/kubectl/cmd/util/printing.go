@@ -22,7 +22,10 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	kubectlscheme "k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -30,8 +33,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
@@ -236,13 +237,13 @@ func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts printer
 
 // ValidResourceTypeList returns a multi-line string containing the valid resources. May
 // be called before the factory is initialized.
-// TODO: This function implementation should be replaced with a real implementation from the
-//   discovery service.
+// It will first attempt to discover all the available resources from the server and then
+// fallback to a static list that is calculated from code compiled into the factory if not found.
 func ValidResourceTypeList(f ClientAccessFactory) string {
-	// TODO: Should attempt to use the cached discovery list or fallback to a static list
-	// that is calculated from code compiled into the factory.
-	return templates.LongDesc(`Valid resource types include:
-	
+	resourcesList, err := DiscoveryResourceTypeList(f)
+	if err != nil {
+		return templates.LongDesc(`Valid resource types include:
+
 			* all
 			* certificatesigningrequests (aka 'csr')
 			* clusterrolebindings
@@ -280,8 +281,21 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 			* services (aka 'svc')
 			* statefulsets (aka 'sts')
 			* storageclasses (aka 'sc')
-	
+
 	`)
+	}
+
+	validResources := sets.NewString()
+	for _, list := range resourcesList {
+		if len(list.APIResources) == 0 {
+			continue
+		}
+		for _, resource := range list.APIResources {
+			rt := resourceType{Name: resource.Name, ShortNames: resource.ShortNames}
+			validResources.Insert(rt.String())
+		}
+	}
+	return templates.LongDesc("Valid resource types include:\n\n" + strings.Join(validResources.List(), "\n"))
 }
 
 // Retrieve a list of handled resources from printer as valid args
@@ -294,4 +308,19 @@ func ValidArgList(f ClientAccessFactory) []string {
 	validArgs = humanReadablePrinter.HandledResources()
 
 	return validArgs
+}
+
+type resourceType struct {
+	// name is the plural name of the resource.
+	Name string
+	// shortNames is a list of suggested short names of the resource.
+	ShortNames []string
+}
+
+// String renders resourceType as a string using fmt.
+func (resource *resourceType) String() string {
+	if len(resource.ShortNames) == 0 {
+		return fmt.Sprintf("* %s", resource.Name)
+	}
+	return fmt.Sprintf("* %s (aka %q)", resource.Name, strings.Join(resource.ShortNames, ", "))
 }

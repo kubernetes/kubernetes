@@ -41,6 +41,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 	tf.Namespace = "non-default"
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
@@ -68,6 +69,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
 	tf.Namespace = "non-default"
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
@@ -103,6 +105,7 @@ func TestDescribeObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
@@ -132,6 +135,7 @@ func TestDescribeListObjects(t *testing.T) {
 	}
 
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
@@ -155,6 +159,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	}
 
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
@@ -179,6 +184,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	}
 
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(tf, buf, buferr)
@@ -192,6 +198,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 func TestDescribeHelpMessage(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
+	tf.ClientConfigVal = defaultClientConfig()
 
 	buf := bytes.NewBuffer([]byte{})
 	buferr := bytes.NewBuffer([]byte{})

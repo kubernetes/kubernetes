@@ -278,6 +278,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
 	tf.Namespace = "test"
+	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet(tf, streams)
