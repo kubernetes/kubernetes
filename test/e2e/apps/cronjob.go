@@ -51,7 +51,7 @@ var _ = SIGDescribe("CronJob", func() {
 	successCommand := []string{"/bin/true"}
 
 	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceBeta, f.Namespace.Name)
+		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
 	})
 
 	// multiple jobs running at once

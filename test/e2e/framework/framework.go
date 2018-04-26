@@ -70,7 +70,7 @@ type Framework struct {
 
 	InternalClientset *internalclientset.Clientset
 	AggregatorClient  *aggregatorclient.Clientset
-	ClientPool        dynamic.ClientPool
+	DynamicClient     dynamic.DynamicInterface
 
 	ScalesGetter scaleclient.ScalesGetter
 
@@ -167,7 +167,8 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
-		f.ClientPool = dynamic.NewClientPool(config, legacyscheme.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
+		f.DynamicClient, err = dynamic.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
 		// as they are required when creating a REST client.
@@ -288,7 +289,7 @@ func (f *Framework) AfterEach() {
 				if f.NamespaceDeletionTimeout != 0 {
 					timeout = f.NamespaceDeletionTimeout
 				}
-				if err := deleteNS(f.ClientSet, f.ClientPool, ns.Name, timeout); err != nil {
+				if err := deleteNS(f.ClientSet, f.DynamicClient, ns.Name, timeout); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 					} else {
