@@ -4171,8 +4171,14 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	}
 
 	if len(strings.Split(value, "/")) == 1 {
-		if !helper.IsStandardResourceName(value) {
-			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource type or fully qualified"))
+		if helper.IsUlimitResourceName(value) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.SupportUlimits) {
+				return append(allErrs, field.Invalid(fldPath, value, "support for ulimits is not enabled"))
+			}
+		} else {
+			if !helper.IsStandardResourceName(value) {
+				return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource type or fully qualified"))
+			}
 		}
 	}
 

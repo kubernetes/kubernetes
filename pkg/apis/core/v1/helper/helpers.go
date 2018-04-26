@@ -67,6 +67,11 @@ func IsHugePageResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
 }
 
+// IsUlimitResourceName returns true if the resource name is related to ulimits.
+func IsUlimitResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), "ulimit-")
+}
+
 // HugePageResourceName returns a ResourceName with the canonical hugepage
 // prefix prepended for the specified page size.  The page size is converted
 // to its canonical representation.
@@ -95,7 +100,7 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 // Extended and Hugepages resources
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name)
+		IsPrefixedNativeResource(name) || IsUlimitResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not

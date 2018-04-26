@@ -38,6 +38,11 @@ func IsHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
 }
 
+// IsUlimitResourceName returns true if the resource name is related to ulimits.
+func IsUlimitResourceName(name string) bool {
+	return strings.HasPrefix(string(name), "ulimit-")
+}
+
 // IsQuotaHugePageResourceName returns true if the resource name has the quota
 // related huge page resource prefix.
 func IsQuotaHugePageResourceName(name core.ResourceName) bool {
@@ -144,7 +149,7 @@ var standardContainerResources = sets.NewString(
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
 func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str) || IsHugePageResourceName(core.ResourceName(str))
+	return standardContainerResources.Has(str) || IsHugePageResourceName(core.ResourceName(str)) || IsUlimitResourceName(str)
 }
 
 // IsExtendedResourceName returns true if:

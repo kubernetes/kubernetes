@@ -30,6 +30,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerunits "github.com/docker/go-units"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 )
 
@@ -112,7 +113,19 @@ func (ds *dockerService) updateCreateConfig(
 				CPUPeriod:  rOpts.CpuPeriod,
 			}
 			createConfig.HostConfig.OomScoreAdj = int(rOpts.OomScoreAdj)
+
+			createConfig.HostConfig.Ulimits = make([]*dockerunits.Ulimit, len(rOpts.Ulimits))
+			index := 0
+			for key, value := range rOpts.Ulimits {
+				createConfig.HostConfig.Ulimits[index] = &dockerunits.Ulimit{
+					Name: key,
+					Hard: value.Hard,
+					Soft: value.Soft,
+				}
+				index++
+			}
 		}
+
 		// Note: ShmSize is handled in kube_docker_client.go
 
 		// Apply security context.
