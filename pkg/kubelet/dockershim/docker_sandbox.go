@@ -31,6 +31,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -209,6 +210,12 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 		// actions will only have sandbox ID and not have pod namespace and name information.
 		// Return error if encounter any unexpected error.
 		if checkpointErr != nil {
+			if checkpointErr != errors.ErrCheckpointNotFound {
+				err := ds.checkpointManager.RemoveCheckpoint(podSandboxID)
+				if err != nil {
+					glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", podSandboxID, err)
+				}
+			}
 			if libdocker.IsContainerNotFoundError(statusErr) {
 				glog.Warningf("Both sandbox container and checkpoint for id %q could not be found. "+
 					"Proceed without further sandbox information.", podSandboxID)
@@ -517,6 +524,12 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 		err := ds.checkpointManager.GetCheckpoint(id, checkpoint)
 		if err != nil {
 			glog.Errorf("Failed to retrieve checkpoint for sandbox %q: %v", id, err)
+			if err == errors.ErrCorruptCheckpoint {
+				err = ds.checkpointManager.RemoveCheckpoint(id)
+				if err != nil {
+					glog.Errorf("Failed to delete corrupt checkpoint for sandbox %q: %v", id, err)
+				}
+			}
 			continue
 		}
 		result = append(result, checkpointToRuntimeAPISandbox(id, checkpoint))
