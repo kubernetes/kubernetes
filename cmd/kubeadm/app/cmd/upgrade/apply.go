@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -268,7 +269,9 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 		return err
 	}
 
-	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg, etcdUpgrade)
+	// These are uninitialized because passing in the clients allow for mocking the client during testing
+	var oldEtcdClient, newEtdClient etcdutil.Client
+	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg, etcdUpgrade, oldEtcdClient, newEtdClient)
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane

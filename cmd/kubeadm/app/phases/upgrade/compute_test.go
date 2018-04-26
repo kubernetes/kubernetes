@@ -17,10 +17,12 @@ limitations under the License.
 package upgrade
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"reflect"
 	"testing"
+	"time"
+
+	"github.com/coreos/etcd/clientv3"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 type fakeVersionGetter struct {
@@ -60,12 +62,18 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string]uint16, error) {
 	}, nil
 }
 
-type fakeEtcdCluster struct{}
+type fakeEtcdCluster struct{ TLS bool }
 
-func (f fakeEtcdCluster) GetEtcdClusterStatus() (*clientv3.StatusResponse, error) {
+func (f fakeEtcdCluster) HasTLS() bool { return f.TLS }
+
+func (f fakeEtcdCluster) GetStatus() (*clientv3.StatusResponse, error) {
 	client := &clientv3.StatusResponse{}
 	client.Version = "3.1.12"
 	return client, nil
+}
+
+func (f fakeEtcdCluster) WaitForStatus(delay time.Duration, retries int, retryInterval time.Duration) (*clientv3.StatusResponse, error) {
+	return f.GetStatus()
 }
 
 func TestGetAvailableUpgrades(t *testing.T) {
