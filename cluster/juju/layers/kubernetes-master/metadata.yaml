@@ -42,6 +42,8 @@ requires:
     interface: ceph-admin
   aws:
     interface: aws
+  gcp:
+    interface: gcp
 resources:
   kubectl:
     type: file

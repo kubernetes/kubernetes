@@ -30,6 +30,8 @@ requires:
     interface: kube-control
   aws:
     interface: aws
+  gcp:
+    interface: gcp
 provides:
   cni:
     interface: kubernetes-cni
