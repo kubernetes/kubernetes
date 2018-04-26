@@ -287,7 +287,7 @@ func TestAddFlags(t *testing.T) {
 			StorageVersions:        legacyscheme.Registry.AllPreferredGroupVersions(),
 			DefaultStorageVersions: legacyscheme.Registry.AllPreferredGroupVersions(),
 		},
-		APIEnablement: &apiserveroptions.APIEnablementOptions{
+		APIEnablement: &kubeoptions.APIEnablementOptions{
 			RuntimeConfig: utilflag.ConfigurationMap{},
 		},
 		EnableLogsHandler:       false,

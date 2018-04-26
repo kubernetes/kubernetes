@@ -88,17 +88,16 @@ func MergeAPIResourceConfigs(
 	// This takes preference over api/all, if specified.
 	// Iterate through all group/version overrides specified in runtimeConfig.
 	for key := range overrides {
-		// Have already handled them above. Can skip them here.
+		// Have already handled it above. Can skip them here.
 		if key == "api/all" {
 			continue
 		}
 
 		tokens := strings.Split(key, "/")
 		if len(tokens) != 2 {
-			continue
+			return nil, fmt.Errorf("invalid key %s", key)
 		}
-		groupVersionString := tokens[0] + "/" + tokens[1]
-		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
+		groupVersion, err := schema.ParseGroupVersion(key)
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
 		}
@@ -107,12 +106,11 @@ func MergeAPIResourceConfigs(
 		if !registry.IsRegistered(groupVersion.Group) {
 			continue
 		}
-
 		// Verify that the groupVersion is registered into registry.
 		if !registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
-		enabled, err := getRuntimeConfigValue(overrides, key, false)
+		enabled, err := GetRuntimeConfigValue(overrides, key, false)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +124,8 @@ func MergeAPIResourceConfigs(
 	return resourceConfig, nil
 }
 
-func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+// GetRuntimeConfigValue takes in a key and returns its value with a default.
+func GetRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
 	flagValue, ok := overrides[apiKey]
 	if ok {
 		if flagValue == "" {
@@ -149,7 +148,7 @@ func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
 			continue
 		}
 		tokens := strings.Split(key, "/")
-		if len(tokens) != 2 && len(tokens) != 3 {
+		if len(tokens) < 2 {
 			return groups, fmt.Errorf("runtime-config invalid key %s", key)
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]

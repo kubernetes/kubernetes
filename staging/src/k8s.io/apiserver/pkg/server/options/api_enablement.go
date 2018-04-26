@@ -28,8 +28,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 )
 
-// APIEnablementOptions contains the options for which resources to turn on and off.
-// Given small aggregated API servers, this option isn't required for "normal" API servers
+// APIEnablementOptions contains the options for which group/version to turn on and off.
 type APIEnablementOptions struct {
 	RuntimeConfig utilflag.ConfigurationMap
 }
@@ -44,10 +43,9 @@ func NewAPIEnablementOptions() *APIEnablementOptions {
 func (s *APIEnablementOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
 		"A set of key=value pairs that describe runtime configuration that may be passed "+
-		"to apiserver. <group>/<version> (or <version> for the core group) key can be used to "+
+		"to apiserver. <group>/<version> key can be used to "+
 		"turn on/off specific api versions. api/all is special key to control all api versions, "+
-		"be careful setting it false, unless you know what you do. api/legacy is deprecated, "+
-		"we will remove it in the future, so stop using it.")
+		"be careful setting it false, unless you know what you do.")
 }
 
 // Validate validates RuntimeConfig with a list of registries.
@@ -66,6 +64,13 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 		return append(errors, fmt.Errorf("invliad key with only api/all=false"))
 	}
 
+	for key := range s.RuntimeConfig {
+		tokens := strings.Split(key, "/")
+		if len(tokens) != 2 {
+			return append(errors, fmt.Errorf("invalid key %s", key))
+		}
+	}
+
 	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)
 	if err != nil {
 		return append(errors, err)
@@ -73,7 +78,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 
 	for _, registry := range registries {
 		// filter out known groups
-		groups = unknownGroups(groups, registry)
+		groups = UnknownGroups(groups, registry)
 	}
 	if len(groups) != 0 {
 		errors = append(errors, fmt.Errorf("unknown api groups %s", strings.Join(groups, ",")))
@@ -94,7 +99,7 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 	return err
 }
 
-func unknownGroups(groups []string, registry GroupRegisty) []string {
+func UnknownGroups(groups []string, registry GroupRegisty) []string {
 	unknownGroups := []string{}
 	for _, group := range groups {
 		if !registry.IsRegistered(group) {

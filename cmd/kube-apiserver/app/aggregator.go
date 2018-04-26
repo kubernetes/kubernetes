@@ -80,8 +80,9 @@ func createAggregatorConfig(
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion)
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
-	// override MergedResourceConfig with aggregator defaults and registry
-	if err := commandOptions.APIEnablement.ApplyTo(
+	// override genericConfig.MergedResourceConfig with aggregator defaults and registry
+	genericAPIEnablement := genericoptions.APIEnablementOptions{RuntimeConfig: commandOptions.APIEnablement.RuntimeConfig}
+	if err := genericAPIEnablement.ApplyTo(
 		&genericConfig,
 		aggregatorapiserver.DefaultAPIResourceConfigSource(),
 		aggregatorscheme.Registry); err != nil {
