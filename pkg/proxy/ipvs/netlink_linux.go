@@ -82,10 +82,11 @@ func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 		// found dummy device
 		return true, nil
 	}
-	dummy := &netlink.Dummy{
-		LinkAttrs: netlink.LinkAttrs{Name: devName},
+	dummy := &netlink.Dummy{LinkAttrs: netlink.LinkAttrs{Name: devName}}
+	if err := h.LinkAdd(dummy); err != nil {
+		return false, err
 	}
-	return false, h.LinkAdd(dummy)
+	return false, h.LinkSetUp(dummy)
 }
 
 // DeleteDummyDevice is part of interface.
