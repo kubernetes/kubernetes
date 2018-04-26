@@ -215,7 +215,7 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error
 		for ix := range pods.Items {
 			pod := &pods.Items[ix]
 			containers := pod.Spec.Containers
-			writer := setupOutputWriter(cmd, out, path.Join(namespace, pod.Name, "logs.txt"))
+			writer := setupOutputWriter(cmd, out, path.Join(namespace, "PodLog", pod.Name, "logs.txt"))
 
 			for i := range containers {
 				printContainer(writer, containers[i], pod)
