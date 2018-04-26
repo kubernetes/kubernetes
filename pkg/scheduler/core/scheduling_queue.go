@@ -29,7 +29,10 @@ package core
 import (
 	"container/heap"
 	"fmt"
+	"reflect"
 	"sync"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,10 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-
-	"reflect"
-
-	"github.com/golang/glog"
 )
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.

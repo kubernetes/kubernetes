@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
-
-	"github.com/golang/glog"
 )
 
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.

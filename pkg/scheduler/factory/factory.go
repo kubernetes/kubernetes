@@ -837,6 +837,9 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 			if oldConditions[v1.NodeDiskPressure] != newConditions[v1.NodeDiskPressure] {
 				invalidPredicates.Insert(predicates.CheckNodeDiskPressurePred)
 			}
+			if oldConditions[v1.NodePIDPressure] != newConditions[v1.NodePIDPressure] {
+				invalidPredicates.Insert(predicates.CheckNodePIDPressurePred)
+			}
 			if oldConditions[v1.NodeReady] != newConditions[v1.NodeReady] ||
 				oldConditions[v1.NodeOutOfDisk] != newConditions[v1.NodeOutOfDisk] ||
 				oldConditions[v1.NodeNetworkUnavailable] != newConditions[v1.NodeNetworkUnavailable] {
