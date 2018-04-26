@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	computepreview "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -39,24 +38,24 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	disks := *vm.StorageProfile.DataDisks
 	if isManagedDisk {
 		disks = append(disks,
-			computepreview.DataDisk{
+			compute.DataDisk{
 				Name:         &diskName,
 				Lun:          &lun,
-				Caching:      computepreview.CachingTypes(cachingMode),
+				Caching:      compute.CachingTypes(cachingMode),
 				CreateOption: "attach",
-				ManagedDisk: &computepreview.ManagedDiskParameters{
+				ManagedDisk: &compute.ManagedDiskParameters{
 					ID: &diskURI,
 				},
 			})
 	} else {
 		disks = append(disks,
-			computepreview.DataDisk{
+			compute.DataDisk{
 				Name: &diskName,
-				Vhd: &computepreview.VirtualHardDisk{
+				Vhd: &compute.VirtualHardDisk{
 					URI: &diskURI,
 				},
 				Lun:          &lun,
-				Caching:      computepreview.CachingTypes(cachingMode),
+				Caching:      compute.CachingTypes(cachingMode),
 				CreateOption: "attach",
 			})
 	}

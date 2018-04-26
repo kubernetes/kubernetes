@@ -18,17 +18,18 @@ package azure
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
+	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
 type fakeClient struct {
-	results containerregistry.RegistryListResult
+	results []containerregistry.Registry
 }
 
-func (f *fakeClient) List() (containerregistry.RegistryListResult, error) {
+func (f *fakeClient) List(ctx context.Context) ([]containerregistry.Registry, error) {
 	return f.results, nil
 }
 
@@ -38,25 +39,23 @@ func Test(t *testing.T) {
         "aadClientId": "foo",
         "aadClientSecret": "bar"
     }`
-	result := containerregistry.RegistryListResult{
-		Value: &[]containerregistry.Registry{
-			{
-				Name: to.StringPtr("foo"),
-				RegistryProperties: &containerregistry.RegistryProperties{
-					LoginServer: to.StringPtr("foo-microsoft.azurecr.io"),
-				},
+	result := []containerregistry.Registry{
+		{
+			Name: to.StringPtr("foo"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("foo-microsoft.azurecr.io"),
 			},
-			{
-				Name: to.StringPtr("bar"),
-				RegistryProperties: &containerregistry.RegistryProperties{
-					LoginServer: to.StringPtr("bar-microsoft.azurecr.io"),
-				},
+		},
+		{
+			Name: to.StringPtr("bar"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("bar-microsoft.azurecr.io"),
 			},
-			{
-				Name: to.StringPtr("baz"),
-				RegistryProperties: &containerregistry.RegistryProperties{
-					LoginServer: to.StringPtr("baz-microsoft.azurecr.io"),
-				},
+		},
+		{
+			Name: to.StringPtr("baz"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("baz-microsoft.azurecr.io"),
 			},
 		},
 	}
@@ -71,8 +70,8 @@ func Test(t *testing.T) {
 
 	creds := provider.Provide()
 
-	if len(creds) != len(*result.Value) {
-		t.Errorf("Unexpected list: %v, expected length %d", creds, len(*result.Value))
+	if len(creds) != len(result) {
+		t.Errorf("Unexpected list: %v, expected length %d", creds, len(result))
 	}
 	for _, cred := range creds {
 		if cred.Username != "foo" {
@@ -82,7 +81,7 @@ func Test(t *testing.T) {
 			t.Errorf("expected 'bar' for password, saw: %v", cred.Username)
 		}
 	}
-	for _, val := range *result.Value {
+	for _, val := range result {
 		registryName := getLoginServer(val)
 		if _, found := creds[registryName]; !found {
 			t.Errorf("Missing expected registry: %s", registryName)
