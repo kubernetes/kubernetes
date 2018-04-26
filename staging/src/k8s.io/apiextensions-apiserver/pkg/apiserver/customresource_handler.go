@@ -232,9 +232,9 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return nil
 		}
-		return handlers.CreateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
 		return handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
 	case "delete":
@@ -257,7 +257,7 @@ func (r *crdHandler) serveStatus(w http.ResponseWriter, req *http.Request, reque
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
 		return handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
 	default:
@@ -274,7 +274,7 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	case "get":
 		return handlers.GetResource(storage, nil, requestScope)
 	case "update":
-		return handlers.UpdateResource(storage, requestScope, discovery.NewUnstructuredObjectTyper(nil), r.admission)
+		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
 		return handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{}, supportedTypes)
 	default:

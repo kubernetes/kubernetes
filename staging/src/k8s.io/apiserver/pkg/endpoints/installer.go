@@ -605,7 +605,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if hasSubresource {
 				doc = "replace " + subresource + " of the specified " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulUpdateResource(updater, reqScope, a.group.Typer, admit))
+			handler := metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, restfulUpdateResource(updater, reqScope, admit))
 			route := ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
@@ -644,9 +644,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "POST": // Create a resource.
 			var handler restful.RouteFunction
 			if isNamedCreater {
-				handler = restfulCreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+				handler = restfulCreateNamedResource(namedCreater, reqScope, admit)
 			} else {
-				handler = restfulCreateResource(creater, reqScope, a.group.Typer, admit)
+				handler = restfulCreateResource(creater, reqScope, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, subresource, requestScope, handler)
 			article := getArticleForNoun(kind, " ")
@@ -975,15 +975,15 @@ func restfulListResource(r rest.Lister, rw rest.Watcher, scope handlers.RequestS
 	}
 }
 
-func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func restfulCreateNamedResource(r rest.NamedCreater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.CreateNamedResource(r, scope, typer, admit)(res.ResponseWriter, req.Request)
+		handlers.CreateNamedResource(r, scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
 
-func restfulCreateResource(r rest.Creater, scope handlers.RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func restfulCreateResource(r rest.Creater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.CreateResource(r, scope, typer, admit)(res.ResponseWriter, req.Request)
+		handlers.CreateResource(r, scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
 
@@ -999,9 +999,9 @@ func restfulDeleteCollection(r rest.CollectionDeleter, checkBody bool, scope han
 	}
 }
 
-func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.UpdateResource(r, scope, typer, admit)(res.ResponseWriter, req.Request)
+		handlers.UpdateResource(r, scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
 
