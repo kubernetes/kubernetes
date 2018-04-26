@@ -19,9 +19,10 @@ package util
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 func TestReplaceAliases(t *testing.T) {
@@ -126,7 +127,7 @@ func TestReplaceAliases(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
+	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
 
 	for _, test := range tests {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
@@ -178,7 +179,7 @@ func TestKindFor(t *testing.T) {
 	}
 
 	ds := &fakeDiscoveryClient{}
-	mapper := NewShortcutExpander(testapi.Default.RESTMapper(), ds)
+	mapper := NewShortcutExpander(testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Registry, legacyscheme.Scheme), ds)
 
 	for i, test := range tests {
 		ds.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {

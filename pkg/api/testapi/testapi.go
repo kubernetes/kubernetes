@@ -30,7 +30,6 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
@@ -472,52 +471,4 @@ func (g TestGroup) SubResourcePath(resource, namespace, name, sub string) string
 	}
 
 	return path
-}
-
-// RESTMapper returns RESTMapper in legacyscheme.Registry.
-func (g TestGroup) RESTMapper() meta.RESTMapper {
-	return legacyscheme.Registry.RESTMapper()
-}
-
-// ExternalGroupVersions returns all external group versions allowed for the server.
-func ExternalGroupVersions() schema.GroupVersions {
-	versions := []schema.GroupVersion{}
-	for _, g := range Groups {
-		gv := g.GroupVersion()
-		versions = append(versions, *gv)
-	}
-	return versions
-}
-
-// GetCodecForObject gets codec based on runtime.Object
-func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
-	kinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
-	if err != nil {
-		return nil, fmt.Errorf("unexpected encoding error: %v", err)
-	}
-	kind := kinds[0]
-
-	for _, group := range Groups {
-		if group.GroupVersion().Group != kind.Group {
-			continue
-		}
-
-		if legacyscheme.Scheme.Recognizes(kind) {
-			return group.Codec(), nil
-		}
-	}
-	// Codec used for unversioned types
-	if legacyscheme.Scheme.Recognizes(kind) {
-		serializer, ok := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-		if !ok {
-			return nil, fmt.Errorf("no serializer registered for json")
-		}
-		return serializer.Serializer, nil
-	}
-	return nil, fmt.Errorf("unexpected kind: %v", kind)
-}
-
-// NewTestGroup creates a new TestGroup.
-func NewTestGroup(external, internal schema.GroupVersion, internalTypes map[string]reflect.Type, externalTypes map[string]reflect.Type) TestGroup {
-	return TestGroup{external, internal, internalTypes, externalTypes}
 }

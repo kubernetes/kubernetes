@@ -34,7 +34,6 @@ import (
 	// "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -153,13 +152,8 @@ func TestInstallAPIGroups(t *testing.T) {
 		scheme.AddKnownTypes(v1GroupVersion, &metav1.Status{})
 		metav1.AddToGroupVersion(scheme, v1GroupVersion)
 
-		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv})
-		for kind := range scheme.KnownTypes(gv) {
-			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
-		}
 		groupMeta := apimachinery.GroupMeta{
 			GroupVersions: []schema.GroupVersion{gv},
-			RESTMapper:    mapper,
 		}
 
 		return APIGroupInfo{

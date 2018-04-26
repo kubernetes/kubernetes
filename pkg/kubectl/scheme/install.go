@@ -71,18 +71,6 @@ func init() {
 				"PersistentVolume",
 				"ComponentStatus",
 			),
-			IgnoredKinds: sets.NewString(
-				"ListOptions",
-				"DeleteOptions",
-				"Status",
-				"PodLogOptions",
-				"PodExecOptions",
-				"PodAttachOptions",
-				"PodPortForwardOptions",
-				"PodProxyOptions",
-				"NodeProxyOptions",
-				"ServiceProxyOptions",
-			),
 		},
 		announced.VersionToSchemeFunc{
 			corev1.SchemeGroupVersion.Version: corev1.AddToScheme,
