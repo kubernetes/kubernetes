@@ -17,6 +17,7 @@ includes:
   - 'interface:kube-control'
   - 'interface:public-address'
   - 'interface:aws'
+  - 'interface:gcp'
 options:
   basic:
     packages:

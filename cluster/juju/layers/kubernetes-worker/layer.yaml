@@ -14,6 +14,7 @@ includes:
   - 'interface:kube-dns'
   - 'interface:kube-control'
   - 'interface:aws'
+  - 'interface:gcp'
 config:
   deletes:
     - install_from_upstream

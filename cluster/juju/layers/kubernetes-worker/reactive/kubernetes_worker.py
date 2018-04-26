@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import time
 
+from pathlib import Path
 from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
@@ -31,7 +32,7 @@ from charms.layer import snap
 from charms.reactive import hook
 from charms.reactive import endpoint_from_flag
 from charms.reactive import set_state, remove_state, is_state
-from charms.reactive import when, when_any, when_not
+from charms.reactive import when, when_any, when_not, when_none
 
 from charms.kubernetes.common import get_version
 
@@ -50,6 +51,7 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 kubeconfig_path = '/root/cdk/kubeconfig'
 kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
 kubeclientconfig_path = '/root/.kube/config'
+gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 db = unitdata.kv()
@@ -626,6 +628,10 @@ def configure_kubelet(dns, ingress_ip):
 
     if is_state('endpoint.aws.ready'):
         kubelet_opts['cloud-provider'] = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_config_path = _cloud_config_path('kubelet')
+        kubelet_opts['cloud-provider'] = 'gce'
+        kubelet_opts['cloud-config'] = str(cloud_config_path)
 
     configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
 
@@ -1031,6 +1037,10 @@ def _systemctl_is_active(application):
 def get_node_name():
     kubelet_extra_args = parse_extra_args('kubelet-extra-args')
     cloud_provider = kubelet_extra_args.get('cloud-provider', '')
+    if is_state('endpoint.aws.ready'):
+        cloud_provider = 'aws'
+    elif is_state('endpoint.gcp.ready'):
+        cloud_provider = 'gcp'
     if cloud_provider == 'aws':
         return getfqdn()
     else:
@@ -1073,37 +1083,94 @@ def remove_label(label):
         raise ApplyNodeLabelFailed(retry)
 
 
-@when('endpoint.aws.joined',
-      'kube-control.cluster_tag.available')
-@when_not('kubernetes-worker.aws-request-sent')
+@when_any('endpoint.aws.joined',
+          'endpoint.gcp.joined')
+@when('kube-control.cluster_tag.available')
+@when_not('kubernetes-worker.cloud-request-sent')
 def request_integration():
+    hookenv.status_set('maintenance', 'requesting cloud integration')
     kube_control = endpoint_from_flag('kube-control.cluster_tag.available')
-    hookenv.status_set('maintenance', 'requesting aws integration')
-    aws = endpoint_from_flag('endpoint.aws.joined')
     cluster_tag = kube_control.get_cluster_tag()
-    aws.tag_instance({
-        'KubernetesCluster': cluster_tag,
-    })
-    aws.tag_instance_security_group({
-        'KubernetesCluster': cluster_tag,
-    })
-    aws.tag_instance_subnet({
-        'KubernetesCluster': cluster_tag,
-    })
-    aws.enable_instance_inspection()
-    aws.enable_dns_management()
-    aws.enable_object_storage_management(['kubernetes-*'])
-    set_state('kubernetes-worker.aws-request-sent')
-    hookenv.status_set('waiting', 'waiting for aws integration')
+    if is_state('endpoint.aws.joined'):
+        cloud = endpoint_from_flag('endpoint.aws.joined')
+        cloud.tag_instance({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.tag_instance_security_group({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.tag_instance_subnet({
+            'kubernetes.io/cluster/{}'.format(cluster_tag): 'owned',
+        })
+        cloud.enable_object_storage_management(['kubernetes-*'])
+    elif is_state('endpoint.gcp.joined'):
+        cloud = endpoint_from_flag('endpoint.gcp.joined')
+        cloud.label_instance({
+            'k8s-io-cluster-name': cluster_tag,
+        })
+        cloud.enable_object_storage_management()
+    cloud.enable_instance_inspection()
+    cloud.enable_dns_management()
+    set_state('kubernetes-worker.cloud-request-sent')
+    hookenv.status_set('waiting', 'waiting for cloud integration')
 
 
-@when_not('endpoint.aws.joined')
+@when_none('endpoint.aws.joined',
+           'endpoint.gcp.joined')
 def clear_requested_integration():
-    remove_state('kubernetes-worker.aws-request-sent')
+    remove_state('kubernetes-worker.cloud-request-sent')
 
 
-@when('endpoint.aws.ready')
-@when_not('kubernetes-worker.restarted-for-aws')
-def restart_for_aws():
-    set_state('kubernetes-worker.restarted-for-aws')
+@when_any('endpoint.aws.ready',
+          'endpoint.gcp.ready')
+@when_not('kubernetes-worker.restarted-for-cloud')
+def restart_for_cloud():
+    if is_state('endpoint.gcp.ready'):
+        _write_gcp_snap_config('kubelet')
+    set_state('kubernetes-worker.restarted-for-cloud')
     set_state('kubernetes-worker.restart-needed')
+
+
+def _snap_common_path(component):
+    return Path('/var/snap/{}/common'.format(component))
+
+
+def _cloud_config_path(component):
+    return _snap_common_path(component) / 'cloud-config.conf'
+
+
+def _gcp_creds_path(component):
+    return _snap_common_path(component) / 'gcp-creds.json'
+
+
+def _daemon_env_path(component):
+    return _snap_common_path(component) / 'environment'
+
+
+def _write_gcp_snap_config(component):
+    # gcp requires additional credentials setup
+    gcp = endpoint_from_flag('endpoint.gcp.ready')
+    creds_path = _gcp_creds_path(component)
+    with creds_path.open('w') as fp:
+        os.fchmod(fp.fileno(), 0o600)
+        fp.write(gcp.credentials)
+
+    # create a cloud-config file that sets token-url to nil to make the
+    # services use the creds env var instead of the metadata server, as
+    # well as making the cluster multizone
+    cloud_config_path = _cloud_config_path(component)
+    cloud_config_path.write_text('[Global]\n'
+                                 'token-url = nil\n'
+                                 'multizone = true\n')
+
+    daemon_env_path = _daemon_env_path(component)
+    if daemon_env_path.exists():
+        daemon_env = daemon_env_path.read_text()
+        if not daemon_env.endswith('\n'):
+            daemon_env += '\n'
+    else:
+        daemon_env = ''
+    if gcp_creds_env_key not in daemon_env:
+        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
+        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
+        daemon_env_path.write_text(daemon_env)
