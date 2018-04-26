@@ -72,8 +72,11 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	}
 
 	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
+	cmd.MarkFlagCustom(clientcmd.FlagClusterName, "__kubectl_config_get_clusters")
 	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
+	cmd.MarkFlagCustom(clientcmd.FlagAuthInfoName, "__kubectl_config_get_users")
 	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
+	cmd.MarkFlagCustom(clientcmd.FlagNamespace, "__kubectl_get_resource_namespace")
 
 	return cmd
 }
