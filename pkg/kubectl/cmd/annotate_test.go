@@ -425,7 +425,7 @@ func TestAnnotateErrors(t *testing.T) {
 			tf.ClientConfigVal = defaultClientConfig()
 
 			iostreams, _, bufOut, bufErr := genericclioptions.NewTestIOStreams()
-			cmd := NewCmdAnnotate(tf, iostreams)
+			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 			cmd.SetOutput(bufOut)
 
 			for k, v := range testCase.flags {
@@ -489,7 +489,7 @@ func TestAnnotateObject(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(bufOut)
 	options := NewAnnotateOptions(iostreams)
 	args := []string{"pods/foo", "a=b", "c-"}
@@ -543,7 +543,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(bufOut)
 	options := NewAnnotateOptions(iostreams)
 	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
@@ -575,7 +575,7 @@ func TestAnnotateLocal(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	options := NewAnnotateOptions(iostreams)
 	options.local = true
 	options.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
@@ -631,7 +631,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate(tf, iostreams)
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(iostreams.Out)
 	options := NewAnnotateOptions(iostreams)
 	options.all = true

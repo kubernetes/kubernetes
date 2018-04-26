@@ -57,6 +57,8 @@ type GetOptions struct {
 	IsGeneric            bool
 	PrintWithOpenAPICols bool
 
+	CmdParent string
+
 	resource.FilenameOptions
 
 	Raw       string
@@ -131,26 +133,27 @@ const (
 )
 
 // NewGetOptions returns a GetOptions with default chunk size 500.
-func NewGetOptions(streams genericclioptions.IOStreams) *GetOptions {
+func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
 		PrintFlags: NewGetPrintFlags(),
-		ChunkSize:  500,
+		CmdParent:  parent,
 
 		IOStreams: streams,
+		ChunkSize: 500,
 	}
 }
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewGetOptions(streams)
+func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewGetOptions(parent, streams)
 	validArgs := cmdutil.ValidArgList(f)
 
 	cmd := &cobra.Command{
 		Use: "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Display one or many resources"),
-		Long:    getLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
+		Long:    getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
 		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
@@ -258,7 +261,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, len(args) == 2)
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.ValidResourceTypeList(f))
+			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestApiResources(o.CmdParent))
 			fullCmdName := cmd.Parent().CommandPath()
 			usageString := "Required resource not specified."
 			if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {

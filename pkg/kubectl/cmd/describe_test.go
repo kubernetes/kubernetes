@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"strings"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -40,10 +40,11 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
 	tf.Namespace = "non-default"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"type", "foo"})
 
 	if d.Name != "foo" || d.Namespace != "" {
@@ -68,9 +69,10 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
 	tf.Namespace = "non-default"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"namespacedtype", "foo"})
 
 	if d.Name != "foo" || d.Namespace != "non-default" {
@@ -103,9 +105,10 @@ func TestDescribeObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
@@ -131,10 +134,10 @@ func TestDescribeListObjects(t *testing.T) {
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"pods"})
 	if buf.String() != fmt.Sprintf("%s\n\n%s", d.Output, d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
@@ -155,9 +158,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	}
 
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "true")
 	cmd.Run(cmd, []string{"pods"})
 	if d.Settings.ShowEvents != true {
@@ -179,9 +180,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	}
 
 	tf.Namespace = "test"
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "false")
 	cmd.Run(cmd, []string{"pods"})
 	if d.Settings.ShowEvents != false {
@@ -193,9 +192,9 @@ func TestDescribeHelpMessage(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	buf := bytes.NewBuffer([]byte{})
-	buferr := bytes.NewBuffer([]byte{})
-	cmd := NewCmdDescribe(tf, buf, buferr)
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdDescribe("kubectl", tf, streams)
 	cmd.SetArgs([]string{"-h"})
 	cmd.SetOutput(buf)
 	_, err := cmd.ExecuteC()

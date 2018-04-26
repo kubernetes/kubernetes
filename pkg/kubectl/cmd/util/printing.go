@@ -234,54 +234,10 @@ func maybeWrapSortingPrinter(printer printers.ResourcePrinter, printOpts printer
 	return printer
 }
 
-// ValidResourceTypeList returns a multi-line string containing the valid resources. May
-// be called before the factory is initialized.
-// TODO: This function implementation should be replaced with a real implementation from the
-//   discovery service.
-func ValidResourceTypeList(f ClientAccessFactory) string {
-	// TODO: Should attempt to use the cached discovery list or fallback to a static list
-	// that is calculated from code compiled into the factory.
-	return templates.LongDesc(`Valid resource types include:
-	
-			* all
-			* certificatesigningrequests (aka 'csr')
-			* clusterrolebindings
-			* clusterroles
-			* componentstatuses (aka 'cs')
-			* configmaps (aka 'cm')
-			* controllerrevisions
-			* cronjobs
-			* customresourcedefinition (aka 'crd')
-			* daemonsets (aka 'ds')
-			* deployments (aka 'deploy')
-			* endpoints (aka 'ep')
-			* events (aka 'ev')
-			* horizontalpodautoscalers (aka 'hpa')
-			* ingresses (aka 'ing')
-			* jobs
-			* limitranges (aka 'limits')
-			* namespaces (aka 'ns')
-			* networkpolicies (aka 'netpol')
-			* nodes (aka 'no')
-			* persistentvolumeclaims (aka 'pvc')
-			* persistentvolumes (aka 'pv')
-			* poddisruptionbudgets (aka 'pdb')
-			* podpreset
-			* pods (aka 'po')
-			* podsecuritypolicies (aka 'psp')
-			* podtemplates
-			* replicasets (aka 'rs')
-			* replicationcontrollers (aka 'rc')
-			* resourcequotas (aka 'quota')
-			* rolebindings
-			* roles
-			* secrets
-			* serviceaccounts (aka 'sa')
-			* services (aka 'svc')
-			* statefulsets (aka 'sts')
-			* storageclasses (aka 'sc')
-	
-	`)
+// SuggestApiResources returns a suggestion to use the "api-resources" command
+// to retrieve a supported list of resources
+func SuggestApiResources(parent string) string {
+	return templates.LongDesc(fmt.Sprintf("Use \"%s api-resources\" for a complete list of supported resources.", parent))
 }
 
 // Retrieve a list of handled resources from printer as valid args

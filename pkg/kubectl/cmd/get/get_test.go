@@ -213,7 +213,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
@@ -255,7 +255,7 @@ func TestGetSchemaObject(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.Run(cmd, []string{"replicationcontrollers", "foo"})
 
 	if !strings.Contains(buf.String(), "foo") {
@@ -280,7 +280,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -334,7 +334,7 @@ func TestGetObjects(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -382,7 +382,7 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "yaml")
@@ -426,7 +426,7 @@ func TestGetSortedObjects(t *testing.T) {
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	// sorting with metedata.name
@@ -457,7 +457,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
@@ -484,7 +484,7 @@ func TestGetListObjects(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
@@ -511,7 +511,7 @@ func TestGetAllListObjects(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
@@ -538,7 +538,7 @@ func TestGetListComponentStatus(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
@@ -588,7 +588,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods"})
@@ -639,7 +639,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
@@ -679,7 +679,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	tf.ClientConfigVal = defaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("output", "json")
@@ -783,7 +783,7 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("selector", "a=b")
@@ -827,7 +827,7 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("field-selector", "a=b")
@@ -873,7 +873,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
@@ -992,7 +992,7 @@ func TestWatchLabelSelector(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1044,7 +1044,7 @@ func TestWatchFieldSelector(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1090,7 +1090,7 @@ func TestWatchResource(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1134,7 +1134,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -1179,7 +1179,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
@@ -1225,7 +1225,7 @@ func TestWatchOnlyList(t *testing.T) {
 	tf.Namespace = "test"
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet(tf, streams)
+	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")
