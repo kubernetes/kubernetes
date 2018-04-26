@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/printers"
 )
 
 // LabelOptions have the data required to perform the label operation
@@ -47,6 +47,9 @@ type LabelOptions struct {
 	// Filename options
 	resource.FilenameOptions
 	RecordFlags *genericclioptions.RecordFlags
+
+	PrintFlags *printers.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinterFunc, error)
 
 	// Common user flags
 	overwrite       bool
@@ -66,8 +69,7 @@ type LabelOptions struct {
 	Recorder genericclioptions.Recorder
 
 	// Common shared fields
-	out    io.Writer
-	errout io.Writer
+	genericclioptions.IOStreams
 }
 
 var (
@@ -100,19 +102,19 @@ var (
 		kubectl label pods foo bar-`))
 )
 
-func NewLabelOptions(out, errOut io.Writer) *LabelOptions {
+func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
 	return &LabelOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
+		Recorder:    genericclioptions.NoopRecorder{},
 
-		Recorder: genericclioptions.NoopRecorder{},
+		PrintFlags: printers.NewPrintFlags("labeled"),
 
-		out:    out,
-		errout: errOut,
+		IOStreams: ioStreams,
 	}
 }
 
-func NewCmdLabel(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
-	o := NewLabelOptions(out, errOut)
+func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewLabelOptions(ioStreams)
 
 	validArgs := cmdutil.ValidArgList(f)
 
@@ -136,8 +138,8 @@ func NewCmdLabel(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	}
 
 	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
-	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the labels for a given resource.")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, label will NOT contact api-server but run locally.")
@@ -164,6 +166,19 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+
+	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.dryrun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+
+		printer, err := o.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+		return printer.PrintObj, nil
+	}
 
 	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
 	if err != nil {
@@ -255,7 +270,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			}
 			for _, label := range o.removeLabels {
 				if _, ok := accessor.GetLabels()[label]; !ok {
-					fmt.Fprintf(o.out, "label %q not found.\n", label)
+					fmt.Fprintf(o.Out, "label %q not found.\n", label)
 				}
 			}
 
@@ -304,19 +319,20 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			indent := ""
 			if !one {
 				indent = " "
-				fmt.Fprintf(o.errout, "Listing labels for %s.%s/%s:\n", info.Mapping.GroupVersionKind.Kind, info.Mapping.GroupVersionKind.Group, info.Name)
+				fmt.Fprintf(o.ErrOut, "Listing labels for %s.%s/%s:\n", info.Mapping.GroupVersionKind.Kind, info.Mapping.GroupVersionKind.Group, info.Name)
 			}
 			for k, v := range accessor.GetLabels() {
-				fmt.Fprintf(o.out, "%s%s=%s\n", indent, k, v)
+				fmt.Fprintf(o.Out, "%s%s=%s\n", indent, k, v)
 			}
 
 			return nil
 		}
 
-		if len(o.outputFormat) > 0 {
-			return cmdutil.PrintObject(cmd, outputObj, o.out)
+		printer, err := o.ToPrinter(dataChangeMsg)
+		if err != nil {
+			return err
 		}
-		cmdutil.PrintSuccess(false, o.out, info.Object, o.dryrun, dataChangeMsg)
+		printer.PrintObj(info.AsVersioned(), o.Out)
 		return nil
 	})
 }

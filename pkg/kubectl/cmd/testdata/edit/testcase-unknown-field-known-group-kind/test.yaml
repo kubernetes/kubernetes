@@ -4,7 +4,7 @@ args:
 - storageclasses.v1beta1.storage.k8s.io/foo
 namespace: default
 expectedStdout:
-- "storageclass.storage.k8s.io \"foo\" edited"
+- "storageclass.storage.k8s.io/foo edited"
 expectedExitCode: 0
 steps:
 - type: request

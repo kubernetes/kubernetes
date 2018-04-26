@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -524,9 +525,9 @@ func TestCopyToPod(t *testing.T) {
 	}
 
 	tf.ClientConfigVal = defaultClientConfig()
-	buf := bytes.NewBuffer([]byte{})
-	errBuf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdCp(tf, buf, errBuf)
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdCp(tf, ioStreams)
 
 	srcFile, err := ioutil.TempDir("", "test")
 	if err != nil {
@@ -554,6 +555,7 @@ func TestCopyToPod(t *testing.T) {
 	}
 
 	for name, test := range tests {
+		opts := NewCopyOptions(ioStreams)
 		src := fileSpec{
 			File: srcFile,
 		}
@@ -562,8 +564,9 @@ func TestCopyToPod(t *testing.T) {
 			PodName:      "pod-name",
 			File:         test.dest,
 		}
+		opts.Complete(tf, cmd)
 		t.Run(name, func(t *testing.T) {
-			err = copyToPod(tf, cmd, buf, errBuf, src, dest)
+			err = opts.copyToPod(src, dest)
 			//If error is NotFound error , it indicates that the
 			//request has been sent correctly.
 			//Treat this as no error.

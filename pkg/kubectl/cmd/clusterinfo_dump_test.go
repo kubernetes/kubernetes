@@ -17,27 +17,27 @@ limitations under the License.
 package cmd
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestSetupOutputWriterNoOp(t *testing.T) {
 	tests := []string{"", "-"}
 	for _, test := range tests {
-		out := &bytes.Buffer{}
+		_, _, buf, _ := genericclioptions.NewTestIOStreams()
 		f := cmdtesting.NewTestFactory()
 		defer f.Cleanup()
 
-		cmd := NewCmdClusterInfoDump(f, os.Stdout)
+		cmd := NewCmdClusterInfoDump(f, genericclioptions.NewTestIOStreamsDiscard())
 		cmd.Flag("output-directory").Value.Set(test)
-		writer := setupOutputWriter(cmd, out, "/some/file/that/should/be/ignored")
-		if writer != out {
-			t.Errorf("expected: %v, saw: %v", out, writer)
+		writer := setupOutputWriter(cmd, buf, "/some/file/that/should/be/ignored")
+		if writer != buf {
+			t.Errorf("expected: %v, saw: %v", buf, writer)
 		}
 	}
 }
@@ -51,15 +51,15 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	fullPath := path.Join(dir, file)
 	defer os.RemoveAll(dir)
 
-	out := &bytes.Buffer{}
+	_, _, buf, _ := genericclioptions.NewTestIOStreams()
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	cmd := NewCmdClusterInfoDump(f, os.Stdout)
+	cmd := NewCmdClusterInfoDump(f, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flag("output-directory").Value.Set(dir)
-	writer := setupOutputWriter(cmd, out, file)
-	if writer == out {
-		t.Errorf("expected: %v, saw: %v", out, writer)
+	writer := setupOutputWriter(cmd, buf, file)
+	if writer == buf {
+		t.Errorf("expected: %v, saw: %v", buf, writer)
 	}
 	output := "some data here"
 	writer.Write([]byte(output))

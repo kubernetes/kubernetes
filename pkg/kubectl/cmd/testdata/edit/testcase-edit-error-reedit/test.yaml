@@ -5,7 +5,7 @@ args:
 - svc1
 namespace: edit-test
 expectedStdout:
-- service "svc1" edited
+- service/svc1 edited
 expectedStderr:
 - "error: services \"svc1\" is invalid"
 expectedExitCode: 0

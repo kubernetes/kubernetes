@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -327,14 +328,15 @@ func TestLabelErrors(t *testing.T) {
 			tf.Namespace = "test"
 			tf.ClientConfigVal = defaultClientConfig()
 
+			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdLabel(tf, buf, buf)
+			cmd := NewCmdLabel(tf, ioStreams)
 			cmd.SetOutput(buf)
 
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
 			}
-			opts := NewLabelOptions(buf, buf)
+			opts := NewLabelOptions(ioStreams)
 			err := opts.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = opts.Validate()
@@ -389,9 +391,9 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf, buf)
-	opts := NewLabelOptions(buf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdLabel(tf, ioStreams)
+	opts := NewLabelOptions(ioStreams)
 	opts.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {
@@ -422,9 +424,9 @@ func TestLabelLocal(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdLabel(tf, buf, buf)
-	opts := NewLabelOptions(buf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdLabel(tf, ioStreams)
+	opts := NewLabelOptions(ioStreams)
 	opts.Filenames = []string{"../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	opts.local = true
 	err := opts.Complete(tf, cmd, []string{"a=b"})
@@ -480,10 +482,10 @@ func TestLabelMultipleObjects(t *testing.T) {
 	tf.Namespace = "test"
 	tf.ClientConfigVal = defaultClientConfig()
 
-	buf := bytes.NewBuffer([]byte{})
-	opts := NewLabelOptions(buf, buf)
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	opts := NewLabelOptions(ioStreams)
 	opts.all = true
-	cmd := NewCmdLabel(tf, buf, buf)
+	cmd := NewCmdLabel(tf, ioStreams)
 	err := opts.Complete(tf, cmd, []string{"pods", "a=b"})
 	if err == nil {
 		err = opts.Validate()
