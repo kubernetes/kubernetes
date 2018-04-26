@@ -353,11 +353,10 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 			Decoder:         cmdutil.InternalVersionDecoder(),
 		},
 		&resource.Mapper{
-			RESTMapper:      mapper,
-			ObjectTyper:     typer,
-			ClientMapper:    resource.ClientMapperFunc(f.UnstructuredClientForMapping),
-			ObjectConverter: unstructured.UnstructuredObjectConverter{},
-			Decoder:         unstructured.UnstructuredJSONScheme,
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: resource.ClientMapperFunc(f.UnstructuredClientForMapping),
+			Decoder:      unstructured.UnstructuredJSONScheme,
 		},
 		f.CategoryExpander(),
 	)

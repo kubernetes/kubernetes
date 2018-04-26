@@ -186,6 +186,8 @@ func (b *Builder) Unstructured() *Builder {
 		return b
 	}
 	b.mapper = b.unstructured
+	// the unstructured mapper doesn't do any conversion
+	b.mapper.ObjectConverter = nil
 	return b
 }
 
@@ -835,12 +837,12 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:          client,
-			Mapping:         mapping,
-			ObjectConverter: b.mapper.ObjectConverter,
-			Namespace:       selectorNamespace,
-			Name:            tuple.Name,
-			Export:          b.export,
+			Client:                     client,
+			Mapping:                    mapping,
+			toVersionedObjectConverter: b.mapper.ObjectConverter,
+			Namespace:                  selectorNamespace,
+			Name:                       tuple.Name,
+			Export:                     b.export,
 		}
 		items = append(items, info)
 	}
@@ -901,12 +903,12 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:          client,
-			Mapping:         mapping,
-			ObjectConverter: b.mapper.ObjectConverter,
-			Namespace:       selectorNamespace,
-			Name:            name,
-			Export:          b.export,
+			Client:                     client,
+			Mapping:                    mapping,
+			toVersionedObjectConverter: b.mapper.ObjectConverter,
+			Namespace:                  selectorNamespace,
+			Name:                       name,
+			Export:                     b.export,
 		}
 		visitors = append(visitors, info)
 	}

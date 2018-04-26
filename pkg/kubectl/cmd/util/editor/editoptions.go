@@ -441,7 +441,7 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 			if err != nil {
 				return err
 			}
-			printer.PrintObj(info.AsVersioned(), o.Out)
+			printer.PrintObj(info.Object, o.Out)
 			return nil
 		} else {
 			err := o.annotationPatch(info)
@@ -453,7 +453,7 @@ func (o *EditOptions) visitToApplyEditPatch(originalInfos []*resource.Info, patc
 			if err != nil {
 				return err
 			}
-			printer.PrintObj(info.AsVersioned(), o.Out)
+			printer.PrintObj(info.Object, o.Out)
 			return nil
 		}
 	})
@@ -576,7 +576,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			if err != nil {
 				return err
 			}
-			printer.PrintObj(info.AsVersioned(), o.Out)
+			printer.PrintObj(info.Object, o.Out)
 			return nil
 		}
 
@@ -634,7 +634,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 		if err != nil {
 			return err
 		}
-		printer.PrintObj(info.AsVersioned(), o.Out)
+		printer.PrintObj(info.Object, o.Out)
 		return nil
 	})
 	return err
@@ -649,7 +649,7 @@ func (o *EditOptions) visitToCreate(createVisitor resource.Visitor) error {
 		if err != nil {
 			return err
 		}
-		printer.PrintObj(info.AsVersioned(), o.Out)
+		printer.PrintObj(info.Object, o.Out)
 		return nil
 	})
 	return err

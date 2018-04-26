@@ -94,9 +94,9 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		resourceVersion, _ := metadataAccessor.ResourceVersion(list)
 		nextContinueToken, _ := metadataAccessor.Continue(list)
 		info := &Info{
-			Client:          r.Client,
-			Mapping:         r.Mapping,
-			ObjectConverter: r.ObjectConverter,
+			Client:                     r.Client,
+			Mapping:                    r.Mapping,
+			toVersionedObjectConverter: r.ObjectConverter,
 
 			Namespace:       r.Namespace,
 			ResourceVersion: resourceVersion,

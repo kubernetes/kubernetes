@@ -63,11 +63,10 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 			Decoder:         InternalVersionDecoder(),
 		},
 		&resource.Mapper{
-			RESTMapper:      mapper,
-			ObjectTyper:     typer,
-			ObjectConverter: unstructured.UnstructuredObjectConverter{},
-			ClientMapper:    unstructuredClientMapperFunc,
-			Decoder:         unstructured.UnstructuredJSONScheme,
+			RESTMapper:   mapper,
+			ObjectTyper:  typer,
+			ClientMapper: unstructuredClientMapperFunc,
+			Decoder:      unstructured.UnstructuredJSONScheme,
 		},
 		categoryExpander,
 	)

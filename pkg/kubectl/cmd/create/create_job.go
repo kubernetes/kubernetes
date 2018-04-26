@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -144,7 +145,12 @@ func (o *CreateJobOptions) RunCreateJob() error {
 	if len(infos) != 1 {
 		return fmt.Errorf("from must be an existing cronjob")
 	}
-	cronJob, ok := infos[0].AsVersioned().(*batchv1beta1.CronJob)
+
+	uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(infos[0].Object, batchv1beta1.SchemeGroupVersion)
+	if err != nil {
+		return fmt.Errorf("from must be an existing cronjob: %v", err)
+	}
+	cronJob, ok := uncastVersionedObj.(*batchv1beta1.CronJob)
 	if !ok {
 		return fmt.Errorf("from must be an existing cronjob")
 	}

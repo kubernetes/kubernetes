@@ -364,7 +364,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			if err != nil {
 				return err
 			}
-			return printer.PrintObj(info.AsVersioned(), o.Out)
+			return printer.PrintObj(info.Object, o.Out)
 		}
 
 		if !o.DryRun {
@@ -415,7 +415,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 				if err != nil {
 					return err
 				}
-				return printer.PrintObj(info.AsVersioned(), o.Out)
+				return printer.PrintObj(info.Object, o.Out)
 			}
 		}
 		count++
@@ -429,7 +429,7 @@ func (o *ApplyOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.AsVersioned(), o.Out)
+		return printer.PrintObj(info.Object, o.Out)
 	})
 	if err != nil {
 		return err

@@ -242,7 +242,7 @@ func (o *PatchOptions) RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 			if err != nil {
 				return err
 			}
-			printer.PrintObj(info.AsVersioned(), out)
+			printer.PrintObj(info.Object, out)
 
 			// if object was not successfully patched, exit with error code 1
 			if !didPatch {
@@ -285,7 +285,7 @@ func (o *PatchOptions) RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Com
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.AsVersioned(), out)
+		return printer.PrintObj(info.Object, out)
 	})
 	if err != nil {
 		return err

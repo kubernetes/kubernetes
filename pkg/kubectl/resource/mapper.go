@@ -72,9 +72,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 
 	return &Info{
-		Client:          client,
-		Mapping:         mapping,
-		ObjectConverter: m.ObjectConverter,
+		Client:                     client,
+		Mapping:                    mapping,
+		toVersionedObjectConverter: m.ObjectConverter,
 
 		Source:          source,
 		Namespace:       namespace,
@@ -112,9 +112,9 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupV
 	namespace, _ := metadataAccessor.Namespace(obj)
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 	return &Info{
-		Client:          client,
-		Mapping:         mapping,
-		ObjectConverter: m.ObjectConverter,
+		Client:                     client,
+		Mapping:                    mapping,
+		toVersionedObjectConverter: m.ObjectConverter,
 
 		Namespace:       namespace,
 		Name:            name,
