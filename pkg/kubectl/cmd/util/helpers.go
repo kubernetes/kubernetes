@@ -680,3 +680,18 @@ func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) b
 	}
 	return shouldIncludeUninitialized
 }
+
+// DiscoveryResourceTypeList discovers all available resources directly from the server
+func DiscoveryResourceTypeList(f ClientAccessFactory) ([]*metav1.APIResourceList, error) {
+	discoveryClient, err := f.DiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	// Always request fresh data from the server
+	discoveryClient.Invalidate()
+	resourcesList, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		return nil, err
+	}
+	return resourcesList, nil
+}
