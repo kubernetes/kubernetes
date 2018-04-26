@@ -27,14 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
-// AttachDisk attaches a vhd to vm
-// the vhd must exist, can be identified by diskName, diskURI, and lun.
-func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
-	vm, err := as.getVirtualMachine(nodeName)
-	if err != nil {
-		return err
-	}
-
+func addDiskToVMDefinition(vm compute.VirtualMachine, isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) (string, compute.VirtualMachine) {
 	disks := *vm.StorageProfile.DataDisks
 	if isManagedDisk {
 		disks = append(disks,
@@ -50,13 +43,13 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	} else {
 		disks = append(disks,
 			compute.DataDisk{
-				Name: &diskName,
-				Vhd: &compute.VirtualHardDisk{
-					URI: &diskURI,
-				},
+				Name:         &diskName,
 				Lun:          &lun,
 				Caching:      cachingMode,
 				CreateOption: "attach",
+				Vhd: &compute.VirtualHardDisk{
+					URI: &diskURI,
+				},
 			})
 	}
 
@@ -68,19 +61,20 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			},
 		},
 	}
-	vmName := mapNodeNameToVMName(nodeName)
-	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk", as.resourceGroup, vmName)
-	respChan, errChan := as.VirtualMachinesClient.CreateOrUpdate(as.resourceGroup, vmName, newVM, nil)
-	resp := <-respChan
-	err = <-errChan
-	if as.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
-		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", as.resourceGroup, vmName)
-		retryErr := as.CreateOrUpdateVMWithRetry(vmName, newVM)
-		if retryErr != nil {
-			err = retryErr
-			glog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s)", as.resourceGroup, vmName)
-		}
+	return mapNodeNameToVMName(nodeName), newVM
+}
+
+// AttachDisk attaches a vhd to vm
+// the vhd must exist, can be identified by diskName, diskURI, and lun.
+func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+	vm, err := as.cloud.getVirtualMachine(nodeName)
+	if err != nil {
+		return err
 	}
+	vmName, newVM := addDiskToVMDefinition(vm, isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
+	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk", as.resourceGroup, vmName)
+
+	err = as.cloud.CreateOrUpdateVMWithRetryRG(as.resourceGroup, vmName, newVM)
 	if err != nil {
 		glog.Errorf("azureDisk - azure attach failed, err: %v", err)
 		detail := err.Error()
@@ -135,17 +129,7 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 	}
 	vmName := mapNodeNameToVMName(nodeName)
 	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk", as.resourceGroup, vmName)
-	respChan, errChan := as.VirtualMachinesClient.CreateOrUpdate(as.resourceGroup, vmName, newVM, nil)
-	resp := <-respChan
-	err = <-errChan
-	if as.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
-		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", as.resourceGroup, vmName)
-		retryErr := as.CreateOrUpdateVMWithRetry(vmName, newVM)
-		if retryErr != nil {
-			err = retryErr
-			glog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s)", as.ResourceGroup, vmName)
-		}
-	}
+	err = as.cloud.CreateOrUpdateVMWithRetryRG(as.resourceGroup, vmName, newVM)
 	if err != nil {
 		glog.Errorf("azureDisk - azure disk detach failed, err: %v", err)
 	} else {
