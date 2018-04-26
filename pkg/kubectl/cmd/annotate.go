@@ -60,10 +60,15 @@ type AnnotateOptions struct {
 	outputFormat    string
 
 	// results of arg parsing
-	resources         []string
-	newAnnotations    map[string]string
-	removeAnnotations []string
-	Recorder          genericclioptions.Recorder
+	resources                    []string
+	newAnnotations               map[string]string
+	removeAnnotations            []string
+	Recorder                     genericclioptions.Recorder
+	namespace                    string
+	enforceNamespace             bool
+	builder                      *resource.Builder
+	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	includeUninitialized         bool
 
 	genericclioptions.IOStreams
 }
@@ -75,7 +80,7 @@ var (
 		All Kubernetes objects support the ability to store additional data with the object as
 		annotations. Annotations are key/value pairs that can be larger than labels and include
 		arbitrary string values such as structured JSON. Tools and system extensions may use
-		annotations to store their own data.  
+		annotations to store their own data.
 
 		Attempting to set an annotation that already exists will fail unless --overwrite is set.
 		If --resource-version is specified and does not match the current resource version on
@@ -124,13 +129,9 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 		Long:    annotateLong + "\n\n" + cmdutil.SuggestApiResources(parent),
 		Example: annotateExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, cmd, args); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
-			}
-			if err := o.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, "%v", err))
-			}
-			cmdutil.CheckErr(o.RunAnnotate(f, cmd))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunAnnotate())
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: kubectl.ResourceAliases(validArgs),
@@ -178,6 +179,14 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return printer.PrintObj(obj, out)
 	}
 
+	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	o.includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, false)
+	o.builder = f.NewBuilder()
+	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+
 	// retrieves resource and annotation args from args
 	// also checks args to verify that all resources are specified before annotations
 	resources, annotationArgs, err := cmdutil.GetResourcesAndPairs(args, "annotation")
@@ -186,7 +195,11 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 	o.resources = resources
 	o.newAnnotations, o.removeAnnotations, err = parseAnnotations(annotationArgs)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Validate checks to the AnnotateOptions to see if there is sufficient information run the command.
@@ -207,20 +220,14 @@ func (o AnnotateOptions) Validate() error {
 }
 
 // RunAnnotate does the work
-func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) error {
-	namespace, enforceNamespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-
-	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	b := f.NewBuilder().
+func (o AnnotateOptions) RunAnnotate() error {
+	b := o.builder.
 		Unstructured().
 		LocalParam(o.local).
 		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, &o.FilenameOptions).
-		IncludeUninitialized(includeUninitialized).
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(o.includeUninitialized).
 		Flatten()
 
 	if !o.local {
@@ -282,7 +289,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			}
 
 			mapping := info.ResourceMapping()
-			client, err := f.UnstructuredClientForMapping(mapping)
+			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}

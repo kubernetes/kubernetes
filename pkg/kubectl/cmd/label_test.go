@@ -342,7 +342,7 @@ func TestLabelErrors(t *testing.T) {
 				err = opts.Validate()
 			}
 			if err == nil {
-				err = opts.RunLabel(tf, cmd)
+				err = opts.RunLabel()
 			}
 			if !testCase.errFn(err) {
 				t.Errorf("%s: unexpected error: %v", k, err)
@@ -400,7 +400,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 		err = opts.Validate()
 	}
 	if err == nil {
-		err = opts.RunLabel(tf, cmd)
+		err = opts.RunLabel()
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -434,7 +434,7 @@ func TestLabelLocal(t *testing.T) {
 		err = opts.Validate()
 	}
 	if err == nil {
-		err = opts.RunLabel(tf, cmd)
+		err = opts.RunLabel()
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -491,7 +491,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 		err = opts.Validate()
 	}
 	if err == nil {
-		err = opts.RunLabel(tf, cmd)
+		err = opts.RunLabel()
 	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

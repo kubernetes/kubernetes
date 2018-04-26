@@ -1090,7 +1090,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object",
 			filePath:    filenameRC,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc\n",
+			expectedOut: "replicationcontroller/test-rc configured\n",
 			output:      "name",
 		},
 		{
@@ -1103,7 +1103,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 		{
 			name:        "set for the annotation does not exist on the live object",
 			filePath:    filenameRCNoAnnotation,
-			expectedErr: "error: no last-applied-configuration annotation found on resource: no-annotation, to create the annotation, run the command with --create-annotation\nSee 'set-last-applied -h' for help and examples.",
+			expectedErr: "error: no last-applied-configuration annotation found on resource: no-annotation, to create the annotation, run the command with --create-annotation",
 			expectedOut: "",
 			output:      "name",
 		},
@@ -1111,14 +1111,14 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			name:        "set with exist object output json",
 			filePath:    filenameRCJSON,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc\n",
+			expectedOut: "replicationcontroller/test-rc configured\n",
 			output:      "name",
 		},
 		{
 			name:        "set test for a directory of files",
 			filePath:    dirName,
 			expectedErr: "",
-			expectedOut: "replicationcontroller/test-rc\nreplicationcontroller/test-rc\n",
+			expectedOut: "replicationcontroller/test-rc configured\nreplicationcontroller/test-rc configured\n",
 			output:      "name",
 		},
 	}
