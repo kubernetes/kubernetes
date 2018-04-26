@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/install"
-	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardleregistry "k8s.io/sample-apiserver/pkg/registry"
 	fischerstorage "k8s.io/sample-apiserver/pkg/registry/wardle/fischer"
 	flunderstorage "k8s.io/sample-apiserver/pkg/registry/wardle/flunder"
@@ -109,7 +108,6 @@ func (c completedConfig) New() (*WardleServer, error) {
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(wardle.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 
 	v1alpha1storage := map[string]rest.Storage{}
 	v1alpha1storage["flunders"] = wardleregistry.RESTInPeace(flunderstorage.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter))

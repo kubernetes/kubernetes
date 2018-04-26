@@ -147,7 +147,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					if test.obj != nil {
@@ -184,7 +184,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 }
 
 func TestAttach(t *testing.T) {
-	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].Version
 	tests := []struct {
 		name, version, podPath, fetchPodPath, attachPath, container string
 		pod                                                         *api.Pod
@@ -231,7 +231,7 @@ func TestAttach(t *testing.T) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
@@ -298,7 +298,7 @@ func TestAttach(t *testing.T) {
 }
 
 func TestAttachWarnings(t *testing.T) {
-	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.Version
+	version := legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0].Version
 	tests := []struct {
 		name, container, version, podPath, fetchPodPath, expectedErr string
 		pod                                                          *api.Pod
@@ -324,7 +324,7 @@ func TestAttachWarnings(t *testing.T) {
 			ns := legacyscheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+				GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersions[0],
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {

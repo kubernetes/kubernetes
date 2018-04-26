@@ -164,7 +164,6 @@ func TestInstallAPIGroups(t *testing.T) {
 			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
 		}
 		groupMeta := apimachinery.GroupMeta{
-			GroupVersion:  gv,
 			GroupVersions: []schema.GroupVersion{gv},
 			RESTMapper:    mapper,
 			InterfacesFor: interfacesFor,
@@ -199,7 +198,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	for _, api := range apis[1:] {
 		err = s.InstallAPIGroup(&api)
 		assert.NoError(err)
-		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersion.Group) // /apis/<group>
+		groupPaths = append(groupPaths, APIGroupPrefix+"/"+api.GroupMeta.GroupVersions[0].Group) // /apis/<group>
 	}
 
 	server := httptest.NewServer(s.Handler)
@@ -240,19 +239,19 @@ func TestInstallAPIGroups(t *testing.T) {
 				continue
 			}
 
-			if got, expected := group.Name, info.GroupMeta.GroupVersion.Group; got != expected {
+			if got, expected := group.Name, info.GroupMeta.GroupVersions[0].Group; got != expected {
 				t.Errorf("[%d] unexpected group name at path %q: got=%q expected=%q", i, path, got, expected)
 				continue
 			}
 
-			if got, expected := group.PreferredVersion.Version, info.GroupMeta.GroupVersion.Version; got != expected {
+			if got, expected := group.PreferredVersion.Version, info.GroupMeta.GroupVersions[0].Version; got != expected {
 				t.Errorf("[%d] unexpected group version at path %q: got=%q expected=%q", i, path, got, expected)
 				continue
 			}
 		}
 
 		// should serve APIResourceList at group path + /<group-version>
-		path = path + "/" + info.GroupMeta.GroupVersion.Version
+		path = path + "/" + info.GroupMeta.GroupVersions[0].Version
 		resp, err = http.Get(server.URL + path)
 		if err != nil {
 			t.Errorf("[%d] unexpected error getting path %q path: %v", i, path, err)
@@ -274,7 +273,7 @@ func TestInstallAPIGroups(t *testing.T) {
 			continue
 		}
 
-		if got, expected := resources.GroupVersion, info.GroupMeta.GroupVersion.String(); got != expected {
+		if got, expected := resources.GroupVersion, info.GroupMeta.GroupVersions[0].String(); got != expected {
 			t.Errorf("[%d] unexpected groupVersion at path %q: got=%q expected=%q", i, path, got, expected)
 			continue
 		}

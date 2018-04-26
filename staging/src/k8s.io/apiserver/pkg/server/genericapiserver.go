@@ -358,10 +358,10 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 	// Catching these here places the error  much closer to its origin
-	if len(apiGroupInfo.GroupMeta.GroupVersion.Group) == 0 {
+	if len(apiGroupInfo.GroupMeta.GroupVersions[0].Group) == 0 {
 		return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
 	}
-	if len(apiGroupInfo.GroupMeta.GroupVersion.Version) == 0 {
+	if len(apiGroupInfo.GroupMeta.GroupVersions[0].Version) == 0 {
 		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
 	}
 
@@ -384,11 +384,11 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		})
 	}
 	preferredVersionForDiscovery := metav1.GroupVersionForDiscovery{
-		GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
-		Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
+		GroupVersion: apiGroupInfo.GroupMeta.GroupVersions[0].String(),
+		Version:      apiGroupInfo.GroupMeta.GroupVersions[0].Version,
 	}
 	apiGroup := metav1.APIGroup{
-		Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
+		Name:             apiGroupInfo.GroupMeta.GroupVersions[0].Group,
 		Versions:         apiVersionsForDiscovery,
 		PreferredVersion: preferredVersionForDiscovery,
 	}

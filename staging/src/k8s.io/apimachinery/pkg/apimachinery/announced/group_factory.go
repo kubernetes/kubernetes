@@ -153,11 +153,9 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 		gmf.GroupArgs.AddInternalObjectsToScheme(scheme)
 	}
 
-	preferredExternalVersion := externalVersions[0]
 	accessor := meta.NewAccessor()
 
 	groupMeta := &apimachinery.GroupMeta{
-		GroupVersion:  preferredExternalVersion,
 		GroupVersions: externalVersions,
 		SelfLinker:    runtime.SelfLinker(accessor),
 	}
