@@ -62,10 +62,6 @@ type VMSet interface {
 	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
 	// DetachDiskByName detaches a vhd from host. The vhd can be identified by diskName or diskURI.
 	DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error
-	// GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI.
-	GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error)
-	// GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
-	GetNextDiskLun(nodeName types.NodeName) (int32, error)
-	// DisksAreAttached checks if a list of volumes are attached to the node with the specified NodeName.
-	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
+	// GetDataDisks gets a list of data disks attached to the node.
+	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
 }

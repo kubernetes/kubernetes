@@ -1180,14 +1180,6 @@ func (f *fakeVMSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
-	return -1, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
-	return -1, fmt.Errorf("unimplemented")
-}
-
-func (f *fakeVMSet) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
