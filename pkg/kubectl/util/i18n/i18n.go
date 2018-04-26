@@ -17,14 +17,14 @@ limitations under the License.
 package i18n
 
 import (
-	"archive/zip"
-	"bytes"
+	//"archive/zip"
+	//"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/generated"
+	//"k8s.io/kubernetes/pkg/generated"
 
 	"github.com/chai2010/gettext-go/gettext"
 	"github.com/golang/glog"
@@ -81,42 +81,42 @@ func findLanguage(root string, getLanguageFn func() string) string {
 // string (e.g. 'en-US'). If getLanguageFn is nil, then the loadSystemLanguage function
 // is used, which uses the 'LANG' environment variable.
 func LoadTranslations(root string, getLanguageFn func() string) error {
-	if getLanguageFn == nil {
-		getLanguageFn = loadSystemLanguage
-	}
-
-	langStr := findLanguage(root, getLanguageFn)
-	translationFiles := []string{
-		fmt.Sprintf("%s/%s/LC_MESSAGES/k8s.po", root, langStr),
-		fmt.Sprintf("%s/%s/LC_MESSAGES/k8s.mo", root, langStr),
-	}
-
-	glog.V(3).Infof("Setting language to %s", langStr)
-	// TODO: list the directory and load all files.
-	buf := new(bytes.Buffer)
-	w := zip.NewWriter(buf)
-
-	// Make sure to check the error on Close.
-	for _, file := range translationFiles {
-		filename := "translations/" + file
-		f, err := w.Create(file)
-		if err != nil {
-			return err
-		}
-		data, err := generated.Asset(filename)
-		if err != nil {
-			return err
-		}
-		if _, err := f.Write(data); err != nil {
-			return nil
-		}
-	}
-	if err := w.Close(); err != nil {
-		return err
-	}
-	gettext.BindTextdomain("k8s", root+".zip", buf.Bytes())
-	gettext.Textdomain("k8s")
-	gettext.SetLocale(langStr)
+	//if getLanguageFn == nil {
+	//	getLanguageFn = loadSystemLanguage
+	//}
+	//
+	//langStr := findLanguage(root, getLanguageFn)
+	//translationFiles := []string{
+	//	fmt.Sprintf("%s/%s/LC_MESSAGES/k8s.po", root, langStr),
+	//	fmt.Sprintf("%s/%s/LC_MESSAGES/k8s.mo", root, langStr),
+	//}
+	//
+	//glog.V(3).Infof("Setting language to %s", langStr)
+	//// TODO: list the directory and load all files.
+	//buf := new(bytes.Buffer)
+	//w := zip.NewWriter(buf)
+	//
+	//// Make sure to check the error on Close.
+	//for _, file := range translationFiles {
+	//	filename := "translations/" + file
+	//	f, err := w.Create(file)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	data, err := generated.Asset(filename)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	if _, err := f.Write(data); err != nil {
+	//		return nil
+	//	}
+	//}
+	//if err := w.Close(); err != nil {
+	//	return err
+	//}
+	//gettext.BindTextdomain("k8s", root+".zip", buf.Bytes())
+	//gettext.Textdomain("k8s")
+	//gettext.SetLocale(langStr)
 	return nil
 }
 
