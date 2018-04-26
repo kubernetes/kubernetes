@@ -70,46 +70,40 @@ type ScaleOptions struct {
 	PrintFlags      *printers.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
-	BuilderArgs      []string
-	Namespace        string
-	EnforceNamespace bool
-
-	Builder   *resource.Builder
-	ClientSet internalclientset.Interface
-	Scaler    kubectl.Scaler
-
-	All      bool
-	Selector string
-
-	CmdParent string
-
+	Selector        string
+	All             bool
+	Replicas        int
 	ResourceVersion string
 	CurrentReplicas int
-	Replicas        int
-	Duration        time.Duration
+	Timeout         time.Duration
 
-	ClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
-
-	Recorder genericclioptions.Recorder
+	Recorder                     genericclioptions.Recorder
+	builder                      *resource.Builder
+	namespace                    string
+	enforceNamespace             bool
+	args                         []string
+	shortOutput                  bool
+	clientSet                    internalclientset.Interface
+	scaler                       kubectl.Scaler
+	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	parent                       string
 
 	genericclioptions.IOStreams
 }
 
 func NewScaleOptions(ioStreams genericclioptions.IOStreams) *ScaleOptions {
 	return &ScaleOptions{
-		RecordFlags: genericclioptions.NewRecordFlags(),
-		PrintFlags:  printers.NewPrintFlags("scaled"),
-
+		RecordFlags:     genericclioptions.NewRecordFlags(),
+		PrintFlags:      printers.NewPrintFlags("scaled"),
 		CurrentReplicas: -1,
-
-		Recorder:  genericclioptions.NoopRecorder{},
-		IOStreams: ioStreams,
+		Recorder:        genericclioptions.NoopRecorder{},
+		IOStreams:       ioStreams,
 	}
 }
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
-func NewCmdScale(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewScaleOptions(streams)
+func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := NewScaleOptions(ioStreams)
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -122,7 +116,7 @@ func NewCmdScale(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Example: scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
+			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.RunScale())
 		},
 		ValidArgs:  validArgs,
@@ -138,46 +132,51 @@ func NewCmdScale(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.Flags().IntVar(&o.CurrentReplicas, "current-replicas", o.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale.")
 	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
-	cmd.Flags().DurationVar(&o.Duration, "timeout", o.Duration, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
-
-	usage := "identifying the resource to set a new size"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to set a new size")
 	return cmd
 }
 
 func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.Namespace, o.EnforceNamespace, err = f.DefaultNamespace()
+	o.RecordFlags.Complete(f.Command(cmd, false))
+	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
 		return err
 	}
-
-	o.CmdParent = cmd.Parent().Name()
-	o.Builder = f.NewBuilder()
-
-	o.ClientSet, err = f.ClientSet()
-	if err != nil {
-		return err
-	}
-
-	o.Scaler, err = f.Scaler()
-	if err != nil {
-		return err
-	}
-
-	o.BuilderArgs = args
-	o.ClientForMapping = f.UnstructuredClientForMapping
-
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
 	}
 	o.PrintObj = printer.PrintObj
 
-	o.RecordFlags.Complete(f.Command(cmd, false))
-	o.Recorder, err = o.RecordFlags.ToRecorder()
+	o.namespace, o.enforceNamespace, err = f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+	o.builder = f.NewBuilder()
+	o.args = args
+	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
+	o.clientSet, err = f.ClientSet()
+	if err != nil {
+		return err
+	}
+	o.scaler, err = f.Scaler()
+	if err != nil {
+		return err
+	}
+	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+	o.parent = cmd.Parent().Name()
+
+	return nil
+}
+
+func (o *ScaleOptions) Validate(cmd *cobra.Command) error {
+	if err := cmdutil.ValidateOutputArgs(cmd); err != nil {
+		return err
+	}
+	if o.Replicas < 0 {
+		return fmt.Errorf("The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
 	}
 
 	return nil
@@ -185,24 +184,16 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 // RunScale executes the scaling
 func (o *ScaleOptions) RunScale() error {
-
-	if o.Replicas < 0 {
-		return fmt.Errorf("The --replicas=COUNT flag is required, and COUNT must be greater than or equal to 0")
-	}
-
-	r := o.Builder.
+	r := o.builder.
 		Unstructured().
 		ContinueOnError().
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
-		ResourceTypeOrNameArgs(o.All, o.BuilderArgs...).
+		NamespaceParam(o.namespace).DefaultNamespace().
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		ResourceTypeOrNameArgs(o.All, o.args...).
 		Flatten().
 		LabelSelectorParam(o.Selector).
 		Do()
 	err := r.Err()
-	if resource.IsUsageError(err) {
-		return fmt.Errorf("%v", err)
-	}
 	if err != nil {
 		return err
 	}
@@ -219,12 +210,11 @@ func (o *ScaleOptions) RunScale() error {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
 	}
 
-	currentSize := o.CurrentReplicas
-	precondition := &kubectl.ScalePrecondition{Size: currentSize, ResourceVersion: o.ResourceVersion}
+	precondition := &kubectl.ScalePrecondition{Size: o.CurrentReplicas, ResourceVersion: o.ResourceVersion}
 	retry := kubectl.NewRetryParams(kubectl.Interval, kubectl.Timeout)
 
 	var waitForReplicas *kubectl.RetryParams
-	if timeout := o.Duration; timeout != 0 {
+	if o.Timeout != 0 {
 		waitForReplicas = kubectl.NewRetryParams(kubectl.Interval, timeout)
 	}
 
@@ -237,15 +227,15 @@ func (o *ScaleOptions) RunScale() error {
 		mapping := info.ResourceMapping()
 		if mapping.Resource == "jobs" {
 			// go down the legacy jobs path.  This can be removed in 3.14  For now, contain it.
-			fmt.Fprintf(o.ErrOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", o.CmdParent)
+			fmt.Fprintf(o.ErrOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", o.parent)
 
-			if err := ScaleJob(info, o.ClientSet.Batch(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
+			if err := ScaleJob(info, o.clientSet.Batch(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
 				return err
 			}
 
 		} else {
 			gvk := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource)
-			if err := o.Scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, gvk.GroupResource()); err != nil {
+			if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, gvk.GroupResource()); err != nil {
 				return err
 			}
 		}
@@ -254,7 +244,7 @@ func (o *ScaleOptions) RunScale() error {
 		if mergePatch, err := o.Recorder.MakeRecordMergePatch(info.Object); err != nil {
 			glog.V(4).Infof("error recording current command: %v", err)
 		} else if len(mergePatch) > 0 {
-			client, err := o.ClientForMapping(mapping)
+			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}

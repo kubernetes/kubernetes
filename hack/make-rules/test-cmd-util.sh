@@ -3144,7 +3144,7 @@ run_deployment_tests() {
   # Set env of deployments for all container
   kubectl set env deployment nginx-deployment env=prod "${kube_flags[@]}"
   # Set env of deployments for specific container
-  kubectl set env deployment nginx-deployment env=prod -c=nginx "${kube_flags[@]}"
+  kubectl set env deployment nginx-deployment superenv=superprod -c=nginx "${kube_flags[@]}"
   # Set env of deployments by configmap
   kubectl set env deployment nginx-deployment --from=configmap/test-set-env-config "${kube_flags[@]}"
   # Set env of deployments by secret
