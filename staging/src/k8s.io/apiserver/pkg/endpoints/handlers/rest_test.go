@@ -266,15 +266,21 @@ type patchTestCase struct {
 
 	// startingPod is used as the starting point for the first Update
 	startingPod *example.Pod
-	// changedPod is the "destination" pod for the patch.  The test will create a patch from the startingPod to the changedPod
-	// to use when calling the patch operation
-	changedPod *example.Pod
+	// changedPod can be set as the "destination" pod for the patch, and the test will compute a patch from the startingPod to the changedPod,
+	// or patches can be set directly using strategicMergePatch, mergePatch, and jsonPatch
+	changedPod          *example.Pod
+	strategicMergePatch string
+	mergePatch          string
+	jsonPatch           string
+
 	// updatePod is the pod that is used for conflict comparison and as the starting point for the second Update
 	updatePod *example.Pod
 
 	// expectedPod is the pod that you expect to get back after the patch is complete
 	expectedPod   *example.Pod
 	expectedError string
+	// if set, indicates the number of times patching was expected to be attempted
+	expectedTries int
 }
 
 func (tc *patchTestCase) Run(t *testing.T) {
@@ -317,39 +323,59 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			updatePod:   tc.updatePod,
 		}
 
-		// TODO SUPPORT THIS!
-		if patchType == types.JSONPatchType {
-			continue
-		}
 		t.Logf("Working with patchType %v", patchType)
-
-		originalObjJS, err := runtime.Encode(codec, tc.startingPod)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			continue
-		}
-		changedJS, err := runtime.Encode(codec, tc.changedPod)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			continue
-		}
 
 		patch := []byte{}
 		switch patchType {
 		case types.StrategicMergePatchType:
-			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, schemaReferenceObj)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", tc.name, err)
-				continue
+			patch = []byte(tc.strategicMergePatch)
+			if len(patch) == 0 {
+				originalObjJS, err := runtime.Encode(codec, tc.startingPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				changedJS, err := runtime.Encode(codec, tc.changedPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, schemaReferenceObj)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
 			}
 
 		case types.MergePatchType:
-			patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", tc.name, err)
+			patch = []byte(tc.mergePatch)
+			if len(patch) == 0 {
+				originalObjJS, err := runtime.Encode(codec, tc.startingPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				changedJS, err := runtime.Encode(codec, tc.changedPod)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+				patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
+				if err != nil {
+					t.Errorf("%s: unexpected error: %v", tc.name, err)
+					continue
+				}
+			}
+
+		case types.JSONPatchType:
+			patch = []byte(tc.jsonPatch)
+			if len(patch) == 0 {
+				// TODO SUPPORT THIS!
 				continue
 			}
 
+		default:
+			t.Error("unsupported patch type")
 		}
 
 		p := patcher{
@@ -388,6 +414,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
 				continue
+			}
+		}
+
+		if tc.expectedTries > 0 {
+			if tc.expectedTries != testPatcher.numUpdates {
+				t.Errorf("%s: expected %d tries, got %d", tc.expectedTries, testPatcher.numUpdates)
 			}
 		}
 
@@ -548,6 +580,73 @@ func TestPatchResourceWithVersionConflict(t *testing.T) {
 	tc.expectedPod.ResourceVersion = "2"
 	tc.expectedPod.Spec.ActiveDeadlineSeconds = &thirty
 	tc.expectedPod.Spec.NodeName = "anywhere"
+
+	tc.Run(t)
+}
+
+func TestPatchResourceWithStaleVersionConflict(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	uid := types.UID("uid")
+
+	tc := &patchTestCase{
+		name: "TestPatchResourceWithStaleVersionConflict",
+
+		startingPod: &example.Pod{},
+		updatePod:   &example.Pod{},
+
+		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
+		expectedTries: 1,
+	}
+
+	// starting pod is at rv=2
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
+	tc.startingPod.ResourceVersion = "2"
+	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
+	// same pod is still in place when attempting to persist the update
+	tc.updatePod = tc.startingPod
+
+	// patches are submitted with a stale rv=1
+	tc.mergePatch = `{"metadata":{"resourceVersion":"1"},"spec":{"nodeName":"foo"}}`
+	tc.strategicMergePatch = `{"metadata":{"resourceVersion":"1"},"spec":{"nodeName":"foo"}}`
+
+	tc.Run(t)
+}
+
+func TestPatchResourceWithRacingVersionConflict(t *testing.T) {
+	namespace := "bar"
+	name := "foo"
+	uid := types.UID("uid")
+
+	tc := &patchTestCase{
+		name: "TestPatchResourceWithRacingVersionConflict",
+
+		startingPod: &example.Pod{},
+		updatePod:   &example.Pod{},
+
+		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 3, new 2`,
+		expectedTries: 2,
+	}
+
+	// starting pod is at rv=2
+	tc.startingPod.Name = name
+	tc.startingPod.Namespace = namespace
+	tc.startingPod.UID = uid
+	tc.startingPod.ResourceVersion = "2"
+	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
+
+	// pod with rv=3 is found when attempting to persist the update
+	tc.updatePod.Name = name
+	tc.updatePod.Namespace = namespace
+	tc.updatePod.UID = uid
+	tc.updatePod.ResourceVersion = "3"
+	tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
+
+	// patches are submitted with a rv=2
+	tc.mergePatch = `{"metadata":{"resourceVersion":"2"},"spec":{"nodeName":"foo"}}`
+	tc.strategicMergePatch = `{"metadata":{"resourceVersion":"2"},"spec":{"nodeName":"foo"}}`
 
 	tc.Run(t)
 }
