@@ -25,7 +25,7 @@ import (
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
-	runtime.ObjectConvertor
+	ObjectConvertor runtime.ObjectConvertor
 }
 
 type ListMetaAccessor interface {
@@ -91,13 +91,6 @@ const (
 type RESTScope interface {
 	// Name of the scope
 	Name() RESTScopeName
-	// ParamName is the optional name of the parameter that should be inserted in the resource url
-	// If empty, no param will be inserted
-	ParamName() string
-	// ArgumentName is the optional name that should be used for the variable holding the value.
-	ArgumentName() string
-	// ParamDescription is the optional description to use to document the parameter in api documentation
-	ParamDescription() string
 }
 
 // RESTMapping contains the information needed to deal with objects of a specific
@@ -110,8 +103,6 @@ type RESTMapping struct {
 
 	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
 	Scope RESTScope
-
-	runtime.ObjectConvertor
 }
 
 // RESTMapper allows clients to map resources to kind, and map kind and version

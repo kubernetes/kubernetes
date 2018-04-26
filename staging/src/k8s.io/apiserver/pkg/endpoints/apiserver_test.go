@@ -117,7 +117,6 @@ var parameterCodec = runtime.NewParameterCodec(scheme)
 
 var accessor = meta.NewAccessor()
 var selfLinker runtime.SelfLinker = accessor
-var mapper, namespaceMapper meta.RESTMapper // The mappers with namespace and with legacy namespace scopes.
 var admissionControl admission.Interface
 
 func init() {
@@ -203,25 +202,6 @@ func init() {
 	addTestTypes()
 	addNewTestTypes()
 
-	nsMapper := newMapper()
-
-	// enumerate all supported versions, get the kinds, and register with
-	// the mapper how to address our resources
-	for _, gv := range groupVersions {
-		for kind := range scheme.KnownTypes(gv) {
-			gvk := gv.WithKind(kind)
-			root := bool(kind == "SimpleRoot")
-			if root {
-				nsMapper.Add(gvk, meta.RESTScopeRoot)
-			} else {
-				nsMapper.Add(gvk, meta.RESTScopeNamespace)
-			}
-		}
-	}
-
-	mapper = nsMapper
-	namespaceMapper = nsMapper
-
 	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
 			return label, value, nil
@@ -263,12 +243,12 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	template := APIGroupVersion{
 		Storage: storage,
 
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
-		Mapper:    namespaceMapper,
+		Creater:         scheme,
+		Convertor:       scheme,
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
+		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		ParameterCodec: parameterCodec,
 
@@ -841,7 +821,6 @@ func TestNotFound(t *testing.T) {
 
 		if response.StatusCode != v.Status {
 			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v.Method, k, response)
-			t.Errorf("MAPPER: %v", mapper)
 		}
 	}
 }
@@ -3188,15 +3167,15 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Storage: map[string]rest.Storage{
 			"simple/sub": storage,
 		},
-		Root:      "/" + prefix,
-		Creater:   scheme,
-		Convertor: scheme,
-		Defaulter: scheme,
-		Typer:     scheme,
-		Linker:    selfLinker,
+		Root:            "/" + prefix,
+		Creater:         scheme,
+		Convertor:       scheme,
+		Defaulter:       scheme,
+		Typer:           scheme,
+		Linker:          selfLinker,
+		RootScopedKinds: sets.NewString("SimpleRoot"),
 
-		Admit:  admissionControl,
-		Mapper: namespaceMapper,
+		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3225,8 +3204,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Typer:     scheme,
 		Linker:    selfLinker,
 
-		Admit:  admissionControl,
-		Mapper: namespaceMapper,
+		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
 		OptionsExternalVersion: &newGroupVersion,
@@ -3806,6 +3784,8 @@ type SimpleXGSubresourceRESTStorage struct {
 	itemGVK schema.GroupVersionKind
 }
 
+var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
+
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 	return &genericapitesting.SimpleXGSubresource{}
 }
@@ -3814,10 +3794,12 @@ func (storage *SimpleXGSubresourceRESTStorage) Get(ctx context.Context, id strin
 	return storage.item.DeepCopyObject(), nil
 }
 
-var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
-
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	return storage.itemGVK
+}
+
+func (*SimpleXGSubresourceRESTStorage) ClusterScoped() bool {
+	return false
 }
 
 func TestXGSubresource(t *testing.T) {
@@ -3845,7 +3827,6 @@ func TestXGSubresource(t *testing.T) {
 		Defaulter: scheme,
 		Typer:     scheme,
 		Linker:    selfLinker,
-		Mapper:    namespaceMapper,
 
 		ParameterCodec: parameterCodec,
 

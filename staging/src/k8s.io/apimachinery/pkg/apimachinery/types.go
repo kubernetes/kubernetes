@@ -22,12 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // GroupMeta stores the metadata of a group.
 type GroupMeta struct {
 	// GroupVersions is Group + all versions in that group.
 	GroupVersions []schema.GroupVersion
+
+	RootScopedKinds sets.String
 
 	// SelfLinker can set or get the SelfLink field of all API types.
 	// TODO: when versioning changes, make this part of each API definition.

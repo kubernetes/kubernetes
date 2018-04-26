@@ -29,6 +29,8 @@ import (
 // needed to create Info for arbitrary objects.
 type Mapper struct {
 	runtime.ObjectTyper
+	ObjectConverter runtime.ObjectConvertor
+
 	meta.RESTMapper
 	ClientMapper
 	runtime.Decoder
@@ -70,8 +72,9 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 
 	return &Info{
-		Client:  client,
-		Mapping: mapping,
+		Client:                     client,
+		Mapping:                    mapping,
+		toVersionedObjectConverter: m.ObjectConverter,
 
 		Source:          source,
 		Namespace:       namespace,
@@ -109,8 +112,9 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []schema.GroupV
 	namespace, _ := metadataAccessor.Namespace(obj)
 	resourceVersion, _ := metadataAccessor.ResourceVersion(obj)
 	return &Info{
-		Client:  client,
-		Mapping: mapping,
+		Client:                     client,
+		Mapping:                    mapping,
+		toVersionedObjectConverter: m.ObjectConverter,
 
 		Namespace:       namespace,
 		Name:            name,
@@ -199,7 +203,6 @@ func (m relaxedMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*me
 		return &meta.RESTMapping{
 			GroupVersionKind: gk.WithVersion(versions[0]),
 			Scope:            meta.RESTScopeRoot,
-			ObjectConvertor:  identityConvertor{},
 		}, nil
 	}
 	return mapping, err
@@ -211,7 +214,6 @@ func (m relaxedMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]
 			{
 				GroupVersionKind: gk.WithVersion(versions[0]),
 				Scope:            meta.RESTScopeRoot,
-				ObjectConvertor:  identityConvertor{},
 			},
 		}, nil
 	}

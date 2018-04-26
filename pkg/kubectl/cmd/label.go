@@ -332,7 +332,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		printer.PrintObj(info.AsVersioned(), o.Out)
+		printer.PrintObj(info.Object, o.Out)
 		return nil
 	})
 }

@@ -282,7 +282,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			}
 		}
 
-		converted, err := tryConvert(info.Mapping.ObjectConvertor, info.Object, targetVersions...)
+		converted, err := tryConvert(scheme.Scheme, info.Object, targetVersions...)
 		if err != nil {
 			return nil, err
 		}

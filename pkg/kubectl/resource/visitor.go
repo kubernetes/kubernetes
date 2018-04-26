@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,6 +77,9 @@ type Info struct {
 	// Mapping may be nil if the object has no available metadata, but is still parseable
 	// from disk.
 	Mapping *meta.RESTMapping
+	// ObjectConverter allows conversion
+	toVersionedObjectConverter runtime.ObjectConvertor
+
 	// Namespace will be set if the object is namespaced and has a specified value.
 	Namespace string
 	Name      string
@@ -180,57 +182,19 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
 }
 
-// Internal attempts to convert the provided object to an internal type or returns an error.
-func (i *Info) Internal() (runtime.Object, error) {
-	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
-}
-
-// AsInternal returns the object in internal form if possible, or i.Object if it cannot be
-// converted.
-func (i *Info) AsInternal() runtime.Object {
-	if obj, err := i.Internal(); err == nil {
-		return obj
-	}
-	return i.Object
-}
-
 // Versioned returns the object as a Go type in the mapping's version or returns an error.
 func (i *Info) Versioned() (runtime.Object, error) {
-	return i.Mapping.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
+	return i.toVersionedObjectConverter.ConvertToVersion(i.Object, i.Mapping.GroupVersionKind.GroupVersion())
 }
 
 // AsVersioned returns the object as a Go object in the external form if possible (matching the
 // group version kind of the mapping, or i.Object if it cannot be converted.
 func (i *Info) AsVersioned() runtime.Object {
+	if i.toVersionedObjectConverter == nil {
+		panic("attempt to call AsVersioned object using .Unstructured builder")
+	}
 	if obj, err := i.Versioned(); err == nil {
 		return obj
-	}
-	return i.Object
-}
-
-// Unstructured returns the current object in unstructured form (as a runtime.Unstructured)
-func (i *Info) Unstructured() (runtime.Unstructured, error) {
-	switch t := i.Object.(type) {
-	case runtime.Unstructured:
-		return t, nil
-	case *runtime.Unknown:
-		gvk := i.Mapping.GroupVersionKind
-		out, _, err := unstructured.UnstructuredJSONScheme.Decode(t.Raw, &gvk, nil)
-		return out.(runtime.Unstructured), err
-	default:
-		out := &unstructured.Unstructured{}
-		if err := i.Mapping.Convert(i.Object, out, nil); err != nil {
-			return nil, err
-		}
-		return out, nil
-	}
-}
-
-// AsUnstructured returns the object as a Go object in external form as a runtime.Unstructured
-// (map of JSON equivalent values) or as i.Object if it cannot be converted.
-func (i *Info) AsUnstructured() runtime.Object {
-	if out, err := i.Unstructured(); err == nil {
-		return out
 	}
 	return i.Object
 }

@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	scaleclient "k8s.io/client-go/scale"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -55,10 +56,11 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 
 	return resource.NewBuilder(
 		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: clientMapperFunc,
-			Decoder:      InternalVersionDecoder(),
+			RESTMapper:      mapper,
+			ObjectTyper:     typer,
+			ObjectConverter: legacyscheme.Scheme,
+			ClientMapper:    clientMapperFunc,
+			Decoder:         InternalVersionDecoder(),
 		},
 		&resource.Mapper{
 			RESTMapper:   mapper,

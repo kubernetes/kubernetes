@@ -43,6 +43,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -718,7 +719,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 
 	for _, nodeInfo := range o.nodeInfos {
 		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-			obj, err := nodeInfo.Mapping.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+			obj, err := legacyscheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 				continue

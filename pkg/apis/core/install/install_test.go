@@ -103,11 +103,6 @@ func TestRESTMapper(t *testing.T) {
 			t.Errorf("incorrect version: %v", mapping)
 		}
 
-		interfaces, _ := legacyscheme.Registry.GroupOrDie(internal.GroupName).InterfacesFor(version)
-		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
-			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
-		}
-
 		rc := &internal.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		name, err := meta.NewAccessor().Name(rc)
 		if err != nil {

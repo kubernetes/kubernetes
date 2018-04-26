@@ -234,7 +234,7 @@ func (o *ReplaceOptions) Run() error {
 		}
 
 		info.Refresh(obj, true)
-		return o.PrintObj(info.AsVersioned())
+		return o.PrintObj(info.Object)
 	})
 }
 
@@ -330,7 +330,7 @@ func (o *ReplaceOptions) forceReplace() error {
 
 		count++
 		info.Refresh(obj, true)
-		return o.PrintObj(info.AsVersioned())
+		return o.PrintObj(info.Object)
 	})
 	if err != nil {
 		return err

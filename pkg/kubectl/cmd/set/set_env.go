@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
@@ -272,7 +273,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		}
 
 		for _, info := range infos {
-			versionedObject, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+			versionedObject, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				return err
 			}

@@ -346,10 +346,11 @@ func (f *TestFactory) NewBuilder() *resource.Builder {
 
 	return resource.NewBuilder(
 		&resource.Mapper{
-			RESTMapper:   mapper,
-			ObjectTyper:  typer,
-			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:      cmdutil.InternalVersionDecoder(),
+			RESTMapper:      mapper,
+			ObjectTyper:     typer,
+			ClientMapper:    resource.ClientMapperFunc(f.ClientForMapping),
+			ObjectConverter: legacyscheme.Scheme,
+			Decoder:         cmdutil.InternalVersionDecoder(),
 		},
 		&resource.Mapper{
 			RESTMapper:   mapper,
