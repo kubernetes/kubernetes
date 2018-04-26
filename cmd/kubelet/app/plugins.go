@@ -54,8 +54,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 )
 
-// ProbeVolumePlugins collects all volume plugins into an easy to use list.
-func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+// probeVolumePlugins collects all volume plugins into an easy to use list.
+func probeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by the kubelet binary, not

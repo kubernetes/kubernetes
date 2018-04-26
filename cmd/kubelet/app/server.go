@@ -389,7 +389,8 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	if err != nil {
 		return nil, err
 	}
-	return &kubelet.Dependencies{
+
+	deps := &kubelet.Dependencies{
 		Auth:                nil, // default does not enforce auth[nz]
 		CAdvisorInterface:   nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
 		Cloud:               nil, // cloud provider might start background processes
@@ -405,7 +406,14 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       plugins,
 		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
-		TLSOptions:          tlsOptions}, nil
+		TLSOptions:          tlsOptions,
+	}
+
+	if err := PatchVolumePluginsForLocalQuota(s.RootDirectory, &deps.VolumePlugins); err != nil {
+		return nil, fmt.Errorf("Local quota setup failed: %v", err)
+	}
+
+	return deps, nil
 }
 
 // Run runs the specified KubeletServer with the given Dependencies. This should never exit.
