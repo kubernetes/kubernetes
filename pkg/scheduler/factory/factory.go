@@ -1061,14 +1061,8 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}
 
 	// Init equivalence class cache
-	if c.enableEquivalenceClassCache && getEquivalencePodFuncFactory != nil {
-		pluginArgs, err := c.getPluginArgs()
-		if err != nil {
-			return nil, err
-		}
-		c.equivalencePodCache = core.NewEquivalenceCache(
-			getEquivalencePodFuncFactory(*pluginArgs),
-		)
+	if c.enableEquivalenceClassCache {
+		c.equivalencePodCache = core.NewEquivalenceCache()
 		glog.Info("Created equivalence class cache")
 	}
 
