@@ -66,6 +66,18 @@ type OIDCAuthenticationOptions struct {
 	GroupsPrefix   string
 	SigningAlgs    []string
 	RequiredClaims map[string]string
+
+	// Distributed claims configuration.
+	// See for details:
+	// http://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims
+
+	// IssuersPerClaim lists, for each claim, the list of issuer URLs that are
+	// trusted to provide the respective distributed claim.  Only distributed
+	// claims with issuers as specified below will be resolved.
+	//
+	// Example:
+	// "groups" -> []string{"http://example1.com/foo","http://example2.com/bar"}
+	IssuersPerClaim map[string][]string
 }
 
 type PasswordFileAuthenticationOptions struct {
@@ -230,6 +242,9 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"A key=value pair that describes a required claim in the ID Token. "+
 			"If set, the claim is verified to be present in the ID Token with a matching value. "+
 			"Repeat this flag to specify multiple claims.")
+
+		fs.Var(flag.NewColonSeparatedMultimapStringString(&s.OIDC.IssuersPerClaim), "oidc-distributed-claims-issuers-per-claim", ""+
+			"A multimap that describes acceptable issuer URLs per each distributed claim.  Repeat this flag to specify multiple claims.")
 	}
 
 	if s.PasswordFile != nil {
@@ -306,6 +321,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.OIDCUsernamePrefix = s.OIDC.UsernamePrefix
 		ret.OIDCSigningAlgs = s.OIDC.SigningAlgs
 		ret.OIDCRequiredClaims = s.OIDC.RequiredClaims
+		ret.OIDCIssuersPerClaim = s.OIDC.IssuersPerClaim
 	}
 
 	if s.PasswordFile != nil {

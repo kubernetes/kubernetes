@@ -60,6 +60,7 @@ type AuthenticatorConfig struct {
 	OIDCGroupsPrefix            string
 	OIDCSigningAlgs             []string
 	OIDCRequiredClaims          map[string]string
+	OIDCIssuersPerClaim         map[string][]string
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
 	ServiceAccountIssuer        string
@@ -160,7 +161,7 @@ func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDe
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix, config.OIDCSigningAlgs, config.OIDCRequiredClaims)
+		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCUsernamePrefix, config.OIDCGroupsClaim, config.OIDCGroupsPrefix, config.OIDCSigningAlgs, config.OIDCRequiredClaims, config.OIDCIssuersPerClaim)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -242,7 +243,7 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 }
 
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Token or an error.
-func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string, signingAlgs []string, requiredClaims map[string]string) (authenticator.Token, error) {
+func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string, signingAlgs []string, requiredClaims map[string]string, issuersPerClaim map[string][]string) (authenticator.Token, error) {
 	const noUsernamePrefix = "-"
 
 	if usernamePrefix == "" && usernameClaim != "email" {
@@ -268,6 +269,7 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		GroupsPrefix:         groupsPrefix,
 		SupportedSigningAlgs: signingAlgs,
 		RequiredClaims:       requiredClaims,
+		IssuersPerClaim:      issuersPerClaim,
 	})
 	if err != nil {
 		return nil, err

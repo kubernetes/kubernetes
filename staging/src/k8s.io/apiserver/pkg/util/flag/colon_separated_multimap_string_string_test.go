@@ -162,6 +162,15 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 			NewColonSeparatedMultimapStringString(nil),
 			nil,
 			"no target (nil pointer to map[string][]string)"},
+		{"values with colons in them (e.g. URLs)",
+			[]string{"a:http://e11.com,a:http://e12.com,b:http://e22.com"},
+			NewColonSeparatedMultimapStringString(&nilMap),
+			&ColonSeparatedMultimapStringString{
+				initialized: true,
+				Multimap: &map[string][]string{
+					"a": {"http://e11.com", "http://e12.com"},
+					"b": {"http://e22.com"},
+				}}, ""},
 	}
 
 	for _, c := range cases {
@@ -183,7 +192,7 @@ func TestSetColonSeparatedMultimapStringString(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(c.expect, c.start) {
-				t.Fatalf("expect %#v but got %#v", c.expect, c.start)
+				t.Fatalf("expect %v but got %v", c.expect, c.start)
 			}
 		})
 	}
