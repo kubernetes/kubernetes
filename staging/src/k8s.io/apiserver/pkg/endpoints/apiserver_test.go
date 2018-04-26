@@ -71,18 +71,6 @@ import (
 	"k8s.io/apiserver/pkg/server/filters"
 )
 
-// alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
-// It is useful in tests and when using kubernetes in an open manner.
-type alwaysAdmit struct{}
-
-func (alwaysAdmit) Admit(a admission.Attributes) (err error) {
-	return nil
-}
-
-func (alwaysAdmit) Handles(operation admission.Operation) bool {
-	return true
-}
-
 type alwaysMutatingDeny struct{}
 
 func (alwaysMutatingDeny) Admit(a admission.Attributes) (err error) {
@@ -233,7 +221,6 @@ func init() {
 
 	mapper = nsMapper
 	namespaceMapper = nsMapper
-	admissionControl = alwaysAdmit{}
 
 	scheme.AddFieldLabelConversionFunc(grouplessGroupVersion.String(), "Simple",
 		func(label, value string) (string, string, error) {
@@ -260,11 +247,6 @@ type defaultAPIServer struct {
 
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, admissionControl, selfLinker, nil)
-}
-
-// tests using the new namespace scope mechanism
-func handleNamespaced(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker, nil)
 }
 
