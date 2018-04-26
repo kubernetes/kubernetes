@@ -236,22 +236,3 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 
 	return out
 }
-
-func deepCopyJSON(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		clone := make(map[string]interface{}, len(x))
-		for k, v := range x {
-			clone[k] = deepCopyJSON(v)
-		}
-		return clone
-	case []interface{}:
-		clone := make([]interface{}, len(x))
-		for i := range x {
-			clone[i] = deepCopyJSON(x[i])
-		}
-		return clone
-	default:
-		return x
-	}
-}
