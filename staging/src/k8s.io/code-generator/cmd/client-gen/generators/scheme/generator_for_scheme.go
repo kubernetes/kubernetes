@@ -89,14 +89,13 @@ func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Write
 		"allGroupVersions":                 allGroupVersions,
 		"allInstallGroups":                 allInstallGroups,
 		"customRegister":                   false,
-		"osGetenv":                         c.Universe.Function(types.Name{Package: "os", Name: "Getenv"}),
 		"runtimeNewParameterCodec":         c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewParameterCodec"}),
 		"runtimeNewScheme":                 c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewScheme"}),
 		"serializerNewCodecFactory":        c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/serializer", Name: "NewCodecFactory"}),
 		"runtimeScheme":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Scheme"}),
 		"schemaGroupVersion":               c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"metav1AddToGroupVersion":          c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
-		"registeredNewOrDie":               c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "NewOrDie"}),
+		"registeredNew":                    c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "NewAPIRegistrationManager"}),
 		"registeredAPIRegistrationManager": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apimachinery/registered", Name: "APIRegistrationManager"}),
 	}
 	globals := map[string]string{
@@ -137,7 +136,7 @@ var $.ParameterCodec$ = $.runtimeNewParameterCodec|raw$($.Scheme$)
 `
 
 var registryRegistration = `
-var $.Registry$ = $.registeredNewOrDie|raw$($.osGetenv|raw$("KUBE_API_VERSIONS"))
+var $.Registry$ = $.registeredNew|raw$()
 
 func init() {
 	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})

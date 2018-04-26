@@ -138,9 +138,6 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 
 	externalVersions := []schema.GroupVersion{}
 	for _, v := range gmf.prioritizedVersionList {
-		if !m.IsAllowedVersion(v) {
-			continue
-		}
 		externalVersions = append(externalVersions, v)
 		gmf.VersionArgs[v.Version].AddToScheme(scheme)
 	}

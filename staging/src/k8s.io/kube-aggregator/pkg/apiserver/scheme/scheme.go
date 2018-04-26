@@ -35,7 +35,7 @@ var (
 	Codecs = serializer.NewCodecFactory(Scheme)
 	// Registry is an instance of an API registry.  This is an interim step to start removing the idea of a global
 	// API registry.
-	Registry = registered.NewOrDie("")
+	Registry = registered.NewAPIRegistrationManager()
 )
 
 func init() {

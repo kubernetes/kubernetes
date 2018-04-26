@@ -19,10 +19,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"time"
-
-	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +49,7 @@ import (
 )
 
 var (
-	Registry = registered.NewOrDie("")
+	Registry = registered.NewAPIRegistrationManager()
 	Scheme   = runtime.NewScheme()
 	Codecs   = serializer.NewCodecFactory(Scheme)
 
@@ -151,17 +148,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		// it's really bad that this is leaking here, but until we can fix the test (which I'm pretty sure isn't even testing what it wants to test),
 		// we need to be able to move forward
-		kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
-		if len(kubeAPIVersions) == 0 {
-			return nil, fmt.Errorf("failed to create clientset: %v", err)
-		}
-
-		// KUBE_API_VERSIONS is used in test-update-storage-objects.sh, disabling a number of API
-		// groups. This leads to a nil client above and undefined behaviour further down.
-		//
-		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
-		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q: %v. KUBE_API_VERSIONS is only for testing. Things will break.",
-			kubeAPIVersions, err)
+		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
 	s.Informers = internalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 
@@ -188,11 +175,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
-
-	// this only happens when KUBE_API_VERSIONS is set.  We must return without adding controllers or poststarthooks which would affect healthz
-	if crdClient == nil {
-		return s, nil
-	}
 
 	crdController := NewDiscoveryController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
 	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().InternalVersion().CustomResourceDefinitions(), crdClient.Apiextensions())

@@ -45,7 +45,7 @@ var (
 	//
 	// Can we make these passable to NewGenericWebhook?
 	// TODO(audit): figure out a general way to let the client choose their preferred version
-	registry = registered.NewOrDie("")
+	registry = registered.NewAPIRegistrationManager()
 )
 
 func init() {

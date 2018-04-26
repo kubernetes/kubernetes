@@ -166,7 +166,7 @@ func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 }
 
 func newFakeRegistry() *registered.APIRegistrationManager {
-	registry := registered.NewOrDie("")
+	registry := registered.NewAPIRegistrationManager()
 
 	registry.RegisterGroup(apimachinery.GroupMeta{
 		GroupVersion:  apiv1.SchemeGroupVersion,
