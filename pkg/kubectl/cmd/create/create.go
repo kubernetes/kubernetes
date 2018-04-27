@@ -409,12 +409,10 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 			return err
 		}
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:     typer,
-			ObjectConverter: legacyscheme.Scheme,
-			RESTMapper:      mapper,
-			ClientMapper:    resource.ClientMapperFunc(f.ClientForMapping),
+			RESTMapper:   mapper,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
 		}
-		info, err := resourceMapper.InfoForObject(obj, nil)
+		info, err := resourceMapper.InfoForObject(obj, legacyscheme.Scheme, nil)
 		if err != nil {
 			return err
 		}
@@ -428,7 +426,7 @@ func RunCreateSubcommand(f cmdutil.Factory, options *CreateSubcommandOptions) er
 		}
 
 		// ensure we pass a versioned object to the printer
-		obj = info.AsVersioned()
+		obj = info.AsVersioned(legacyscheme.Scheme)
 	} else {
 		if meta, err := meta.Accessor(obj); err == nil && nsOverriden {
 			meta.SetNamespace(namespace)

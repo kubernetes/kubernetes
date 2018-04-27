@@ -89,6 +89,14 @@ func (t unstructuredObjectTyper) ObjectKinds(obj runtime.Object) ([]schema.Group
 	if _, ok := obj.(runtime.Unstructured); !ok {
 		return nil, false, fmt.Errorf("cannot type %T", obj)
 	}
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if len(gvk.Kind) == 0 {
+		return nil, false, runtime.NewMissingKindErr("object has no kind field ")
+	}
+	if len(gvk.Version) == 0 {
+		return nil, false, runtime.NewMissingVersionErr("object has no apiVersion field")
+	}
+
 	return []schema.GroupVersionKind{obj.GetObjectKind().GroupVersionKind()}, false, nil
 }
 

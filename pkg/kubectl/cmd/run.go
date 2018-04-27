@@ -458,7 +458,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			return err
 		}
 		r := f.NewBuilder().
-			Internal().
+			Internal(legacyscheme.Scheme).
 			ContinueOnError().
 			NamespaceParam(namespace).DefaultNamespace().
 			ResourceNames(obj.Mapping.Resource, name).
@@ -674,13 +674,11 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	versioned := obj
 	if !o.DryRun {
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:     typer,
-			ObjectConverter: legacyscheme.Scheme,
-			RESTMapper:      mapper,
-			ClientMapper:    resource.ClientMapperFunc(f.ClientForMapping),
-			Decoder:         cmdutil.InternalVersionDecoder(),
+			RESTMapper:   mapper,
+			ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
-		info, err := resourceMapper.InfoForObject(obj, nil)
+		info, err := resourceMapper.InfoForObject(obj, legacyscheme.Scheme, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -694,7 +692,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 			return nil, err
 		}
 
-		versioned = info.AsVersioned()
+		versioned = info.AsVersioned(legacyscheme.Scheme)
 	}
 	return &RunObject{
 		Versioned: versioned,

@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -203,7 +204,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet internalclientset.Interface, force bool, modify func(csr *certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, bool)) error {
 	var found int
 	r := builder.
-		Internal().
+		Internal(legacyscheme.Scheme).
 		ContinueOnError().
 		FilenameParam(false, &options.FilenameOptions).
 		ResourceNames("certificatesigningrequest", options.csrNames...).
@@ -227,7 +228,7 @@ func (options *CertificateOptions) modifyCertificateCondition(builder *resource.
 		}
 		found++
 
-		return options.PrintObj(info.AsVersioned(), options.Out)
+		return options.PrintObj(info.AsVersioned(legacyscheme.Scheme), options.Out)
 	})
 	if found == 0 {
 		fmt.Fprintf(options.Out, "No resources found\n")

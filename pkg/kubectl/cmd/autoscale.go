@@ -197,7 +197,7 @@ func (o *AutoscaleOptions) Validate(cmd *cobra.Command) error {
 
 func (o *AutoscaleOptions) Run() error {
 	r := o.Builder.
-		Internal().
+		Internal(legacyscheme.Scheme).
 		ContinueOnError().
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
@@ -231,13 +231,11 @@ func (o *AutoscaleOptions) Run() error {
 		}
 
 		resourceMapper := &resource.Mapper{
-			ObjectTyper:     o.Typer,
-			ObjectConverter: legacyscheme.Scheme,
-			RESTMapper:      o.Mapper,
-			ClientMapper:    resource.ClientMapperFunc(o.ClientForMapping),
-			Decoder:         cmdutil.InternalVersionDecoder(),
+			RESTMapper:   o.Mapper,
+			ClientMapper: resource.ClientMapperFunc(o.ClientForMapping),
+			Decoder:      cmdutil.InternalVersionDecoder(),
 		}
-		hpa, err := resourceMapper.InfoForObject(object, nil)
+		hpa, err := resourceMapper.InfoForObject(object, legacyscheme.Scheme, nil)
 		if err != nil {
 			return err
 		}
@@ -253,7 +251,7 @@ func (o *AutoscaleOptions) Run() error {
 			if err != nil {
 				return err
 			}
-			return printer.PrintObj(hpa.AsVersioned(), o.Out)
+			return printer.PrintObj(hpa.AsVersioned(legacyscheme.Scheme), o.Out)
 		}
 
 		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, hpa.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
@@ -270,7 +268,7 @@ func (o *AutoscaleOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.AsVersioned(), o.Out)
+		return printer.PrintObj(info.AsVersioned(legacyscheme.Scheme), o.Out)
 	})
 	if err != nil {
 		return err

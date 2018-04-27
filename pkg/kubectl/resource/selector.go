@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -30,7 +29,6 @@ import (
 type Selector struct {
 	Client               RESTClient
 	Mapping              *meta.RESTMapping
-	ObjectConverter      runtime.ObjectConvertor
 	Namespace            string
 	LabelSelector        string
 	FieldSelector        string
@@ -40,11 +38,10 @@ type Selector struct {
 }
 
 // NewSelector creates a resource selector which hides details of getting items by their label selector.
-func NewSelector(client RESTClient, mapping *meta.RESTMapping, objectConverter runtime.ObjectConvertor, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
+func NewSelector(client RESTClient, mapping *meta.RESTMapping, namespace, labelSelector, fieldSelector string, export, includeUninitialized bool, limitChunks int64) *Selector {
 	return &Selector{
 		Client:               client,
 		Mapping:              mapping,
-		ObjectConverter:      objectConverter,
 		Namespace:            namespace,
 		LabelSelector:        labelSelector,
 		FieldSelector:        fieldSelector,
@@ -94,9 +91,8 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 		resourceVersion, _ := metadataAccessor.ResourceVersion(list)
 		nextContinueToken, _ := metadataAccessor.Continue(list)
 		info := &Info{
-			Client:                     r.Client,
-			Mapping:                    r.Mapping,
-			toVersionedObjectConverter: r.ObjectConverter,
+			Client:  r.Client,
+			Mapping: r.Mapping,
 
 			Namespace:       r.Namespace,
 			ResourceVersion: resourceVersion,
