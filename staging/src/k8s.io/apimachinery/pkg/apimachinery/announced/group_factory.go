@@ -159,7 +159,7 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 	}
 	for _, v := range externalVersions {
 		gvf := gmf.VersionArgs[v.Version]
-		if err := groupMeta.AddVersionInterfaces(
+		if err := groupMeta.AddVersion(
 			schema.GroupVersion{Group: gvf.GroupName, Version: gvf.VersionName},
 			&meta.VersionInterfaces{
 				ObjectConvertor: scheme,
@@ -168,7 +168,6 @@ func (gmf *GroupMetaFactory) Register(m *registered.APIRegistrationManager, sche
 			return err
 		}
 	}
-	groupMeta.InterfacesFor = groupMeta.DefaultInterfacesFor
 	groupMeta.RESTMapper = gmf.newRESTMapper(scheme, externalVersions, groupMeta)
 
 	if err := m.RegisterGroup(*groupMeta); err != nil {

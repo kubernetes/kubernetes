@@ -27,8 +27,8 @@ func TestAdd(t *testing.T) {
 		GroupVersions: []schema.GroupVersion{{Group: "test", Version: "v1"}},
 	}
 
-	gm.AddVersionInterfaces(schema.GroupVersion{Group: "test", Version: "v1"}, nil)
-	if e, a := 1, len(gm.InterfacesByVersion); e != a {
+	gm.AddVersion(schema.GroupVersion{Group: "test", Version: "v1"}, nil)
+	if e, a := 1, len(gm.versionInterfaces); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
