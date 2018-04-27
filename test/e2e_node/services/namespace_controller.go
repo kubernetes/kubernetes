@@ -49,8 +49,12 @@ func NewNamespaceController(host string) *NamespaceController {
 
 // Start starts the namespace controller.
 func (n *NamespaceController) Start() error {
-	// Use the default QPS
 	config := restclient.AddUserAgent(&restclient.Config{Host: n.host}, ncName)
+
+	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls.
+	config.QPS = 50
+	config.Burst = 200
+
 	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		return err
